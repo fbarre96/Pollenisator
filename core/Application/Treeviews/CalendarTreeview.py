@@ -3,7 +3,7 @@ Ttk treeview class with added functions.
 """
 import tkinter as tk
 from bson.objectid import ObjectId
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 from core.Components.Settings import Settings
 from core.Models.Interval import Interval
 from core.Models.Ip import Ip
@@ -259,10 +259,10 @@ class CalendarTreeview(PollenisatorTreeview):
             action: string "update" or "insert" or "delete". It was the action performed on the iid
             _parent: Not used. the mongo ObjectId of the parent. Only if action in an insert. Not used anymore
         """
-        mongoInstance = MongoCalendar.getInstance()
-        if not mongoInstance.hasACalendarOpen():
+        apiclient = APIClient.getInstance()
+        if not apiclient.getCurrentPentest() != "":
             return
-        if mongoInstance.calendarName != db:
+        if apiclient.getCurrentPentest() != db:
             return
         # Delete
         if action == "delete":
@@ -279,7 +279,7 @@ class CalendarTreeview(PollenisatorTreeview):
         # Insert
         if action == "insert":
             view = None
-            res = mongoInstance.find(collection, {"_id": ObjectId(iid)}, False)
+            res = apiclient.find(collection, {"_id": ObjectId(iid)}, False)
             if collection == "tools":
                 view = ToolView(self, self.appli.viewframe,
                                 self.appli, ToolController(Tool(res)))
@@ -381,8 +381,8 @@ class CalendarTreeview(PollenisatorTreeview):
         Args:
             _event: not used but mandatory
         """
-        mongoInstance = MongoCalendar.getInstance()
-        workers = self.appli.scanManager.monitor.getWorkerList({"excludedDatabases":{"$nin":[mongoInstance.calendarName]}})
+        apiclient = APIClient.getInstance()
+        workers = self.appli.scanManager.monitor.getWorkerList({"excludedDatabases":{"$nin":[apiclient.getCurrentPentest()]}})
         workers.append("localhost")
         dialog = ChildDialogCustomCommand(
                     self, workers, "localhost")
@@ -412,7 +412,7 @@ class CalendarTreeview(PollenisatorTreeview):
                         print("Tool already existing.")
                         return
                     self.appli.scanManager.monitor.launchTask(
-                        mongoInstance.calendarName, tool, parser, False, worker)
+                        apiclient.getCurrentPentest(), tool, parser, False, worker)
 
     def onTreeviewSelect(self, event=None):
         """Called when a line is selected on the treeview
@@ -424,15 +424,15 @@ class CalendarTreeview(PollenisatorTreeview):
         if len(selection) == 1:
             item = super().onTreeviewSelect(event)
             if isinstance(item, str):
-                mongoInstance = MongoCalendar.getInstance()
-                self.saveState(mongoInstance.calendarName)
+                apiclient = APIClient.getInstance()
+                self.saveState(apiclient.getCurrentPentest())
                 if str(item) == "waves":
                     objView = WaveView(self, self.appli.viewframe,
                                     self.appli, WaveController(Wave()))
                     objView.openInsertWindow()
                 elif str(item) == "commands":
                     objView = CommandView(
-                        self, self.appli.viewframe, self.appli, CommandController(Command({"indb":mongoInstance.calendarName})))
+                        self, self.appli.viewframe, self.appli, CommandController(Command({"indb":apiclient.getCurrentPentest()})))
                     objView.openInsertWindow()
                 elif str(item) == "ips":
                     objView = MultipleIpView(
@@ -476,8 +476,8 @@ class CalendarTreeview(PollenisatorTreeview):
             except tk.TclError:
                 pass
         # Clear the tree
-        mongoInstance = MongoCalendar.getInstance()
-        self.heading("#0", text=mongoInstance.calendarName)
+        apiclient = APIClient.getInstance()
+        self.heading("#0", text=apiclient.getCurrentPentest())
         self.delete(*self.get_children())
         self._hidden = []
         if searchModel is None:
@@ -489,7 +489,7 @@ class CalendarTreeview(PollenisatorTreeview):
                 self, self.appli.viewframe, self.appli)
             for viewFound in viewsFound:
                 viewFound.addInTreeview('', False)
-        self.loadState(mongoInstance.calendarName)
+        self.loadState(apiclient.getCurrentPentest())
 
     def refresh(self):
         """Alias to load function"""
@@ -499,19 +499,19 @@ class CalendarTreeview(PollenisatorTreeview):
         """
         Load the treeview with database information
         """
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         dialog = ChildDialogProgress(self.appli, "Loading "+str(
-            mongoInstance.calendarName), "Opening "+str(mongoInstance.calendarName) + ". Please wait for a few seconds.", 200, "determinate")
+            apiclient.getCurrentPentest()), "Opening "+str(apiclient.getCurrentPentest()) + ". Please wait for a few seconds.", 200, "determinate")
         step = 0
         dialog.show(100)
-        nbObjects = mongoInstance.find("waves").count()
-        nbObjects += mongoInstance.find("scopes").count()
-        nbObjects += mongoInstance.find("intervals").count()
-        nbObjects += mongoInstance.find("scopes").count()
-        nbObjects += mongoInstance.find("ips").count()
-        nbObjects += mongoInstance.find("ports").count()
-        nbObjects += mongoInstance.find("tools").count()
-        nbObjects += mongoInstance.find("commands").count()
+        nbObjects = apiclient.count("waves",)
+        nbObjects += apiclient.count("scopes")
+        nbObjects += apiclient.count("intervals")
+        nbObjects += apiclient.count("scopes")
+        nbObjects += apiclient.count("ips")
+        nbObjects += apiclient.count("ports")
+        nbObjects += apiclient.count("tools")
+        nbObjects += apiclient.count("commands")
         onePercentNbObject = nbObjects//100 if nbObjects > 100 else 1
         nbObjectTreated = 0
         for child in self.get_children():
@@ -526,39 +526,38 @@ class CalendarTreeview(PollenisatorTreeview):
 
         self.commands_node = self.insert(
             "", "end", "commands", text="Commands", image=CommandView.getClassIcon())
-        commands = Command.fetchObjects({}, mongoInstance.calendarName)
+        commands = Command.fetchObjects({}, apiclient.getCurrentPentest())
         for command in commands:
             command_vw = CommandView(
                 self, self.appli.viewframe, self.appli, CommandController(command))
             command_vw.addInTreeview()
-
         waves = Wave.fetchObjects({})
         for wave in waves:
             wave_o = WaveController(wave)
             wave_vw = WaveView(self, self.appli.viewframe, self.appli, wave_o)
-            wave_vw.addInTreeview(self.waves_node, False)
+            wave_vw.addInTreeview(self.waves_node, True)
             nbObjectTreated += 1
             if nbObjectTreated % onePercentNbObject == 0:
                 step += 1
                 dialog.update(step)
-        scopes = Scope.fetchObjects({})
-        for scope in scopes:
-            scope_o = ScopeController(scope)
-            scope_vw = ScopeView(self, self.appli.viewframe, self.appli, scope_o)
-            scope_vw.addInTreeview(None, False)
-            nbObjectTreated += 1
-            if nbObjectTreated % onePercentNbObject == 0:
-                step += 1
-                dialog.update(step)
-        intervals = Interval.fetchObjects({})
-        for interval in intervals:
-            interval_o = IntervalController(interval)
-            interval_vw = IntervalView(self, self.appli.viewframe, self.appli, interval_o)
-            interval_vw.addInTreeview(None, False)
-            nbObjectTreated += 1
-            if nbObjectTreated % onePercentNbObject == 0:
-                step += 1
-                dialog.update(step)
+        # scopes = Scope.fetchObjects({})
+        # for scope in scopes:
+        #     scope_o = ScopeController(scope)
+        #     scope_vw = ScopeView(self, self.appli.viewframe, self.appli, scope_o)
+        #     scope_vw.addInTreeview(None, False)
+        #     nbObjectTreated += 1
+        #     if nbObjectTreated % onePercentNbObject == 0:
+        #         step += 1
+        #         dialog.update(step)
+        # intervals = Interval.fetchObjects({})
+        # for interval in intervals:
+        #     interval_o = IntervalController(interval)
+        #     interval_vw = IntervalView(self, self.appli.viewframe, self.appli, interval_o)
+        #     interval_vw.addInTreeview(None, False)
+        #     nbObjectTreated += 1
+        #     if nbObjectTreated % onePercentNbObject == 0:
+        #         step += 1
+        #         dialog.update(step)
         # Adding ip objects
         self.ips_node = self.insert("", "end", str(
             "ips"), text="IPs", image=IpView.getClassIcon())
@@ -566,45 +565,45 @@ class CalendarTreeview(PollenisatorTreeview):
         for ip in ips:
             ip_o = IpController(ip)
             ip_vw = IpView(self, self.appli.viewframe, self.appli, ip_o)
-            ip_vw.addInTreeview(None, False)
+            ip_vw.addInTreeview(None, True)
             self.appli.statusbar.notify(ip_vw.controller.getTags())
             nbObjectTreated += 1
             if nbObjectTreated % onePercentNbObject == 0:
                 step += 1
                 dialog.update(step)
         # Adding port objects
-        ports = Port.fetchObjects({})
-        for port in ports:
-            port_o = PortController(port)
-            port_vw = PortView(self, self.appli.viewframe, self.appli, port_o)
-            port_vw.addInTreeview(None, False)
-            self.appli.statusbar.notify(port_vw.controller.getTags())
-            nbObjectTreated += 1
-            if nbObjectTreated % onePercentNbObject == 0:
-                step += 1
-                dialog.update(step)
+        # ports = Port.fetchObjects({})
+        # for port in ports:
+        #     port_o = PortController(port)
+        #     port_vw = PortView(self, self.appli.viewframe, self.appli, port_o)
+        #     port_vw.addInTreeview(None, False)
+        #     self.appli.statusbar.notify(port_vw.controller.getTags())
+        #     nbObjectTreated += 1
+        #     if nbObjectTreated % onePercentNbObject == 0:
+        #         step += 1
+        #         dialog.update(step)
         # Adding defect objects
-        defects = Defect.fetchObjects({"ip":{"$ne":""}})
-        for defect in defects:
-            defect_o = DefectController(defect)
-            defect_vw = DefectView(
-                self, self.appli.viewframe, self.appli, defect_o)
-            defect_vw.addInTreeview(None)
-            nbObjectTreated += 1
-            if nbObjectTreated % onePercentNbObject == 0:
-                step += 1
-                dialog.update(step)
+        # defects = Defect.fetchObjects({"ip":{"$ne":""}})
+        # for defect in defects:
+        #     defect_o = DefectController(defect)
+        #     defect_vw = DefectView(
+        #         self, self.appli.viewframe, self.appli, defect_o)
+        #     defect_vw.addInTreeview(None)
+        #     nbObjectTreated += 1
+        #     if nbObjectTreated % onePercentNbObject == 0:
+        #         step += 1
+        #         dialog.update(step)
         # Adding tool objects
-        tools = Tool.fetchObjects({})
-        for tool in tools:
-            tool_o = ToolController(tool)
-            tool_vw = ToolView(self, self.appli.viewframe, self.appli, tool_o)
-            tool_vw.addInTreeview(None, False)
-            self.appli.statusbar.notify(tool_vw.controller.getTags())
-            nbObjectTreated += 1
-            if nbObjectTreated % onePercentNbObject == 0:
-                step += 1
-                dialog.update(step)
+        # tools = Tool.fetchObjects({})
+        # for tool in tools:
+        #     tool_o = ToolController(tool)
+        #     tool_vw = ToolView(self, self.appli.viewframe, self.appli, tool_o)
+        #     tool_vw.addInTreeview(None, False)
+        #     self.appli.statusbar.notify(tool_vw.controller.getTags())
+        #     nbObjectTreated += 1
+        #     if nbObjectTreated % onePercentNbObject == 0:
+        #         step += 1
+        #         dialog.update(step)
         self.sort(self.ips_node)
         self.appli.statusbar.update()
         dialog.destroy()

@@ -2,7 +2,7 @@
 
 from core.Models.Element import Element
 from core.Models.Tool import Tool
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 import core.Components.Utils as Utils
 from bson.objectid import ObjectId
 from datetime import datetime
@@ -51,14 +51,14 @@ class Interval(Element):
         """
         Delete the Interval represented by this model in database.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.delete(
+        apiclient = APIClient.getInstance()
+        apiclient.delete(
             "intervals", {"_id": self._id})
-        parent_wave = mongoInstance.find("waves", {"wave": self.wave}, False)
+        parent_wave = apiclient.find("waves", {"wave": self.wave}, False)
         self._id = None
         if parent_wave is None:
             return
-        mongoInstance.notify(mongoInstance.calendarName,
+        apiclient.pushNotification(apiclient.getCurrentPentest(),
                              "waves", parent_wave["_id"], "update", "")
         other_intervals = Interval.fetchObjects({"wave": self.wave})
         no_interval_in_time = True
@@ -90,8 +90,8 @@ class Interval(Element):
         """
         base = {"wave": self.wave, "dated": self.dated, "datef": self.datef}
         parent = self.getParent()
-        mongoInstance = MongoCalendar.getInstance()
-        res = mongoInstance.insert(
+        apiclient = APIClient.getInstance()
+        res = apiclient.insert(
             "intervals", base, parent)
         self.setToolsInTime()
         self._id = res.inserted_id
@@ -103,12 +103,12 @@ class Interval(Element):
             pipeline_set: (Opt.) A dictionnary with custom values. If None (default) use model attributes.
         """
         self.setToolsInTime()
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         if pipeline_set is None:
-            mongoInstance.update("intervals", {"_id": ObjectId(self._id)}, {
+            apiclient.update("intervals", {"_id": ObjectId(self._id)}, {
                 "$set": {"dated": self.dated, "datef": self.datef}})
         else:
-            mongoInstance.update("intervals", {"_id": ObjectId(self._id)}, {
+            apiclient.update("intervals", {"_id": ObjectId(self._id)}, {
                 "$set": pipeline_set})
 
     def _getParent(self):
@@ -118,8 +118,8 @@ class Interval(Element):
         Returns:
             Returns the parent wave's ObjectId _id".
         """
-        mongoInstance = MongoCalendar.getInstance()
-        return mongoInstance.find("waves", {"wave": self.wave}, False)["_id"]
+        apiclient = APIClient.getInstance()
+        return apiclient.find("waves", {"wave": self.wave}, False)["_id"]
 
     def __str__(self):
         """

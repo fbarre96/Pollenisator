@@ -7,7 +7,7 @@ from core.Models.Ip import Ip
 from core.Models.Interval import Interval
 import core.Components.Utils as Utils
 from core.Models.Scope import Scope
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 
 
 class Wave(Element):
@@ -52,10 +52,10 @@ class Wave(Element):
         Delete the wave represented by this model in database.
         Also delete the tools, intervals, scopes associated with this wave
         """
-        mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.delete("tools", {"wave": self.wave}, True)
-        mongoInstance.delete("intervals", {"wave": self.wave}, True)
-        mongoInstance.delete("waves", {"_id": self._id})
+        apiclient = APIClient.getInstance()
+        apiclient.delete("tools", {"wave": self.wave}, True)
+        apiclient.delete("intervals", {"wave": self.wave}, True)
+        apiclient.delete("waves", {"_id": self._id})
 
     def addInDb(self):
         """
@@ -65,12 +65,12 @@ class Wave(Element):
                 * mongo ObjectId : already existing object if duplicate, create object id otherwise 
         """
         # Check unicity
-        mongoInstance = MongoCalendar.getInstance()
-        existing = mongoInstance.find("waves", {"wave": self.wave}, False)
+        apiclient = APIClient.getInstance()
+        existing = apiclient.find("waves", {"wave": self.wave}, False)
         if existing is not None:
             return False, existing["_id"]
         # Insertion
-        res = mongoInstance.insert(
+        res = apiclient.insert(
             "waves", {"wave": self.wave, "wave_commands": list(self.wave_commands)})
         ret = res.inserted_id
         self._id = ret
@@ -84,12 +84,12 @@ class Wave(Element):
         Args:
             pipeline_set: (Opt.) A dictionnary with custom values. If None (default) use model attributes.
         """
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         if pipeline_set is None:
-            mongoInstance.update("waves", {"_id": ObjectId(self._id)}, {
+            apiclient.update("waves", {"_id": ObjectId(self._id)}, {
                 "$set": {"wave_commands": list(self.wave_commands)}})
         else:
-            mongoInstance.update("waves", {"_id": ObjectId(self._id)}, {
+            apiclient.update("waves", {"_id": ObjectId(self._id)}, {
                 "$set": pipeline_set})
 
     def addAllTool(self, command_name):
@@ -100,15 +100,15 @@ class Wave(Element):
         Args:
             command_name: The command that we want to create all the tools for.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        command = mongoInstance.findInDb(mongoInstance.calendarName, "commands", {
+        apiclient = APIClient.getInstance()
+        command = apiclient.findInDb(apiclient.getCurrentPentest(), "commands", {
                                          "name": command_name}, False)
         if command["lvl"] == "wave":
             newTool = Tool()
             newTool.initialize(command_name, self.wave, "", "", "", "", "wave")
             newTool.addInDb()
             return
-        scopes = mongoInstance.find("scopes", {"wave": self.wave})
+        scopes = apiclient.find("scopes", {"wave": self.wave})
         for scope in scopes:
             h = Scope(scope)
             h.addAllTool(command_name)
@@ -155,8 +155,8 @@ class Wave(Element):
         Returns:
             list of defect raw mongo data dictionnaries
         """
-        mongoInstance = MongoCalendar.getInstance()
-        return mongoInstance.find("intervals",
+        apiclient = APIClient.getInstance()
+        return apiclient.find("intervals",
                                   {"wave": self.wave})
 
     def getScopes(self):
@@ -164,8 +164,8 @@ class Wave(Element):
         Returns:
             list of defect raw mongo data dictionnaries
         """
-        mongoInstance = MongoCalendar.getInstance()
-        return mongoInstance.find("scopes", {"wave": self.wave})
+        apiclient = APIClient.getInstance()
+        return apiclient.find("scopes", {"wave": self.wave})
 
     def getDbKey(self):
         """Return a dict from model to use as unique composed key.
@@ -208,8 +208,8 @@ class Wave(Element):
             list of all wave names
         """
         ret = []
-        mongoInstance = MongoCalendar.getInstance()
-        waves = mongoInstance.find("waves", {})
+        apiclient = APIClient.getInstance()
+        waves = apiclient.find("waves", {})
         for wave in waves:
             ret.append(wave["wave"])
         return ret
@@ -219,8 +219,8 @@ class Wave(Element):
         """Returns a set of tool mongo ID that are not done yet.
         """
         notDoneTools = set()
-        mongoInstance = MongoCalendar.getInstance()
-        tools = mongoInstance.find("tools", {
+        apiclient = APIClient.getInstance()
+        tools = apiclient.find("tools", {
                                    "wave": waveName, "ip": "", "scanner_ip": "None", "dated": "None", "datef": "None"})
         for tool in tools:
             notDoneTools.add(tool["_id"])
@@ -229,7 +229,7 @@ class Wave(Element):
             scopeId = scope.getId()
             ips = Ip.getIpsInScope(scopeId)
             for ip in ips:
-                tools = mongoInstance.find("tools", {
+                tools = apiclient.find("tools", {
                                            "wave": waveName, "ip": ip.ip, "scanner_ip": "None", "dated": "None", "datef": "None"})
                 for tool in tools:
                     notDoneTools.add(tool["_id"])

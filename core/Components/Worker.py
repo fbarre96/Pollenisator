@@ -2,7 +2,7 @@
 from core.Models.Command import Command
 from core.Models.CommandGroup import CommandGroup
 
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 
 
 class Worker:
@@ -28,9 +28,9 @@ class Worker:
         Returns:
             Return the total of running tools with this command's name as an integer.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        t = mongoInstance.find("tools", {"name": commandName, "scanner_ip": self.name, "dated": {
-                               "$ne": "None"}, "datef": {"$eq": "None"}}).count()
+        apiclient = APIClient.getInstance()
+        t = apiclient.count("tools", {"name": commandName, "scanner_ip": self.name, "dated": {
+                               "$ne": "None"}, "datef": {"$eq": "None"}})
         return t
 
     def hasRegistered(self, launchableTool):
@@ -41,9 +41,8 @@ class Worker:
         Returns:
             Return bool.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        list_registered_command = mongoInstance.getRegisteredCommands(
-            self.name)
+        apiclient = APIClient.getInstance()
+        list_registered_command = apiclient.getRegisteredCommands(self.name)
         if list_registered_command is None:
             return False
         return (launchableTool.name in list_registered_command)

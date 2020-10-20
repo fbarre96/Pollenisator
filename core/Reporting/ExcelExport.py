@@ -49,54 +49,54 @@ def addGlobalStatus(workbook):
         'valign': 'vcenter',
         'fg_color': 'yellow'})
     ligne = 1
-    mongoInstance = MongoCalendar.getInstance()
-    waves = mongoInstance.find("waves", )
+    apiclient = APIClient.getInstance()
+    waves = apiclient.find("waves", )
     for wave in waves:
         total = 0
         worksheet1.write(ligne, colWave, wave["wave"])
-        agg_res = mongoInstance.aggregate("tools", [{"$match":{"wave":wave["wave"]}}, {"$count":"total"}])
+        agg_res = apiclient.aggregate("tools", [{"$match":{"wave":wave["wave"]}}, {"$count":"total"}])
         for elem in agg_res:
             total = elem["total"]
-        agg_res = mongoInstance.aggregate("tools", [{"$match":{"wave":wave["wave"], "dated":{"$ne":"None"}, "datef":{"$ne":"None"}, "scanner_ip":{"$ne":"None"}}}, {"$count":"total"}])
+        agg_res = apiclient.aggregate("tools", [{"$match":{"wave":wave["wave"], "dated":{"$ne":"None"}, "datef":{"$ne":"None"}, "scanner_ip":{"$ne":"None"}}}, {"$count":"total"}])
         for elem in agg_res:
             done = elem["total"]
         if total > 0:
             worksheet1.write(ligne, colStatus, str(done)+"/"+str(total)+" ("+str(int((float(done)/float(total))*100))+"%)")
         ligne += 1
         
-        scopes = mongoInstance.find("scopes", {"wave":wave["wave"]})
+        scopes = apiclient.find("scopes", {"wave":wave["wave"]})
         for scope in scopes:
             worksheet1.write(ligne, colScope, scope["scope"])
-            agg_res = mongoInstance.aggregate("tools", [{"$match":{"wave":wave["wave"], "scope":scope["scope"]}}, {"$count":"total"}])
+            agg_res = apiclient.aggregate("tools", [{"$match":{"wave":wave["wave"], "scope":scope["scope"]}}, {"$count":"total"}])
             for elem in agg_res:
                 total = elem["total"]
-            agg_res = mongoInstance.aggregate("tools", [{"$match":{"wave":wave["wave"], "scope":scope["scope"], "dated":{"$ne":"None"}, "datef":{"$ne":"None"}, "scanner_ip":{"$ne":"None"}}}, {"$count":"total"}])
+            agg_res = apiclient.aggregate("tools", [{"$match":{"wave":wave["wave"], "scope":scope["scope"], "dated":{"$ne":"None"}, "datef":{"$ne":"None"}, "scanner_ip":{"$ne":"None"}}}, {"$count":"total"}])
             for elem in agg_res:
                 done = elem["total"]
             if total > 0:
                 worksheet1.write(ligne, colStatus, str(done)+"/"+str(total)+" ("+str(int((float(done)/float(total))*100))+"%)")
             ligne += 1
 
-            ips = mongoInstance.find("ips", {"wave":wave["wave"], "scope":scope["scope"]})
+            ips = apiclient.find("ips", {"wave":wave["wave"], "scope":scope["scope"]})
             for ip in ips:
                 worksheet1.write(ligne, colIp, ip["ip"])
-                agg_res = mongoInstance.aggregate("tools", [{"$match":{"wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"]}}, {"$count":"total"}])
+                agg_res = apiclient.aggregate("tools", [{"$match":{"wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"]}}, {"$count":"total"}])
                 for elem in agg_res:
                     total = elem["total"]
-                agg_res = mongoInstance.aggregate("tools", [{"$match":{"wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"], "dated":{"$ne":"None"}, "datef":{"$ne":"None"}, "scanner_ip":{"$ne":"None"}}}, {"$count":"total"}])
+                agg_res = apiclient.aggregate("tools", [{"$match":{"wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"], "dated":{"$ne":"None"}, "datef":{"$ne":"None"}, "scanner_ip":{"$ne":"None"}}}, {"$count":"total"}])
                 for elem in agg_res:
                     done = elem["total"]
                 if total > 0:
                     worksheet1.write(ligne, colStatus, str(done)+"/"+str(total)+" ("+str(int((float(done)/float(total))*100))+"%)")
                 ligne += 1
 
-                ports = mongoInstance.find("ports", {"wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"]})
+                ports = apiclient.find("ports", {"wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"]})
                 for port in ports:
                     worksheet1.write(ligne, colPort, port["proto"]+"/"+port["port"])
-                    agg_res = mongoInstance.aggregate("tools", [{"$match":{"wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"], "port":port["port"]}}, {"$count":"total"}])
+                    agg_res = apiclient.aggregate("tools", [{"$match":{"wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"], "port":port["port"]}}, {"$count":"total"}])
                     for elem in agg_res:
                         total = elem["total"]
-                    agg_res = mongoInstance.aggregate("tools", [{"$match":{"wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"], "port":port["port"], "dated":{"$ne":"None"}, "datef":{"$ne":"None"}, "scanner_ip":{"$ne":"None"}}}, {"$count":"total"}])
+                    agg_res = apiclient.aggregate("tools", [{"$match":{"wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"], "port":port["port"], "dated":{"$ne":"None"}, "datef":{"$ne":"None"}, "scanner_ip":{"$ne":"None"}}}, {"$count":"total"}])
                     for elem in agg_res:
                         done = elem["total"]
                     if total > 0:
@@ -135,20 +135,20 @@ def addNotesReport(workbook):
         'valign': 'vcenter',
         'fg_color': 'green'})
     ligne = 1
-    mongoInstance = MongoCalendar.getInstance()
-    waves = mongoInstance.find("waves", )
+    apiclient = APIClient.getInstance()
+    waves = apiclient.find("waves", )
     for wave in waves:
         waveLineStart = ligne
         ligne += 1
-        scopes = mongoInstance.find("scopes", {"wave":wave["wave"]})
+        scopes = apiclient.find("scopes", {"wave":wave["wave"]})
         for scope in scopes:
             scopeLineStart = ligne
             ligne += 1
-            ips = mongoInstance.find("ips", {"wave":wave["wave"], "scope":scope["scope"]})
+            ips = apiclient.find("ips", {"wave":wave["wave"], "scope":scope["scope"]})
             for ip in ips:
                 ipLineStart = ligne
                 ligne += 1
-                ports = mongoInstance.find("ports", {"wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"]})
+                ports = apiclient.find("ports", {"wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"]})
                 for port in ports:
                     portLineStart = ligne
                     ligne += 1
@@ -158,7 +158,7 @@ def addNotesReport(workbook):
                         notes += port["notes"]+"\n"
                     except:
                         pass
-                    port_tools = mongoInstance.find("tools", {"lvl":"port", "wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"], "port":port["port"], "proto":port["proto"]})
+                    port_tools = apiclient.find("tools", {"lvl":"port", "wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"], "port":port["port"], "proto":port["proto"]})
                     for port_tool in port_tools:
                         try:
                             notes += "------------------------\n"+port_tool["name"]+":\n"+port_tool["notes"]+"\n"
@@ -171,7 +171,7 @@ def addNotesReport(workbook):
                     notes = ip["notes"]
                 except:
                     notes = "Nothing yet"
-                ip_tools = mongoInstance.find("tools", {"lvl":"ip", "wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"]})
+                ip_tools = apiclient.find("tools", {"lvl":"ip", "wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"]})
                 for ip_tool in ip_tools:
                     try:
                         notes += "------------------------\n"+ip_tool["name"]+":\n"+ip_tool["notes"]+"\n"
@@ -185,7 +185,7 @@ def addNotesReport(workbook):
                 notes = scope["notes"]
             except:
                 notes = "Nothing yet"
-            scope_tools = mongoInstance.find("tools", {"lvl":"scope", "wave":wave["wave"], "scope":scope["scope"]})
+            scope_tools = apiclient.find("tools", {"lvl":"scope", "wave":wave["wave"], "scope":scope["scope"]})
             for scope_tool in scope_tools:
                 try:
                     notes += "------------------------\n"+scope_tool["name"]+":\n"+scope_tool["notes"]+"\n"
@@ -243,12 +243,12 @@ def addDefectsReport(workbook):
         'font_color': 'black'
     })
     risk_formats = {"Critique":critical_risk_format, "Majeur":major_risk_format, "Important":important_risk_format, "Mineur":minor_risk_format}
-    mongoInstance = MongoCalendar.getInstance()
-    titles = mongoInstance.aggregate("defects", [{"$group":{"_id": "$title"}}])
+    apiclient = APIClient.getInstance()
+    titles = apiclient.aggregate("defects", [{"$group":{"_id": "$title"}}])
     ligne = 1
     for title_id in titles:
         title = title_id["_id"] 
-        defects = mongoInstance.find("defects", {"title":title})        
+        defects = apiclient.find("defects", {"title":title})        
         defectLigneStart = ligne
         for defect in defects:
             
@@ -437,20 +437,20 @@ def addReport(workbook):
         'valign': 'vcenter',
         'fg_color': 'green'})
     ligne = 1
-    mongoInstance = MongoCalendar.getInstance()
-    waves = mongoInstance.find("waves", )
+    apiclient = APIClient.getInstance()
+    waves = apiclient.find("waves", )
     for wave in waves:
         waveLineStart = ligne
         ligne += 1
-        scopes = mongoInstance.find("scopes", {"wave":wave["wave"]})
+        scopes = apiclient.find("scopes", {"wave":wave["wave"]})
         for scope in scopes:
             scopeLineStart = ligne
             ligne += 1
-            ips = mongoInstance.find("ips", {"wave":wave["wave"], "scope":scope["scope"]})
+            ips = apiclient.find("ips", {"wave":wave["wave"], "scope":scope["scope"]})
             for ip in ips:
                 ipLineStart = ligne
                 ligne += 1
-                ports = mongoInstance.find("ports", {"wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"]})
+                ports = apiclient.find("ports", {"wave":wave["wave"], "scope":scope["scope"], "ip":ip["ip"]})
                 for port in ports:
                     portLineStart = ligne
                     ligne += 1

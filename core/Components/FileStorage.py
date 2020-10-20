@@ -13,13 +13,13 @@ class FileStorage(object):
         Constructor
         Args:
             cfg: a dict with keys host, sftp_port, sftp_user, sftp_password.
-                If None, reads configuration file in config/client.cfg
+                If None, reads configuration file in config/server.cfg
                 Default to None.
         """
         # /home/barre/Documents/Pollenisator/core/Components/FileStorage.py
         if cfg is None:
             dir_path = os.path.dirname(os.path.realpath(__file__))
-            dir_path = os.path.join(dir_path, "../../config/client.cfg")
+            dir_path = os.path.join(dir_path, "../../config/server.cfg")
             cfg = Utils.loadCfg(dir_path)
         self.hostname = cfg["host"]
         self.port = int(cfg["sftp_port"])

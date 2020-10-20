@@ -95,7 +95,7 @@ class ScanManager:
                         '', 'end', workername, text=workername, image=self.ok_icon)
             except tk.TclError:
                 worker_node = self.workerTv.item(workername)
-            worker_registered = mongoInstance.findInDb("pollenisator", "workers", {"name":workername}, False)
+            worker_registered = apiclient.getWorker({"name":workername})
             commands_registered = worker_registered["registeredCommands"]
             for command in commands_registered:
                 try:

@@ -74,6 +74,7 @@ config/tools.d/*
 .vscode
 venv/
 config/client.cfg
+config/server.cfg
 config/settings.cfg
 AllInOne/results/*
 !AllInOne/results

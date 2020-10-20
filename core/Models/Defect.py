@@ -3,7 +3,7 @@
 import os
 from bson.objectid import ObjectId
 from core.Models.Element import Element
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 from core.Components.FileStorage import FileStorage
 
 
@@ -94,8 +94,8 @@ class Defect(Element):
         """
         ret = self._id
         self.rmProofs()
-        mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.delete("defects", {"_id": ret})
+        apiclient = APIClient.getInstance()
+        apiclient.delete("defects", {"_id": ret})
 
     def addInDb(self):
         """
@@ -107,8 +107,8 @@ class Defect(Element):
         base = self.getDbKey()
         # add to base parameters defined or not depending on the lvl.
         # Checking unicity
-        mongoInstance = MongoCalendar.getInstance()
-        existing = mongoInstance.find("defects", base, False)
+        apiclient = APIClient.getInstance()
+        existing = apiclient.find("defects", base, False)
         if existing is not None:
             return False, existing["_id"]
 
@@ -126,7 +126,7 @@ class Defect(Element):
         if self.index is not None:
             base["index"] = self.index
         # Get parent for notifications
-        res = mongoInstance.insert("defects", base, parent)
+        res = apiclient.insert("defects", base, parent)
         self._id = res.inserted_id
         if self.isAssigned():
             # Set global defect
@@ -144,14 +144,14 @@ class Defect(Element):
         Args:
             pipeline_set: (Opt.) A dictionnary with custom values. If None (default) use model attributes.
         """
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         if pipeline_set is None:
-            mongoInstance.update("defects", {"_id": ObjectId(self._id)}, {
+            apiclient.update("defects", {"_id": ObjectId(self._id)}, {
                 "$set": {"ip": self.ip, "title": self.title, "port": self.port,
                          "proto": self.proto, "notes": self.notes, "ease": self.ease, "impact": self.impact,
                          "risk": self.risk, "redactor": self.redactor, "type": list(self.mtype), "proofs": self.proofs, "infos": self.infos, "index":self.index}})
         else:
-            mongoInstance.update("defects", {"_id": ObjectId(self._id)}, {
+            apiclient.update("defects", {"_id": ObjectId(self._id)}, {
                 "$set": pipeline_set})
 
     def _getParent(self):
@@ -165,13 +165,13 @@ class Defect(Element):
             port = self.port
         except AttributeError:
             port = None
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         if port is None:
             port = ""
         if port == "":
-            obj = mongoInstance.find("ips", {"ip": self.ip}, False)
+            obj = apiclient.find("ips", {"ip": self.ip}, False)
         else:
-            obj = mongoInstance.find(
+            obj = apiclient.find(
                 "ports", {"ip": self.ip, "port": self.port, "proto": self.proto}, False)
         return obj["_id"]
 
@@ -180,8 +180,8 @@ class Defect(Element):
         Returns:
             path as string
         """
-        mongoInstance = MongoCalendar.getInstance()
-        path_calc = str(mongoInstance.calendarName)+"/"+str(self.ip)
+        apiclient = APIClient.getInstance()
+        path_calc = str(apiclient.getCurrentPentest())+"/"+str(self.ip)
         try:
             port = self.port
         except AttributeError:

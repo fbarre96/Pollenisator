@@ -3,7 +3,7 @@
 from core.Models.Element import Element
 from core.Models.Tool import Tool
 from core.Models.Defect import Defect
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 from bson.objectid import ObjectId
 
 
@@ -61,18 +61,18 @@ class Port(Element):
         Also deletes the tools associated with this port
         Also deletes the defects associated with this port
         """
-        mongoInstance = MongoCalendar.getInstance()
-        tools = mongoInstance.find("tools", {"port": self.port, "proto": self.proto,
+        apiclient = APIClient.getInstance()
+        tools = apiclient.find("tools", {"port": self.port, "proto": self.proto,
                                              "ip": self.ip}, True)
         for tool in tools:
             tool_model = Tool(tool)
             tool_model.delete()
-        defects = mongoInstance.find("defects", {"port": self.port, "proto": self.proto,
+        defects = apiclient.find("defects", {"port": self.port, "proto": self.proto,
                                                  "ip": self.ip}, True)
         for defect in defects:
             defect_model = Defect(defect)
             defect_model.delete()
-        mongoInstance.delete("ports", {"_id":  ObjectId(self._id)})
+        apiclient.delete("ports", {"_id":  ObjectId(self._id)})
 
     def update(self, pipeline_set=None):
         """Update this object in database.
@@ -83,11 +83,11 @@ class Port(Element):
         if oldPort is None:
             return
         oldService = oldPort.service
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         if oldService != self.service:
-            mongoInstance.delete("tools", {
+            apiclient.delete("tools", {
                                  "lvl": "port", "ip": self.ip, "port": self.port, "proto": self.proto}, many=True)
-            port_commands = mongoInstance.findInDb(
+            port_commands = apiclient.findInDb(
                 "pollenisator", "commands", {"lvl": "port"})
             for port_command in port_commands:
                 allowed_services = port_command["ports"].split(",")
@@ -95,7 +95,7 @@ class Port(Element):
                     if not(elem.strip().startswith("tcp/") or elem.strip().startswith("udp/")):
                         allowed_services[i] = "tcp/"+str(elem)
                 if self.proto+"/"+str(self.service) in allowed_services:
-                    waves = mongoInstance.find("waves", {"wave_commands": {"$elemMatch": {
+                    waves = apiclient.find("waves", {"wave_commands": {"$elemMatch": {
                         "$eq": port_command["name"].strip()}}})
                     for wave in waves:
                         tool_m = Tool().initialize(port_command["name"], wave["wave"], "",
@@ -103,10 +103,10 @@ class Port(Element):
                         tool_m.addInDb()
         # Update variable instance. (this avoid to refetch the whole command in database)
         if pipeline_set is None:
-            mongoInstance.update("ports", {"_id": ObjectId(self._id)}, {
+            apiclient.update("ports", {"_id": ObjectId(self._id)}, {
                 "$set": {"service": self.service, "product":self.product, "notes": self.notes, "tags": self.tags, "infos": self.infos}})
         else:
-            mongoInstance.update("ports", {"_id": ObjectId(self._id)}, {
+            apiclient.update("ports", {"_id": ObjectId(self._id)}, {
                 "$set": pipeline_set})
 
     def addInDb(self):
@@ -118,8 +118,8 @@ class Port(Element):
                 * mongo ObjectId : already existing object if duplicate, create object id otherwise 
         """
         base = self.getDbKey()
-        mongoInstance = MongoCalendar.getInstance()
-        existing = mongoInstance.find("ports", base, False)
+        apiclient = APIClient.getInstance()
+        existing = apiclient.find("ports", base, False)
         if existing is not None:
             return False, existing["_id"]
         # Inserting port
@@ -130,18 +130,18 @@ class Port(Element):
         base["notes"] = self.notes
         base["tags"] = self.tags
         base["infos"] = self.infos
-        res = mongoInstance.insert("ports", base, parent)
+        res = apiclient.insert("ports", base, parent)
         ret = res.inserted_id
         self._id = ret
         # adding the appropriate tools for this port.
         # 1. fetching the wave's commands
-        waves = mongoInstance.find("waves", {})
+        waves = apiclient.find("waves", {})
         for wave in waves:
             waveName = wave["wave"]
             commands = wave["wave_commands"]
             for commName in commands:
                 # 2. finding the command only if lvl is port
-                comm = mongoInstance.findInDb(mongoInstance.calendarName, "commands",
+                comm = apiclient.findInDb(apiclient.getCurrentPentest(), "commands",
                                               {"name": commName, "lvl": "port"}, False)
                 if comm is not None:
                     # 3. checking if the added port fit into the command's allowed service
@@ -188,14 +188,14 @@ class Port(Element):
             newTool.addInDb()
             return
         # retrieve wave's command
-        mongoInstance = MongoCalendar.getInstance()
-        wave = mongoInstance.find(
+        apiclient = APIClient.getInstance()
+        wave = apiclient.find(
             "waves", {"wave": wave_name}, False)
         commands = wave["wave_commands"]
         try:
             index = commands.index(command_name)
             # retrieve the command level
-            command = mongoInstance.findInDb(mongoInstance.calendarName,
+            command = apiclient.findInDb(apiclient.getCurrentPentest(),
                                              "commands", {"name": commands[index]}, False)
             if command["lvl"] == "port":
                 # 3. checking if the added port fit into the command's allowed service
@@ -235,8 +235,8 @@ class Port(Element):
         Returns:
             Returns the parent ip's ObjectId _id".
         """
-        mongoInstance = MongoCalendar.getInstance()
-        return mongoInstance.find("ips", {"ip": self.ip}, False)["_id"]
+        apiclient = APIClient.getInstance()
+        return apiclient.find("ips", {"ip": self.ip}, False)["_id"]
 
     def __str__(self):
         """
@@ -259,16 +259,16 @@ class Port(Element):
         Returns:
             list of tool raw mongo data dictionnaries
         """
-        mongoInstance = MongoCalendar.getInstance()
-        return mongoInstance.find("tools", {"lvl": "port", "ip": self.ip, "port": self.port, "proto": self.proto})
+        apiclient = APIClient.getInstance()
+        return apiclient.find("tools", {"lvl": "port", "ip": self.ip, "port": self.port, "proto": self.proto})
 
     def getDefects(self):
         """Return port assigned defects as a list of mongo fetched defects dict
         Returns:
             list of defect raw mongo data dictionnaries
         """
-        mongoInstance = MongoCalendar.getInstance()
-        return mongoInstance.find("defects", {"ip": self.ip, "port": self.port, "proto": self.proto})
+        apiclient = APIClient.getInstance()
+        return apiclient.find("defects", {"ip": self.ip, "port": self.port, "proto": self.proto})
 
     def getDbKey(self):
         """Return a dict from model to use as unique composed key.

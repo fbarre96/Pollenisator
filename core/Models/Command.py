@@ -1,6 +1,6 @@
 """Command Model."""
 from core.Models.Element import Element
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 from bson.objectid import ObjectId
 
 
@@ -72,27 +72,27 @@ class Command(Element):
         Also delete every tools refering to this command.
         """
         ret = self._id
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         # Remove from all group of commands this command name if they have it.
-        mongoInstance.updateInDb(self.indb, "group_commands", {}, {
+        apiclient.updateInDb(self.indb, "group_commands", {}, {
             "$pull": {"commands": self.name}}, True, True)
         # Remove from all waves this command.
         if self.indb == "pollenisator":
-            calendars = mongoInstance.listCalendars()
+            calendars = apiclient.getPentestList()
         else:
             calendars = [self.indb]
         for calendar in calendars:
-            waves = mongoInstance.findInDb(calendar, "waves")
+            waves = apiclient.findInDb(calendar, "waves")
             for wave in waves:
                 toBeUpdated = wave["wave_commands"]
                 if self.name in wave["wave_commands"]:
                     toBeUpdated.remove(self.name)
-                    mongoInstance.updateInDb(calendar, "waves", {"_id": wave["_id"]}, {
+                    apiclient.updateInDb(calendar, "waves", {"_id": wave["_id"]}, {
                         "$set": {"wave_commands": toBeUpdated}}, False)
             # Remove all tools refering to this command's name.
-            mongoInstance.deleteFromDb(calendar,
+            apiclient.deleteFromDb(calendar,
                                     "tools", {"name": self.name}, True, True)
-        mongoInstance.deleteFromDb(self.indb, "commands", {
+        apiclient.deleteFromDb(self.indb, "commands", {
                                    "_id": ret}, False, True)
 
     def addInDb(self):
@@ -101,12 +101,12 @@ class Command(Element):
                 * bool for success
                 * mongo ObjectId : already existing object if duplicate, create object id otherwise 
         """
-        mongoInstance = MongoCalendar.getInstance()
-        existing = mongoInstance.findInDb(
+        apiclient = APIClient.getInstance()
+        existing = apiclient.findInDb(
             self.indb, "commands", {"name": self.name}, False)
         if existing is not None:
             return False, existing["_id"]
-        ins_result = mongoInstance.insertInDb(self.indb, "commands", {"name": self.name, "lvl": self.lvl, "priority": self.priority,
+        ins_result = apiclient.insertInDb(self.indb, "commands", {"name": self.name, "lvl": self.lvl, "priority": self.priority,
                                                                            "sleep_between": self.sleep_between, "max_thread": self.max_thread, "text": self.text,
                                                                            "ports": self.ports, "safe": self.safe, "types": self.types, "indb": self.indb, "timeout": self.timeout}, '', True)
         self._id = ins_result.inserted_id
@@ -117,13 +117,13 @@ class Command(Element):
         Args:
             pipeline_set: (Opt.) A dictionnary with custom values. If None (default) use model attributes.
         """
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         if pipeline_set is None:
-            mongoInstance.updateInDb(self.indb, "commands", {"_id": ObjectId(self._id)}, {
+            apiclient.updateInDb(self.indb, "commands", {"_id": ObjectId(self._id)}, {
                 "$set": {"priority": self.priority, "sleep_between": self.sleep_between, "max_thread": self.max_thread, "timeout": self.timeout,
                          "text": self.text, "ports": self.ports, "safe": self.safe, "types": self.types}}, False, True)
         else:
-            mongoInstance.updateInDb(self.indb, "commands", {"_id": ObjectId(self._id)}, {
+            apiclient.updateInDb(self.indb, "commands", {"_id": ObjectId(self._id)}, {
                 "$set": pipeline_set}, False, True)
 
     @classmethod
@@ -147,8 +147,8 @@ class Command(Element):
         Returns:
             Returns a Command or None if nothing matches the pipeline.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        d = mongoInstance.findInDb(targetdb, "commands", pipeline, False)
+        apiclient = APIClient.getInstance()
+        d = apiclient.findInDb(targetdb, "commands", pipeline, False)
         if d is None:
             return None
         return Command(d)
@@ -161,8 +161,10 @@ class Command(Element):
         Returns:
             Returns a cursor to iterate on Command objects
         """
-        mongoInstance = MongoCalendar.getInstance()
-        ds = mongoInstance.findInDb(targetdb, "commands", pipeline, True)
+        apiclient = APIClient.getInstance()
+        ds = apiclient.findInDb(targetdb, "commands", pipeline, True)
+        if ds is None:
+            return None
         for d in ds:
             yield Command(d)
 

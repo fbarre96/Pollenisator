@@ -37,7 +37,7 @@ class Monitor:
         # manager = multiprocessing.Manager()
         # self.worker_list = manager.dict()
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        cfg = Utils.loadClientConfig()
+        cfg = Utils.loadServerConfig()
         userString = cfg["user"]+':'+cfg["password"] + \
             '@' if cfg['user'].strip() != "" else ""
         if cfg["ssl"] == "True":
@@ -176,8 +176,8 @@ class Monitor:
         return l
         
     def isWorkerExcludedFrom(self, worker_hostname, dbName):
-        mongoInstance = MongoCalendar.getInstance()
-        worker = mongoInstance.findInDb("pollenisator", "workers", {"name": worker_hostname}, False)
+        apiclient = APIClient.getInstance()
+        worker = apiclient.getWorker()
         if worker is None:
             return True
         return dbName in worker.get("excludedDatabases", [])

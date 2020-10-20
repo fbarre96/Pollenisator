@@ -9,7 +9,7 @@ from core.Views.CommandView import CommandView
 from core.Controllers.CommandGroupController import CommandGroupController
 from core.Controllers.CommandController import CommandController
 from core.Application.Treeviews.PollenisatorTreeview import PollenisatorTreeview
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 
 
 class CommandsTreeview(PollenisatorTreeview):
@@ -140,7 +140,7 @@ class CommandsTreeview(PollenisatorTreeview):
         if db != "pollenisator":
             return
         # Delete
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         if action == "delete":
             try:
                 self.delete(ObjectId(iid))
@@ -149,7 +149,7 @@ class CommandsTreeview(PollenisatorTreeview):
 
         # Insert
         if action == "insert":
-            res = mongoInstance.findInDb(
+            res = apiclient.findInDb(
                 db, collection, {"_id": ObjectId(iid)}, False)
             if collection == "commands":
                 view = CommandView(self, self.appli.commandsViewFrame,

@@ -1,7 +1,7 @@
 """View for tool object. Handle node in treeview and present forms to user when interacted with."""
 
 from core.Views.ViewElement import ViewElement
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 import tkinter.messagebox
 import tkinter as tk
 from tkinter import TclError
@@ -264,9 +264,9 @@ class ToolView(ViewElement):
         Args:
             event: Automatically generated with a button Callback, not used.
         """
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         self.mainApp.scanManager.monitor.launchTask(
-            mongoInstance.calendarName, self.controller.model, "", False, "localhost")
+            apiclient.getCurrentPentest(), self.controller.model, "", False, "localhost")
         self.controller.update()
         self.form.clear()
         for widget in self.appliViewFrame.winfo_children():
@@ -281,9 +281,9 @@ class ToolView(ViewElement):
         Returns:
             None if failed. 
         """
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         result = self.mainApp.scanManager.monitor.launchTask(
-            mongoInstance.calendarName, self.controller.model)
+            apiclient.getCurrentPentest(), self.controller.model)
         return result
 
     def launchCallback(self, _event=None):
@@ -301,9 +301,9 @@ class ToolView(ViewElement):
             self.appliViewFrame.wait_window(dialog.app)
             answer = dialog.rvalue
             if answer == "Yes":
-                mongoInstance = MongoCalendar.getInstance()
+                apiclient = APIClient.getInstance()
                 res = self.mainApp.scanManager.monitor.launchTask(
-                    mongoInstance.calendarName, self.controller.model, "", False)
+                    apiclient.getCurrentPentest(), self.controller.model, "", False)
         if res:
             self.controller.update()
             self.form.clear()

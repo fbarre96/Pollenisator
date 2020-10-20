@@ -1,6 +1,6 @@
 """DEPRECATED Hold functions to interact with the search bar. NOW LOCATED IN Filter.py"""
 
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 from core.Models.Ip import Ip
 from core.Models.Port import Port
 from core.Models.Scope import Scope
@@ -79,8 +79,8 @@ every ip starting as 1.2    || ip:1\.2\..* class:ip"""
         liste = [keyword for keyword in cls.classes[coll]["keywords"]
                  if keyword.startswith(start) and keyword not in terms]
         if coll in ["ip", "port"] and start.startswith("infos."):
-            mongoInstance = MongoCalendar.getInstance()
-            infosInDb = mongoInstance.find(
+            apiclient = APIClient.getInstance()
+            infosInDb = apiclient.find(
                 Search.classes[coll]["collection"], {"infos": {"$ne": {}}})
             keys = set()
             for infoInDb in infosInDb:
@@ -149,11 +149,11 @@ every ip starting as 1.2    || ip:1\.2\..* class:ip"""
 
     def getViews(self, appTw, viewFrame, mainApp):
         mongoLine = {}
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         for term in self.terms:
             key, val = term.getMongo()
             mongoLine[key] = val
-        found_res = mongoInstance.find(
+        found_res = apiclient.find(
             Search.classes[self.coll]["collection"], mongoLine)
         print("Searchinging in "+str(self.coll)+" mogoline:"+str(mongoLine))
         ret = []
@@ -165,14 +165,14 @@ every ip starting as 1.2    || ip:1\.2\..* class:ip"""
 
     def getIds(self):
         ret = []
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         if self.coll == '':
             return ret
         mongoLine = {}
         for term in self.terms:
             key, val = term.getMongo()
             mongoLine[key] = val
-        found_res = mongoInstance.find(
+        found_res = apiclient.find(
             Search.classes[self.coll]["collection"], mongoLine)
         for found in found_res:
             ret.append(str(found["_id"]))

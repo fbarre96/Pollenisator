@@ -295,6 +295,26 @@ def saveToolsConfig(dic):
     with open(default_tools_config, "w") as f:
         f.write(json.dumps(dic))
 
+def loadServerConfig():
+    """Return data converted from json inside config/server.cfg
+    Returns:
+        Json converted data inside config/server.cfg
+    """
+    config = os.path.join(os.path.dirname(
+        os.path.realpath(__file__)), "../../config/server.cfg")
+    return loadCfg(config)
+
+
+def saveServerConfig(configDict):
+    """Saves data in configDict to config/server.cfg as json
+    Args:
+        configDict: data to be stored in config/server.cfg
+    """
+    configFile = os.path.join(os.path.dirname(
+        os.path.realpath(__file__)), "../../config/server.cfg")
+    with open(configFile, "w") as f:
+        f.write(json.dumps(configDict))
+
 def loadClientConfig():
     """Return data converted from json inside config/client.cfg
     Returns:
@@ -314,8 +334,7 @@ def saveClientConfig(configDict):
         os.path.realpath(__file__)), "../../config/client.cfg")
     with open(configFile, "w") as f:
         f.write(json.dumps(configDict))
-
-
+        
 def getValidMarkIconPath():
     """Returns:
          a validation mark icon path

@@ -5,7 +5,7 @@ from core.Application.Dialogs.ChildDialogProgress import ChildDialogProgress
 from core.Models.Ip import Ip
 from core.Models.Port import Port
 from core.Components.Settings import Settings
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 
 class ScrollFrame(tk.Frame):
     """A scrollable frame using canvas"""
@@ -98,8 +98,8 @@ class Summary:
         self.frameTw = None
     
     def open(self):
-        mongoInstance = MongoCalendar.getInstance()
-        if mongoInstance.calendarName is not None:
+        apiclient = APIClient.getInstance()
+        if apiclient.getCurrentPentest() is not None:
             self.refreshUI()
         return True
 
@@ -145,15 +145,15 @@ class Summary:
     def loadSummary(self):
         """Reload information about IP and Port and reload the view.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        nonEmptyIps = list(mongoInstance.aggregate("ports",[{"$group":{"_id":"$ip"}}, {"$count": "total"}]))
+        apiclient = APIClient.getInstance()
+        nonEmptyIps = list(apiclient.aggregate("ports",[{"$group":{"_id":"$ip"}}, {"$count": "total"}]))
         if not nonEmptyIps:
             return
         nonEmptyIps = nonEmptyIps[0]
         step = 0
         dialog = ChildDialogProgress(self.parent, "Loading summary ", "Refreshing summary. Please wait for a few seconds.", 200, "determinate")
         dialog.show(nonEmptyIps["total"])
-        nonEmptyIps = mongoInstance.aggregate("ports",[{"$group":{"_id":"$ip"}}])
+        nonEmptyIps = apiclient.aggregate("ports",[{"$group":{"_id":"$ip"}}])
         for ipCIDR in nonEmptyIps:
             step += 1
             ip = Ip.fetchObject({"ip": ipCIDR["_id"]})

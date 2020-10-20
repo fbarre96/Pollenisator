@@ -9,7 +9,7 @@ from core.Views.ViewElement import ViewElement
 from core.Views.DefectView import DefectView
 from core.Controllers.DefectController import DefectController
 from core.Controllers.ToolController import ToolController
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 from tkinter import TclError
 
 

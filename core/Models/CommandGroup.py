@@ -1,6 +1,6 @@
 """Command Group Model."""
 from core.Models.Element import Element
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 from bson.objectid import ObjectId
 
 
@@ -52,8 +52,8 @@ class CommandGroup(Element):
         Delete the command group represented by this model in database.
         """
         ret = self._id
-        mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.deleteFromDb("pollenisator", "group_commands", {
+        apiclient = APIClient.getInstance()
+        apiclient.deleteFromDb("pollenisator", "group_commands", {
                                    "_id": ret}, False, True)
 
     def addInDb(self):
@@ -64,12 +64,12 @@ class CommandGroup(Element):
                 * bool for success
                 * mongo ObjectId : already existing object if duplicate, create object id otherwise 
         """
-        mongoInstance = MongoCalendar.getInstance()
-        existing = mongoInstance.findInDb(
+        apiclient = APIClient.getInstance()
+        existing = apiclient.findInDb(
             "pollenisator", "group_commands", {"name": self.name}, False)
         if existing is not None:
             return False, existing["_id"]
-        res = mongoInstance.insertInDb("pollenisator", "group_commands", {
+        res = apiclient.insertInDb("pollenisator", "group_commands", {
             "name": self.name, "sleep_between": self.sleep_between, "commands": self.commands, "max_thread": self.max_thread}, '', True)
         self._id = res.inserted_id
         return True, res.inserted_id
@@ -82,8 +82,8 @@ class CommandGroup(Element):
         Returns:
             Returns a CommandGroup or None if nothing matches the pipeline.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        d = mongoInstance.findInDb(
+        apiclient = APIClient.getInstance()
+        d = apiclient.findInDb(
             "pollenisator", "group_commands", pipeline, False)
         if d is None:
             return None
@@ -97,9 +97,11 @@ class CommandGroup(Element):
         Returns:
             Returns a cursor to iterate on CommandGroup objects
         """
-        mongoInstance = MongoCalendar.getInstance()
-        ds = mongoInstance.findInDb(
+        apiclient = APIClient.getInstance()
+        ds = apiclient.findInDb(
             "pollenisator", "group_commands", pipeline, True)
+        if ds is None:
+            return None
         for d in ds:
             yield CommandGroup(d)
 
@@ -108,13 +110,13 @@ class CommandGroup(Element):
         Args:
             pipeline_set: (Opt.) A dictionnary with custom values. If None (default) use model attributes.
         """
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         if pipeline_set is None:
             # Update in database
-            mongoInstance.updateInDb("pollenisator", "group_commands", {"_id": ObjectId(self._id)}, {
+            apiclient.updateInDb("pollenisator", "group_commands", {"_id": ObjectId(self._id)}, {
                 "$set": {"name": self.name, "sleep_between": self.sleep_between, "commands": self.commands, "max_thread": self.max_thread}}, False, True)
         else:
-            mongoInstance.updateInDb("pollenisator", "group_commands", {"_id": ObjectId(self._id)}, {
+            apiclient.updateInDb("pollenisator", "group_commands", {"_id": ObjectId(self._id)}, {
                 "$set": pipeline_set}, False, True)
 
     @classmethod
@@ -125,8 +127,8 @@ class CommandGroup(Element):
         Returns:
             Returns the list of command groups name found inside the database. List may be empty.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        gcommands = mongoInstance.findInDb("pollenisator", "group_commands")
+        apiclient = APIClient.getInstance()
+        gcommands = apiclient.findInDb("pollenisator", "group_commands")
         ret = []
         for gcommand in gcommands:
             ret.append(gcommand["name"])

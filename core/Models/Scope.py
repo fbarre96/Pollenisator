@@ -3,7 +3,7 @@
 from core.Models.Element import Element
 from core.Models.Ip import Ip
 from bson.objectid import ObjectId
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 from core.Models.Tool import Tool
 import core.Components.Utils as Utils
 from core.Components.Settings import Settings
@@ -54,12 +54,12 @@ class Scope(Element):
         Args:
             pipeline_set: (Opt.) A dictionnary with custom values. If None (default) use model attributes.
         """
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         if pipeline_set is None:
-            mongoInstance.update("scopes", {"_id": ObjectId(self._id)}, {
+            apiclient.update("scopes", {"_id": ObjectId(self._id)}, {
                 "$set": {"notes": self.notes, "tags": self.tags}})
         else:
-            mongoInstance.update("scopes", {"_id": ObjectId(self._id)}, {
+            apiclient.update("scopes", {"_id": ObjectId(self._id)}, {
                 "$set": pipeline_set})
 
     def delete(self):
@@ -77,12 +77,12 @@ class Scope(Element):
         ips = Ip.getIpsInScope(self._id)
         for ip in ips:
             ip.removeScopeFitting(self._id)
-        mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.delete("scopes", {"_id": self._id})
-        parent_wave = mongoInstance.find("waves", {"wave": self.wave}, False)
+        apiclient = APIClient.getInstance()
+        apiclient.delete("scopes", {"_id": self._id})
+        parent_wave = apiclient.find("waves", {"wave": self.wave}, False)
         if parent_wave is None:
             return
-        mongoInstance.notify(mongoInstance.calendarName,
+        apiclient.pushNotification(apiclient.getCurrentPentest(),
                              "waves", parent_wave["_id"], "update", "")
         # Finally delete the selected element
 
@@ -96,17 +96,17 @@ class Scope(Element):
         """
         base = self.getDbKey()
         # Checking unicity
-        mongoInstance = MongoCalendar.getInstance()
-        existing = mongoInstance.find("scopes", base, False)
+        apiclient = APIClient.getInstance()
+        existing = apiclient.find("scopes", base, False)
         if existing is not None:
             return False, existing["_id"]
         # Inserting scope
         parent = self.getParent()
-        res_insert = mongoInstance.insert("scopes", base, parent)
+        res_insert = apiclient.insert("scopes", base, parent)
         ret = res_insert.inserted_id
         self._id = ret
         # adding the appropriate tools for this scope.
-        wave = mongoInstance.find("waves", {"wave": self.wave}, False)
+        wave = apiclient.find("waves", {"wave": self.wave}, False)
         commands = wave["wave_commands"]
         for commName in commands:
             if commName.strip() != "":
@@ -132,8 +132,8 @@ class Scope(Element):
         """
         # Checking unicity
         base = self.getDbKey()
-        mongoInstance = MongoCalendar.getInstance()
-        existing = mongoInstance.find("scopes", base, False)
+        apiclient = APIClient.getInstance()
+        existing = apiclient.find("scopes", base, False)
         if existing is not None:
             return 0, None
         # Check if domain's ip fit in one of the Scope of the wave
@@ -142,14 +142,14 @@ class Scope(Element):
                 return -1, None
         # insert the domains in the scopes
         parent = self.getParent()
-        res_insert = mongoInstance.insert("scopes", base, parent)
+        res_insert = apiclient.insert("scopes", base, parent)
         ret = res_insert.inserted_id
         self._id = ret
         # Adding appropriate tools for this scopes
-        wave = mongoInstance.find("waves", {"wave": self.wave}, False)
+        wave = apiclient.find("waves", {"wave": self.wave}, False)
         commands = wave["wave_commands"]
         for commName in commands:
-            comm = mongoInstance.findInDb(mongoInstance.calendarName,
+            comm = apiclient.findInDb(apiclient.getCurrentPentest(),
                                           "commands", {"name": commName, "lvl": "network"}, False)
             if comm is not None:
                 newTool = Tool()
@@ -157,7 +157,7 @@ class Scope(Element):
                     comm["name"], self.wave, self.scope, "", "", "", "network")
                 newTool.addInDb()
             else:
-                comm = mongoInstance.findInDb(mongoInstance.calendarName,
+                comm = apiclient.findInDb(apiclient.getCurrentPentest(),
                                               "commands", {"name": commName, "lvl": "domain"}, False)
                 if comm is not None:
                     newTool = Tool()
@@ -191,8 +191,8 @@ class Scope(Element):
         settings = Settings()
         # get the domain ip so we can search for it in ipv4 range scopes.
         domainIp = Utils.performLookUp(domain)
-        mongoInstance = MongoCalendar.getInstance()
-        scopesOfWave = mongoInstance.find("scopes", {"wave": waveName})
+        apiclient = APIClient.getInstance()
+        scopesOfWave = apiclient.find("scopes", {"wave": waveName})
         for scopeOfWave in scopesOfWave:
             scopeIsANetworkIp = Utils.isNetworkIp(scopeOfWave["scope"])
             if scopeIsANetworkIp:
@@ -224,8 +224,8 @@ class Scope(Element):
         Args:
             command_name: The command that we want to create all the tools for.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        command = mongoInstance.findInDb(mongoInstance.calendarName, "commands", {
+        apiclient = APIClient.getInstance()
+        command = apiclient.findInDb(apiclient.getCurrentPentest(), "commands", {
                                          "name": command_name}, False)
         if command["lvl"] == "network":
             newTool = Tool()
@@ -252,8 +252,9 @@ class Scope(Element):
         Returns:
             Returns the parent wave's ObjectId _id".
         """
-        mongoInstance = MongoCalendar.getInstance()
-        return mongoInstance.find("waves", {"wave": self.wave}, False)["_id"]
+        apiclient = APIClient.getInstance()
+        res = apiclient.find("waves", {"wave": self.wave}, False)
+        return res["_id"]
 
     def __str__(self):
         """
@@ -269,8 +270,8 @@ class Scope(Element):
         Returns:
             list of tool raw mongo data dictionnaries
         """
-        mongoInstance = MongoCalendar.getInstance()
-        return mongoInstance.find("tools", {"wave": self.wave, "$or": [{"lvl": "network"}, {"lvl": "domain"}], "scope": self.scope})
+        apiclient = APIClient.getInstance()
+        return apiclient.find("tools", {"wave": self.wave, "$or": [{"lvl": "network"}, {"lvl": "domain"}], "scope": self.scope})
 
     def getDbKey(self):
         """Return a dict from model to use as unique composed key.
@@ -284,8 +285,8 @@ class Scope(Element):
         Returns:
             A list ip IP dictionnary from mongo db
         """
-        mongoInstance = MongoCalendar.getInstance()
-        ips = mongoInstance.find("ips", )
+        apiclient = APIClient.getInstance()
+        ips = apiclient.find("ips", )
         ips_fitting = []
         isdomain = self.isDomain()
         for ip in ips:

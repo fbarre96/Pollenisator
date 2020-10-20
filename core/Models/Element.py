@@ -1,6 +1,6 @@
 """Element parent Model. Common ground for every model"""
 
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 from bson.objectid import ObjectId
 from core.Components.Settings import Settings
 
@@ -38,8 +38,8 @@ class Element(object):
         Returns:
             Returns the model object or None if nothing matches the pipeline.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        d = mongoInstance.find(cls.coll_name, pipeline, False)
+        apiclient = APIClient.getInstance()
+        d = apiclient.find(cls.coll_name, pipeline, False)
         if d is None:
             return d
         # disabling this error as it is an abstract function
@@ -53,8 +53,10 @@ class Element(object):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoCalendar.getInstance()
-        ds = mongoInstance.find(cls.coll_name, pipeline, True)
+        apiclient = APIClient.getInstance()
+        ds = apiclient.find(cls.coll_name, pipeline, True)
+        if ds is None:
+            return None
         for d in ds:
             # disabling this error as it is an abstract function
             yield cls(d)  #  pylint: disable=no-value-for-parameter
@@ -162,11 +164,11 @@ class Element(object):
             tagToDelete: a tag as a string to be deleted from this model tags
         """
         tags = self.getTags()
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         if tagToDelete in tags:
             del tags[tags.index(tagToDelete)]
             notify = tagToDelete != "hidden"
-            mongoInstance.update(self.__class__.coll_name, {"_id": ObjectId(self._id)}, {
+            apiclient.update(self.__class__.coll_name, {"_id": ObjectId(self._id)}, {
                 "$set": {"tags": tags}}, False, notify)
 
     def setTags(self, tags):
@@ -175,8 +177,8 @@ class Element(object):
             tags: a list of tag string
         """
         self.tags = tags
-        mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.update(self.__class__.coll_name, {"_id": ObjectId(self._id)}, {
+        apiclient = APIClient.getInstance()
+        apiclient.update(self.__class__.coll_name, {"_id": ObjectId(self._id)}, {
             "$set": {"tags": tags}})
 
     def getDetailedString(self):

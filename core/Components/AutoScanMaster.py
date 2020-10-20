@@ -25,12 +25,12 @@ certs = {
     'cert_reqs': ssl.CERT_REQUIRED
 }
 config_dir = os.path.join(dir_path, "../../config/")
-if not os.path.isfile(os.path.join(config_dir, "client.cfg")):
+if not os.path.isfile(os.path.join(config_dir, "server.cfg")):
     if os.path.isfile(os.path.join(config_dir, "clientSample.cfg")):
-        copyfile(os.path.join(config_dir, "clientSample.cfg"), os.path.join(config_dir, "client.cfg"))
+        copyfile(os.path.join(config_dir, "clientSample.cfg"), os.path.join(config_dir, "server.cfg"))
 
-if os.path.isfile(os.path.join(config_dir, "client.cfg")):
-    cfg = Utils.loadCfg(os.path.join(config_dir, "client.cfg"))
+if os.path.isfile(os.path.join(config_dir, "server.cfg")):
+    cfg = Utils.loadCfg(os.path.join(config_dir, "server.cfg"))
 else:
     print("No client config file found under "+str(config_dir))
     sys.exit(1)

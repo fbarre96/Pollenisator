@@ -3,7 +3,7 @@ from shutil import which
 import tkinter.messagebox
 
 import core.Components.Utils as Utils
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 
 class Terminal:
     iconName = "tab_terminal.png"
@@ -17,11 +17,11 @@ class Terminal:
 
     def open(self):
         mainDir = os.path.normpath(Utils.getMainDir())
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         with open(os.path.join(mainDir, "setupTerminalForPentest.sh"), "r") as f:
             data = f.read()
             lines = data.split("\n")
-            lines[0] = "POLLENISATOR_CURRENT_DB="+str(mongoInstance.calendarName)
+            lines[0] = "POLLENISATOR_CURRENT_DB="+str(apiclient.getCurrentPentest())
             data = "\n".join(lines)
             with open(os.path.join(mainDir, "setupTerminalForPentest.sh"), "w") as f:
                 f.write(data)

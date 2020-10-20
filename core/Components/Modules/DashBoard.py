@@ -14,7 +14,7 @@ from core.Application.Dialogs.ChildDialogCombo import ChildDialogCombo
 from core.Application.Dialogs.ChildDialogDefectView import ChildDialogDefectView
 from core.Application.Dialogs.ChildDialogProgress import ChildDialogProgress
 from core.Application.Dialogs.ChildDialogQuestion import ChildDialogQuestion
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 from core.Models.Ip import Ip
 from core.Models.Port import Port
 from core.Models.Tool import Tool
@@ -57,8 +57,8 @@ class DashBoard:
             Image.open(iconPath+"cross.png"))
     
     def open(self):
-        mongoInstance = MongoCalendar.getInstance()
-        if mongoInstance.calendarName is not None:
+        apiclient = APIClient.getInstance()
+        if apiclient.getCurrentPentest() is not None:
             self.refreshUI()
         return True
 

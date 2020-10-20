@@ -9,7 +9,7 @@ from os import listdir
 from os.path import isfile, join
 from bson.objectid import ObjectId
 from datetime import datetime
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 import core.Reporting.WordExport as WordExport
 import core.Reporting.PowerpointExport as PowerpointExport
 import core.Reporting.ExcelExport as ExcelExport
@@ -284,12 +284,12 @@ class Report:
                 break
         if currentIndice != 0:
             self.treevw.move(selected, '', currentIndice-1)
-            mongoInstance = MongoCalendar.getInstance()
+            apiclient = APIClient.getInstance()
             selected = children[currentIndice]
             moved_by_side_effect = children[currentIndice-1]
-            mongoInstance.update(Defect.coll_name,
+            apiclient.update(Defect.coll_name,
                              {"_id": ObjectId(selected)}, {"$set": {"index":str(currentIndice-1)}})
-            mongoInstance.update(Defect.coll_name,
+            apiclient.update(Defect.coll_name,
                              {"_id": ObjectId(moved_by_side_effect)}, {"$set": {"index":str(currentIndice)}})
         return "break"
 
@@ -311,12 +311,12 @@ class Report:
                 break
         if currentIndice < len_max-1:
             self.treevw.move(selected, '', currentIndice+1)
-            mongoInstance = MongoCalendar.getInstance()
+            apiclient = APIClient.getInstance()
             selected = children[currentIndice]
             moved_by_side_effect = children[currentIndice+1]
-            mongoInstance.update(Defect.coll_name,
+            apiclient.update(Defect.coll_name,
                              {"_id": ObjectId(selected)}, {"$set": {"index":str(currentIndice+1)}})
-            mongoInstance.update(Defect.coll_name,
+            apiclient.update(Defect.coll_name,
                              {"_id": ObjectId(moved_by_side_effect)}, {"$set": {"index":str(currentIndice)}})
         return "break"
 
@@ -535,7 +535,7 @@ class Report:
             elif defect_o.redactor not in values[4].split(", "):
                 values[4] += ", "+defect_o.redactor
             self.treevw.item(already_inserted_iid, values=values)
-        # mongoInstance.insert("defects_table",{""})
+        # apiclient.insert("defects_table",{""})
         self.resizeDefectTreeview()
     
     def resizeDefectTreeview(self):
@@ -624,8 +624,8 @@ class Report:
             tk.messagebox.showerror(
                 "Missing required field", "The contract's name input must be filled.")
             return
-        mongoInstance = MongoCalendar.getInstance()
-        toExport = mongoInstance.calendarName
+        apiclient = APIClient.getInstance()
+        toExport = apiclient.getCurrentPentest()
         if toExport != "":
             modele_docx = str(self.val_word.get())
             timestr = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -651,8 +651,8 @@ class Report:
             tk.messagebox.showerror(
                 "Missing required field", "The contract's name input must be filled.")
             return
-        mongoInstance = MongoCalendar.getInstance()
-        toExport = mongoInstance.calendarName
+        apiclient = APIClient.getInstance()
+        toExport = apiclient.getCurrentPentest()
         if toExport != "":
             modele_pptx = str(self.val_ppt.get())
             timestr = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -670,8 +670,8 @@ class Report:
         """
         Export a calendar status to an excel file.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        toExport = mongoInstance.calendarName
+        apiclient = APIClient.getInstance()
+        toExport = apiclient.getCurrentPentest()
         if toExport != "":
             timestr = datetime.now().strftime("%Y%m%d-%H%M%S")
             out_name = toExport+"_"+str(timestr)+".xlsx"

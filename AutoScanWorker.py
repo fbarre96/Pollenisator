@@ -11,7 +11,7 @@ import io
 from bson.objectid import ObjectId
 from celery import Celery
 from multiprocessing import Process
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 import core.Components.Utils as Utils
 from core.Models.Interval import Interval
 from core.Models.Tool import Tool
@@ -30,12 +30,12 @@ certs = {
     'cert_reqs': ssl.CERT_REQUIRED
 }
 config_dir = os.path.join(dir_path, "./config/")
-if not os.path.isfile(os.path.join(config_dir, "client.cfg")):
-    if os.path.isfile(os.path.join(config_dir, "clientSample.cfg")):
-        copyfile(os.path.join(config_dir, "clientSample.cfg"), os.path.join(config_dir, "client.cfg"))
+if not os.path.isfile(os.path.join(config_dir, "server.cfg")):
+    if os.path.isfile(os.path.join(config_dir, "server.cfg")):
+        copyfile(os.path.join(config_dir, "server.cfg"), os.path.join(config_dir, "server.cfg"))
 
-if os.path.isfile(os.path.join(config_dir, "client.cfg")):
-    cfg = Utils.loadCfg(os.path.join(config_dir, "client.cfg"))
+if os.path.isfile(os.path.join(config_dir, "server.cfg")):
+    cfg = Utils.loadCfg(os.path.join(config_dir, "server.cfg"))
 else:
     print("No client config file found under "+str(config_dir))
     sys.exit(1)
@@ -101,11 +101,11 @@ def dispatchLaunchableToolsv2(launchableTools, worker):
         my_monitor: A Monitor instance which knows what tools are already launched and online workers
         launchableTools: A list of tools within a Wave that passed the Intervals checking.
     """
-    mongoInstance = MongoCalendar.getInstance()
+    apiclient = APIClient.getInstance()
     for launchableTool in launchableTools:
         tool = Tool.fetchObject({"_id": ObjectId(launchableTool["_id"])})
-        if worker.hasSpaceFor(tool, mongoInstance.calendarName):
-            launchTask(mongoInstance.calendarName, worker, tool)
+        if worker.hasSpaceFor(tool, apiclient.getCurrentPentest()):
+            launchTask(apiclient.getCurrentPentest(), worker, tool)
 
 def findLaunchableToolsOnWorker(worker, calendarName):
     """ 
@@ -117,11 +117,10 @@ def findLaunchableToolsOnWorker(worker, calendarName):
             * A list of launchable tools as dictionary with values _id, name and priority
             * A dictionary of waiting tools with tool's names as keys and integer as value.
     """
-    mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(calendarName)
+    apiclient = APIClient.getInstance()
+    apiclient.setCurrentPentest(calendarName)
     toolsLaunchable = []
-    worker_registered = mongoInstance.findInDb("pollenisator", "workers", {"name":worker.name}, False)
-    commands_registered = worker_registered["registeredCommands"]
+    commands_registered = apiclient.getRegisteredCommands(worker.name)
     
     waiting = {}
     time_compatible_waves_id = Wave.searchForAddressCompatibleWithTime()
@@ -157,18 +156,18 @@ def getCommands(calendarName, worker_name):
     List worker registered tools in configuration folder.
     Store the results in mongo database in pollenisator.workers database.
     """
-    mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(calendarName)
+    apiclient = APIClient.getInstance()
+    apiclient.setCurrentPentest(calendarName)
     tools_to_register = Utils.loadToolsConfig()
     print("Registering commands : "+str(list(tools_to_register.keys())))
-    mongoInstance.registerCommands(worker_name, list(tools_to_register.keys()))
+    apiclient.registeredCommands(worker_name, list(tools_to_register.keys()))
     return
 
 
 @app.task
 def startAutoScan(calendarName, workerName):
-    mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(calendarName)
+    apiclient = APIClient.getInstance()
+    apiclient.setCurrentPentest(calendarName)
     print("Starting auto scan on "+str(calendarName))
     autoScanv2(calendarName, workerName)
     return
@@ -189,8 +188,8 @@ def autoScanv2(databaseName, workerName):
         endless: a boolean that indicates if the autoscan will be endless or if it will stop at the moment it does not found anymore launchable tools.
         useReprinter: a boolean that indicates if the array outpur will be entirely reprinted or if it will be overwritten.
     """
-    mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(databaseName)
+    apiclient = APIClient.getInstance()
+    apiclient.setCurrentPentest(databaseName)
     time_compatible_waves_id = Wave.searchForAddressCompatibleWithTime()
     worker = Worker(workerName)
     while True:
@@ -222,8 +221,8 @@ def executeCommand(calendarName, toolId, parser=""):
         Exception: if a plugin considered a failure.
     """
     # Connect to given calendar
-    mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(calendarName)
+    apiclient = APIClient.getInstance()
+    apiclient.setCurrentPentest(calendarName)
     msg = ""
     # retrieve tool from tool sid
     toolModel = Tool.fetchObject({"_id": ObjectId(toolId)})

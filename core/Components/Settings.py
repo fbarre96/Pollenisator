@@ -4,7 +4,7 @@ import tkinter.ttk as ttk
 import tkinter as tk
 import tkinter.messagebox
 import json
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 from shutil import which
 
 
@@ -16,6 +16,7 @@ class Settings:
         * pentest db settings: stored in the pentest database under settings collection
         * global settings: stored in the pollenisator database under settings collection
     """
+    tags_cache = None
     def __init__(self):
         """
         Load the tree types of settings and stores them in dictionnaries
@@ -53,13 +54,16 @@ class Settings:
             If none are defined returns {"todo":"orange", "unscanned":"yellow", "P0wned!":"red", "Interesting":"dark green", "Uninteresting":"sky blue", "Neutral":"white"}
             otherwise returns a dict with defined key values
         """
-        mongoInstance = MongoCalendar.getInstance()
-        tags = mongoInstance.findInDb(
+        apiclient = APIClient.getInstance()
+        if cls.tags_cache is not None:
+            return cls.tags_cache
+        tags = apiclient.findInDb(
             "pollenisator", "settings", {"key": "tags"}, False)
         if tags is not None:
             if isinstance(tags["value"], dict):
-                return tags["value"]
-        return  {"todo":"orange", "unscanned":"yellow", "P0wned!":"red", "Interesting":"dark green", "Uninteresting":"sky blue", "Neutral":"white"}
+                cls.tags_cache = tags["value"]
+        cls.tags_cache = {"todo":"orange", "unscanned":"yellow", "P0wned!":"red", "Interesting":"dark green", "Uninteresting":"sky blue", "Neutral":"white"}
+        return cls.tags_cache
 
     @classmethod
     def getPentestTypes(cls):
@@ -69,8 +73,8 @@ class Settings:
             If none are defined returns {"Web":["Socle", "Application", "Données", "Politique"], "LAN":["Infrastructure", "Active Directory", "Données", "Politique"]}
             otherwise returns a dict with defined key values
         """
-        mongoInstance = MongoCalendar.getInstance()
-        pentest_types = mongoInstance.findInDb(
+        apiclient = APIClient.getInstance()
+        pentest_types = apiclient.findInDb(
             "pollenisator", "settings", {"key": "pentest_types"}, False)
         if pentest_types is not None:
             if isinstance(pentest_types["value"], dict):
@@ -134,8 +138,8 @@ class Settings:
         """
         Reload pentest database settings from pentest database
         """
-        mongoInstance = MongoCalendar.getInstance()
-        dbSettings = mongoInstance.find("settings", {})
+        apiclient = APIClient.getInstance()
+        dbSettings = apiclient.find("settings", {})
         if dbSettings is None:
             dbSettings = {}
         for settings_dict in dbSettings:
@@ -148,8 +152,8 @@ class Settings:
         """
         Reload pentest database settings from pollenisator database
         """
-        mongoInstance = MongoCalendar.getInstance()
-        globalSettings = mongoInstance.findInDb("pollenisator", "settings", {})
+        apiclient = APIClient.getInstance()
+        globalSettings = apiclient.getSettings("pollenisator", "settings", {})
         for settings_dict in globalSettings:
             self.global_settings[settings_dict["key"]] = settings_dict["value"]
 
@@ -217,26 +221,28 @@ class Settings:
         with open(self.confdir, "w") as f:
             f.write(json.dumps(self.local_settings))
 
+    def savePentestSettings(self):
+        settings = apiclient.find("settings")
+        for k, v in self.db_settings.items():
+            if k not in settings:
+                apiclient.insert("settings", {
+                    "key": k, "value": v})
+            else:
+                apiclient.update("settings", {
+                    "key": k}, {"$set": {"value": v}})
+
     def save(self):
         """
         Save all the settings (local, database and global)
         """
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
+
         for k, v in self.global_settings.items():
-            if mongoInstance.findInDb("pollenisator", "settings", {"key": k}, False) is None:
-                mongoInstance.insertInDb("pollenisator", "settings", {
-                                         "key": k, "value": v})
+            if apiclient.getSettings({"key": k}) is None:
+                apiclient.createSetting(k, v)
             else:
-                mongoInstance.updateInDb("pollenisator", "settings", {
-                    "key": k}, {"$set": {"value": v}})
-        for k, v in self.db_settings.items():
-            if mongoInstance.find("settings", {"key": k}, False) is None:
-                mongoInstance.insert("settings", {
-                    "key": k, "value": v})
-            else:
-                mongoInstance.update("settings", {
-                    "key": k}, {"$set": {"value": v}})
-        
+                apiclient.updateSetting(k, v)
+        self.savePentestSettings()
         self.saveLocalSettings()
         self.reloadUI()
 

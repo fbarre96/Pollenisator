@@ -6,7 +6,7 @@ import io
 import os
 import hashlib
 from core.Components.Utils import listPlugin, loadPlugin
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 from core.Forms.FormPanel import FormPanel
 from core.Views.ViewElement import ViewElement
 from core.Models.Wave import Wave
@@ -149,9 +149,9 @@ class ChildDialogFileParser:
                     tool_m = Tool().initialize(toolName, wave, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
                                                 dated=date, datef=date, scanner_ip="Imported file", status="done", notes=notes, tags=tags)
                     tool_m.addInDb()
-                    mongoInstance = MongoCalendar.getInstance()
+                    apiclient = APIClient.getInstance()
                     outputRelDir = tool_m.getOutputDir(
-                        mongoInstance.calendarName)
+                        apiclient.getCurrentPentest())
                     abs_path = os.path.dirname(os.path.abspath(__file__))
                     outputDir = os.path.join(
                         abs_path, "../../../results", outputRelDir)

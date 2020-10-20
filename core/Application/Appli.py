@@ -26,7 +26,7 @@ from core.Application.Dialogs.ChildDialogException import ChildDialogException
 from core.Application.Dialogs.ChildDialogInfo import ChildDialogInfo
 from core.Application.Dialogs.ChildDialogFileParser import ChildDialogFileParser
 from core.Application.StatusBar import StatusBar
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 from core.Components.ScanManager import ScanManager
 from core.Components.Settings import Settings
 from core.Components.Filter import Filter
@@ -302,13 +302,13 @@ class Appli(ttk.Frame):
 
         # Connect to database and choose database to open
         abandon = False
-        mongoInstance = MongoCalendar.getInstance()
-        while not mongoInstance.isUserConnected() and not abandon:
+        apiclient = APIClient.getInstance()
+        while not apiclient.tryConnection() and not abandon:
             abandon = self.promptForConnection() is None
         if not abandon:
-            mongoInstance.attach(self)
+            apiclient.attach(self)
             self.initUI()
-            # Will trigger promptForCalendarOpen when tab will be opened
+            self.promptCalendarName()
         else:
             self.onClosing()
             try:
@@ -354,8 +354,8 @@ class Appli(ttk.Frame):
         
         Returns: 
             The number of pollenisator database found, 0 if the connection failed."""
-        mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.reinitConnection()
+        apiclient = APIClient.getInstance()
+        apiclient.reinitConnection()
         connectDialog = ChildDialogConnect(self.parent)
         self.wait_window(connectDialog.app)
         return connectDialog.rvalue
@@ -392,12 +392,10 @@ class Appli(ttk.Frame):
         """
         Read notifications from database every 0.5 or so second. Notifications are used to exchange informations between applications.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        for old_notif in self.old_notifs:
-            mongoInstance.deleteFromDb("pollenisator", "notifications", {"_id": old_notif})
+        apiclient = APIClient.getInstance()
         self.old_notifs = []
         try:
-            notifications = mongoInstance.findInDb("pollenisator", "notifications", {"$or":[{"db":str(mongoInstance.calendarName)}, {"db":"pollenisator"}]})
+            notifications = apiclient.fetchNotifications(apiclient.getCurrentPentest())
             for notification in notifications:
                 # print("Notification received "+str(notification["db"])+"/"+str(notification["collection"])+" iid="+str(notification["iid"])+" action="+str(notification["action"]))
                 self.old_notifs.append(notification["_id"])
@@ -416,15 +414,15 @@ class Appli(ttk.Frame):
         except Exception as e:
             print(str(e))
         self.notifications_timers = threading.Timer(
-            0.5, self.readNotifications)
+            5, self.readNotifications)
         self.notifications_timers.start()
 
     def onClosing(self):
         """
         Close the application properly.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.dettach(self)
+        apiclient = APIClient.getInstance()
+        apiclient.dettach(self)
         if self.scanManager is not None:
             self.scanManager.stop()
         print("Stopping notifications...")
@@ -737,21 +735,18 @@ class Appli(ttk.Frame):
         self.searchBar.quit()
         if tabName == "Commands":
             self.commandsTreevw.initUI()
-        mongoInstance = MongoCalendar.getInstance()
-        if not mongoInstance.hasACalendarOpen():
+        apiclient = APIClient.getInstance()
+        if not apiclient.getCurrentPentest() != "":
             opened = self.promptCalendarName()
             if opened is None:
                 return
         if tabName == "Scan":
-            if mongoInstance.calendarName is not None:
-                if mongoInstance.calendarName != "":
-                    if os.name != 'nt': # Disable on windows
-                        # if self.scanManager is None:
-                        #    self.scanManager = ScanManager(mongoInstance.calendarName, self.settings)
-                        self.scanManager.initUI(self.scanViewFrame)
-                    else:
-                        lbl = ttk.Label(self.scanViewFrame, text="Disabled on windows because celery does not support it.")
-                        lbl.pack()
+            if not apiclient.getCurrentPentest() != "":
+                if os.name != 'nt': # Disable on windows
+                    self.scanManager.initUI(self.scanViewFrame)
+                else:
+                    lbl = ttk.Label(self.scanViewFrame, text="Disabled on windows because celery does not support it.")
+                    lbl.pack()
         elif tabName == "Settings":
             self.settings.reloadUI()
         else:
@@ -867,8 +862,8 @@ class Appli(ttk.Frame):
         """
         Reset all running tools to a ready state.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        if mongoInstance.hasACalendarOpen():
+        apiclient = APIClient.getInstance()
+        if apiclient.getCurrentPentest() != "":
             Utils.resetUnfinishedTools()
             self.statusbar.reset()
             self.treevw.load()
@@ -877,19 +872,19 @@ class Appli(ttk.Frame):
         """
         Dump a pentest database to an archive file gunzip.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        dialog = ChildDialogCombo(self, mongoInstance.listCalendars()[::-1], "Choose a database to dump:")
+        apiclient = APIClient.getInstance()
+        dialog = ChildDialogCombo(self, apiclient.getPentestList()[::-1], "Choose a pentest to dump:")
         self.wait_window(dialog.app)
         if isinstance(dialog.rvalue, str):
-            mongoInstance.dumpDb(dialog.rvalue)
+            apiclient.dumpDb(dialog.rvalue)
 
     def exportCommands(self):
         """
         Dump pollenisator from database to an archive file gunzip.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.dumpDb("pollenisator", "commands")
-        mongoInstance.dumpDb("pollenisator", "group_commands")
+        apiclient = APIClient.getInstance()
+        apiclient.dumpDb("pollenisator", "commands")
+        apiclient.dumpDb("pollenisator", "group_commands")
         tkinter.messagebox.showinfo(
             "Export pollenisator database", "Export completed in exports/pollenisator_commands.gzip and exports/pollenisator_group_commands.gzip")
 
@@ -899,7 +894,7 @@ class Appli(ttk.Frame):
         Args:
             name: The filename of the gunzip database exported previously
         """
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         filename = ""
         if name is None:
             f = tkinter.filedialog.askopenfilename(defaultextension=".gzip")
@@ -908,7 +903,7 @@ class Appli(ttk.Frame):
             filename = str(f)
         else:
             filename = name
-        mongoInstance.importDatabase(filename)
+        apiclient.importDatabase(filename)
 
     def importCommands(self, name=None):
         """
@@ -929,8 +924,8 @@ class Appli(ttk.Frame):
         else:
             filename = name
         try:
-            mongoInstance = MongoCalendar.getInstance()
-            mongoInstance.importCommands(filename)
+            apiclient = APIClient.getInstance()
+            apiclient.importCommands(filename)
             self.commandsTreevw.refresh()
         except IOError:
             tkinter.messagebox.showerror(
@@ -955,8 +950,8 @@ class Appli(ttk.Frame):
             None if no database were selected
             datababase name otherwise
         """
-        mongoInstance = MongoCalendar.getInstance()
-        calendars = mongoInstance.listCalendars()
+        apiclient = APIClient.getInstance()
+        calendars = apiclient.getPentestList()
         if calendars is None:
             calendars = []
         dialog = ChildDialogCombo(self, ["New database"]+calendars[::-1], "Please select a database")
@@ -974,9 +969,9 @@ class Appli(ttk.Frame):
         """
         Ask a user a calendar name then delete it.
         """
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         dialog = ChildDialogCombo(
-            self, mongoInstance.listCalendars()[::-1], "Choose a database to delete:")
+            self, apiclient.getPentestList()[::-1], "Choose a database to delete:")
         self.wait_window(dialog.app)
         if isinstance(dialog.rvalue, str):
             calendarName = dialog.rvalue
@@ -988,7 +983,7 @@ class Appli(ttk.Frame):
             ret = tkinter.messagebox.askokcancel(
                 "The document will be deleted", "You are going to delete permanently the database \""+calendarName+"\". Are you sure ?")
             if ret:
-                mongoInstance.doDeleteCalendar(calendarName)
+                apiclient.doDeletePentest(calendarName)
 
             self.treevw.deleteState(calendarName)
 
@@ -1001,8 +996,8 @@ class Appli(ttk.Frame):
         """
         succeed = False
         if calendarName is not None:
-            mongoInstance = MongoCalendar.getInstance()
-            succeed = mongoInstance.registerCalendar(calendarName, True, True)
+            apiclient = APIClient.getInstance()
+            succeed = apiclient.registerPentest(calendarName)
         return succeed
 
     def selectNewCalendar(self):
@@ -1080,7 +1075,7 @@ class Appli(ttk.Frame):
         self.settings.db_settings["include_domains_with_topdomain_in_scope"] = settings["Add domains who have a parent domain in scope"] == 1
         self.settings.db_settings["include_all_domains"] = settings["Add all domains found"] == 1
         self.settings.db_settings["pentesters"] = list(map(lambda x: x.strip(), pentesters.split("\n")))
-        self.settings.save()
+        self.settings.savePentestSettings()
 
     def openCalendar(self, filename=""):
         """
@@ -1091,9 +1086,9 @@ class Appli(ttk.Frame):
         """
         print("Start monitoring")
         calendarName = None
-        mongoInstance = MongoCalendar.getInstance()
-        if filename == "" and mongoInstance.hasACalendarOpen():
-            calendarName = mongoInstance.calendarName
+        apiclient = APIClient.getInstance()
+        if filename == "" and apiclient.getCurrentPentest() != "":
+            calendarName = apiclient.getCurrentPentest()
         elif filename != "":
             calendarName = filename.split(".")[0].split("/")[-1]
         if calendarName is not None:
@@ -1102,7 +1097,7 @@ class Appli(ttk.Frame):
             if self.notifications_timers is not None:
                 self.notifications_timers.cancel()
                 self.notifications_timers = None
-            mongoInstance.connectToDb(calendarName)
+            apiclient.setCurrentPentest(calendarName)
             for widget in self.viewframe.winfo_children():
                 widget.destroy()
             for module in self.modules:
@@ -1110,9 +1105,9 @@ class Appli(ttk.Frame):
             self.statusbar.reset()
             self.treevw.refresh()
             if os.name != "nt": # On windows celery 4.X is not managed
-                self.scanManager = ScanManager(self.nbk, self.treevw, mongoInstance.calendarName, self.settings)
+                self.scanManager = ScanManager(self.nbk, self.treevw, apiclient.getCurrentPentest(), self.settings)
                 self.notifications_timers = threading.Timer(
-                    0.5, self.readNotifications)
+                    5, self.readNotifications)
                 self.notifications_timers.start()
 
     def wrapCopyDb(self, _event=None):
@@ -1122,8 +1117,8 @@ class Appli(ttk.Frame):
         Args:
             _event: not used but mandatory
         """
-        mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.copyDb()
+        apiclient = APIClient.getInstance()
+        apiclient.copyDb()
 
     def importExistingTools(self, _event=None):
         """

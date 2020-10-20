@@ -5,6 +5,7 @@ import tkinter.messagebox
 import tkinter.simpledialog
 import tkinter.filedialog
 import datetime
+import uuid, OpenSSL
 from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError, OperationFailure
 import core.Components.Utils as Utils
@@ -58,7 +59,6 @@ class MongoCalendar:
             self.db = None
             self.forbiddenNames = ["admin", "config", "local",
                                    "broker_pollenisator", "pollenisator"]
-            self._observers = []
             MongoCalendar.__instances[pid] = self
 
     def reinitConnection(self):
@@ -72,12 +72,12 @@ class MongoCalendar:
         pipeline = {} if pipeline is None else pipeline
         return self.findInDb("pollenisator", "workers", pipeline)
     
-    def setWorkerExclusion(self, worker_hostname, db, setExcluded):
+    def setWorkerExclusion(self, name, db, setExcluded):
         if setExcluded:
-            self.updateInDb("pollenisator", "workers", {"name": worker_hostname}, {
+            return self.updateInDb("pollenisator", "workers", {"name": name}, {
                             "$push": {"excludedDatabases": db}}, False, True)
         else:
-            self.updateInDb("pollenisator", "workers", {"name": worker_hostname}, {
+            return self.updateInDb("pollenisator", "workers", {"name": name}, {
                             "$pull": {"excludedDatabases": db}}, False, True)
 
     def deleteWorker(self, worker_hostname):
@@ -86,6 +86,7 @@ class MongoCalendar:
             worker_hostname: the worker shortname to update."""
         res = self.deleteFromDb("pollenisator", "workers", {
             "name": worker_hostname}, False, True)
+        return res
 
     def removeInactiveWorkers(self):
         """Remove workers that did not sent a heart beat in 30 sec."""
@@ -94,6 +95,7 @@ class MongoCalendar:
         res = self.deleteFromDb("pollenisator", "workers", {
             "last_heartbeat": {"$lt": deltaTime}}, True, True)
         print("Removed inactive workers:"+str(res.deleted_count))
+        return res.deleted_count
 
 
     def updateWorkerLastHeartbeat(self, worker_hostname):
@@ -101,15 +103,16 @@ class MongoCalendar:
         Args:
             worker_hostname: the worker shortname to update.
         """
-        self.updateInDb("pollenisator", "workers", {"name": worker_hostname}, {
+        return self.updateInDb("pollenisator", "workers", {"name": worker_hostname}, {
                         "$set": {"last_heartbeat": datetime.datetime.now()}})
+
 
     def connect(self, config=None, timeoutInMS=500):
         """
         Connect the mongo client to the database using the login provided and ssl certificates if ssl is activated.
         Args:
-            config: A dictionnary with client.cfg config values (host, mongo_port, password, user, ssl).
-                    Default to None. If None, the client.cfg file will be read.
+            config: A dictionnary with server.cfg config values (host, mongo_port, password, user, ssl).
+                    Default to None. If None, the server.cfg file will be read.
             timeoutInMs: milliseconds to wait before timeout. Default to 500ms.
         Raises:
             ServerSelectionTimeoutError: if unable to connect to the mongo database
@@ -123,7 +126,7 @@ class MongoCalendar:
             return
         dir_path = os.path.dirname(os.path.realpath(__file__))
         cfg = config if config is not None else Utils.loadCfg(
-            os.path.join(dir_path, "../../config/client.cfg"))
+            os.path.join(dir_path, "../../config/server.cfg"))
         try:
             self.host = str(cfg["host"])
             self.port = str(cfg.get("mongo_port", 27017))
@@ -210,12 +213,14 @@ class MongoCalendar:
                     "name": worker_name, "shortname": worker_shortname, "registeredCommands": command_names}, '', True)
             print("Registered commands "+str(command_names) +
                   " for  "+str(worker_name))
+            return True
         except IOError as e:
             print("Failed to connect." + str(e))
             print("Please verify that the mongod service is running on host " +
                   self.host + " and has a user mongAdmin with the correct password.")
             self.client = None
-
+            return False
+            
     def getRegisteredCommands(self, worker_name):
         """Return the commands list registered by the given worker name
         Args:
@@ -236,45 +241,7 @@ class MongoCalendar:
                   self.host + " and has a user mongAdmin with the correct password.")
             self.client = None
 
-    def attach(self, observer):
-        """
-        Attach an observer to the database. All attached observers will be notified when a modication is done to a calendar through the methods presented below.
-
-        Args:
-            observer: the observer that implements a notify(collection, iid, action) function
-        """
-        self._observers.append(observer)
-
-    def dettach(self, observer):
-        """
-        Dettach the given observer from the database.
-
-        Args:
-            observer: the observer to detach
-        """
-        try:
-            self._observers.remove(observer)
-        except ValueError:
-            pass
-
-    def notify(self, db, collection, iid, action, parentId=""):
-        """
-        Notify all observers of the modified record from database.
-        Uses the observer's notify implementation. This implementation must take the same args as this.
-
-        Args:
-            collection: the collection where a document has been modified
-            iid: the mongo ObjectId of the document that has been modified
-            action: the type of modification performed on this document ("insert", "update" or "delete")
-            parentId: (not used) default to "", a node parent id as str
-        """
-        if self._observers is not None:
-            if len(self._observers) > 1:
-                for observer in self._observers:
-                    observer.notify(db, collection, iid, action)
-            else:
-                self.client["pollenisator"]["notifications"].insert_one(
-                    {"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId})
+    
 
     def update(self, collection, pipeline, updatePipeline, many=False, notify=True):
         """
@@ -419,6 +386,10 @@ class MongoCalendar:
         self.connect()
         dbMongo = self.client[db]
         return self._find(dbMongo, collection, pipeline, multi)
+
+    def fetchNotifications(self, pentest):
+        self.connect()
+        return self._find("pollenisator", "notifications", {"$or":[{"db":str(pentest)}, {"db":"pollenisator"}]}, True)
 
     def _find(self, db, collection, pipeline=None, multi=True):
         """
@@ -603,10 +574,11 @@ class MongoCalendar:
                 self.client.drop_database(calendarName)
                 tkinter.messagebox.showinfo(
                     "Success", "Deleted from "+"calendars"+" \""+str(calendarName)+"\"")
-                return
+                return True
 
         tkinter.messagebox.showinfo(
             "Error", "Deleting "+str(calendarName)+" is not allowed because it is not a database.")
+        return False
 
     def validateCalendarName(self, calendarName):
         """Check the database name to see if it usable.
@@ -648,7 +620,7 @@ class MongoCalendar:
         # check for forbidden names
         if not authorized:
             tkinter.messagebox.showinfo("add database attempt:", msg)
-            return False
+            return False, "msg"
         else:
             # check if already exists
             self.connectToDb("pollenisator")
@@ -665,11 +637,13 @@ class MongoCalendar:
                 self.connectToDb("pollenisator")
                 self.db.calendars.insert({"nom": saveAsName.strip()})
                 self.connectToDb(saveAsName.strip())
+            else:
+                return False, msg
             if autoconnect:
                 self.connectToDb(saveAsName.strip())
             else:
                 self.connectToDb(oldConnection)
-        return True
+        return True, "Success"
 
     def copyDb(self, ToCopyName="", fromCopyName=""):
         """
@@ -779,3 +753,16 @@ class MongoCalendar:
 
         execute(cmd, None, False)
         return True
+
+    def notify(self, db, collection, iid, action, parentId=""):
+        """
+        Notify all observers of the modified record from database.
+        Uses the observer's notify implementation. This implementation must take the same args as this.
+        Args:
+            collection: the collection where a document has been modified
+            iid: the mongo ObjectId of the document that has been modified
+            action: the type of modification performed on this document ("insert", "update" or "delete")
+            parentId: (not used) default to "", a node parent id as str
+        """
+        self.client["pollenisator"]["notifications"].insert_one(
+            {"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId})

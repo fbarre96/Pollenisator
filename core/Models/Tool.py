@@ -1,7 +1,7 @@
 """Tool Model. A tool is an instanciation of a command against a target"""
 
 from core.Models.Element import Element
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 from bson.objectid import ObjectId
 from datetime import datetime
 import core.Components.Utils as Utils
@@ -95,8 +95,8 @@ class Tool(Element):
         """
         Delete the tool represented by this model in database.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.delete("tools", {"_id": self._id})
+        apiclient = APIClient.getInstance()
+        apiclient.delete("tools", {"_id": self._id})
 
     def addInDb(self):
         """
@@ -107,9 +107,9 @@ class Tool(Element):
                 * mongo ObjectId : already existing object if duplicate, create object id otherwise 
         """
         base = self.getDbKey()
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         # Checking unicity
-        existing = mongoInstance.find("tools", base, False)
+        existing = apiclient.find("tools", base, False)
         if existing is not None:
             return False, existing["_id"]
         # Those are added to base after tool's unicity verification
@@ -125,7 +125,7 @@ class Tool(Element):
         base["text"] = self.text
         base["resultfile"] = self.resultfile
         base["notes"] = self.notes
-        res = mongoInstance.insert("tools", base, parent)
+        res = apiclient.insert("tools", base, parent)
         self._id = res.inserted_id
         return True, res.inserted_id
 
@@ -188,8 +188,8 @@ class Tool(Element):
         Return:
             Returns the Mongo dict command fetched instance associated with this tool's name.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        commandTemplate = mongoInstance.findInDb(mongoInstance.calendarName,
+        apiclient = APIClient.getInstance()
+        commandTemplate = apiclient.findInDb(apiclient.getCurrentPentest(),
                                                  "commands", {"name": self.name}, False)
         return commandTemplate
 
@@ -246,7 +246,7 @@ class Tool(Element):
             comm = self.getCommand()
             command = comm["text"]
             lvl = comm["lvl"]
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         command = command.replace("|outputDir|", outputDirectory)
         command = command.replace("|wave|", self.wave)
         if lvl == "network" or lvl == "domain":
@@ -260,7 +260,7 @@ class Tool(Element):
                 command = command.replace("|parent_domain|", topdomain)
         if lvl == "ip":
             command = command.replace("|ip|", self.ip)
-            ip_db = mongoInstance.find("ips", {"ip":self.ip}, False)
+            ip_db = apiclient.find("ips", {"ip":self.ip}, False)
             ip_infos = ip_db.get("infos", {})
             for info in ip_infos:
                 command = command.replace("|ip.infos."+str(info)+"|", command)
@@ -268,7 +268,7 @@ class Tool(Element):
             command = command.replace("|ip|", self.ip)
             command = command.replace("|port|", self.port)
             command = command.replace("|port.proto|", self.proto)
-            port_db = mongoInstance.find("ports", {"port":self.port, "proto":self.proto, "ip":self.ip}, False)
+            port_db = apiclient.find("ports", {"port":self.port, "proto":self.proto, "ip":self.ip}, False)
             command = command.replace("|port.service|", port_db["service"])
             command = command.replace("|port.product|", port_db["product"])
             port_infos = port_db.get("infos", {})
@@ -282,13 +282,13 @@ class Tool(Element):
         Args:
             pipeline_set: (Opt.) A dictionnary with custom values. If None (default) use model attributes.
         """
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         if pipeline_set is None:
-            mongoInstance.update("tools", {"_id": ObjectId(self._id)}, {
+            apiclient.update("tools", {"_id": ObjectId(self._id)}, {
                 "$set": {"scanner_ip": str(self.scanner_ip), "dated": str(self.dated), "status": self.status,
                          "datef":  str(self.datef), "notes":  self.notes, "resultfile": self.resultfile, "tags": self.tags}})
         else:
-            mongoInstance.update(
+            apiclient.update(
                 "tools", {"_id": ObjectId(self._id)}, {"$set": pipeline_set})
 
     def _getParent(self):
@@ -298,17 +298,17 @@ class Tool(Element):
         Returns:
             Returns the parent's ObjectId _id". or None if a type error occurs
         """
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         try:
             if self.lvl == "wave":
-                wave = mongoInstance.find("waves", {"wave": self.wave}, False)
+                wave = apiclient.find("waves", {"wave": self.wave}, False)
                 return wave["_id"]
             elif self.lvl == "network" or self.lvl == "domain":
-                return mongoInstance.find("scopes", {"wave": self.wave, "scope": self.scope}, False)["_id"]
+                return apiclient.find("scopes", {"wave": self.wave, "scope": self.scope}, False)["_id"]
             elif self.lvl == "ip":
-                return mongoInstance.find("ips", {"ip": self.ip}, False)["_id"]
+                return apiclient.find("ips", {"ip": self.ip}, False)["_id"]
             else:
-                return mongoInstance.find("ports", {"ip": self.ip, "port": self.port, "proto": self.proto}, False)["_id"]
+                return apiclient.find("ports", {"ip": self.ip, "port": self.port, "proto": self.proto}, False)["_id"]
         except TypeError:
             # None type returned:
             return None
