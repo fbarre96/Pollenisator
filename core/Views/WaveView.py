@@ -31,7 +31,7 @@ class WaveView(ViewElement):
         self.form.addFormHelper(
             "If you select a previously unselected command,\n it will be added to every object of its level.\nIf you unselect a previously selected command,\n it will remove only tools that are not already done.")
         self.form.addFormChecklist(
-            "Commands", Command.getList(None, MongoCalendar.getInstance().calendarName), modelData["wave_commands"])
+            "Commands", Command.getList(None, APIClient.getInstance().getCurrentPentest()), modelData["wave_commands"])
         self.completeModifyWindow()
 
     def openInsertWindow(self):
@@ -42,7 +42,7 @@ class WaveView(ViewElement):
         top_panel.addFormLabel("Wave")
         top_panel.addFormStr("Wave", r".+", "", column=1)
         self.form.addFormHelper("Only selected commands will be launchable.")
-        self.form.addFormChecklist("Commands", Command.getList(None, MongoCalendar.getInstance().calendarName), [])
+        self.form.addFormChecklist("Commands", Command.getList(None, APIClient.getInstance().getCurrentPentest()), [])
         self.completeInsertWindow()
 
     def addChildrenBaseNodes(self, newNode):
@@ -68,7 +68,7 @@ class WaveView(ViewElement):
             parentNode: if None, will calculate the parent. If setted, forces the node to be inserted inside given parentNode.
             addChildren: If False: skip interval, tools and scope insert. Useful when displaying search results.
         """
-        parentNode = self.getParent()
+        parentNode = self.getParentNode()
         self.appliTw.views[str(self.controller.getDbId())] = {
             "view": self, 'parent': ''}
         wave_node = self.appliTw.insert(parentNode, "end", str(self.controller.getDbId()), text=str(
@@ -95,7 +95,7 @@ class WaveView(ViewElement):
         if "hidden" in self.controller.getTags():
             self.hide()
 
-    def getParent(self):
+    def getParentNode(self):
         """
         Return the id of the parent node in treeview.
 

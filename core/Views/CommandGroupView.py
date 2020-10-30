@@ -62,14 +62,14 @@ class CommandGroupView(ViewElement):
         Args:
             parentNode: not used
         """
-        parentNode = self.getParent()
+        parentNode = self.getParentNode()
         self.appliTw.views[str(self.controller.getDbId())] = {"view": self}
         self.appliTw.insert(parentNode, "end", str(self.controller.getDbId()), text=str(
             self.controller.getModelRepr()), tags=self.controller.getTags(), image=self.getClassIcon())
         if "hidden" in self.controller.getTags():
             self.hide()
 
-    def getParent(self):
+    def getParentNode(self):
         """
         Return the id of the parent node in treeview.
 

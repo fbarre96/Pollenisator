@@ -535,7 +535,6 @@ class Report:
             elif defect_o.redactor not in values[4].split(", "):
                 values[4] += ", "+defect_o.redactor
             self.treevw.item(already_inserted_iid, values=values)
-        # apiclient.insert("defects_table",{""})
         self.resizeDefectTreeview()
     
     def resizeDefectTreeview(self):

@@ -24,28 +24,28 @@ class Command(Element):
             valuesFromDb = dict()
         super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None),  valuesFromDb.get(
             "tags", []), valuesFromDb.get("infos", {}))
-        self.initialize(valuesFromDb.get("name", ""), valuesFromDb.get("sleep_between", "0"),
-                        valuesFromDb.get("priority", "0"), valuesFromDb.get(
-                            "max_thread", "1"),
+        self.initialize(valuesFromDb.get("name", ""), valuesFromDb.get("sleep_between", 0),
+                        valuesFromDb.get("priority", 0), valuesFromDb.get(
+                            "max_thread", 1),
                         valuesFromDb.get("text", ""), valuesFromDb.get(
                             "lvl", "network"),
                         valuesFromDb.get("ports", ""),
-                        valuesFromDb.get("safe", "True"), valuesFromDb.get("types", []), valuesFromDb.get("indb", "pollenisator"), valuesFromDb.get("timeout", "300"), valuesFromDb.get("infos", {}))
+                        valuesFromDb.get("safe", True), valuesFromDb.get("types", []), valuesFromDb.get("indb", "pollenisator"), valuesFromDb.get("timeout", 300), valuesFromDb.get("infos", {}))
 
-    def initialize(self, name, sleep_between="0", priority="0", max_thread="1", text="", lvl="network", ports="", safe="True", types=None, indb=False, timeout="300", infos=None):
+    def initialize(self, name, sleep_between=0, priority=0, max_thread=1, text="", lvl="network", ports="", safe=True, types=None, indb=False, timeout=300, infos=None):
         """Set values of command
         Args:
             name: the command name
-            sleep_between: delay to wait between two call to this command. Default is "0".
-            priority: priority of the command ("0" is highest). Default is "0".
-            max_thread: number of parallel execution possible of this command. Default is "1".
+            sleep_between: delay to wait between two call to this command. Default is 0
+            priority: priority of the command (0 is highest). Default is 0
+            max_thread: number of parallel execution possible of this command. Default is 1
             text: the command line options. Default is "".
             lvl: level of the command. Must be either "wave", "network", "domain", "ip", "port". Default is "network"
             ports: allowed proto/port, proto/service or port-range for this command
-            safe: "True" or "False" with "True" as default. Indicates if autoscan is authorized to launch this command.
+            safe: True or False with True as default. Indicates if autoscan is authorized to launch this command.
             types: type for the command. Lsit of string. Default to None.
             indb: db name : global (pollenisator database) or  local pentest database
-            timeout: a timeout to kill stuck tools and retry them later
+            timeout: a timeout to kill stuck tools and retry them later. Default is 300 (in seconds)
             infos: a dictionnary with key values as additional information. Default to None
         Returns:
             this object
@@ -73,27 +73,8 @@ class Command(Element):
         """
         ret = self._id
         apiclient = APIClient.getInstance()
-        # Remove from all group of commands this command name if they have it.
-        apiclient.updateInDb(self.indb, "group_commands", {}, {
-            "$pull": {"commands": self.name}}, True, True)
-        # Remove from all waves this command.
-        if self.indb == "pollenisator":
-            calendars = apiclient.getPentestList()
-        else:
-            calendars = [self.indb]
-        for calendar in calendars:
-            waves = apiclient.findInDb(calendar, "waves")
-            for wave in waves:
-                toBeUpdated = wave["wave_commands"]
-                if self.name in wave["wave_commands"]:
-                    toBeUpdated.remove(self.name)
-                    apiclient.updateInDb(calendar, "waves", {"_id": wave["_id"]}, {
-                        "$set": {"wave_commands": toBeUpdated}}, False)
-            # Remove all tools refering to this command's name.
-            apiclient.deleteFromDb(calendar,
-                                    "tools", {"name": self.name}, True, True)
-        apiclient.deleteFromDb(self.indb, "commands", {
-                                   "_id": ret}, False, True)
+        apiclient.delete("commands", ret)
+        
 
     def addInDb(self):
         """Add this command to pollenisator database
@@ -102,15 +83,14 @@ class Command(Element):
                 * mongo ObjectId : already existing object if duplicate, create object id otherwise 
         """
         apiclient = APIClient.getInstance()
-        existing = apiclient.findInDb(
-            self.indb, "commands", {"name": self.name}, False)
-        if existing is not None:
-            return False, existing["_id"]
-        ins_result = apiclient.insertInDb(self.indb, "commands", {"name": self.name, "lvl": self.lvl, "priority": self.priority,
-                                                                           "sleep_between": self.sleep_between, "max_thread": self.max_thread, "text": self.text,
-                                                                           "ports": self.ports, "safe": self.safe, "types": self.types, "indb": self.indb, "timeout": self.timeout}, '', True)
-        self._id = ins_result.inserted_id
-        return True, self._id
+        res, id = apiclient.insert("commands", {"name": self.name, "lvl": self.lvl, "priority": int(self.priority),
+                                                                           "sleep_between": int(self.sleep_between), "max_thread": int(self.max_thread), "text": self.text,
+                                                                           "ports": self.ports, "safe": bool(self.safe), "types": self.types, "indb": self.indb, "timeout": int(self.timeout)})
+        if not res:
+            return False, id
+        self._id = id
+        return True, id
+        
 
     def update(self, pipeline_set=None):
         """Update this object in database.
@@ -118,13 +98,14 @@ class Command(Element):
             pipeline_set: (Opt.) A dictionnary with custom values. If None (default) use model attributes.
         """
         apiclient = APIClient.getInstance()
+        
         if pipeline_set is None:
-            apiclient.updateInDb(self.indb, "commands", {"_id": ObjectId(self._id)}, {
-                "$set": {"priority": self.priority, "sleep_between": self.sleep_between, "max_thread": self.max_thread, "timeout": self.timeout,
-                         "text": self.text, "ports": self.ports, "safe": self.safe, "types": self.types}}, False, True)
+            apiclient.update("commands", self._id, {"priority": int(self.priority), "sleep_between": int(self.sleep_between), "max_thread": int(self.max_thread), "timeout": int(self.timeout),
+                         "text": self.text, "ports": self.ports, "safe": bool(self.safe), "types": self.types, "indb":self.indb})
+           
         else:
-            apiclient.updateInDb(self.indb, "commands", {"_id": ObjectId(self._id)}, {
-                "$set": pipeline_set}, False, True)
+            apiclient.update("commands", self._id, pipeline_set)
+            
 
     @classmethod
     def getList(cls, pipeline=None, targetdb="pollenisator"):

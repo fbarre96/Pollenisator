@@ -55,12 +55,12 @@ class IntervalView(ViewElement):
         """
         parentDbId = parentNode
         if parentNode is None:
-            parentNode = self.getParent()
+            parentNode = self.getParentNode()
         elif "intervals" not in parentNode:
             parentNode = IntervalView.DbToTreeviewListId(parentDbId)
         try:
             parentNode = self.appliTw.insert(
-                self.controller.getParent(), 0, parentNode, text="Intervals", image=self.getClassIcon())
+                self.controller.getParentId(), 0, parentNode, text="Intervals", image=self.getClassIcon())
         except TclError:  #  trigger if tools list node already exist
             pass
         self.appliTw.views[str(self.controller.getDbId())] = {"view": self}
@@ -75,7 +75,7 @@ class IntervalView(ViewElement):
         """
         if self.controller.model is None:
             return
-        parentId = self.controller.getParent()
+        parentId = self.controller.getParentId()
         parentView = self.appliTw.views[str(parentId)]["view"]
         parentView.updateReceived()
         super().updateReceived()
@@ -87,7 +87,7 @@ class IntervalView(ViewElement):
         """
         if self.controller.model is None:
             return
-        parentId = self.controller.getParent()
+        parentId = self.controller.getParentId()
         parentView = self.appliTw.views[str(parentId)]["view"]
         parentView.updateReceived()
         super().insertReceived()

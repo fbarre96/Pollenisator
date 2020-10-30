@@ -56,11 +56,9 @@ class Scope(Element):
         """
         apiclient = APIClient.getInstance()
         if pipeline_set is None:
-            apiclient.update("scopes", {"_id": ObjectId(self._id)}, {
-                "$set": {"notes": self.notes, "tags": self.tags}})
+            apiclient.update("scopes", ObjectId(self._id), {"notes": self.notes, "tags": self.tags})
         else:
-            apiclient.update("scopes", {"_id": ObjectId(self._id)}, {
-                "$set": pipeline_set})
+            apiclient.update("scopes", ObjectId(self._id), pipeline_set)
 
     def delete(self):
         """
@@ -69,21 +67,8 @@ class Scope(Element):
         Also remove this scope from ips in_scopes attributes
         """
         # deleting tool with scope lvl
-        tools = Tool.fetchObjects({"scope": self.scope, "wave": self.wave, "$or": [
-                                  {"lvl": "network"}, {"lvl": "domain"}]})
-        for tool in tools:
-            tool.delete()
-        # Deleting this scope against every ips
-        ips = Ip.getIpsInScope(self._id)
-        for ip in ips:
-            ip.removeScopeFitting(self._id)
         apiclient = APIClient.getInstance()
-        apiclient.delete("scopes", {"_id": self._id})
-        parent_wave = apiclient.find("waves", {"wave": self.wave}, False)
-        if parent_wave is None:
-            return
-        apiclient.pushNotification(apiclient.getCurrentPentest(),
-                             "waves", parent_wave["_id"], "update", "")
+        apiclient.delete("scopes", ObjectId(self._id))
         # Finally delete the selected element
 
     def addInDb(self):
@@ -97,27 +82,10 @@ class Scope(Element):
         base = self.getDbKey()
         # Checking unicity
         apiclient = APIClient.getInstance()
-        existing = apiclient.find("scopes", base, False)
-        if existing is not None:
-            return False, existing["_id"]
-        # Inserting scope
-        parent = self.getParent()
-        res_insert = apiclient.insert("scopes", base, parent)
-        ret = res_insert.inserted_id
-        self._id = ret
+        res_insert, iid = apiclient.insert("scopes", base)
+        self._id = iid
         # adding the appropriate tools for this scope.
-        wave = apiclient.find("waves", {"wave": self.wave}, False)
-        commands = wave["wave_commands"]
-        for commName in commands:
-            if commName.strip() != "":
-                self.addAllTool(commName)
-        # Testing this scope against every ips
-        ips = Ip.fetchObjects({})
-        for ip in ips:
-            if self._id not in ip.in_scopes:
-                if ip.fitInScope(self.scope):
-                    ip.addScopeFitting(self.getId())
-        return True, ret
+        return res_insert, iid
 
     def addDomainInDb(self, checkDomain=True):
         """
@@ -133,47 +101,15 @@ class Scope(Element):
         # Checking unicity
         base = self.getDbKey()
         apiclient = APIClient.getInstance()
-        existing = apiclient.find("scopes", base, False)
-        if existing is not None:
-            return 0, None
         # Check if domain's ip fit in one of the Scope of the wave
         if checkDomain:
             if not Scope.checkDomainFit(self.wave, self.scope):
                 return -1, None
         # insert the domains in the scopes
-        parent = self.getParent()
-        res_insert = apiclient.insert("scopes", base, parent)
-        ret = res_insert.inserted_id
-        self._id = ret
+        res_insert, iid = apiclient.insert("scopes", base)
+        self._id = iid
         # Adding appropriate tools for this scopes
-        wave = apiclient.find("waves", {"wave": self.wave}, False)
-        commands = wave["wave_commands"]
-        for commName in commands:
-            comm = apiclient.findInDb(apiclient.getCurrentPentest(),
-                                          "commands", {"name": commName, "lvl": "network"}, False)
-            if comm is not None:
-                newTool = Tool()
-                newTool.initialize(
-                    comm["name"], self.wave, self.scope, "", "", "", "network")
-                newTool.addInDb()
-            else:
-                comm = apiclient.findInDb(apiclient.getCurrentPentest(),
-                                              "commands", {"name": commName, "lvl": "domain"}, False)
-                if comm is not None:
-                    newTool = Tool()
-                    newTool.initialize(
-                        comm["name"], self.wave, self.scope, "", "", "", "domain")
-                    newTool.addInDb()
-        # Testing this scope against every ips
-        ips = Ip.fetchObjects({})
-        for ip in ips:
-            if self._id not in ip.in_scopes:
-                if ip.fitInScope(self.scope):
-                    ip.addScopeFitting(self.getId())
-        ipToInsert = Ip()
-        ipToInsert.initialize(self.scope)
-        ipToInsert.addInDb()
-        return 1, ret
+        return 1, iid
 
     @classmethod
     def checkDomainFit(cls, waveName, domain):
@@ -218,34 +154,9 @@ class Scope(Element):
                             return True
         return False
 
-    def addAllTool(self, command_name):
-        """
-        Add the appropriate tools (level check and wave's commands check) for this scope.
-        Args:
-            command_name: The command that we want to create all the tools for.
-        """
-        apiclient = APIClient.getInstance()
-        command = apiclient.findInDb(apiclient.getCurrentPentest(), "commands", {
-                                         "name": command_name}, False)
-        if command["lvl"] == "network":
-            newTool = Tool()
-            newTool.initialize(
-                command["name"], self.wave, self.scope, "", "", "", "network")
-            newTool.addInDb()
-            return
-        if command["lvl"] == "domain":
-            if not Utils.isNetworkIp(self.scope):
-                newTool = Tool()
-                newTool.initialize(
-                    command["name"], self.wave, self.scope, "", "", "", "domain")
-                newTool.addInDb()
-            return
-        ips = self.getIpsFitting()
-        for ip in ips:
-            i = Ip(ip)
-            i.addAllTool(command_name, self.wave, self.scope)
+    
 
-    def _getParent(self):
+    def _getParentId(self):
         """
         Return the mongo ObjectId _id of the first parent of this object. For a scope it is the wave.
 
@@ -280,32 +191,7 @@ class Scope(Element):
         """
         return {"wave": self.wave, "scope": self.scope}
 
-    def getIpsFitting(self):
-        """Returns a list of ip mongo dict fitting this scope
-        Returns:
-            A list ip IP dictionnary from mongo db
-        """
-        apiclient = APIClient.getInstance()
-        ips = apiclient.find("ips", )
-        ips_fitting = []
-        isdomain = self.isDomain()
-        for ip in ips:
-            if isdomain:
-                my_ip = Utils.performLookUp(self.scope)
-                my_domain = self.scope
-                ip_isdomain = not Utils.isIp(ip["ip"])
-                if ip_isdomain:
-                    if my_domain == ip["ip"]:
-                        ips_fitting.append(ip)
-                    if Scope.isSubDomain(my_domain, ip["ip"]):
-                        ips_fitting.append(ip)
-                else:
-                    if my_ip == ip["ip"]:
-                        ips_fitting.append(ip)
-            else:
-                if Ip.checkIpScope(self.scope, ip["ip"]):
-                    ips_fitting.append(ip)
-        return ips_fitting
+    
 
     def isDomain(self):
         """Returns True if this scope is not a valid NetworkIP

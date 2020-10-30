@@ -54,31 +54,9 @@ class Interval(Element):
         apiclient = APIClient.getInstance()
         apiclient.delete(
             "intervals", {"_id": self._id})
-        parent_wave = apiclient.find("waves", {"wave": self.wave}, False)
-        self._id = None
-        if parent_wave is None:
-            return
-        apiclient.pushNotification(apiclient.getCurrentPentest(),
-                             "waves", parent_wave["_id"], "update", "")
-        other_intervals = Interval.fetchObjects({"wave": self.wave})
-        no_interval_in_time = True
-        for other_interval in other_intervals:
-            if Utils.fitNowTime(other_interval.dated, other_interval.datef):
-                no_interval_in_time = False
-                break
-        if no_interval_in_time:
-            tools = Tool.fetchObjects({"wave": self.wave})
-            for tool in tools:
-                tool.setOutOfTime()
+        
 
-    def setToolsInTime(self):
-        """Get all OOT (Out of Time) tools in this wave and checks if this Interval makes them in time. 
-        If it is the case, set them in time.
-        """
-        if Utils.fitNowTime(self.dated, self.datef):
-            tools = Tool.fetchObjects({"wave": self.wave, "status": "OOT"})
-            for tool in tools:
-                tool.setInTime()
+    
 
     def addInDb(self):
         """
@@ -89,29 +67,24 @@ class Interval(Element):
                 * mongo ObjectId : already existing object if duplicate, create object id otherwise 
         """
         base = {"wave": self.wave, "dated": self.dated, "datef": self.datef}
-        parent = self.getParent()
         apiclient = APIClient.getInstance()
-        res = apiclient.insert(
-            "intervals", base, parent)
-        self.setToolsInTime()
-        self._id = res.inserted_id
-        return True, res.inserted_id
+        res, iid = apiclient.insert("intervals", base)
+        self._id = iid
+        return True, iid
 
     def update(self, pipeline_set=None):
         """Update this object in database.
         Args:
             pipeline_set: (Opt.) A dictionnary with custom values. If None (default) use model attributes.
         """
-        self.setToolsInTime()
+        
         apiclient = APIClient.getInstance()
         if pipeline_set is None:
-            apiclient.update("intervals", {"_id": ObjectId(self._id)}, {
-                "$set": {"dated": self.dated, "datef": self.datef}})
+            apiclient.update("intervals", ObjectId(self._id), {"dated": self.dated, "datef": self.datef})
         else:
-            apiclient.update("intervals", {"_id": ObjectId(self._id)}, {
-                "$set": pipeline_set})
+            apiclient.update("intervals", ObjectId(self._id), pipeline_set)
 
-    def _getParent(self):
+    def _getParentId(self):
         """
         Return the mongo ObjectId _id of the first parent of this object. For an interval it is the wave.
 

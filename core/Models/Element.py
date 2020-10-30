@@ -68,19 +68,19 @@ class Element(object):
         """
         return self._id
 
-    def getParent(self):
+    def getParentId(self):
         """Returns the mongo id  of this element parent.
         Returns:
             bson.objectid.ObjectId
         """
         if self.parent is None:
             try:
-                self.parent = self._getParent()  # pylint: disable=assignment-from-none
+                self.parent = self._getParentId()  # pylint: disable=assignment-from-none
             except TypeError:
                 return None
         return self.parent
 
-    def _getParent(self):
+    def _getParentId(self):
         """
         To be overriden
         Return the mongo ObjectId _id of the first parent of this object. 

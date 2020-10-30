@@ -20,7 +20,7 @@ class ControllerElement:
             return self.model.getId()
         return None
 
-    def getParent(self):
+    def getParentId(self):
         """Return the parent object database id of the model. E.G a port would returns its parent IP mongo id
         Returns:
             None if model is None
@@ -28,7 +28,7 @@ class ControllerElement:
         """
         if self.model is None:
             return None
-        return self.model.getParent()
+        return self.model.getParentId()
 
     def doDelete(self):
         """Ask the model to delete itself from database

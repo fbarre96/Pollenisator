@@ -18,20 +18,10 @@ class WaveController(ControllerElement):
         """
         wave_commands_dict = values.get("Commands", self.model.wave_commands)
         wave_commands = [k for k, v in wave_commands_dict.items() if v == 1]
-        oldCommands = self.model.wave_commands
+        
         self.model.wave_commands = list(wave_commands)
         self.model.update()
-        # If the wave_commands are changed, we have to add and delete corresponding tools.
-        for command_name in oldCommands:
-            # The previously present command name is not authorized anymore.
-            if command_name not in wave_commands:
-                # So delete all of its tool (only if not done) from this wave
-                self.model.removeAllTool(command_name)
-        for command_name in wave_commands:
-            # The command authorized is not found, we have to add its new tools.
-            if command_name not in oldCommands:
-                # So add all of this command's tool to this wave.
-                self.model.addAllTool(command_name)
+        
 
     def doInsert(self, values):
         """

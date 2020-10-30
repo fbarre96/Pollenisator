@@ -128,7 +128,7 @@ class DashBoard:
         listOfTools = [_ for _ in self.tools]
         listOfTools.sort(key=lambda x: x.status, reverse=True)
 
-        result = MongoCalendar.getInstance().aggregate("tools",
+        result = APIClient.getInstance().aggregate("tools",
                                                        [
                                                            {
                                                                "$group":
@@ -142,7 +142,7 @@ class DashBoard:
         result = [_ for _ in result]
         tools_dashboard = {}
         for tool_result in result:
-            tool_id = tool_result["_id"]["wave"]+"::"+tool_result["_id"]["name"]
+            tool_id = tool_result["_id"].get("wave","")+"::"+tool_result["_id"]["name"]
             tools_dashboard[tool_id] = tools_dashboard.get(tool_id, {})
             tools_dashboard[tool_id][tool_result["_id"]["status"][0]] = tool_result["count"]
         dialog.update(8)
@@ -155,7 +155,7 @@ class DashBoard:
         for children in self.treevwDefaults.get_children():
             self.treevwDefaults.delete(children)
 
-        result = MongoCalendar.getInstance().aggregate("defects",
+        result = APIClient.getInstance().aggregate("defects",
                                                        [
                                                            {
                                                                "$group":

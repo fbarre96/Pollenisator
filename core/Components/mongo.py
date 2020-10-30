@@ -40,7 +40,7 @@ class MongoCalendar:
             calendarName: the calendar name the db has connected to. Or None if not connected to any calendar.
             ssldir: The string path to a folder where all the ssl certificates are to be found.
             db: The database to the client last connected.
-            forbiddenNames: A list of names forbidden for calendars because they are reserved by mongo, celery or this application. ("admin", "config", "local", "broker_pollenisator", "pollenisator")
+            forbiddenNames: A list of names forbidden for calendars because they are reserved by mongo, this application. ("admin", "config", "local", "broker_pollenisator", "pollenisator")
         Raises:
             Exception if it is instanciated.
         """
@@ -317,7 +317,8 @@ class MongoCalendar:
         Returns:
             Return the pymongo result of the insert_one function.
         """
-        return self._insert(self.calendarName, collection, values, True, parent)
+        ret = self._insert(self.calendarName, collection, values, True, parent)
+        return ret
 
     def insertInDb(self, db, collection, values, _parent='', notify=False):
         """
@@ -387,9 +388,10 @@ class MongoCalendar:
         dbMongo = self.client[db]
         return self._find(dbMongo, collection, pipeline, multi)
 
-    def fetchNotifications(self, pentest):
-        self.connect()
-        return self._find("pollenisator", "notifications", {"$or":[{"db":str(pentest)}, {"db":"pollenisator"}]}, True)
+    def fetchNotifications(self, pentest, fromTime):
+        date = datetime.datetime.strptime(fromTime, "%Y-%m-%d %H:%M:%S.%f")
+        res = self.findInDb("pollenisator", "notifications", {"$or":[{"db":str(pentest)}, {"db":"pollenisator"}], "time":{"$gt":date}}, True)
+        return res
 
     def _find(self, db, collection, pipeline=None, multi=True):
         """
@@ -765,4 +767,4 @@ class MongoCalendar:
             parentId: (not used) default to "", a node parent id as str
         """
         self.client["pollenisator"]["notifications"].insert_one(
-            {"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId})
+            {"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now()})

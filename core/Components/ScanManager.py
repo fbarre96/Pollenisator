@@ -1,6 +1,5 @@
 """Hold functions to interact form the scan tab in the notebook"""
-from core.Components.Monitor import Monitor
-from core.Components.mongo import MongoCalendar
+from core.Components.apiclient import APIClient
 import tkinter as tk
 import tkinter.ttk as ttk
 import multiprocessing
@@ -8,27 +7,17 @@ from core.Models.Command import Command
 from core.Models.Tool import Tool
 from core.Application.Dialogs.ChildDialogFileParser import ChildDialogFileParser
 from core.Application.Dialogs.ChildDialogEditCommandSettings import ChildDialogEditCommandSettings
-from core.Components.AutoScanMaster import autoScan
+from AutoScanWorker import executeCommand
 from PIL import Image, ImageTk
 import os
 
 
-def autoscan_execute(calendarName):
-    """
-    Call the autoScan function with given pentest name as endless and no reprint.
-
-    Args:
-        calendarName: the pentest database name to auto scan.
-    """
-    autoScan(calendarName, True, True)
 
 
 class ScanManager:
     """Scan model class"""
 
     def __init__(self, nbk, linkedTreeview, calendarToScan, settings):
-        """Constructor, initialize a Monitor object"""
-        self.monitor = Monitor(calendarToScan)
         self.calendarToScan = calendarToScan
         self.nbk = nbk
         self.running_auto_scans = []
@@ -47,8 +36,8 @@ class ScanManager:
 
     def startAutoscan(self):
         """Start an automatic scan. Will try to launch all undone tools."""
-        mongoInstance = MongoCalendar.getInstance()
-        workers = mongoInstance.getWorkers({"excludedDatabases":{"$nin":[mongoInstance.calendarName]}})
+        apiclient = APIClient.getInstance()
+        workers = apiclient.getWorkers({"excludedDatabases":{"$nin":[apiclient.getCurrentPentest()]}})
         workers = [w for w in workers]
         if len(workers) == 0:
             tk.messagebox.showwarning("No selected worker found", "Check worker treeview to see if there are workers registered and double click on the disabled one to enable them")
@@ -58,25 +47,18 @@ class ScanManager:
                 "Autoscan warning", "The current settings will add every domain found in attack's scope. Are you sure ?")
             if not answer:
                 return
-        from core.Components.AutoScanMaster import sendStartAutoScan
-        self.btn_autoscan.configure(
-            text="Stop Scanning", command=self.stopAutoscan)
-        tasks = sendStartAutoScan(MongoCalendar.getInstance().calendarName)
-        self.running_auto_scans = tasks
+        self.btn_autoscan.configure(text="Stop Scanning", command=self.stopAutoscan)
+        apiclient.sendStartAutoScan()
     
-    
-
     def stop(self):
         """Stop an automatic scan. Will try to stop running tools."""
-        
-        self.stopAutoscan()
-        if self.monitor is not None:
-            self.monitor.stop()
+        apiclient = APIClient.getInstance()
+        apiclient.sendStopAutoScan()
 
     def refreshUI(self):
         """Reload informations and renew widgets"""
-        mongoInstance = MongoCalendar.getInstance()
-        workernames = self.monitor.getWorkerList()
+        apiclient = APIClient.getInstance()
+        workers = apiclient.getWorkers()
         running_scans = Tool.fetchObjects({"status":"running"})
         for children in self.scanTv.get_children():
             self.scanTv.delete(children)
@@ -85,9 +67,10 @@ class ScanManager:
         for children in self.workerTv.get_children():
             self.workerTv.delete(children)
         registeredCommands = set()
-        for workername in workernames:
+        for worker in workers:
+            workername = worker["name"]
             try:
-                if self.monitor.isWorkerExcludedFrom(workername, mongoInstance.calendarName):
+                if apiclient.getCurrentPentest() in worker.get("excludedDatabases", []):
                     worker_node = self.workerTv.insert(
                         '', 'end', workername, text=workername, image=self.nok_icon)
                 else:
@@ -104,7 +87,7 @@ class ScanManager:
                 except tk.TclError:
                     pass
                 registeredCommands.add(str(command))
-            allCommands = Command.getList(None, mongoInstance.calendarName)
+            allCommands = Command.getList(None, apiclient.getCurrentPentest())
             for command in allCommands:
                 if command not in registeredCommands:
                     try:
@@ -134,7 +117,7 @@ class ScanManager:
         if self.workerTv is not None:
             self.refreshUI()
             return
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         self.parent = parent
         ### WORKER TREEVIEW : Which worker knows which commands
         lblworker = ttk.Label(self.parent, text="Workers:")
@@ -146,12 +129,13 @@ class ScanManager:
         self.workerTv.pack(side=tk.TOP, padx=10, pady=10, fill=tk.X)
         self.workerTv.bind("<Double-Button-1>", self.OnWorkerDoubleClick)
         self.workerTv.bind("<Delete>", self.OnWorkerDelete)
-        workernames = self.monitor.getWorkerList()
+        workers = apiclient.getWorkers()
         total_registered_commands = 0
         registeredCommands = set()
-        for workername in workernames:
+        for worker in workers:
+            workername = worker["name"]
             try:
-                if self.monitor.isWorkerExcludedFrom(workername, mongoInstance.calendarName):
+                if apiclient.getCurrentPentest() in worker.get("excludedDatabases", []):
                     worker_node = self.workerTv.insert(
                         '', 'end', workername, text=workername, image=self.nok_icon)
                 else:
@@ -159,7 +143,7 @@ class ScanManager:
                         '', 'end', workername, text=workername, image=self.ok_icon)
             except tk.TclError:
                 pass
-            commands_registered = mongoInstance.getRegisteredCommands(
+            commands_registered = apiclient.getRegisteredCommands(
                 workername)
             for command in commands_registered:
                 try:
@@ -168,7 +152,7 @@ class ScanManager:
                 except tk.TclError:
                     pass
                 registeredCommands.add(str(command))
-            allCommands = Command.getList(None, mongoInstance.calendarName)
+            allCommands = Command.getList(None, apiclient.getCurrentPentest())
             for command in allCommands:
                 if command not in registeredCommands:
                     try:
@@ -246,21 +230,9 @@ class ScanManager:
             self.refreshUI()
 
     def sendEditToolConfig(self, worker, command_name, remote_bin, plugin):
-        mongoInstance = MongoCalendar.getInstance()
-        queueName = str(mongoInstance.calendarName)+"&" + \
-            worker
-        self.monitor.app.control.add_consumer(
-            queue=queueName,
-            reply=True,
-            exchange="celery",
-            exchange_type="direct",
-            routing_key="transient",
-            destination=[worker])
-        from AutoScanWorker import editToolConfig
-        result_async = editToolConfig.apply_async(args=[command_name, remote_bin, plugin], queue=queueName, retry=False, serializer="json")
-        if self.monitor is not None:
-            self.monitor.workerRegisterCommands(worker)
-            
+        apiclient = APIClient.getInstance()
+        apiclient.sendEditToolConfig(worker, command_name, remote_bin, plugin)
+
     def OnWorkerDoubleClick(self, event):
         """Callback for treeview double click.
         If a link treeview is defined, open mainview and focus on the item with same iid clicked.
@@ -282,9 +254,23 @@ class ScanManager:
                 self.setUseForPentest(item)
     
     def setUseForPentest(self, worker_hostname):
-        mongoInstance = MongoCalendar.getInstance()
-        isExcluded = self.monitor.isWorkerExcludedFrom(worker_hostname, mongoInstance.calendarName)
-        mongoInstance.setWorkerExclusion(worker_hostname, mongoInstance.calendarName, not (isExcluded))
+        apiclient = APIClient.getInstance()
+        worker = apiclient.getWorkers({"name":worker_hostname})
+        if worker is not None:
+            isExcluded = apiclient.getCurrentPentest() in worker["excludedDatabases"]
+            apiclient.setWorkerExclusion(worker_hostname, not (isExcluded))
+
+    def launchTask(self, toolModel, parser="", checks=True, worker=""):
+        apiclient = APIClient.getInstance()
+        launchableToolId = toolModel.getId()
+        toolModel.markAsRunning(worker)
+        if worker == "" or worker == "localhost":
+            thread = None
+            thread = multiprocessing.Process(target=executeCommand, args=(
+                apiclient.getCurrentPentest(), str(launchableToolId), parser))
+            thread.start()
+        else:
+            apiclient.sendLaunchTask(toolModel, parser, checks, worker)
 
     def OnWorkerDelete(self, event):
         """Callback for a delete key press on a worker.
@@ -292,6 +278,6 @@ class ScanManager:
         Args:
             event: Auto filled
         """
-        mongoInstance = MongoCalendar.getInstance()
+        apiclient = APIClient.getInstance()
         if "@" in str(self.workerTv.selection()[0]):
-            mongoInstance.deleteWorker(self.workerTv.selection()[0]) 
+            apiclient.deleteWorker(self.workerTv.selection()[0]) 

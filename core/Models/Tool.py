@@ -96,7 +96,7 @@ class Tool(Element):
         Delete the tool represented by this model in database.
         """
         apiclient = APIClient.getInstance()
-        apiclient.delete("tools", {"_id": self._id})
+        apiclient.delete("tools", ObjectId(self._id))
 
     def addInDb(self):
         """
@@ -113,53 +113,20 @@ class Tool(Element):
         if existing is not None:
             return False, existing["_id"]
         # Those are added to base after tool's unicity verification
-        parent = self.getParent()
         base["scanner_ip"] = self.scanner_ip
         base["dated"] = self.dated
         base["datef"] = self.datef
         if isinstance(self.status, str):
             self.status = [self.status]
-        base["parent"] = parent
         base["status"] = self.status
         base["tags"] = self.tags
         base["text"] = self.text
         base["resultfile"] = self.resultfile
         base["notes"] = self.notes
-        res = apiclient.insert("tools", base, parent)
-        self._id = res.inserted_id
-        return True, res.inserted_id
-
-    def setOutOfTime(self):
-        """Set this tool as out of time (not matching any interval in wave)
-        Add "OOT" in status
-        """
-        if "OOT" not in self.status:
-            self.status.append("OOT")
-            self.update({"status": self.status})
-
-    def setInTime(self):
-        """Set this tool as in time (matching any interval in wave)
-        Remove "OOT" from status
-        """
-        if "OOT" in self.status:
-            self.status.remove("OOT")
-            self.update({"status": self.status})
-
-    def setInScope(self):
-        """Set this tool as out of scope (not matching any scope in wave)
-        Add "OOS" in status
-        """
-        if "OOS" in self.status:
-            self.status.remove("OOS")
-            self.update()
-
-    def setOutOfScope(self):
-        """Set this tool as in scope (is matching at least one scope in wave)
-        Remove "OOS" from status
-        """
-        if not "OOS" in self.status:
-            self.status.append("OOS")
-            self.update({"status": self.status})
+        res, iid = apiclient.insert("tools", base)
+        self._id = iid
+        return True, iid
+      
 
     def setStatus(self,status):
         """Set this tool status with given list of status
@@ -284,14 +251,13 @@ class Tool(Element):
         """
         apiclient = APIClient.getInstance()
         if pipeline_set is None:
-            apiclient.update("tools", {"_id": ObjectId(self._id)}, {
-                "$set": {"scanner_ip": str(self.scanner_ip), "dated": str(self.dated), "status": self.status,
-                         "datef":  str(self.datef), "notes":  self.notes, "resultfile": self.resultfile, "tags": self.tags}})
+            apiclient.update("tools", ObjectId(self._id), {"scanner_ip": str(self.scanner_ip), "dated": str(self.dated), "status": self.status,
+                         "datef":  str(self.datef), "notes":  self.notes, "resultfile": self.resultfile, "tags": self.tags})
         else:
             apiclient.update(
-                "tools", {"_id": ObjectId(self._id)}, {"$set": pipeline_set})
+                "tools", ObjectId(self._id), pipeline_set)
 
-    def _getParent(self):
+    def _getParentId(self):
         """
         Return the mongo ObjectId _id of the first parent of this object. For a Tool it is either a scope, an ip or a port depending on the tool's level.
 

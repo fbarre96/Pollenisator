@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import TclError
 from core.Views.DefectView import DefectView
 from core.Components.FileStorage import FileStorage
+from core.Components.ScanManager import ScanManager
 from core.Models.Defect import Defect
 from core.Controllers.DefectController import DefectController
 from core.Application.Dialogs.ChildDialogQuestion import ChildDialogQuestion
@@ -129,25 +130,28 @@ class ToolView(ViewElement):
         top_panel.addFormText("Notes", r"", notes, None, side="top", height=15)
 
         actions_panel = self.form.addFormPanel()
+        apiclient = APIClient.getInstance()
+        hasWorkers = len(apiclient.getWorkers({"excludedDatabases":{"$nin":[apiclient.getCurrentPentest()]}}))
+
         #Ready is legacy, OOS and/or OOT should be used
         if "ready" in self.controller.getStatus() or "error" in self.controller.getStatus():
             actions_panel.addFormButton(
                 "Local launch", self.localLaunchCallback, side="right")
-            if self.mainApp.scanManager.monitor.hasWorkers(excludeCurrentDb=True):
+            if hasWorkers:
                 actions_panel.addFormButton(
                     "Run on worker", self.launchCallback, side="right")
             else:
                 actions_panel.addFormLabel(
-                    "Info", "Tool is ready but no celery worker found", side="right")
+                    "Info", "Tool is ready but no worker found", side="right")
         elif "OOS" in self.controller.getStatus() or "OOT" in self.controller.getStatus():
             actions_panel.addFormButton(
                 "Local launch", self.localLaunchCallback, side="right")
-            if self.mainApp.scanManager.monitor.hasWorkers():
+            if hasWorkers:
                 actions_panel.addFormButton(
                     "Run on worker", self.launchCallback, side="right")
             else:
                 actions_panel.addFormLabel(
-                    "Info", "Tool is ready but no celery worker found", side="right")
+                    "Info", "Tool is ready but no worker found", side="right")
         elif "running" in self.controller.getStatus():
             actions_panel.addFormButton(
                 "Stop", self.stopCallback, side="right")
@@ -179,7 +183,7 @@ class ToolView(ViewElement):
         """
         if parentNode is None:
             parentNode = ToolView.DbToTreeviewListId(
-                self.controller.getParent())
+                self.controller.getParentId())
             nodeText = str(self.controller.getModelRepr())
         elif parentNode == '':
             # For a filter all node are added to the root which is '' in tkinter
@@ -190,7 +194,7 @@ class ToolView(ViewElement):
             nodeText = str(self.controller.getModelRepr())
         try:
             parentNode = self.appliTw.insert(
-                self.controller.getParent(), 0, parentNode, text="Tools", image=self.getClassIcon())
+                self.controller.getParentId(), 0, parentNode, text="Tools", image=self.getClassIcon())
         except TclError:  #  trigger if tools list node already exist
             pass
         self.appliTw.views[str(self.controller.getDbId())] = {"view": self}
@@ -264,9 +268,8 @@ class ToolView(ViewElement):
         Args:
             event: Automatically generated with a button Callback, not used.
         """
-        apiclient = APIClient.getInstance()
-        self.mainApp.scanManager.monitor.launchTask(
-            apiclient.getCurrentPentest(), self.controller.model, "", False, "localhost")
+        self.mainApp.scanManager.launchTask(self.controller.model)
+        self.controller.model.markAsRunning("localhost")
         self.controller.update()
         self.form.clear()
         for widget in self.appliViewFrame.winfo_children():
@@ -275,35 +278,32 @@ class ToolView(ViewElement):
 
     def safeLaunchCallback(self, _event=None):
         """
-        Callback for the launch tool button. Will queue this tool to a celery worker. #TODO move to ToolController
+        Callback for the launch tool button. Will queue this tool to a worker. #TODO move to ToolController
         Args:
             event: Automatically generated with a button Callback, not used.
         Returns:
             None if failed. 
         """
         apiclient = APIClient.getInstance()
-        result = self.mainApp.scanManager.monitor.launchTask(
-            apiclient.getCurrentPentest(), self.controller.model)
-        return result
+        apiclient.sendLaunchTask(self.controller.model)
 
     def launchCallback(self, _event=None):
         """
-        Callback for the launch tool button. Will queue this tool to a celery worker. #TODO move to ToolController
+        Callback for the launch tool button. Will queue this tool to a worker. #TODO move to ToolController
         Will try to launch respecting limits first. If it does not work, it will asks the user to force launch.
 
         Args:
             _event: Automatically generated with a button Callback, not used.
         """
         res = self.safeLaunchCallback()
+        apiclient = APIClient.getInstance()
         if not res:
             dialog = ChildDialogQuestion(self.appliViewFrame,
                                          "Safe queue failed", "This tool cannot be launched because no worker add space for its thread.\nDo you want to launch it anyway?")
             self.appliViewFrame.wait_window(dialog.app)
             answer = dialog.rvalue
             if answer == "Yes":
-                apiclient = APIClient.getInstance()
-                res = self.mainApp.scanManager.monitor.launchTask(
-                    apiclient.getCurrentPentest(), self.controller.model, "", False)
+                apiclient.sendLaunchTask(self.controller.model)
         if res:
             self.controller.update()
             self.form.clear()
@@ -313,13 +313,13 @@ class ToolView(ViewElement):
 
     def stopCallback(self, _event=None):
         """
-        Callback for the launch tool stop button. Will stop this celery task. #TODO move to ToolController
+        Callback for the launch tool stop button. Will stop this task. #TODO move to ToolController
 
         Args:
             _event: Automatically generated with a button Callback, not used.
         """
-        success = self.mainApp.scanManager.monitor.stopTask(
-            self.controller.getData())
+        apiclient = APIClient.getInstance()
+        success = apiclient.sendStopTask(self.controller.getData())
         delete_anyway = False
         if success == False:
             delete_anyway = tkinter.messagebox.askyesno(
@@ -327,7 +327,6 @@ class ToolView(ViewElement):
                     Reset tool anyway?""")
         if delete_anyway or success:
             self.controller.markAsNotDone()
-            self.controller.update()
             self.form.clear()
             for widget in self.appliViewFrame.winfo_children():
                 widget.destroy()
@@ -341,7 +340,6 @@ class ToolView(ViewElement):
             event: Automatically generated with a button Callback, not used.
         """
         self.controller.markAsNotDone()
-        self.controller.update()
         self.form.clear()
         for widget in self.appliViewFrame.winfo_children():
             widget.destroy()

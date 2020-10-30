@@ -93,9 +93,8 @@ class Defect(Element):
         Delete the defect represented by this model in database.
         """
         ret = self._id
-        self.rmProofs()
         apiclient = APIClient.getInstance()
-        apiclient.delete("defects", {"_id": ret})
+        apiclient.delete("defects", ret)
 
     def addInDb(self):
         """
@@ -104,18 +103,8 @@ class Defect(Element):
                 * bool for success
                 * mongo ObjectId : already existing object if duplicate, create object id otherwise 
         """
-        base = self.getDbKey()
-        # add to base parameters defined or not depending on the lvl.
-        # Checking unicity
         apiclient = APIClient.getInstance()
-        existing = apiclient.find("defects", base, False)
-        if existing is not None:
-            return False, existing["_id"]
-
-        # Those are added to base after tool's unicity verification
-        parent = self.getParent()
-
-        base["parent"] = parent
+        base = self.getDbKey()
         base["notes"] = self.notes
         base["ease"] = self.ease
         base["impact"] = self.impact
@@ -125,19 +114,13 @@ class Defect(Element):
         base["proofs"] = self.proofs
         if self.index is not None:
             base["index"] = self.index
-        # Get parent for notifications
-        res = apiclient.insert("defects", base, parent)
-        self._id = res.inserted_id
-        if self.isAssigned():
-            # Set global defect
-            base["ip"] = ""
-            base["port"] = ""
-            base["proto"] = ""
-            base["parent"] = ""
-            base["notes"] = ""
-            glob_defect = Defect(base)
-            glob_defect.addInDb()
-        return True, res.inserted_id
+        res, id = apiclient.insert("defects", base)
+        if not res:
+            return False, id
+        self._id = id
+        return True, id
+
+    
 
     def update(self, pipeline_set=None):
         """Update this object in database.
@@ -146,15 +129,13 @@ class Defect(Element):
         """
         apiclient = APIClient.getInstance()
         if pipeline_set is None:
-            apiclient.update("defects", {"_id": ObjectId(self._id)}, {
-                "$set": {"ip": self.ip, "title": self.title, "port": self.port,
+            apiclient.update("defects", ObjectId(self._id), {"ip": self.ip, "title": self.title, "port": self.port,
                          "proto": self.proto, "notes": self.notes, "ease": self.ease, "impact": self.impact,
-                         "risk": self.risk, "redactor": self.redactor, "type": list(self.mtype), "proofs": self.proofs, "infos": self.infos, "index":self.index}})
+                         "risk": self.risk, "redactor": self.redactor, "type": list(self.mtype), "proofs": self.proofs, "infos": self.infos, "index":self.index})
         else:
-            apiclient.update("defects", {"_id": ObjectId(self._id)}, {
-                "$set": pipeline_set})
+            apiclient.update("defects", ObjectId(self._id), pipeline_set)
 
-    def _getParent(self):
+    def _getParentId(self):
         """
         Return the mongo ObjectId _id of the first parent of this object. For a Defect it is either an ip or a port depending on the Defect's level.
 
@@ -233,18 +214,7 @@ class Defect(Element):
         self.proofs.remove(self.proofs[index])
         self.update()
 
-    def rmProofs(self):
-        """Removes all the proof file in this defect
-        """
-        proofs = self.proofs
-        fs = FileStorage()
-        fs.open()
-        remote_dirpath = self.calcDirPath()
-        fs.rmProofs(remote_dirpath)
-        fs.close()
-        del proofs
-        self.proofs = []
-        self.update()
+    
 
     def __str__(self):
         """

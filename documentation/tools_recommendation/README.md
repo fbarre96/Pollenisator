@@ -26,7 +26,7 @@ Quick list of how to install those tools on a classic linux.
 
 The most well-known port scanner.
 
-If you use it, remember that udp scanning requires root privileges, so you must start your worker with root privileges. Celery will prevent you to do so unless you declare the C_FORCE_ROOT variable to true by doing `export C_FORCE_ROOT="true"`.
+If you use it, remember that udp scanning requires root privileges, so you must start your worker with root privileges. 
 
 See https://www.howtoforge.com/tutorial/nmap-on-linux/ to install.
 

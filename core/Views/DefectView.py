@@ -250,7 +250,7 @@ class DefectView(ViewElement):
             return
         if parentNode is None:
             parentNode = DefectView.DbToTreeviewListId(
-                self.controller.getParent())
+                self.controller.getParentId())
             nodeText = str(self.controller.getModelRepr())
         elif parentNode == '':
             nodeText = self.controller.getDetailedString()
@@ -259,7 +259,7 @@ class DefectView(ViewElement):
             nodeText = str(self.controller.getModelRepr())
         try:
             parentNode = self.appliTw.insert(
-                self.controller.getParent(), 0, parentNode, text="Defects", image=self.getIcon())
+                self.controller.getParentId(), 0, parentNode, text="Defects", image=self.getIcon())
         except TclError:
             pass
         self.appliTw.views[str(self.controller.getDbId())] = {"view": self}

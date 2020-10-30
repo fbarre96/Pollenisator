@@ -1,20 +1,17 @@
 import connexion
 from core.Components.mongo import MongoCalendar
 import json
+from datetime import datetime
 from flask import jsonify
 from bson import ObjectId
 
-class JSONEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, ObjectId):
-            return "ObjectId|"+str(o)
-        return json.JSONEncoder.default(self, o)
+from core.Components.Utils import JSONEncoder
 
 # Create the application instance
-app = connexion.App(__name__, specification_dir='./server/')
+app = connexion.App(__name__, specification_dir='./server/api_specs/')
 
-# Read the swagger.yml file to configure the endpoints
-app.add_api('swagger.yml')
+# Read the swagger.yaml file to configure the endpoints
+app.add_api('swagger.yaml')
 # Tell your app object which encoder to use to create JSON from objects. 
 app.app.json_encoder = JSONEncoder
 # Create a URL route in our application for "/"

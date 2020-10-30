@@ -82,32 +82,7 @@ class Ip(Element):
                 ret.append(str(scope["_id"]))
         return ret
 
-    def addScopeFitting(self, scopeId):
-        """Add the given scopeId to the list of scopes this IP fits in.
-        Args:
-            scopeId: a mongo ObjectId of a Scope object.
-        """
-        if not self.in_scopes:
-            tools = Tool.fetchObjects({"ip": self.ip})
-            for tool in tools:
-                tool.setInScope()
-        if str(scopeId) not in self.in_scopes:
-            self.in_scopes.append(str(scopeId))
-            self.update()
-
-    def removeScopeFitting(self, scopeId):
-        """Remove the given scopeId from the list of scopes this IP fits in.
-        Args:
-            scopeId: a mongo ObjectId of a scope object.
-        """
-        if str(scopeId) in self.in_scopes:
-            self.in_scopes.remove(str(scopeId))
-            self.update()
-            if not self.in_scopes:
-                tools = Tool.fetchObjects({"ip": self.ip})
-                for tool in tools:
-                    tool.setOutOfScope()
-
+    
     @classmethod
     def getIpsInScope(cls, scopeId):
         """Returns a list of IP objects that have the given scope id in there matching scopes.
@@ -126,22 +101,8 @@ class Ip(Element):
         Also deletes the defects associated with this ip and its ports
         """
         apiclient = APIClient.getInstance()
-        tools = apiclient.find("tools",
-                                   {"ip": self.ip}, True)
-        for tool in tools:
-            tool_model = Tool(tool)
-            tool_model.delete()
-        defects = apiclient.find("defects",
-                                     {"ip": self.ip, "$or": [{"port": {"$exists": False}}, {"port": None}]}, True)
-        for defect in defects:
-            defect_model = Defect(defect)
-            defect_model.delete()
-        ports = apiclient.find("ports",
-                                   {"ip": self.ip}, True)
-        for port in ports:
-            port_model = Port(port)
-            port_model.delete()
-        apiclient.delete("ips", {"_id": self._id})
+        apiclient.delete("ips", ObjectId(self._id))
+        
 
     def addPort(self, values):
         """
@@ -195,11 +156,9 @@ class Ip(Element):
         """
         apiclient = APIClient.getInstance()
         if pipeline_set is None:
-            apiclient.update("ips",
-                                 {"_id": ObjectId(self._id)}, {"$set": {"notes": self.notes, "in_scopes": self.in_scopes, "tags": self.tags, "infos": self.infos}})
+            apiclient.update("ips", ObjectId(self._id), {"notes": self.notes, "in_scopes": self.in_scopes, "tags": self.tags, "infos": self.infos})
         else:
-            apiclient.update("ips",
-                                 {"_id": ObjectId(self._id)}, {"$set": pipeline_set})
+            apiclient.update("ips", ObjectId(self._id), pipeline_set)
 
     def addInDb(self):
         """
@@ -214,66 +173,18 @@ class Ip(Element):
             raise ValueError("Ip insertion error: Cannot insert empty ip")
         base = self.getDbKey()
         apiclient = APIClient.getInstance()
-        existing = apiclient.find(
-            "ips", base, False)
-        if existing is not None:
-            return False, existing["_id"]
         # Add ip as it is unique
-        base["parent"] = self.getParent()
         base["notes"] = self.notes
         base["tags"] = self.tags
         base["in_scopes"] = self.in_scopes
         base["infos"] = self.infos
-        resInsert = apiclient.insert(
-            "ips", base)
-        self._id = resInsert.inserted_id
+        resInsert, idInsert = apiclient.insert("ips", base)
+        self._id = idInsert
         # adding the appropriate tools for this port.
         # 1. fetching the wave's commands
-        waves = apiclient.find("waves", {})
-        for wave in waves:
-            waveName = wave["wave"]
-            commands = wave["wave_commands"]
-            for commName in commands:
-                # 2. finding the command only if lvl is port
-                comm = apiclient.findInDb(apiclient.getCurrentPentest(), "commands",
-                                              {"name": commName, "lvl": "ip"}, False)
-                if comm is not None:
-                    # 3. checking if the added port fit into the command's allowed service
-                    # 3.1 first, default the selected port as tcp if no protocole is defined.
-                    newTool = Tool()
-                    newTool.initialize(
-                        comm["name"], waveName, "", self.ip, "", "", "ip")
-                    newTool.addInDb()
+        return resInsert, self._id
 
-        return True, self._id
-
-    def addAllTool(self, command_name, wave_name, scope):
-        """
-        Kind of recursive operation as it will call the same function in its children ports.
-        Add the appropriate tools (level check and wave's commands check) for this ip.
-        Also add for all registered ports the appropriate tools.
-
-        Args:
-            command_name: The command that we want to create all the tools for.
-            wave_name: the wave name from where we want to load tools
-            scope: a scope object allowing to launch this command. Opt
-        """
-        # retrieve the command level
-        apiclient = APIClient.getInstance()
-        command = apiclient.findInDb(apiclient.getCurrentPentest(),
-                                         "commands", {"name": command_name}, False)
-        if command["lvl"] == "ip":
-            # finally add tool
-            newTool = Tool()
-            newTool.initialize(command_name, wave_name,
-                               "", self.ip, "", "", "ip")
-            newTool.addInDb()
-            return
-        # Do the same thing for all children ports.
-        ports = apiclient.find("ports", {"ip": self.ip})
-        for port in ports:
-            p = Port(port)
-            p.addAllTool(command_name, wave_name, scope)
+    
 
     def __str__(self):
         """
@@ -342,7 +253,7 @@ class Ip(Element):
         """
         return re.search(r"([0-9]{1,3}\.){3}[0-9]{1,3}", ip) is not None
 
-    def _getParent(self):
+    def _getParentId(self):
         """
         Return the mongo ObjectId _id of the first parent of this object.
 

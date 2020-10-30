@@ -1,18 +1,12 @@
 import json
 from bson import ObjectId
+from datetime import datetime
 from core.Components.mongo import MongoCalendar
+from core.Components.Utils import JSONDecoder
 mongoInstance = MongoCalendar.getInstance()
 
 validCollections = ["group_commands", "commands", "settings"]
 
-class JSONDecoder(json.JSONDecoder):
-    def __init__(self, *args, **kwargs):
-        json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
-    def object_hook(self, dct):
-        for k,v in dct.items():
-            if 'ObjectId|' in str(v):
-                dct[k] = ObjectId(v.split('ObjectId|')[1])
-        return dct
 
 def status():
     mongoInstance.connect()
@@ -47,7 +41,7 @@ def insert(pentest, collection, data):
             return "Collection argument is not a valid pollenisator collection", 403
     elif pentest not in mongoInstance.listCalendars():
         return "Pentest argument is not a valid pollenisator pentest", 403
-    res = mongoInstance.insertInDb(pentest, collection, pipeline, data["notify"])
+    res = mongoInstance.insertInDb(pentest, collection, pipeline, data["parent"], data["notify"])
     return str(res.inserted_id)
 
 def find(pentest, collection, data):
@@ -88,15 +82,15 @@ def count(pentest, collection, data):
     res = mongoInstance.findInDb(pentest, collection, pipeline, True).count()
     return res
 
-def fetchNotifications(pentest):
-    res = mongoInstance.fetchNotifications(pentest)
+def fetchNotifications(pentest, fromTime):
+    res = mongoInstance.fetchNotifications(pentest, fromTime)
     if res is None:
         return []
-    return res
+    return [n for n in res]
 
 def pushNotification(data):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.insertInDb("pollenisator", "notifications", {"db":data["pentest"], "collection":data["collection"], "iid":data["iid"], "action":data["action"], "parentId":data["parentId"]}, False)
+    mongoInstance.insertInDb("pollenisator", "notifications", {"db":data["pentest"], "collection":data["collection"], "iid":data["iid"], "action":data["action"], "parentId":data["parentId"], "time":datetime.now()}, False)
     
 def aggregate(pentest, collection, pipelines):
     ret = []
@@ -121,7 +115,11 @@ def delete(pentest, collection, data):
             return "Collection argument is not a valid pollenisator collection", 403
     elif pentest not in mongoInstance.listCalendars():
         return "Pentest argument is not a valid pollenisator pentest", 403
-    return mongoInstance.deleteFromDb(pentest, collection, pipeline, data["many"], data["notify"])
+    res = mongoInstance.deleteFromDb(pentest, collection, pipeline, data["many"], data["notify"])
+    if res is None:
+        return
+    else:
+        return res.deleted_count
 
 def listPentests():
     ret = mongoInstance.listCalendars()
@@ -145,7 +143,10 @@ def registerCalendar(pentest):
         return msg, 403
 
 def getSettings():
-    return mongoInstance.findInDb("pollenisator", "settings", pipeline, True)
+    res = mongoInstance.findInDb("pollenisator", "settings", {}, True)
+    if res is None:
+        return []
+    return [s for s in res]
 
 def getSetting(data):
     pipeline = data["pipeline"]

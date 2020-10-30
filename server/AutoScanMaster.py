@@ -6,7 +6,6 @@ import sys
 import time
 import ssl
 from bson.objectid import ObjectId
-from celery import Celery
 from bson.objectid import ObjectId
 import os
 import core.Components.Utils as Utils
@@ -34,15 +33,6 @@ if os.path.isfile(os.path.join(config_dir, "server.cfg")):
 else:
     print("No client config file found under "+str(config_dir))
     sys.exit(1)
-
-user_string = cfg["user"]+':'+cfg["password"] + \
-    '@' if cfg['user'].strip() != "" else ""
-if cfg["ssl"] == "True":
-    app = Celery('tasks', broker='mongodb://'+user_string+cfg["host"] + ':' + cfg["mongo_port"] +
-                 '/broker_pollenisator?authSource=admin&ssl=true&ssl_ca_certs='+certs["ca_certs"]+'&ssl_certfile='+certs["keyfile"])
-else:
-    app = Celery('tasks', broker='mongodb://' + user_string +
-                 cfg["host"] + ':'+cfg["mongo_port"] + '/broker_pollenisator?authSource=admin')
 
 class Reprinter:
     """
@@ -182,13 +172,13 @@ def sendStartAutoScan(calendarName):
             from AutoScanWorker import startAutoScan
             result_async = startAutoScan.apply_async(args=[calendarName, worker], queue=queueName, retry=False, serializer="json")
             launchedTasks.append(result_async)
-            # Append to running tasks this celery result and the corresponding tool id
+            # Append to running tasks this  result and the corresponding tool id
     return launchedTasks
 
 
 def autoScan(databaseName, endless, useReprinter=False):
     """
-    Search tools to launch within defined conditions and attempts to launch them on celery workers.
+    Search tools to launch within defined conditions and attempts to launch them on  workers.
     Gives a visual feedback on stdout
 
     Args:

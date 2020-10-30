@@ -382,7 +382,7 @@ class CalendarTreeview(PollenisatorTreeview):
             _event: not used but mandatory
         """
         apiclient = APIClient.getInstance()
-        workers = self.appli.scanManager.monitor.getWorkerList({"excludedDatabases":{"$nin":[apiclient.getCurrentPentest()]}})
+        workers = apiclient.getWorkers({"excludedDatabases":{"$nin":[apiclient.getCurrentPentest()]}})
         workers.append("localhost")
         dialog = ChildDialogCustomCommand(
                     self, workers, "localhost")
@@ -411,8 +411,7 @@ class CalendarTreeview(PollenisatorTreeview):
                     if tool is None:
                         print("Tool already existing.")
                         return
-                    self.appli.scanManager.monitor.launchTask(
-                        apiclient.getCurrentPentest(), tool, parser, False, worker)
+                    self.mainApp.scanManager.launchTask(tool, parser, False, worker)
 
     def onTreeviewSelect(self, event=None):
         """Called when a line is selected on the treeview
@@ -668,5 +667,5 @@ class CalendarTreeview(PollenisatorTreeview):
         if view_o is not None:
             if updateTags:
                 view_o.controller.addTag("hidden")
-            self._hidden.append([nodeToHide, view_o.getParent()])
+            self._hidden.append([nodeToHide, view_o.getParentNode()])
             self.detach(nodeToHide)

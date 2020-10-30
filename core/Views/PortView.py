@@ -78,7 +78,7 @@ class PortView(ViewElement):
         top_panel.addFormLabel("Infos", side="left")
         top_panel.addFormTreevw("Infos", ("Infos", "Values"),
                                 modelData["infos"], side="left", width=300, fill="both", height=8, binds={"<Enter>": self.mainApp.unboundToMousewheelMain, "<Leave>": self.mainApp.boundToMousewheelMain})
-        command_list = Command.fetchObjects({"lvl": "port"}, MongoCalendar.getInstance().calendarName)
+        command_list = Command.fetchObjects({"lvl": "port"}, APIClient.getInstance().getCurrentPentest())
         command_names = ["None"]
         for command_doc in command_list:
             command_names.append(command_doc.name)
@@ -129,7 +129,7 @@ class PortView(ViewElement):
         toolname_values = self.tool_panel.getValue()
         toolname = ViewElement.list_tuple_to_dict(toolname_values)[
             "Tool to add"]
-        self.controller.addAllTool(toolname, 'Custom tools', '', False)
+        self.controller.addCustomTool(toolname)
 
     def addInTreeview(self, parentNode=None, addChildren=True):
         """Add this view in treeview. Also stores infos in application treeview.
@@ -138,7 +138,7 @@ class PortView(ViewElement):
             addChildren: If False, skip the tool and defects insert. Useful when displaying search results
         """
         if parentNode is None:
-            parentNode = self.getParent()
+            parentNode = self.getParentNode()
             nodeText = str(self.controller.getModelRepr())
         elif parentNode == '':
             nodeText = self.controller.getDetailedString()

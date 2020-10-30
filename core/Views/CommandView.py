@@ -135,14 +135,14 @@ class CommandView(ViewElement):
             parentNode: if None, will calculate the parent. If setted, forces the node to be inserted inside given parentNode.
         """
         if parentNode is None:
-            parentNode = self.getParent()
+            parentNode = self.getParentNode()
         self.appliTw.views[str(self.controller.getDbId())] = {"view": self}
         self.appliTw.insert(parentNode, "end", str(
             self.controller.getDbId()), text=str(self.controller.getModelRepr()), tags=self.controller.getTags(), image=self.getClassIcon())
         if "hidden" in self.controller.getTags():
             self.hide()
 
-    def getParent(self):
+    def getParentNode(self):
         """
         Return the id of the parent node in treeview.
 

@@ -1,0 +1,1319 @@
+swagger: "2.0"
+info:
+  description: Pollenisator index api file
+  version: "1.0.0"
+  title: Swagger REST Article
+consumes:
+  - "application/json"
+produces:
+  - "application/json"
+
+basePath: "/api/v1"
+
+definitions:
+  Commands:
+    properties:
+      name:
+        type: string
+      lvl:
+        type: string
+        enum: ["port", "ip", "wave", "domain", "network"]
+      priority:
+        type: integer
+        minimum: 0
+        maximum: 99
+      sleep_between:
+        type: integer
+      max_thread:
+        type: integer
+      text:
+        type: string
+      ports:
+        type: string
+      safe:
+        type: boolean
+      types: 
+        type: array
+        items:
+          type: string
+      indb:
+        type: string
+      timeout:
+        type: integer
+
+  CommandGroups:
+    properties:
+      name:
+        type: string
+      sleep_between:
+        type: integer
+      max_thread:
+        type: integer
+      commands:
+        type: array
+        items:
+          type: string
+  Defects:
+    properties:
+      ip:
+        type: string
+      title:
+        type: string
+      port:
+        type: string
+      proto:
+        type: string
+        enum: ["tcp", "udp", ""]
+      notes:
+        type: string
+      ease:
+        type: string
+        enum: ["Facile", "Modérée", "Difficile", "Très difficile", "N/A"]
+      impact:
+        type: string
+        enum: ["Mineur", "Important", "Majeur", "Critique", "N/A"]
+      risk:
+        type: string
+        enum: ["Mineur", "Important", "Majeur", "Critique", "N/A"]
+      redactor:
+        type: string
+      type:
+        type: array
+        items:
+          type: string
+      proofs:
+        type: array
+        items:
+          type: string
+      index:
+        type: integer
+
+  Intervals:
+    properties:
+      wave:
+        type: string
+      dated:
+        type: string
+      datef:
+        type: string
+  
+  Ips:
+    properties:
+      ip:
+        type: string
+      notes:
+        type: string
+      tags:
+        type: array
+        items:
+          type: string
+      in_scopes:
+        type: array
+        items:
+          type: string
+  Ports:
+    properties:
+      ip:
+        type: string
+      port:
+        type: string
+      proto:
+        type: string
+        enum: ["tcp", "udp", ""]
+      service:
+        type: string
+      product:
+        type: string
+      notes:
+        type: string
+      tags:
+        type: array
+        items:
+          type: string
+  Scopes:
+    properties:
+      wave:
+        type: string
+      scope:
+        type: string
+      notes:
+        type: string
+  Tools:
+    properties:
+      wave:
+        type: string
+      scope:
+        type: string
+      ip:
+        type: string
+      port:
+        type: string
+      proto: 
+        type: string
+        enum: ["tcp", "udp", ""]
+      name: 
+        type: string
+      lvl:
+        type: string
+        enum: ["port", "ip", "wave", "domain", "network"]
+  Waves:
+    properties:
+      wave:
+        type: string
+      wave_commands:
+        type: array
+        items:
+          type: string
+        
+# Paths supported by the server application
+paths:
+  /:
+    get:
+      operationId: "server.mongo.status"
+      tags:
+        - "Mongo"
+      summary: "Test connection"
+      responses:
+        200:
+          description: "Successful read status operation"
+  
+  /update/{pentest}/{collection}:
+    post:
+      operationId: "server.mongo.update"
+      tags:
+        - "Mongo"
+      summary: "Update something in db"
+      description: "Update something in db"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: collection
+          in: path
+          type: string
+          required: true
+        - name: data
+          in: body
+          schema:
+            type: object
+            required:
+              - pipeline
+              - updatePipeline
+            properties:
+              pipeline:
+                type: string
+              updatePipeline:
+                type: string
+              many:
+                type: boolean
+                default: false
+              notify:
+                type: boolean
+                default: false
+      responses:
+        200:
+          description: "Successful update command"
+
+  /insert/{pentest}/{collection}:
+    post:
+      operationId: "server.mongo.insert"
+      tags:
+        - "Mongo"
+      summary: "Insert something in db"
+      description: "Insert something in db"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: collection
+          in: path
+          type: string
+          required: true
+        - name: data
+          in: body
+          schema:
+            type: object
+            required:
+              - pipeline
+            properties:
+              pipeline:
+                type: string
+              parent:
+                type: string
+                default: ""
+              notify:
+                type: boolean
+                default: false
+      responses:
+        200:
+          description: "Successful insert command"
+          
+  /find/{pentest}/{collection}:
+    post:
+      operationId: "server.mongo.find"
+      tags:
+        - "Mongo"
+      summary: "Find something in db"
+      description: "Find something in db"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: collection
+          in: path
+          type: string
+          required: true
+        - name: data
+          in: body
+          schema:
+            type: object
+            properties:
+              pipeline:
+                type: string
+                default: "{}"
+              many:
+                type: boolean
+                default: false
+      responses:
+        200:
+          description: "Successful find command"
+  
+  /count/{pentest}/{collection}:
+    post:
+      operationId: "server.mongo.count"
+      tags:
+        - "Mongo"
+      summary: "Cout something in db"
+      description: "Cout something in db"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: collection
+          in: path
+          type: string
+          required: true
+        - name: data
+          in: body
+          schema:
+            type: object
+            properties:
+              pipeline:
+                type: string
+                default: "{}"
+      responses:
+        200:
+          description: "Successful count command"
+
+  /aggregate/{pentest}/{collection}:
+    post:
+      operationId: "server.mongo.aggregate"
+      tags:
+        - "Mongo"
+      summary: "aggregate something in db"
+      description: "aggregate something in db"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: collection
+          in: path
+          type: string
+          required: true
+        - name: pipelines
+          in: body
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                pipeline:
+                  type: string
+                  default: "{}"
+      responses:
+        200:
+          description: "Successful aggregate command"
+
+  /delete/{pentest}/{collection}:
+    post:
+      operationId: "server.mongo.delete"
+      tags:
+        - "Mongo"
+      summary: "Delete something in db"
+      description: "Delete something in db"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: collection
+          in: path
+          type: string
+          required: true
+        - name: data
+          in: body
+          schema:
+            type: object
+            required:
+              - pipeline
+            properties:
+              pipeline:
+                type: string
+              many:
+                type: boolean
+                default: false
+              notify:
+                type: boolean
+                default: false
+      responses:
+        200:
+          description: "Successful delete command"
+
+  /pentests:
+    get:
+      operationId: "server.mongo.listPentests"
+      tags:
+        - "pentest"
+      summary: "Get a list of pentests"
+      responses:
+        200:
+          description: "Successful get"
+          schema:
+            type: array
+            items:
+              type: string
+  /pentest/{pentest}:
+    delete:
+      operationId: "server.mongo.deletePentest"
+      tags:
+        - "pentest"
+      summary: "Remove a pentest"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+      responses:
+        200:
+          description: "Successful deletion"
+  /pentest/{pentest}:
+    post:
+      operationId: "server.mongo.registerCalendar"
+      tags:
+        - "pentest"
+      summary: "Create a pentest"   
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+      responses:
+        200:
+          description: "Successful creation"
+  /notification/{pentest}:
+    get:
+      operationId: "server.mongo.fetchNotifications"
+      tags:
+        - "Notification"
+      summary: "Return notifications documents from database"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: fromTime
+          in: query
+          type: string
+          format: date-time
+      responses:
+        200:
+          description: "Successful read notifications operation"
+  /notification:
+    post:
+      operationId: "server.mongo.pushNotification"
+      tags:
+        - "Notification"
+      summary: "Create a notification  in database"
+      parameters:
+        - name: data
+          in: body
+          schema:
+            type: object
+            required:
+              - pentest
+              - collection
+              - iid
+              - action
+            properties:
+              pentest:
+                type: string
+              collection:
+                type: string
+              iid:
+                type: string
+              action:
+                type: string
+                enum: [insert, update, delete]
+              parentId:
+                type: string
+                default: ""
+      responses:
+        200:
+          description: "Successful write notification operation"
+
+  /settings:
+    post: 
+      operationId: "server.mongo.createSetting"
+      tags:
+        - "Settings"
+      summary: "Create global pollenisator settings"
+      parameters:
+        - name: data
+          in: body
+          schema:
+            type: object
+            required:
+              - key
+              - value
+            properties:
+              key:
+                type: string
+              value:
+                type: string
+      responses:
+        200:
+          description: "Created global pollenisator settings"
+
+  /settings:
+    put: 
+      operationId: "server.mongo.updateSetting"
+      tags:
+        - "Settings"
+      summary: "Update global pollenisator settings"
+      parameters:
+        - name: data
+          in: body
+          schema:
+            type: object
+            required:
+              - key
+              - value
+            properties:
+              key:
+                type: string
+              value:
+                type: string
+      responses:
+        200:
+          description: "Created global pollenisator settings"
+      
+  /settings/search:
+    get:
+      operationId: "server.mongo.getSetting"
+      tags:
+        - "Settings"
+      summary: "Get global pollenisator settings filtered"
+      parameters:
+        - name: pipeline
+          in: query
+          type: string
+          default: "{}"
+          required: false
+      responses:
+        200:
+          description: "Get global pollenisator settings"
+  /settings:
+    get:
+      operationId: "server.mongo.getSettings"
+      tags:
+        - "Settings"
+      summary: "Get global pollenisator settings"
+      responses:
+        200:
+          description: "Get global pollenisator settings"
+
+  /workers:
+    get:
+      operationId: "server.worker.listWorkers"
+      tags:
+        - "Worker"
+      summary: "Return workers documents from database"
+      description: "Return workers documents from database
+        Returns:
+            Mongo result of workers. Cursor of dictionnary"
+      parameters:
+        - name: pipeline
+          in: query
+          type: string
+          description: query workers with filters
+          required: false
+          default: "{}"
+      responses:
+        200:
+          description: "Successful read worker list operation"
+          schema:
+            type: array
+            items:
+              properties:
+                _id:
+                  type: string
+                last_heartbeat: 
+                  type: string
+                name:
+                  type: string
+                shortname:
+                  type: string
+                registeredCommands:
+                  type: array
+                  items:
+                    type: string
+  /workers/removeInactiveWorkers:
+    get:
+      operationId: "server.worker.removeInactiveWorkers"
+      tags:
+        - "Worker"
+      summary: "Remove inactive workers from database"
+      responses:
+        200:
+          description: "Successful removal of inactive worker operation"
+          schema:
+            type: "object"
+            properties:
+              n:
+                type: integer
+  /workers/{name}:
+    delete:
+      operationId: "server.worker.deleteWorker"
+      tags:
+        - "Worker"
+      summary: "delete workers from database"
+      parameters:
+        - name: name
+          in: path
+          type: string
+          description: query workers with filters
+          required: true
+      responses:
+        200:
+          description: "Successful delete worker operation"
+          schema:
+            type: "object"
+            properties:
+              n:
+                type: integer
+        404:
+          description: "Worker name not found"
+  /workers/{name}/setExclusion:
+    put:
+      operationId: "server.worker.setExclusion"
+      tags:
+        - "Worker"
+      summary: "Set a worker exclusion from database"
+      description: "Set a worker exclusion from database"
+      parameters:
+        - name: name
+          in: path
+          type: string
+          required: true
+        - name: worker
+          in: body
+          schema:
+            type: object
+            required:
+              - db
+              - setExcluded
+            properties:
+              db:
+                type: string
+              setExcluded:
+                type: boolean
+      responses:
+        200:
+          description: "Successful update of worker excluded database"
+          schema:
+            type: "object"
+            properties:
+              n:
+                type: integer
+              nModifider:
+                type: integer
+              ok:
+                type: integer
+              updatedExisting:
+                type: boolean
+
+  /workers/{name}/updateHeartbeat:
+    put:
+      operationId: "server.worker.updateHeartbeat"
+      tags:
+        - "Worker"
+      summary: "Update a worker last heart beat sent"
+      parameters:
+        - name: name
+          in: path
+          type: string
+          required: true
+      responses:
+        200:
+          description: "Successful update of worker excluded database"
+          schema:
+            type: "object"
+            properties:
+              n:
+                type: integer
+              nModifider:
+                type: integer
+              ok:
+                type: integer
+              updatedExisting:
+                type: boolean
+
+  /workers/{name}/registerCommands:
+    put:
+      operationId: "server.worker.registerCommands"
+      tags:
+        - "Worker"
+      summary: "Set a worker registered commands"
+      description: "Set a worker registered commands"
+      parameters:
+        - name: name
+          in: path
+          type: string
+          required: true
+        - name: command_names
+          in: body
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        200:
+          description: "Successful update of worker registed commands"
+  /workers/{name}/getRegisteredCommands:
+    get:
+      operationId: "server.worker.getRegisteredCommands"
+      tags:
+        - "Worker"
+      summary: "Get a worker registered commands"
+      description: "Get a worker registered commands"
+      parameters:
+        - name: name
+          in: path
+          type: string
+          required: true
+      responses:
+        200:
+          description: "Successful get"
+          schema:
+            type: array
+            items:
+              type: string
+  /commands/{pentest}:
+    post:
+      operationId: "server.ServerModels.Command.insert"
+      tags:
+        - "Commands"
+      summary: "Insert a command or return the conflicting existing one"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Commands'
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+  /commands/update/{pentest}/{command_iid}:
+    put:
+      operationId: "server.ServerModels.Command.update"
+      tags:
+        - "Commands"
+      summary: "Update a command "
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: command_iid
+          in: path
+          type: string
+          description: command iid to delete
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Commands'
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+  /commands/{pentest}/{command_iid}:
+    delete:
+      operationId: "server.ServerModels.Command.delete"
+      tags:
+        - "Commands"
+      summary: "Delete a command and dependencies"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: command_iid
+          in: path
+          type: string
+          description: command iid to delete
+          required: true
+      responses:
+        200:
+          description: "Get a delete count"
+  /group_commands/{pentest}/{command_group_iid}:
+    delete:
+      operationId: "server.ServerModels.CommandGroup.delete"
+      tags:
+        - "CommandGroup"
+      summary: "Delete a group of command"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: command_group_iid
+          in: path
+          type: string
+          description: group of command iid to delete
+          required: true
+      responses:
+        200:
+          description: "Get a delete count"
+  /group_commands/{pentest}:
+    post:
+      operationId: "server.ServerModels.CommandGroup.insert"
+      tags:
+        - "CommandGroup"
+      summary: "Insert a group of command or return the conflicting existing one"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/CommandGroups'
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+  /group_commands/update/{pentest}/{command_group_iid}:
+    put:
+      operationId: "server.ServerModels.CommandGroup.update"
+      tags:
+        - "CommandGroup"
+      summary: "Update a group of command "
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: command_group_iid
+          in: path
+          type: string
+          description: group of command iid to delete
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/CommandGroups'
+
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+
+  /defects/{pentest}:
+    post:
+      operationId: "server.ServerModels.Defect.insert"
+      tags:
+        - "Defects"
+      summary: "Insert a defect or return the conflicting existing one"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Defects'
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+  /defects/update/{pentest}/{defect_iid}:
+    put:
+      operationId: "server.ServerModels.Defect.update"
+      tags:
+        - "Defects"
+      summary: "Update a defect "
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: defect_iid
+          in: path
+          type: string
+          description: defect iid to delete
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Defects'
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+  /defects/{pentest}/{defect_iid}:
+    delete:
+      operationId: "server.ServerModels.Defect.delete"
+      tags:
+        - "Defects"
+      summary: "Delete a defect and dependencies"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: defect_iid
+          in: path
+          type: string
+          description: defect iid to delete
+          required: true
+      responses:
+        200:
+          description: "Get a delete count"
+
+  /intervals/{pentest}:
+    post:
+      operationId: "server.ServerModels.Interval.insert"
+      tags:
+        - "Intervals"
+      summary: "Insert an interval or return the conflicting existing one"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Intervals'
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+  /intervals/update/{pentest}/{interval_iid}:
+    put:
+      operationId: "server.ServerModels.Interval.update"
+      tags:
+        - "Intervals"
+      summary: "Update an interval "
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: interval_iid
+          in: path
+          type: string
+          description: interval iid to delete
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Intervals'
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+  /intervals/{pentest}/{interval_iid}:
+    delete:
+      operationId: "server.ServerModels.Interval.delete"
+      tags:
+        - "Intervals"
+      summary: "Delete an interval and dependencies"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: interval_iid
+          in: path
+          type: string
+          description: defect iid to delete
+          required: true
+      responses:
+        200:
+          description: "Get a delete count"
+
+  /ips/{pentest}:
+    post:
+      operationId: "server.ServerModels.Ip.insert"
+      tags:
+        - "Ips"
+      summary: "Insert an ip or return the conflicting existing one"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Ips'
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+  /ips/update/{pentest}/{ip_iid}:
+    put:
+      operationId: "server.ServerModels.Ip.update"
+      tags:
+        - "Ips"
+      summary: "Update an ip "
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: ip_iid
+          in: path
+          type: string
+          description: ip iid to delete
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Ips'
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+  /ips/{pentest}/{ip_iid}:
+    delete:
+      operationId: "server.ServerModels.Ip.delete"
+      tags:
+        - "Ips"
+      summary: "Delete an ip and dependencies"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: ip_iid
+          in: path
+          type: string
+          description: ip iid to delete
+          required: true
+      responses:
+        200:
+          description: "Get a delete count"
+
+  /ports/{pentest}:
+    post:
+      operationId: "server.ServerModels.Port.insert"
+      tags:
+        - "Ports"
+      summary: "Insert an port or return the conflicting existing one"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Ports'
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+  /ports/update/{pentest}/{port_iid}:
+    put:
+      operationId: "server.ServerModels.Port.update"
+      tags:
+        - "Ports"
+      summary: "Update a port"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: port_iid
+          in: path
+          type: string
+          description: port iid to delete
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Ports'
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+  /ports/{pentest}/{port_iid}:
+    delete:
+      operationId: "server.ServerModels.Port.delete"
+      tags:
+        - "Ports"
+      summary: "Delete a port and dependencies"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: port_iid
+          in: path
+          type: string
+          description: port iid to delete
+          required: true
+      responses:
+        200:
+          description: "Get a delete count"
+  /ports/{pentest}/{port_iid}/addCustomTool/:
+    post:
+      operationId: "server.ServerModels.Port.addCustomTool"
+      tags:
+        - "Ports"
+      summary: "Add a tool manually to a port in the 'Custom Tools' wave"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: port_iid
+          in: path
+          type: string
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            type: object
+            required:
+              - tool_name
+            properties:
+              tool_name:
+                type: string
+
+      responses:
+        200:
+          description: "return boolean"
+  
+  /scopes/{pentest}:
+    post:
+      operationId: "server.ServerModels.Scope.insert"
+      tags:
+        - "Scopes"
+      summary: "Insert a scope or return the conflicting existing one"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Scopes'
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+  /scopes/update/{pentest}/{scope_iid}:
+    put:
+      operationId: "server.ServerModels.Scope.update"
+      tags:
+        - "Scopes"
+      summary: "Update a scope"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: scope_iid
+          in: path
+          type: string
+          description: scope iid to delete
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Scopes'
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+  /scopes/{pentest}/{scope_iid}:
+    delete:
+      operationId: "server.ServerModels.Scope.delete"
+      tags:
+        - "Scopes"
+      summary: "Delete a scope and dependencies"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: scope_iid
+          in: path
+          type: string
+          description: scope iid to delete
+          required: true
+      responses:
+        200:
+          description: "Get a delete count"
+
+  /tools/{pentest}:
+    post:
+      operationId: "server.ServerModels.Tool.insert"
+      tags:
+        - "Tools"
+      summary: "Insert a tool or return the conflicting existing one"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Tools'
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+  /tools/update/{pentest}/{tool_iid}:
+    put:
+      operationId: "server.ServerModels.Tool.update"
+      tags:
+        - "Tools"
+      summary: "Update a tool"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: tool_iid
+          in: path
+          type: string
+          description: tool iid to delete
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Tools'
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+  /tools/{pentest}/{tool_iid}:
+    delete:
+      operationId: "server.ServerModels.Tool.delete"
+      tags:
+        - "Tools"
+      summary: "Delete a tool and dependencies"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: tool_iid
+          in: path
+          type: string
+          description: tool iid to delete
+          required: true
+      responses:
+        200:
+          description: "Get a delete count"
+
+  /waves/{pentest}:
+    post:
+      operationId: "server.ServerModels.Wave.insert"
+      tags:
+        - "Waves"
+      summary: "Insert a wave or return the conflicting existing one"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Waves'
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+  /waves/update/{pentest}/{wave_iid}:
+    put:
+      operationId: "server.ServerModels.Wave.update"
+      tags:
+        - "Waves"
+      summary: "Update a wave"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: wave_iid
+          in: path
+          type: string
+          description: wave iid to delete
+          required: true
+        - name: data
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Waves'
+      responses:
+        200:
+          description: "Get a boolean for success and insert idof either new or conflicting object"
+  /waves/{pentest}/{wave_iid}:
+    delete:
+      operationId: "server.ServerModels.Wave.delete"
+      tags:
+        - "Waves"
+      summary: "Delete a wave and dependencies"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: wave_iid
+          in: path
+          type: string
+          description: wave wave_iid to delete
+          required: true
+      responses:
+        200:
+          description: "Get a delete count"

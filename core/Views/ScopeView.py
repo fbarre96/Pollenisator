@@ -47,13 +47,13 @@ class ScopeView(ViewElement):
         """
         parentDbId = parentNode
         if parentNode is None:
-            parentNode = self.getParent()
+            parentNode = self.getParentNode()
         elif 'scopes' not in parentNode:
             parentNode = ScopeView.DbToTreeviewListId(parentDbId)
         self.appliTw.views[str(self.controller.getDbId())] = {"view":self}
         try:
             parentNode = self.appliTw.insert(
-                self.controller.getParent(), 0, parentNode, text="Scopes", image=self.getClassIcon())
+                self.controller.getParentId(), 0, parentNode, text="Scopes", image=self.getClassIcon())
         except TclError:  #  trigger if tools list node already exist
             pass
         self.appliTw.insert(parentNode, "end", str(
@@ -107,7 +107,7 @@ class ScopeView(ViewElement):
         """
         if self.controller.model is None:
             return
-        parentId = self.controller.getParent()
+        parentId = self.controller.getParentId()
         parentView = self.appliTw.views[str(parentId)]["view"]
         parentView.updateReceived()
         super().insertReceived()

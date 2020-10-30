@@ -24,16 +24,16 @@ class CommandGroup(Element):
             valuesFromDb = {}
         super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None), valuesFromDb.get(
             "tags", []), valuesFromDb.get("infos", {}))
-        self.initialize(valuesFromDb.get("name", ""), valuesFromDb.get("sleep_between", "0"), valuesFromDb.get("commands", []),
-                        valuesFromDb.get("max_thread", "1"), valuesFromDb.get("infos", {}))
+        self.initialize(valuesFromDb.get("name", ""), valuesFromDb.get("sleep_between", 0), valuesFromDb.get("commands", []),
+                        valuesFromDb.get("max_thread", 1), valuesFromDb.get("infos", {}))
 
-    def initialize(self, name, sleep_between="0", commands=None, max_thread="1", infos=None):
+    def initialize(self, name, sleep_between=0, commands=None, max_thread=1, infos=None):
         """Set values of command group
         Args:
             name: the command group name
-            sleep_between: delay to wait between two call to this command. Default is "0".
+            sleep_between: delay to wait between two call to this command. Default is 0.
             commands: list of command names that are part of this group. Default is None and stores an empty array
-            max_thread: number of parallel execution possible of this command. Default is "1".
+            max_thread: number of parallel execution possible of this command. Default is 1.
             infos: a dictionnary with key values as additional information. Default to None
         Returns:
             this object
@@ -41,9 +41,9 @@ class CommandGroup(Element):
         if commands is None:
             commands = []
         self.name = name
-        self.sleep_between = sleep_between
+        self.sleep_between = int(sleep_between)
         self.commands = commands
-        self.max_thread = max_thread
+        self.max_thread = int(max_thread)
         self.infos = infos if infos is not None else {}
         return self
 
@@ -53,8 +53,7 @@ class CommandGroup(Element):
         """
         ret = self._id
         apiclient = APIClient.getInstance()
-        apiclient.deleteFromDb("pollenisator", "group_commands", {
-                                   "_id": ret}, False, True)
+        apiclient.delete("group_commands", ret)
 
     def addInDb(self):
         """
@@ -65,14 +64,13 @@ class CommandGroup(Element):
                 * mongo ObjectId : already existing object if duplicate, create object id otherwise 
         """
         apiclient = APIClient.getInstance()
-        existing = apiclient.findInDb(
-            "pollenisator", "group_commands", {"name": self.name}, False)
-        if existing is not None:
-            return False, existing["_id"]
-        res = apiclient.insertInDb("pollenisator", "group_commands", {
-            "name": self.name, "sleep_between": self.sleep_between, "commands": self.commands, "max_thread": self.max_thread}, '', True)
-        self._id = res.inserted_id
-        return True, res.inserted_id
+        res, id = apiclient.insert("group_commands", {
+            "name": self.name, "sleep_between": int(self.sleep_between), "commands": self.commands, "max_thread": int(self.max_thread)})
+        if not res:
+            return False, id
+        self._id = id
+        return True, id
+
 
     @classmethod
     def fetchObject(cls, pipeline):
@@ -113,11 +111,9 @@ class CommandGroup(Element):
         apiclient = APIClient.getInstance()
         if pipeline_set is None:
             # Update in database
-            apiclient.updateInDb("pollenisator", "group_commands", {"_id": ObjectId(self._id)}, {
-                "$set": {"name": self.name, "sleep_between": self.sleep_between, "commands": self.commands, "max_thread": self.max_thread}}, False, True)
+            apiclient.update("group_commands", ObjectId(self._id), {"name": self.name, "sleep_between": int(self.sleep_between), "commands": self.commands, "max_thread": int(self.max_thread)})
         else:
-            apiclient.updateInDb("pollenisator", "group_commands", {"_id": ObjectId(self._id)}, {
-                "$set": pipeline_set}, False, True)
+            apiclient.update("group_commands",  ObjectId(self._id), pipeline_set)
 
     @classmethod
     def getList(cls):

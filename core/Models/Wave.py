@@ -53,9 +53,7 @@ class Wave(Element):
         Also delete the tools, intervals, scopes associated with this wave
         """
         apiclient = APIClient.getInstance()
-        apiclient.delete("tools", {"wave": self.wave}, True)
-        apiclient.delete("intervals", {"wave": self.wave}, True)
-        apiclient.delete("waves", {"_id": self._id})
+        apiclient.delete("waves", ObjectId(self._id))
 
     def addInDb(self):
         """
@@ -64,20 +62,11 @@ class Wave(Element):
                 * bool for success
                 * mongo ObjectId : already existing object if duplicate, create object id otherwise 
         """
-        # Check unicity
         apiclient = APIClient.getInstance()
-        existing = apiclient.find("waves", {"wave": self.wave}, False)
-        if existing is not None:
-            return False, existing["_id"]
-        # Insertion
-        res = apiclient.insert(
+        res, iid = apiclient.insert(
             "waves", {"wave": self.wave, "wave_commands": list(self.wave_commands)})
-        ret = res.inserted_id
-        self._id = ret
-        # Add tools
-        for commName in self.wave_commands:
-            self.addAllTool(commName)
-        return True, ret
+        self._id = iid
+        return res, iid
 
     def update(self, pipeline_set=None):
         """Update this object in database.
@@ -86,45 +75,10 @@ class Wave(Element):
         """
         apiclient = APIClient.getInstance()
         if pipeline_set is None:
-            apiclient.update("waves", {"_id": ObjectId(self._id)}, {
-                "$set": {"wave_commands": list(self.wave_commands)}})
+            apiclient.update("waves", ObjectId(self._id), {"wave_commands": list(self.wave_commands)})
         else:
-            apiclient.update("waves", {"_id": ObjectId(self._id)}, {
-                "$set": pipeline_set})
+            apiclient.update("waves", ObjectId(self._id), pipeline_set)
 
-    def addAllTool(self, command_name):
-        """
-        Kind of recursive operation as it will call the same function in its children ports.
-        Add the appropriate tools (level check and wave's commands check) for this wave.
-        Also add for all registered scopes the appropriate tools.
-        Args:
-            command_name: The command that we want to create all the tools for.
-        """
-        apiclient = APIClient.getInstance()
-        command = apiclient.findInDb(apiclient.getCurrentPentest(), "commands", {
-                                         "name": command_name}, False)
-        if command["lvl"] == "wave":
-            newTool = Tool()
-            newTool.initialize(command_name, self.wave, "", "", "", "", "wave")
-            newTool.addInDb()
-            return
-        scopes = apiclient.find("scopes", {"wave": self.wave})
-        for scope in scopes:
-            h = Scope(scope)
-            h.addAllTool(command_name)
-
-    def removeAllTool(self, command_name):
-        """
-        Remove from every member of this wave the old tool corresponding to given command name but only if the tool is not done.
-        We preserve history
-
-        Args:
-            command_name: The command that we want to remove all the tools.
-        """
-        tools = Tool.fetchObjects({"name": command_name, "wave": self.wave})
-        for tool in tools:
-            if "done" not in tool.getStatus():
-                tool.delete()
 
     def __str__(self):
         """

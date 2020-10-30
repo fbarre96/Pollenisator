@@ -1,4 +1,4 @@
-"""Celery worker module. Execute code and store results in database, files in the SFTP server.
+"""worker module. Execute code and store results in database, files in the SFTP server.
 """
 
 import errno
@@ -9,7 +9,6 @@ import time
 from datetime import datetime, timedelta
 import io
 from bson.objectid import ObjectId
-from celery import Celery
 from multiprocessing import Process
 from core.Components.apiclient import APIClient
 import core.Components.Utils as Utils
@@ -39,26 +38,7 @@ if os.path.isfile(os.path.join(config_dir, "server.cfg")):
 else:
     print("No client config file found under "+str(config_dir))
     sys.exit(1)
-user_string = cfg["user"]+':'+cfg["password"] + \
-    '@' if cfg['user'].strip() != "" else ""
-if cfg["ssl"] == "True":
-    app = Celery('tasks', broker='mongodb://'+user_string+cfg["host"] + ':' + cfg["mongo_port"] +
-                 '/broker_pollenisator?authSource=admin&ssl=true&ssl_ca_certs='+certs["ca_certs"]+'&ssl_certfile='+certs["keyfile"])
-else:
-    app = Celery('tasks', broker='mongodb://' + user_string +
-                 cfg["host"] + ':'+cfg["mongo_port"] + '/broker_pollenisator?authSource=admin')
 
-
-"""FIX MULTIPROCESING INSIDE CELERY TASK"""
-from celery.signals import worker_process_init
-from multiprocessing import current_process
-
-@worker_process_init.connect
-def fix_multiprocessing(**kwargs):
-    try:
-        current_process()._config
-    except AttributeError:
-        current_process()._config = {'semprefix': '/mp'}
 
 def getWaveTimeLimit(waveName):
     """
@@ -89,16 +69,15 @@ def launchTask(calendarName, worker, launchableTool):
     print("Launching command "+str(launchableTool))
     p = Process(target=executeCommand, args=(calendarName, launchableToolId))
     p.start()
-    # Append to running tasks this celery result and the corresponding tool id
+    # Append to running tasks this  result and the corresponding tool id
     return True
 
 
 def dispatchLaunchableToolsv2(launchableTools, worker):
     """
-    Try to launch given tools within the monitor
+    Try to launch given tools within the
 
     Args:
-        my_monitor: A Monitor instance which knows what tools are already launched and online workers
         launchableTools: A list of tools within a Wave that passed the Intervals checking.
     """
     apiclient = APIClient.getInstance()
@@ -149,10 +128,10 @@ def findLaunchableToolsOnWorker(worker, calendarName):
 
 
 
-@app.task
+#@app.task
 def getCommands(calendarName, worker_name):
     """
-    CELERY remote task
+     remote task
     List worker registered tools in configuration folder.
     Store the results in mongo database in pollenisator.workers database.
     """
@@ -164,7 +143,7 @@ def getCommands(calendarName, worker_name):
     return
 
 
-@app.task
+#@app.task
 def startAutoScan(calendarName, workerName):
     apiclient = APIClient.getInstance()
     apiclient.setCurrentPentest(calendarName)
@@ -172,7 +151,7 @@ def startAutoScan(calendarName, workerName):
     autoScanv2(calendarName, workerName)
     return
 
-@app.task
+#@app.task
 def editToolConfig(command_name, remote_bin, plugin):
     tools_to_register = Utils.loadToolsConfig()
     tools_to_register[command_name] = {"bin":remote_bin, "plugin":plugin}
@@ -180,7 +159,7 @@ def editToolConfig(command_name, remote_bin, plugin):
 
 def autoScanv2(databaseName, workerName):
     """
-    Search tools to launch within defined conditions and attempts to launch them this celery worker.
+    Search tools to launch within defined conditions and attempts to launch them this  worker.
     Gives a visual feedback on stdout
 
     Args:
@@ -202,13 +181,13 @@ def autoScanv2(databaseName, workerName):
         
         time.sleep(3)
 
-@app.task
+#@app.task
 def executeCommand(calendarName, toolId, parser=""):
     """
-    CELERY remote task
+     remote task
     Execute the tool with the given toolId on the given calendar name.
     Then execute the plugin corresponding.
-    Any unhandled exception will result in a task-failed event in the Monitor class.
+    Any unhandled exception will result in a task-failed event in the class.
 
     Args:
         calendarName: The calendar to search the given tool id for.

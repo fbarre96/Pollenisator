@@ -233,14 +233,20 @@ class ViewElement(object):
         """
         return str(parent_db_id)
 
-    def getParent(self):
+    def getParentId(self):
         """
         Return the id of the parent node in treeview.
 
         Returns:
             return the model parent id DbToTreeviewListId
         """
-        return self.__class__.DbToTreeviewListId(self.controller.getParent())
+        return self.controller.getParentId()
+
+    def getParentNode(self):
+        """
+        Return the parent node in treeview.
+        """
+        return self.__class__.DbToTreeviewListId(self.controller.getParentId())
 
     def updateReceived(self):
         """Called when any view element update is received by notification.

@@ -107,7 +107,7 @@ class IpView(ViewElement):
             _addChildren: not used here
         """
         if parentNode is None:
-            parentNode = self.getParent()
+            parentNode = self.getParentNode()
         ip_node = None
         try:
             if isinstance(parentNode, ObjectId):
@@ -184,7 +184,7 @@ class IpView(ViewElement):
                         module["object"].insertIp(modelData["ip"])
             super().updateReceived()
 
-    def getParent(self):
+    def getParentNode(self):
         """
         Return the id of the parent node in treeview.
 

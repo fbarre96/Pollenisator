@@ -1,7 +1,6 @@
 """
-Keep track of all celery workers. Also launchs, monitors and stops celery tasks.
+Keep track of all  workers. Also launchs, monitors and stops  tasks.
 """
-from celery import Celery
 import threading
 import multiprocessing
 from core.Components.Worker import Worker
@@ -18,11 +17,11 @@ import AutoScanWorker as slave
 
 class Monitor:
     """
-    Keep track of all celery workers. Also launchs, monitors and stops celery tasks.
+    Keep track of all  workers. Also launchs, monitors and stops  tasks.
     """
     def __init__(self, calendar):
         """
-        Constructor. Connect to Celery and start the thread receiving celery worker's events.
+        Constructor. Connect to  and start the thread receiving  worker's events.
         Args:
             calendar: the pentest database name to monitor
         """
@@ -38,14 +37,6 @@ class Monitor:
         # self.worker_list = manager.dict()
         dir_path = os.path.dirname(os.path.realpath(__file__))
         cfg = Utils.loadServerConfig()
-        userString = cfg["user"]+':'+cfg["password"] + \
-            '@' if cfg['user'].strip() != "" else ""
-        if cfg["ssl"] == "True":
-            self.app = Celery('tasks', broker='mongodb://' + userString + cfg["host"] + ":"+cfg["mongo_port"] +
-                              '/broker_pollenisator?authSource=admin&ssl=true&ssl_ca_certs='+certs["ca_certs"]+'&ssl_certfile='+certs["keyfile"], connect_timeout=5000)
-        else:
-            self.app = Celery('tasks', broker='mongodb://' + userString + cfg["host"] + ":"+cfg["mongo_port"] +
-                              '/broker_pollenisator?authSource=admin', connect_timeout=5000)
         self.state = self.app.events.State()
         self.tasks_running = []
         self.recv = None
@@ -82,7 +73,7 @@ class Monitor:
 
     def stopTask(self, launchableTool):
         """
-        Stop the celery task corresponding to the given tool
+        Stop the task corresponding to the given tool
 
         Args:
             launchableTool: a Tool document instance that was presumably launched.
@@ -101,7 +92,7 @@ class Monitor:
     
     def launchTask(self, calendarName, launchableTool, parser="", checks=True, workerName=""):
         """
-        launch the celery task corresponding to the given tool
+        launch the task corresponding to the given tool
 
         Args:
             calendarNamse: the calendar where the tool given is
@@ -151,7 +142,7 @@ class Monitor:
                 destination=[workerName])
             result_async = executeCommand.apply_async(args=[calendarName, str(
                 launchableToolId), parser], queue=queueName, retry=False, serializer="json")
-            # Append to running tasks this celery result and the corresponding tool id
+            # Append to running tasks this result and the corresponding tool id
             self.tasks_running.append([result_async, launchableToolId])
         else:
             thread = None
@@ -159,7 +150,7 @@ class Monitor:
                 mongoInstance.calendarName, str(launchableToolId), parser))
             thread.start()
 
-        # Execute this celery task
+        # Execute this task
         return True
 
     def getWorkerList(self):
@@ -176,8 +167,8 @@ class Monitor:
         return l
         
     def isWorkerExcludedFrom(self, worker_hostname, dbName):
-        apiclient = APIClient.getInstance()
-        worker = apiclient.getWorker()
+        mongoInstance = MongoCalendar.getInstance()
+        worker = mongoInstance.getWorkers({"name":worker_hostname})
         if worker is None:
             return True
         return dbName in worker.get("excludedDatabases", [])
@@ -203,7 +194,7 @@ class Monitor:
 
     def stop(self):
         """
-        Stop monitoring the celery events and revoke all celery tasks
+        Stop monitoring the events and revoke all tasks
         """
 
         for task_running in self.tasks_running:
@@ -219,21 +210,12 @@ class Monitor:
 
     def addOnlineWorker(self, worker_hostname):
         """
-        Register a celery worker on the worker's list. Also deletes old queues and messages
+        Register a worker on the worker's list. Also deletes old queues and messages
 
         Args:
             worker_hostname: the worker hostname to register on worker's list
         """
         mongoInstance = MongoCalendar.getInstance()
-        agg_queues = mongoInstance.aggregateFromDb("broker_pollenisator", "messages.routing", [{"$group": {"_id": "$queue"}}, {
-            "$match": {"_id": {"$regex": "^.*&"+worker_hostname+"&.*$"}}}])
-        mongoInstance.deleteFromDb("broker_pollenisator", "messages.routing", {
-            "queue": {"$regex": "^.*&"+worker_hostname+"&.*$"}}, True)
-        for agg_queue in agg_queues:
-            Utils.execute("celery -A AutoScanWorker purge -f -Q '" +
-
-                          agg_queue["_id"]+"'", None, False)
-        
         self.workerRegisterCommands(worker_hostname)
 
     def updateWorkerLastHeartbeat(self, worker_hostname):
@@ -268,13 +250,12 @@ class Monitor:
         mongoInstance = MongoCalendar.getInstance()
         mongoInstance.removeWorker(worker_hostname)
 
-    ########################################################
-    ############# CELERY EVENTS CALLBACK BLOCK #############
-    ########################################################
-
+    ################################################
+    ###########  EVENTS CALLBACK BLOCK #############
+    ################################################
     def announce_failed_tasks(self, event):
         """
-        Called when a celery task fails. Is used to reset dates and scanner of the targeted tool.
+        Called when a task fails. Is used to reset dates and scanner of the targeted tool.
 
         Args:
             event: created automatically when the event occurs. Contains some info about the task
@@ -301,7 +282,7 @@ class Monitor:
 
     def announce_online_worker(self, event):
         """
-        Called when a celery worker get online. Is used to register this worker in the worker_list
+        Called when a worker get online. Is used to register this worker in the worker_list
 
         Args:
             event: created automatically when the event occurs. Contains some info about the worker
@@ -315,7 +296,7 @@ class Monitor:
 
     def announce_offline_worker(self, event):
         """
-        Called when a celery worker gets offline nicely. Is used to remove this worker from the worker_list
+        Called when a worker gets offline nicely. Is used to remove this worker from the worker_list
 
         Args:
             event: created automatically when the event occurs. Contains some info about the worker
@@ -333,8 +314,8 @@ class Monitor:
 
     def announce_heartbeat_worker(self, event):
         """
-        Called when a celery worker sends a heartbeat. Is used to register this worker in the worker_list if not already in.
-        Online event is only sent once. If celery workers were already launched, this will not be resend.
+        Called when a worker sends a heartbeat. Is used to register this worker in the worker_list if not already in.
+        Online event is only sent once. If workers were already launched, this will not be resend.
 
         Args:
             event: created automatically when the event occurs. Contains some info about the worker
@@ -358,7 +339,7 @@ class Monitor:
 
     def run(self, calendar):
         """
-        Start monitoring celery events
+        Start monitoring events
         Will stop when receiving a KeyboardInterrupt
         Args:
             calendar: the pentest database name to monitor

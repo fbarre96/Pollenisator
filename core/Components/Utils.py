@@ -10,6 +10,25 @@ import json
 import requests
 from netaddr import IPNetwork
 from netaddr.core import AddrFormatError
+from bson import ObjectId
+
+class JSONEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, ObjectId):
+            return "ObjectId|"+str(o)
+        elif isinstance(o, datetime):
+            return str(o)
+        return json.JSONEncoder.default(self, o)
+
+class JSONDecoder(json.JSONDecoder):
+    def __init__(self, *args, **kwargs):
+        json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
+        
+    def object_hook(self, dct):
+        for k,v in dct.items():
+            if 'ObjectId|' in str(v):
+                dct[k] = ObjectId(v.split('ObjectId|')[1])
+        return dct
 
 def loadPluginByBin(binName):
     """

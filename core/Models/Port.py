@@ -62,52 +62,20 @@ class Port(Element):
         Also deletes the defects associated with this port
         """
         apiclient = APIClient.getInstance()
-        tools = apiclient.find("tools", {"port": self.port, "proto": self.proto,
-                                             "ip": self.ip}, True)
-        for tool in tools:
-            tool_model = Tool(tool)
-            tool_model.delete()
-        defects = apiclient.find("defects", {"port": self.port, "proto": self.proto,
-                                                 "ip": self.ip}, True)
-        for defect in defects:
-            defect_model = Defect(defect)
-            defect_model.delete()
-        apiclient.delete("ports", {"_id":  ObjectId(self._id)})
+        
+        apiclient.delete("ports", ObjectId(self._id))
 
     def update(self, pipeline_set=None):
         """Update this object in database.
         Args:
             pipeline_set: (Opt.) A dictionnary with custom values. If None (default) use model attributes.
         """
-        oldPort = Port.fetchObject({"_id": ObjectId(self._id)})
-        if oldPort is None:
-            return
-        oldService = oldPort.service
         apiclient = APIClient.getInstance()
-        if oldService != self.service:
-            apiclient.delete("tools", {
-                                 "lvl": "port", "ip": self.ip, "port": self.port, "proto": self.proto}, many=True)
-            port_commands = apiclient.findInDb(
-                "pollenisator", "commands", {"lvl": "port"})
-            for port_command in port_commands:
-                allowed_services = port_command["ports"].split(",")
-                for i, elem in enumerate(allowed_services):
-                    if not(elem.strip().startswith("tcp/") or elem.strip().startswith("udp/")):
-                        allowed_services[i] = "tcp/"+str(elem)
-                if self.proto+"/"+str(self.service) in allowed_services:
-                    waves = apiclient.find("waves", {"wave_commands": {"$elemMatch": {
-                        "$eq": port_command["name"].strip()}}})
-                    for wave in waves:
-                        tool_m = Tool().initialize(port_command["name"], wave["wave"], "",
-                                                   self.ip, self.port, self.proto, "port")
-                        tool_m.addInDb()
         # Update variable instance. (this avoid to refetch the whole command in database)
         if pipeline_set is None:
-            apiclient.update("ports", {"_id": ObjectId(self._id)}, {
-                "$set": {"service": self.service, "product":self.product, "notes": self.notes, "tags": self.tags, "infos": self.infos}})
+            apiclient.update("ports", ObjectId(self._id), {"service": self.service, "product":self.product, "notes": self.notes, "tags": self.tags, "infos": self.infos})
         else:
-            apiclient.update("ports", {"_id": ObjectId(self._id)}, {
-                "$set": pipeline_set})
+            apiclient.update("ports", ObjectId(self._id),  pipeline_set)
 
     def addInDb(self):
         """
@@ -119,116 +87,28 @@ class Port(Element):
         """
         base = self.getDbKey()
         apiclient = APIClient.getInstance()
-        existing = apiclient.find("ports", base, False)
-        if existing is not None:
-            return False, existing["_id"]
         # Inserting port
-        parent = self.getParent()
-        base["parent"] = parent
         base["service"] = self.service
         base["product"] = self.product
         base["notes"] = self.notes
         base["tags"] = self.tags
         base["infos"] = self.infos
-        res = apiclient.insert("ports", base, parent)
-        ret = res.inserted_id
-        self._id = ret
-        # adding the appropriate tools for this port.
-        # 1. fetching the wave's commands
-        waves = apiclient.find("waves", {})
-        for wave in waves:
-            waveName = wave["wave"]
-            commands = wave["wave_commands"]
-            for commName in commands:
-                # 2. finding the command only if lvl is port
-                comm = apiclient.findInDb(apiclient.getCurrentPentest(), "commands",
-                                              {"name": commName, "lvl": "port"}, False)
-                if comm is not None:
-                    # 3. checking if the added port fit into the command's allowed service
-                    # 3.1 first, default the selected port as tcp if no protocole is defined.
-                    allowed_ports_services = comm["ports"].split(",")
-                    for i, elem in enumerate(allowed_ports_services):
-                        if not(elem.strip().startswith("tcp/") or elem.strip().startswith("udp/")):
-                            allowed_ports_services[i] = "tcp/"+str(elem.strip())
-                    for allowed in allowed_ports_services:
-                        protoRange = "udp" if allowed.startswith("udp/") else "tcp"
-                        maybeRange = str(allowed)[4:].split("-")
-                        startAllowedRange = -1
-                        endAllowedRange = -1
-                        if len(maybeRange) == 2:
-                            try:
-                                startAllowedRange = int(maybeRange[0])
-                                endAllowedRange = int(maybeRange[1])
-                            except ValueError:
-                                pass
-                        if (self.proto+"/"+self.port == allowed) or \
-                        (self.proto+"/"+self.service == allowed) or \
-                        (self.proto == protoRange and int(self.port) >= int(startAllowedRange) and int(self.port) <= int(endAllowedRange)):
-                            # finally add tool
-                            newTool = Tool()
-                            newTool.initialize(
-                                comm["name"], waveName, "", self.ip, self.port, self.proto, "port")
-                            newTool.addInDb()
-        return True, ret
+        res, iid = apiclient.insert("ports", base)
+        self._id = iid
+        
+        return res, iid
 
-    def addAllTool(self, command_name, wave_name, scope, check=True):
+    def addCustomTool(self, command_name):
         """
         Add the appropriate tools (level check and wave's commands check) for this port.
 
         Args:
             command_name: The command that we want to create all the tools for.
-            wave_name: name of the was to fetch allowed commands from
-            scope: a scope matching this tool (should only be used by network level tools)
-            check: A boolean to bypass checks. Force adding this command tool to this port if False. Default is True
         """
-        if check == False:
-            newTool = Tool()
-            newTool.initialize(command_name, wave_name, scope,
-                               self.ip, self.port, self.proto, "port")
-            newTool.addInDb()
-            return
-        # retrieve wave's command
         apiclient = APIClient.getInstance()
-        wave = apiclient.find(
-            "waves", {"wave": wave_name}, False)
-        commands = wave["wave_commands"]
-        try:
-            index = commands.index(command_name)
-            # retrieve the command level
-            command = apiclient.findInDb(apiclient.getCurrentPentest(),
-                                             "commands", {"name": commands[index]}, False)
-            if command["lvl"] == "port":
-                # 3. checking if the added port fit into the command's allowed service
-                # 3.1 first, default the selected port as tcp if no protocole is defined.
-                allowed_ports_services = command["ports"].split(",")
-                for i, elem in enumerate(allowed_ports_services):
-                    if not(elem.strip().startswith("tcp/") or elem.strip().startswith("udp/")):
-                        allowed_ports_services[i] = "tcp/"+str(elem.strip())
-                for allowed in allowed_ports_services:
-                    protoRange = "udp" if allowed.startswith("udp/") else "tcp"
-                    maybeRange = str(allowed)[4:].split("-")
-                    startAllowedRange = -1
-                    endAllowedRange = -1
-                    if len(maybeRange) == 2:
-                        try:
-                            startAllowedRange = int(maybeRange[0])
-                            endAllowedRange = int(maybeRange[1])
-                        except ValueError:
-                            pass
-                    if (self.proto+"/"+self.port == allowed) or \
-                       (self.proto+"/"+self.service == allowed) or \
-                       (self.proto == protoRange and
-                           int(self.port) >= int(startAllowedRange) and
-                            int(self.port) <= int(endAllowedRange)):
-                        # finally add tool
-                        newTool = Tool()
-                        newTool.initialize(
-                            command_name, wave_name, scope, self.ip, self.port, self.proto, "port")
-                        newTool.addInDb()
-        except ValueError:
-            pass
+        return apiclient.addCustomTool(self._id, command_name)
 
-    def _getParent(self):
+    def _getParentId(self):
         """
         Return the mongo ObjectId _id of the first parent of this object. For a port it is the ip.
 

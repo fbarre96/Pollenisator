@@ -60,15 +60,12 @@ class PortController(ControllerElement):
         return {"ip": self.model.ip, "port": self.model.port, "proto": self.model.proto,
                 "service": self.model.service, "product": self.model.product, "notes": self.model.notes, "_id": self.model.getId(), "tags": self.model.tags, "infos": self.model.infos}
 
-    def addAllTool(self, toolname, wavename, scope, check):
+    def addCustomTool(self, toolname):
         """Add tool name to the model 
         Args:
             toolname: the tool name to be added to the port
-            wavename: the tool wave name
-            scope: the tool is launched through a scope, this is the scope string
-            check: boolean to indicate if the tool must be checked against port infos (matching services or port number)
         """
-        self.model.addAllTool(toolname, wavename, scope, check)
+        self.model.addCustomTool(toolname)
 
     def getDefects(self):
         """Return port assigned defects as a list of mongo fetched defects dict

@@ -149,13 +149,15 @@ class CommandsTreeview(PollenisatorTreeview):
 
         # Insert
         if action == "insert":
-            res = apiclient.findInDb(
-                db, collection, {"_id": ObjectId(iid)}, False)
             if collection == "commands":
+                res = apiclient.findInDb(
+                    db, collection, {"_id": ObjectId(iid)}, False)
                 view = CommandView(self, self.appli.commandsViewFrame,
                                    self.appli, CommandController(Command(res)))
                 parent = None
             elif collection == "group_commands":
+                res = apiclient.findInDb(
+                    db, collection, {"_id": ObjectId(iid)}, False)
                 view = CommandGroupView(self, self.appli.commandsViewFrame,
                                         self.appli, CommandGroupController(CommandGroup(res)))
                 parent = None

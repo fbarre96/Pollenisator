@@ -14,7 +14,7 @@ class Worker:
         """
         Constructor.
         Args:
-            name: The celery worker name
+            name: The worker name
         """
         self.name = name
 

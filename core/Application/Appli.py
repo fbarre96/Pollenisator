@@ -10,6 +10,7 @@ import tkinter.simpledialog
 import tkinter.ttk as ttk
 import sys
 from tkinter import TclError
+import datetime
 import os
 import re
 from PIL import ImageTk, Image
@@ -253,7 +254,7 @@ class Appli(ttk.Frame):
         
         self.parent = parent  #  parent tkinter window
         #  already read notifications from previous notification reading iteration
-        self.old_notifs = []
+        self.lastNotifReadTime = datetime.datetime.now()
         self.notifications_timers = None
         tk.Tk.report_callback_exception = self.show_error
         self.setStyle()
@@ -393,12 +394,12 @@ class Appli(ttk.Frame):
         Read notifications from database every 0.5 or so second. Notifications are used to exchange informations between applications.
         """
         apiclient = APIClient.getInstance()
-        self.old_notifs = []
         try:
-            notifications = apiclient.fetchNotifications(apiclient.getCurrentPentest())
+            lastNotifReadTime = datetime.datetime.now()
+            notifications = apiclient.fetchNotifications(apiclient.getCurrentPentest(), self.lastNotifReadTime)
+            self.lastNotifReadTime = lastNotifReadTime
             for notification in notifications:
                 # print("Notification received "+str(notification["db"])+"/"+str(notification["collection"])+" iid="+str(notification["iid"])+" action="+str(notification["action"]))
-                self.old_notifs.append(notification["_id"])
                 if notification["db"] == "pollenisator":
                     if notification["collection"] == "workers":
                         self.scanManager.notify(notification["iid"], notification["action"])
@@ -413,6 +414,7 @@ class Appli(ttk.Frame):
                                     notification["iid"], notification["action"], notification.get("parent", ""))
         except Exception as e:
             print(str(e))
+        
         self.notifications_timers = threading.Timer(
             5, self.readNotifications)
         self.notifications_timers.start()
@@ -423,13 +425,9 @@ class Appli(ttk.Frame):
         """
         apiclient = APIClient.getInstance()
         apiclient.dettach(self)
-        if self.scanManager is not None:
-            self.scanManager.stop()
         print("Stopping notifications...")
         if self.notifications_timers is not None:
             self.notifications_timers.cancel()
-        if self.scanManager is not None:
-            self.scanManager.monitor.stopWorkersTimer()
         print("Stopping application...")
         self.quit()
 
@@ -731,22 +729,18 @@ class Appli(ttk.Frame):
         Args:
             event : hold informations to identify which tab was clicked.
         """
+        apiclient = APIClient.getInstance()
         tabName = self.nbk.tab(self.nbk.select(), "text").strip()
         self.searchBar.quit()
         if tabName == "Commands":
             self.commandsTreevw.initUI()
-        apiclient = APIClient.getInstance()
-        if not apiclient.getCurrentPentest() != "":
+        if apiclient.getCurrentPentest() == "":
             opened = self.promptCalendarName()
             if opened is None:
                 return
         if tabName == "Scan":
-            if not apiclient.getCurrentPentest() != "":
-                if os.name != 'nt': # Disable on windows
-                    self.scanManager.initUI(self.scanViewFrame)
-                else:
-                    lbl = ttk.Label(self.scanViewFrame, text="Disabled on windows because celery does not support it.")
-                    lbl.pack()
+            if apiclient.getCurrentPentest() != "":
+                self.scanManager.initUI(self.scanViewFrame)
         elif tabName == "Settings":
             self.settings.reloadUI()
         else:
@@ -1060,10 +1054,10 @@ class Appli(ttk.Frame):
                     default = os.path.join(Utils.getMainDir(), "exports/pollenisator_group_commands.gzip")
                     res = self.importCommands(default)
             commands = Command.getList({"$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}]})
-        #Duplicate commands in local database
+        # Duplicate commands in local database
         allcommands = Command.fetchObjects({})
         for command in allcommands:
-            command.indb = MongoCalendar.getInstance().calendarName
+            command.indb = APIClient.getInstance().getCurrentPentest()
             command.addInDb()
         Wave().initialize(dbName, commands).addInDb()
         Interval().initialize(dbName, start_date, end_date).addInDb()
@@ -1084,7 +1078,6 @@ class Appli(ttk.Frame):
         Args:
             filename: the pentest database name to load in application. If "" is given (default), will refresh the already opened database if there is one.
         """
-        print("Start monitoring")
         calendarName = None
         apiclient = APIClient.getInstance()
         if filename == "" and apiclient.getCurrentPentest() != "":
@@ -1092,8 +1085,6 @@ class Appli(ttk.Frame):
         elif filename != "":
             calendarName = filename.split(".")[0].split("/")[-1]
         if calendarName is not None:
-            if self.scanManager is not None:
-                self.scanManager.stop()
             if self.notifications_timers is not None:
                 self.notifications_timers.cancel()
                 self.notifications_timers = None
@@ -1104,11 +1095,10 @@ class Appli(ttk.Frame):
                 module["object"].initUI(module["view"], self.nbk, self.treevw)
             self.statusbar.reset()
             self.treevw.refresh()
-            if os.name != "nt": # On windows celery 4.X is not managed
-                self.scanManager = ScanManager(self.nbk, self.treevw, apiclient.getCurrentPentest(), self.settings)
-                self.notifications_timers = threading.Timer(
-                    5, self.readNotifications)
-                self.notifications_timers.start()
+            self.scanManager = ScanManager(self.nbk, self.treevw, apiclient.getCurrentPentest(), self.settings)
+            self.notifications_timers = threading.Timer(
+                5, self.readNotifications)
+            self.notifications_timers.start()
 
     def wrapCopyDb(self, _event=None):
         """

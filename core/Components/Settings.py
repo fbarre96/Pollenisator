@@ -17,6 +17,7 @@ class Settings:
         * global settings: stored in the pollenisator database under settings collection
     """
     tags_cache = None
+    __pentest_types = None
     def __init__(self):
         """
         Load the tree types of settings and stores them in dictionnaries
@@ -74,12 +75,15 @@ class Settings:
             otherwise returns a dict with defined key values
         """
         apiclient = APIClient.getInstance()
-        pentest_types = apiclient.findInDb(
-            "pollenisator", "settings", {"key": "pentest_types"}, False)
-        if pentest_types is not None:
-            if isinstance(pentest_types["value"], dict):
-                return pentest_types["value"]
-        return  {"Web":["Socle", "Application", "Données", "Politique"], "LAN":["Infrastructure", "Active Directory", "Données", "Politique"]}
+        if cls.__pentest_types is None:
+            pentest_types = apiclient.findInDb(
+                "pollenisator", "settings", {"key": "pentest_types"}, False)
+            if pentest_types is not None:
+                if isinstance(pentest_types["value"], dict):
+                    cls.__pentest_types = pentest_types["value"]
+            else:
+                cls.__pentest_types = {"Web":["Socle", "Application", "Données", "Politique"], "LAN":["Infrastructure", "Active Directory", "Données", "Politique"]}
+        return cls.__pentest_types
 
 
     def getTerms(self):
@@ -153,7 +157,7 @@ class Settings:
         Reload pentest database settings from pollenisator database
         """
         apiclient = APIClient.getInstance()
-        globalSettings = apiclient.getSettings("pollenisator", "settings", {})
+        globalSettings = apiclient.getSettings()
         for settings_dict in globalSettings:
             self.global_settings[settings_dict["key"]] = settings_dict["value"]
 
@@ -222,11 +226,11 @@ class Settings:
             f.write(json.dumps(self.local_settings))
 
     def savePentestSettings(self):
+        apiclient = APIClient.getInstance()
         settings = apiclient.find("settings")
         for k, v in self.db_settings.items():
             if k not in settings:
-                apiclient.insert("settings", {
-                    "key": k, "value": v})
+                apiclient.createSetting(k,v )
             else:
                 apiclient.update("settings", {
                     "key": k}, {"$set": {"value": v}})
