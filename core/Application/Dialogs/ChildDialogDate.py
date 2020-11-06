@@ -146,7 +146,6 @@ class ChildDialogDate:
         canvas.text = canvas.create_text(0, 0, fill=sel_fg, anchor='w')
 
         canvas.bind('<ButtonPress-1>', lambda evt: canvas.place_forget())
-        print("Bindings mouse")
         self._calendar.focus_set()
         self._calendar.bind('<Configure>', lambda evt: canvas.place_forget())
         self._calendar.bind('<ButtonPress-1>', self._pressed)
@@ -185,7 +184,6 @@ class ChildDialogDate:
 
     def _pressed(self, evt):
         """Clicked somewhere in the calendar."""
-        print("PRESSED")
         x, y, widget = evt.x, evt.y, evt.widget
         item = widget.identify_row(y)
         column = widget.identify_column(x)

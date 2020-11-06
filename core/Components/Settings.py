@@ -79,8 +79,11 @@ class Settings:
             pentest_types = apiclient.findInDb(
                 "pollenisator", "settings", {"key": "pentest_types"}, False)
             if pentest_types is not None:
+                if isinstance(pentest_types["value"], str):
+                    cls.__pentest_types = json.loads(pentest_types["value"])
                 if isinstance(pentest_types["value"], dict):
                     cls.__pentest_types = pentest_types["value"]
+                
             else:
                 cls.__pentest_types = {"Web":["Socle", "Application", "Données", "Politique"], "LAN":["Infrastructure", "Active Directory", "Données", "Politique"]}
         return cls.__pentest_types
@@ -229,9 +232,7 @@ class Settings:
         apiclient = APIClient.getInstance()
         settings = apiclient.find("settings")
         for k, v in self.db_settings.items():
-            if k not in settings:
-                apiclient.createSetting(k,v )
-            else:
+            if k in settings:
                 apiclient.update("settings", {
                     "key": k}, {"$set": {"value": v}})
 
@@ -402,15 +403,14 @@ class Settings:
         ) == 1
         self.local_settings["terms"] = [x.strip() for x in self.text_terms.get('1.0', tk.END).split("\n") if x.strip() != ""]
         self.local_settings["fav_term"] = self.box_favorite_term.get().strip()
-        self.global_settings["pentest_types"] = []
+        self.global_settings["pentest_types"] = {}
         for type_of_pentest in self.text_pentest_types.get('1.0', tk.END).split(
                 "\n"):
             if type_of_pentest.strip() != "":
                 line_splitted = type_of_pentest.strip().split(":")
                 if len(line_splitted) == 2:
                     typesOfDefects = list(map(lambda x: x.strip(), line_splitted[1].split(",")))
-                    self.global_settings["pentest_types"].append(
-                        {line_splitted[0].strip():typesOfDefects})
+                    self.global_settings["pentest_types"][line_splitted[0].strip()] = typesOfDefects
         self.global_settings["tags"] = {}
         for tagRegistered in self.text_tags.get('1.0', tk.END).split(
                 "\n"):

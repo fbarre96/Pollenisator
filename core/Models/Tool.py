@@ -196,53 +196,7 @@ class Tool(Element):
             output_dir += Tool.__sanitize(port_dir)+"/"
         return output_dir
 
-    def getCommandToExecute(self, outputDirectory):
-        """
-        Get the tool bash command to execute.
-        Replace the command's text's variables with tool's informations.
-        Args:
-            outputDirectory: the output directory for this tool (see getOutputDir)
-        Return:
-            Returns the bash command of this tool instance.
-        """
-        toolHasCommand = self.text
-        if toolHasCommand is not None and toolHasCommand.strip() != "":
-            command = self.text
-            lvl = self.lvl
-        else:
-            comm = self.getCommand()
-            command = comm["text"]
-            lvl = comm["lvl"]
-        apiclient = APIClient.getInstance()
-        command = command.replace("|outputDir|", outputDirectory)
-        command = command.replace("|wave|", self.wave)
-        if lvl == "network" or lvl == "domain":
-            command = command.replace("|scope|", self.scope)
-            if Utils.isNetworkIp(self.scope) == False:
-                depths = self.scope.split(".")
-                if len(depths) > 2:
-                    topdomain = ".".join(depths[1:])
-                else:
-                    topdomain = ".".join(depths)
-                command = command.replace("|parent_domain|", topdomain)
-        if lvl == "ip":
-            command = command.replace("|ip|", self.ip)
-            ip_db = apiclient.find("ips", {"ip":self.ip}, False)
-            ip_infos = ip_db.get("infos", {})
-            for info in ip_infos:
-                command = command.replace("|ip.infos."+str(info)+"|", command)
-        if lvl == "port":
-            command = command.replace("|ip|", self.ip)
-            command = command.replace("|port|", self.port)
-            command = command.replace("|port.proto|", self.proto)
-            port_db = apiclient.find("ports", {"port":self.port, "proto":self.proto, "ip":self.ip}, False)
-            command = command.replace("|port.service|", port_db["service"])
-            command = command.replace("|port.product|", port_db["product"])
-            port_infos = port_db.get("infos", {})
-            for info in port_infos:
-                # print("replacing "+"|port.infos."+str(info)+"|"+ "by "+str(info))
-                command = command.replace("|port.infos."+str(info)+"|", str(port_infos[info]))
-        return command
+    
 
     def update(self, pipeline_set=None):
         """Update this object in database.
@@ -312,20 +266,7 @@ class Tool(Element):
         """
         return self.resultfile
 
-    def markAsDone(self, file_name=None):
-        """Set this tool status as done but keeps OOT or OOS.
-        Args:
-            file_name: the resulting file of thsi tool execution. Default is None
-        """
-        self.datef = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-        newStatus = ["done"]
-        if "OOS" in self.status:
-            newStatus.append("OOS")
-        if "OOT" in self.status:
-            newStatus.append("OOT")
-        self.status = newStatus
-        self.resultfile = file_name
-        self.update()
+    
 
     def markAsRunning(self, workerName):
         """Set this tool status as running but keeps OOT or OOS.
@@ -357,19 +298,7 @@ class Tool(Element):
             self.status.remove("running")
         self.update()
 
-    def markAsError(self):
-        """Set this tool status as not done by removing "done" or "running" and adding an error status.
-        Also resets starting and ending date as well as worker name
-        """
-        self.dated = "None"
-        self.datef = "None"
-        self.scanner_ip = "None"
-        if "done" in self.status:
-            self.status.remove("done")
-        if "running" in self.status:
-            self.status.remove("running")
-        self.status.append("error")
-        self.update()
+    
 
     def getDbKey(self):
         """Return a dict from model to use as unique composed key.

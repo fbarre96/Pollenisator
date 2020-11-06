@@ -164,6 +164,14 @@ definitions:
         type: array
         items:
           type: string
+  Instructions:
+    properties:
+      function:
+        type: string
+      args:
+        type: array
+        items:
+          type: string
         
 # Paths supported by the server application
 paths:
@@ -387,7 +395,8 @@ paths:
             type: array
             items:
               type: string
-  /pentest/{pentest}:
+
+  /pentest/{pentest}/delete:
     delete:
       operationId: "server.mongo.deletePentest"
       tags:
@@ -412,6 +421,49 @@ paths:
           in: path
           type: string
           required: true
+        - name: data
+          in: body
+          schema:
+            type: object
+            required:
+              - pentest_type
+              - start_date
+              - end_date
+              - scope
+              - settings
+              - pentesters
+            properties:
+              pentest_type:
+                type: string
+              start_date:
+                type: string
+                format: date-time
+              end_date:
+                type: string
+                format: date-time
+              scope:
+                type: string
+              pentesters:
+                type: string
+              settings:
+                type: object
+                properties:
+                  Add domains whose IP are in scope:
+                    type: integer
+                    minimum: 0
+                    maximum: 1
+                  Add domains who have a parent domain in scope:
+                    type: integer
+                    minimum: 0
+                    maximum: 1
+                  Add all domains found:
+                    type: integer
+                    minimum: 0
+                    maximum: 1
+                required:
+                  - Add domains whose IP are in scope
+                  - Add domains who have a parent domain in scope
+                  - Add all domains found
       responses:
         200:
           description: "Successful creation"
@@ -466,7 +518,7 @@ paths:
         200:
           description: "Successful write notification operation"
 
-  /settings:
+  /settings/add:
     post: 
       operationId: "server.mongo.createSetting"
       tags:
@@ -489,7 +541,7 @@ paths:
         200:
           description: "Created global pollenisator settings"
 
-  /settings:
+  /settings/update:
     put: 
       operationId: "server.mongo.updateSetting"
       tags:
@@ -673,6 +725,35 @@ paths:
               updatedExisting:
                 type: boolean
 
+  /workers/register/:
+    post:
+      operationId: "server.worker.registerWorker"
+      tags:
+        - "Worker"
+      summary: "register the caller as worker"
+      parameters:
+        - name: name
+          in: path
+          type: string
+          required: true
+        - name: data
+          in: body
+          schema:
+            type: object
+            required:
+              - name
+              - command_names
+            properties:
+              name:
+                type: string
+              command_names:
+                type: array
+                items:
+                  type: string
+      responses:
+        200:
+          description: "Successful registered a worker"
+          
   /workers/{name}/registerCommands:
     put:
       operationId: "server.worker.registerCommands"
@@ -694,6 +775,23 @@ paths:
       responses:
         200:
           description: "Successful update of worker registed commands"
+
+  /workers/{name}/unregister:
+    post:
+      operationId: "server.worker.unregister"
+      tags:
+        - "Worker"
+      summary: "Remvoe a worker from the lsit of workers"
+      description: "Set a worker unregistered"
+      parameters:
+        - name: name
+          in: path
+          type: string
+          required: true
+      responses:
+        200:
+          description: "Successful update of worker registed commands"
+
   /workers/{name}/getRegisteredCommands:
     get:
       operationId: "server.worker.getRegisteredCommands"
@@ -713,6 +811,45 @@ paths:
             type: array
             items:
               type: string
+
+  /workers/{name}/instructions:
+    get:
+      operationId: "server.worker.getInstructions"
+      tags:
+        - "Worker"
+      summary: "Pull worker instructions"
+      parameters:
+        - name: name
+          in: path
+          type: string
+          required: true
+      responses:
+        200:
+          description: "Successful get"
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Instructions'
+              
+  /workers/{name}/instructions/{instruction_iid}:
+    delete:
+      operationId: "server.worker.deleteInstruction"
+      tags:
+        - "Worker"
+      summary: "delete a worker instruction"
+      parameters:
+        - name: name
+          in: path
+          type: string
+          required: true
+        - name: instruction_iid
+          in: path
+          type: string
+          required: true
+      responses:
+        200:
+          description: "Successful deletion of instruction"
+
   /commands/{pentest}:
     post:
       operationId: "server.ServerModels.Command.insert"
@@ -1317,3 +1454,236 @@ paths:
       responses:
         200:
           description: "Get a delete count"
+
+  /files/{pentest}/upload/proof/{defect_iid}:
+    post:
+      operationId: "server.FileManager.upload"
+      tags:
+        - "FileManager"
+      summary: "Upload a file"
+      consumes:
+        - multipart/form-data
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: defect_iid
+          in: path
+          type: string
+          description: file will be tied to given iid
+          required: true
+        - name: upfile
+          in: formData
+          type: file
+          description: The file to upload
+          required: true  
+      responses:
+        200:
+          description: "Successfully uploaded file"
+
+  /files/{pentest}/download/{filetype}/{attached_iid}:
+    get:
+      operationId: "server.FileManager.listFiles"
+      tags:
+        - "FileManager"
+      summary: "Lists attached to given iid"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: attached_iid
+          in: path
+          type: string
+          description: file will be tied to given iid
+          required: true
+        - name: filetype
+          in: path
+          type: string
+          enum: ["result", "proof"]
+          required: true
+      responses:
+        200:
+          description: "Successfully listed files"
+
+  /files/{pentest}/download/{filetype}/{attached_iid}/{filename}:
+    get:
+      operationId: "server.FileManager.download"
+      tags:
+        - "FileManager"
+      summary: "Download a file"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: attached_iid
+          in: path
+          type: string
+          description: file will be tied to given iid
+          required: true
+        - name: filetype
+          in: path
+          type: string
+          enum: ["result", "proof"]
+          required: true
+        - name: filename
+          in: path
+          type: string
+          required: true
+      responses:
+        200:
+          description: "Successfully downloaded file"
+
+  /files/{pentest}/{defect_iid}/{filename}:
+    delete:
+      operationId: "server.FileManager.rmProof"
+      tags:
+        - "FileManager"
+      summary: "Remove a proof file"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: defect_iid
+          in: path
+          type: string
+          description: object iid which have the file to delete
+          required: true
+        - name: filename
+          in: path
+          type: string
+          required: true
+      responses:
+        200:
+          description: "Successfully deleted the file"
+
+  /files/{pentest}/import:
+    post:
+      operationId: "server.FileManager.importExistingFile"
+      tags:
+        - "FileManager"
+      summary: "Import an existing tool file"
+      consumes:
+        - multipart/form-data
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: upfile
+          in: formData
+          type: file
+          description: The file to upload
+          required: true
+        - name: plugin
+          in: formData
+          type: string
+          description: plugin name to use or "auto-detect"
+          required: true
+      responses:
+        200:
+          description: "Successfully imported the file"
+          
+  /tools/{pentest}/craftCommandLine/{tool_iid}:
+    get:
+      operationId: "server.ServerModels.Tool.craftCommandLine"
+      tags:
+        - "Tools"
+      summary: "Get the command line to execute the tool (using plugin + parameters) a marker for |outputDir| is to be replaced"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: tool_iid
+          in: path
+          type: string
+          description: tool iid for which we want a command line
+          required: true
+        - name: plugin
+          in: query
+          type: string
+          required: false
+          default: ""
+      responses:
+        200:
+          description: "The command line to execute with a marker for |outputDir| to be replaced"
+
+  /tools/{pentest}/importResult/{tool_iid}:
+    post:
+      operationId: "server.ServerModels.Tool.importResult"
+      tags:
+        - "Tools"
+      summary: "Upload a tool result file"
+      consumes:
+        - multipart/form-data
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: tool_iid
+          in: path
+          type: string
+          description: tool iid to launch
+          required: true
+        - name: upfile
+          in: formData
+          type: file
+          description: The file to upload
+          required: true  
+        - name: plugin
+          in: formData
+          type: string
+          required: false
+          default: ""
+        - name: returncode
+          in: formData
+          type: integer
+          required: false
+          default: 0
+      responses:
+        200:
+          description: "Successfully uploaded file"
+  
+  /tools/{pentest}/launchTask/{tool_iid}:
+    post:
+      operationId: "server.ServerModels.Tool.launchTask"
+      tags:
+        - "Tools"
+      summary: "Try to launch a tool on any worker"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: tool_iid
+          in: path
+          type: string
+          description: tool id to launch
+          required: true
+        - name: data
+          in: body
+          schema:
+            type: object
+            properties:
+              plugin:
+                type: string
+                default: ""
+              checks:
+                type: boolean
+                default: true
+      responses:
+        200:
+          description: "Successfully launched task"

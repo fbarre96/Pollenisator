@@ -60,9 +60,6 @@ class DefectController(ControllerElement):
         notes = values["Notes"]
         proof = values["Proof"]
         proofs = []
-        if proof.strip() != "":
-            proof_name = os.path.basename(proof)
-            proofs.append(proof_name)
         tableau_from_ease = {"Facile": {"Mineur": "Majeur", "Important": "Majeur", "Majeur": "Critique", "Critique": "Critique"},
                              "Modérée": {"Mineur": "Important", "Important": "Important", "Majeur": "Majeur", "Critique": "Critique"},
                              "Difficile": {"Mineur": "Mineur", "Important": "Important", "Majeur": "Majeur", "Critique": "Majeur"},
@@ -74,11 +71,7 @@ class DefectController(ControllerElement):
         # Update this instance.
         # Upload proof after insert on db cause we need its mongoid
         if proof.strip() != "":
-            proof_name = os.path.basename(self.model.uploadProof(proof))
-            if proof_name is not None:
-                if proof_name.strip() != "":
-                    proofs.append(proof_name)
-
+            self.model.uploadProof(proof)
         return ret, 0  # 0 erros
 
     def addAProof(self, formValues, index):
@@ -95,7 +88,7 @@ class DefectController(ControllerElement):
             self.model.proofs.append(resName)
         else:
             self.model.proofs[index] = resName
-        self.model.update()
+        # self.model.update()
 
     def getProof(self, ind):
         """Returns proof file to model defect.

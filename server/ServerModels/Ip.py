@@ -8,14 +8,86 @@ from server.ServerModels.Tool import ServerTool
 from server.ServerModels.Tool import delete as tool_delete
 from server.ServerModels.Port import delete as port_delete
 from server.ServerModels.Defect import delete as defect_delete
+from server.ServerModels.Element import ServerElement
 from core.Components.Utils import JSONEncoder, performLookUp
 import json
 
 mongoInstance = MongoCalendar.getInstance()
-class ServerIp(Ip):
-    def __init__(self, pentest, *args, **kwargs):
-        self.pentest = pentest
+class ServerIp(Ip, ServerElement):
+
+    def __init__(self, pentest="", *args, **kwargs):
+        if pentest != "":
+            self.pentest = pentest
+        elif mongoInstance.calendarName != "":
+            self.pentest = mongoInstance.calendarName
+        else:
+            raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
+        mongoInstance.connectToDb(self.pentest)
         super().__init__(*args, **kwargs)
+
+
+    def initialize(self, ip="", notes="", in_scopes=None, tags=None, infos=None):
+        """Set values of ip
+        Args:
+            ip: the host (ip or domain) to represent
+            notes: notes concerning this IP (opt). Default to ""
+            in_scopes: a list of scopes that matches this host. If empty this IP will be OOS (Out of Scope). Default to None
+            tags: a list of tags. Default to None
+            infos: a dictionnary of additional info
+        Returns:
+            this object
+        """
+        self.ip = ip
+        self.notes = notes
+        self.in_scopes = in_scopes if in_scopes is not None else self.getScopesFittingMe()
+        self.tags = tags if tags is not None else []
+        self.infos = infos if infos is not None else {}
+        return self
+    
+    def getScopesFittingMe(self):
+        """Returns a list of scope objects ids where this IP object fits.
+        Returns:
+            a list of scopes objects Mongo Ids where this IP/Domain is in scope.
+        """
+        ret = []
+        mongoInstance.connectToDb(self.pentest)
+        scopes = mongoInstance.find("scopes", {})
+        if scopes is None:
+            return ret
+        for scope in scopes:
+            if self.fitInScope(scope["scope"]):
+                ret.append(str(scope["_id"]))
+        return ret
+
+    @classmethod
+    def fetchObjects(cls, pentest, pipeline):
+        """Fetch many commands from database and return a Cursor to iterate over model objects
+        Args:
+            pipeline: a Mongo search pipeline (dict)
+        Returns:
+            Returns a cursor to iterate on model objects
+        """
+        mongoInstance.connectToDb(pentest)
+        ds = mongoInstance.find(cls.coll_name, pipeline, True)
+        if ds is None:
+            return None
+        for d in ds:
+            # disabling this error as it is an abstract function
+            yield cls(pentest, d)  #  pylint: disable=no-value-for-parameter
+    
+    @classmethod
+    def fetchObject(cls, pentest, pipeline):
+        """Fetch many commands from database and return a Cursor to iterate over model objects
+        Args:
+            pipeline: a Mongo search pipeline (dict)
+        Returns:
+            Returns a cursor to iterate on model objects
+        """
+        mongoInstance.connectToDb(pentest)
+        ds = mongoInstance.find(cls.coll_name, pipeline, False)
+        if ds is None:
+            return None
+        return cls(pentest, d) 
 
     @classmethod
     def getIpsInScope(cls, pentest, scopeId):
@@ -106,10 +178,18 @@ class ServerIp(Ip):
             p = ServerPort(self.pentest, port)
             p.addAllTool(command_name, wave_name, scope)
 
+    def addInDb(self):
+        return insert(self.pentest, IpController(self).getData())
+
+    def update(self):
+        return update("ips", {"_id":ObjectId(self._id)}, {"$set":IpController(self).getData()}, False, True)
+
 
 def delete(pentest, ip_iid):
     mongoInstance.connectToDb(pentest)
     ip_dic = mongoInstance.find("ips", {"_id":ObjectId(ip_iid)}, False)
+    if ip_dic is None:
+        return 0
     tools = mongoInstance.find("tools",
                                 {"ip": ip_dic["ip"]}, True)
     for tool in tools:
@@ -136,6 +216,8 @@ def insert(pentest, data):
             "ips", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
+    if "_id" in data:
+        del data["_id"]
     parent = ip_o.getParentId()
     ins_result = mongoInstance.insert("ips", data, parent)
     iid = ins_result.inserted_id

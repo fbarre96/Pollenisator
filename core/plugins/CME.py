@@ -1,8 +1,8 @@
 """A plugin to parse a CrackMapExex scan"""
 
 import re
-from core.Models.Ip import Ip
-from core.Models.Port import Port
+from server.ServerModels.Ip import ServerIp
+from server.ServerModels.Port import ServerPort
 from core.plugins.plugin import Plugin
 
 
@@ -46,6 +46,7 @@ CONNECTED
     kthxbyeFound = False
     cmeFound = False
     for line in cme_file:
+        line = line.decode("utf-8")
         # Search ip in file
         if "\x1b[1m\x1b[34mCME\x1b[0m" in line:
             cmeFound = True
@@ -89,7 +90,7 @@ CONNECTED
     return retour, countPwn, notes
 
 
-def editScopeIPs(hostsInfos):
+def editScopeIPs(pentest, hostsInfos):
     """
     Add all the ips and theirs ports found after parsing the file to the scope object in database.
     Args:
@@ -99,8 +100,7 @@ def editScopeIPs(hostsInfos):
     if hostsInfos is not None:
         for infos in hostsInfos:
             tags = []
-            if infos.get("powned", False):
-                tags.append("P0wned!")
+            
             infosToAdd = {}
             OS = infos.get("OS", "")
             if OS != "":
@@ -111,24 +111,24 @@ def editScopeIPs(hostsInfos):
             powned = infos.get("powned", False)
             if powned:
                 infosToAdd["powned"] = "True"
-            ip_m = Ip().initialize(str(infos["ip"]))
-            res, iid = ip_m.addInDb()
-            if not res:
-                ip_m = Ip.fetchObject({"_id": iid})
+            ip_m = ServerIp().initialize(str(infos["ip"]))
+            insert_ret = ip_m.addInDb()
+            if not insert_ret["res"]:
+                ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
             infosToAdd["hostname"] = list(set(ip_m.infos.get(
                 "hostname", []) + [infos["hostname"]]))
             ip_m.notes = "hostname:" + \
                 infos["hostname"] + "\n"+infos.get("OS", "")
-            ip_m.tags = tags
-            ip_m.update()
-            port_m = Port().initialize(str(infos["ip"]), str(
+            if infos.get("powned", False):
+                ip_m.addTag("P0wned!")
+            port_m = ServerPort().initialize(str(infos["ip"]), str(
                 infos["port"]), "tcp", "netbios-ssn")
-            res, iid = port_m.addInDb()
-            if not res:
-                port_m = Port.fetchObject({"_id": iid})
+            insert_ret = port_m.addInDb()
+            if not insert_ret["res"]:
+                port_m = ServerPort.fetchObject(pentest{"_id": insert_ret["iid"]})
             port_m.updateInfos(infosToAdd)
-            port_m.tags = tags
-            port_m.update()
+            if infos.get("powned", False):
+                port_m.addTag("P0wned!")
 
 
 class CME(Plugin):
@@ -167,7 +167,7 @@ class CME(Plugin):
         """
         return returncode == 0
 
-    def Parse(self, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
        
@@ -189,5 +189,5 @@ class CME(Plugin):
                 tags = ["P0wned!"]
         if hostsInfos is None:
             return None, None, None, None
-        editScopeIPs(hostsInfos)
+        editScopeIPs(pentest, hostsInfos)
         return notes, tags, "wave", {"wave": None}

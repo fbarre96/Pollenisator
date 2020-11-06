@@ -1,6 +1,6 @@
 """A plugin to parse a dig scan"""
 
-from core.Models.Ip import Ip
+from server.ServerModels.Ip import ServerIp
 from core.plugins.plugin import Plugin
 
 
@@ -57,7 +57,7 @@ class DigReverseLookup(Plugin):
         """
         return returncode == 0
 
-    def Parse(self, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -73,16 +73,16 @@ class DigReverseLookup(Plugin):
         notes = ""
         tags = []
         targets = {}
-        ip, domain = parse_reverse_dig(file_opened.read())
+        ip, domain = parse_reverse_dig(file_opened.read().decode("utf-8"))
         if ip is None:
             return None, None, None, None
         if domain is not None:
             # Add a domain as a scope in db
-            Ip().initialize(domain).addInDb()
-            ip_m = Ip().initialize(ip)
-            res, iid = ip_m.addInDb()
-            if not res:
-                ip_m = Ip.fetchObject({"_id": iid})
+            ServerIp().initialize(domain).addInDb()
+            ip_m = ServerIp().initialize(ip)
+            insert_ret = ip_m.addInDb()
+            if not insert_ret["res"]:
+                ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
             hostnames = list(set(list(ip_m.infos.get("hostname", [])) + [domain]))
             ip_m.updateInfos({"hostname": hostnames})
             ip_m.notes = "reversed dig give this domain : "+domain+"\n"+ip_m.notes

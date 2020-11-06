@@ -1,6 +1,7 @@
 import json
 import requests
 import os
+import io
 import core.Components.Utils as Utils
 from bson import ObjectId
 from core.Components.Utils import JSONEncoder, JSONDecoder
@@ -27,6 +28,7 @@ class APIClient():
     def getInstance():
         """ Singleton Static access method.
         """
+        print("Called getInstance")
         pid = os.getpid()  # HACK : One api client per process.
         instance = APIClient.__instances.get(pid, None)
         if instance is None:
@@ -55,7 +57,6 @@ class APIClient():
         return self.currentPentest
 
     def removeInactiveWorkers(self):
-        
         api_url = '{0}workers/removeInactiveWorkers'.format(self.api_url_base)
         response = requests.get(api_url, headers=self.headers)
         if response.status_code == 200:
@@ -63,8 +64,33 @@ class APIClient():
         else:
             return None
 
+    def unregisterWorker(self, worker_name):
+        api_url = '{0}workers/{1}/unregister'.format(self.api_url_base, worker_name)
+        response = requests.post(api_url, headers=self.headers)
+        if response.status_code == 200:
+            return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+        else:
+            return None
+
+    def updateWorkerHeartbeat(self, worker_name):
+        api_url = '{0}workers/{1}/updateHeartbeat'.format(self.api_url_base, worker_name)
+        response = requests.put(api_url, headers=self.headers)
+        if response.status_code == 200:
+            return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+        else:
+            return None
+
+    def setWorkerExclusion(self, worker_name, isExcluded):
+        api_url = '{0}workers/{1}/setExclusion'.format(self.api_url_base, worker_name)
+        data = {"db":self.getCurrentPentest(), "setExcluded":isExcluded}
+        response = requests.put(api_url, headers=self.headers, data=json.dumps(data, cls=JSONEncoder))
+        if response.status_code == 200:
+            return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+        else:
+            return None
+
     def getRegisteredCommands(self, workerName):
-        api_url = '{0}workers/{1}/getRegisteredCommands/'.format(self.api_url_base, workerName)
+        api_url = '{0}workers/{1}/getRegisteredCommands'.format(self.api_url_base, workerName)
         response = requests.get(api_url, headers=self.headers)
         if response.status_code == 200:
             return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
@@ -72,8 +98,8 @@ class APIClient():
             return None
 
     def registeredCommands(self, workerName, commandNames):
-        api_url = '{0}workers/{1}/registerCommands/'.format(self.api_url_base, workerName)
-        response = requests.put(api_url, headers=self.headers, data={"command_names":commandNames})
+        api_url = '{0}workers/{1}/registerCommands'.format(self.api_url_base, workerName)
+        response = requests.put(api_url, headers=self.headers, data=json.dumps(commandNames, cls=JSONEncoder), proxies=proxies, verify=False)
         if response.status_code == 200:
             return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
         else:
@@ -129,20 +155,21 @@ class APIClient():
             return None
     
     def doDeletePentest(self, pentest):
-        api_url = '{0}pentest/{1}'.format(self.api_url_base, pentest)
+        api_url = '{0}pentest/{1}/delete'.format(self.api_url_base, pentest)
         response = requests.delete(api_url, headers=self.headers)
         if response.status_code == 200:
             return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
         else:
             return None
 
-    def registerPentest(self, pentest):
+    def registerPentest(self, pentest, pentest_type, start_date, end_date, scope, settings, pentesters):
         api_url = '{0}pentest/{1}'.format(self.api_url_base, pentest)
-        response = requests.post(api_url, headers=self.headers)
+        data = {"pentest_type":str(pentest_type), "start_date":start_date, "end_date":end_date, "scope":scope, "settings":settings, "pentesters":pentesters}
+        response = requests.post(api_url, headers=self.headers, data=json.dumps(data, cls=JSONEncoder), proxies=proxies, verify=False)
         if response.status_code == 200:
-            return True
+            return True, "Success"
         else:
-            return False
+            return False, json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
 
     def find(self, collection, pipeline=None, multi=True):
         return self.findInDb(self.getCurrentPentest(), collection, pipeline, multi)
@@ -262,8 +289,8 @@ class APIClient():
             return None
 
     def createSetting(self, key, value):
-        api_url = '{0}settings'.format(self.api_url_base)
-        data = {"key":key, "value":value}
+        api_url = '{0}settings/add'.format(self.api_url_base)
+        data = {"key":key, "value":json.dumps(value)}
         response = requests.post(api_url, headers=self.headers, data=json.dumps(data, cls=JSONEncoder))
         if response.status_code == 200:
             return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
@@ -271,8 +298,8 @@ class APIClient():
             return None
     
     def updateSetting(self, key, value):
-        api_url = '{0}settings'.format(self.api_url_base)
-        data = {"key":key, "value":value}
+        api_url = '{0}settings/update'.format(self.api_url_base)
+        data = {"key":key, "value":json.dumps(value)}
         response = requests.put(api_url, headers=self.headers, data=json.dumps(data, cls=JSONEncoder))
         if response.status_code == 200:
             return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
@@ -282,8 +309,14 @@ class APIClient():
     def sendStopTask(self, toolModelData):
         return False
 
-    def sendLaunchTask(self, toolModel, parser="", checks=True, worker=""):
-        pass
+    def sendLaunchTask(self, tool_iid, plugin="", checks=True, worker=""):
+        api_url = '{0}tools/{1}/launchTask/{2}'.format(self.api_url_base, self.getCurrentPentest(), tool_iid)
+        data = {"checks":checks, "plugin":plugin}
+        response = requests.post(api_url, headers=self.headers, data=json.dumps(data, cls=JSONEncoder), proxies=proxies, verify=False)
+        if response.status_code == 200:
+            return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+        else:
+            return None
 
     def addCustomTool(self, port_iid, tool_name):
         api_url = '{0}ports/{1}/{2}/addCustomTool/'.format(self.api_url_base, self.getCurrentPentest(), port_iid)
@@ -292,3 +325,91 @@ class APIClient():
             return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
         else:
             return None
+
+    def putProof(self, defect_iid, local_path):
+        api_url = '{0}files/{1}/upload/proof/{2}'.format(self.api_url_base, self.getCurrentPentest(), defect_iid)
+        with open(local_path,'rb') as f:
+            response = requests.post(api_url, files={"upfile": (os.path.basename(local_path) ,f)}, proxies=proxies, verify=False)
+            if response.status_code == 200:
+                return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+        return None
+
+    def listProofs(self, defect_iid):
+        api_url = '{0}files/{1}/download/{2}/{3}'.format(self.api_url_base, self.getCurrentPentest(), filetype, attached_iid)
+        response = requests.get(api_url, headers=self.headers)
+        if response.status_code == 200:
+            return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+        return []
+
+    def getResult(self, tool_iid, local_path):
+        return self._get("result", tool_iid, "resultfile", local_path)
+    
+    def getProof(self, defect_iid, filename, local_path):
+        return self._get("proof", defect_iid, filename, local_path)
+
+    def _get(self, filetype, attached_iid, filename, local_path):
+        """Download file affiliated with given iid and place it at given path
+        Args:
+            filetype: 'result' or 'proof' 
+            attached_iid: tool or defect iid depending on filetype
+            filename: remote file file name
+            local_path: local file path
+        """
+        api_url = '{0}files/{1}/download/{2}/{3}/{4}'.format(self.api_url_base, self.getCurrentPentest(), filetype, attached_iid, filename)
+        response = requests.get(api_url, headers=self.headers, proxies=proxies, verify=False)
+        if response.status_code == 200:
+            with open(local_path, 'wb') as f:
+                f.write(response.content)
+                return local_path
+        return None
+
+    def rmProof(self, defect_iid, filename):
+        """Remove file affiliated with given iid 
+        """
+        api_url = '{0}files/{1}/{2}/{3}'.format(self.api_url_base, self.getCurrentPentest(), defect_iid, filename)
+        response = requests.delete(api_url, headers=self.headers)
+        if response.status_code == 200:
+            return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+        return None
+
+    def getCommandline(self, toolId, parser=""):
+        """Get full command line from toolid and choosen parser, a marker for |outputDir| is to be replaced
+        """
+        api_url = '{0}tools/{1}/craftCommandLine/{2}'.format(self.api_url_base, self.getCurrentPentest(), toolId)
+        response = requests.get(api_url, headers=self.headers, params={"plugin":parser}, proxies=proxies, verify=False)
+        if response.status_code == 200:
+            data = json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+            return True, data["comm"], data["ext"]
+        return False, json.loads(response.content.decode('utf-8'), cls=JSONDecoder), ""
+    
+    def importToolResult(self, tool_iid, parser, local_path, returncode):
+        api_url = '{0}tools/{1}/importResult/{2}'.format(self.api_url_base, self.getCurrentPentest(), tool_iid)
+        with io.open(local_path, 'r', encoding='utf-8', errors="ignore") as f:
+            response = requests.post(api_url, files={"upfile": (os.path.basename(local_path) ,f)}, data={"plugin":parser, "returncode":int(returncode)}, proxies=proxies, verify=False)
+            if response.status_code == 200:
+                return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+        return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+
+    def importExistingResultFile(self, filepath, plugin):
+        api_url = '{0}files/{1}/import'.format(self.api_url_base, self.getCurrentPentest())
+        with io.open(filepath, 'r', encoding='utf-8', errors="ignore") as f:
+            response = requests.post(api_url, files={"upfile": (os.path.basename(filepath) ,f)}, data={"plugin":plugin}, proxies=proxies, verify=False)
+            if response.status_code == 200:
+                return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+        return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+
+    def fetchWorkerInstruction(self, worker_name):
+        api_url = '{0}workers/{1}/instructions'.format(self.api_url_base, worker_name)
+        response = requests.get(api_url, headers=self.headers, proxies=proxies, verify=False)
+        if response.status_code == 200:
+            data = json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+            return data
+        return None
+    
+    def deleteWorkerInstruction(self, worker_name, instruction_iid):
+        api_url = '{0}workers/{1}/instructions/{2}'.format(self.api_url_base, worker_name, instruction_iid)
+        response = requests.delete(api_url, headers=self.headers, proxies=proxies, verify=False)
+        if response.status_code == 200:
+            data = json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+            return data
+        return None

@@ -219,7 +219,7 @@ class Monitor:
         self.workerRegisterCommands(worker_hostname)
 
     def updateWorkerLastHeartbeat(self, worker_hostname):
-        """Update the given worker last hearthbeat
+        """Update the given worker last heartbeat
         Args:
             worker_hostname: the worker name to be refreshed
         """
@@ -337,31 +337,4 @@ class Monitor:
         """
         # pass
 
-    def run(self, calendar):
-        """
-        Start monitoring events
-        Will stop when receiving a KeyboardInterrupt
-        Args:
-            calendar: the pentest database name to monitor
-        """
-        print("Starting monitor thread")
-        try:
-            self.recv = None
-            self.calendar = calendar
-            with self.app.connection() as connection:
-                self.recv = self.app.events.Receiver(connection, handlers={
-                    'task-failed': self.announce_failed_tasks,
-                    'worker-online': self.announce_online_worker,
-                    'worker-offline': self.announce_offline_worker,
-                    'worker-heartbeat': self.announce_heartbeat_worker,
-                    '*': self.on_event,
-                })
-                self.recv.capture(limit=None, timeout=None, wakeup=True)
-        except(KeyboardInterrupt, SystemExit):
-            self.recv.should_stop = True
-            print("Should stop received...")
-            self.stop()
-        self.recv.should_stop = True
-        print("Should stop received...")
-        self.stop()
-        print("Ending monitor thread")
+    

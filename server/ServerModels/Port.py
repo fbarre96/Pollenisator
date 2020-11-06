@@ -1,18 +1,27 @@
 from bson import ObjectId
 from core.Components.mongo import MongoCalendar
 from core.Models.Port import Port
+from core.Controllers.PortController import PortController
 from server.ServerModels.Tool import ServerTool, delete as tool_delete
 from server.ServerModels.Defect import delete as defect_delete
-
+from server.ServerModels.Element import ServerElement
 from core.Components.Utils import JSONEncoder
 import json
 
 mongoInstance = MongoCalendar.getInstance()
 
-class ServerPort(Port):
-    def __init__(self, pentest, *args, **kwargs):
-        self.pentest = pentest
+class ServerPort(Port, ServerElement):
+    
+    def __init__(self, pentest="", *args, **kwargs):
+        if pentest != "":
+            self.pentest = pentest
+        elif mongoInstance.calendarName != "":
+            self.pentest = mongoInstance.calendarName
+        else:
+            raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
+        mongoInstance.connectToDb(self.pentest)
         super().__init__(*args, **kwargs)
+
 
     def getParentId(self):
         mongoInstance.connectToDb(self.pentest)
@@ -74,6 +83,42 @@ class ServerPort(Port):
                         newTool.addInDb()
         except ValueError:
             pass
+    
+    @classmethod
+    def fetchObjects(cls, pentest, pipeline):
+        """Fetch many commands from database and return a Cursor to iterate over model objects
+        Args:
+            pipeline: a Mongo search pipeline (dict)
+        Returns:
+            Returns a cursor to iterate on model objects
+        """
+        mongoInstance.connectToDb(pentest)
+        ds = mongoInstance.find(cls.coll_name, pipeline, True)
+        if ds is None:
+            return None
+        for d in ds:
+            # disabling this error as it is an abstract function
+            yield cls(pentest, d)  #  pylint: disable=no-value-for-parameter
+    
+    @classmethod
+    def fetchObject(cls, pentest, pipeline):
+        """Fetch many commands from database and return a Cursor to iterate over model objects
+        Args:
+            pipeline: a Mongo search pipeline (dict)
+        Returns:
+            Returns a cursor to iterate on model objects
+        """
+        mongoInstance.connectToDb(pentest)
+        d = mongoInstance.find(cls.coll_name, pipeline, False)
+        if d is None:
+            return None
+        return cls(pentest, d) 
+
+    def addInDb(self):
+        return insert(self.pentest, PortController(self).getData())
+
+    def update(self):
+        return update("ports", ObjectId(self._id), PortController(self).getData())
 
 def delete(pentest, port_iid):
     mongoInstance.connectToDb(pentest)
@@ -101,6 +146,8 @@ def insert(pentest, data):
             "ports", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
+    if "_id" in data:
+        del data["_id"]
     parent = port_o.getParentId()
     ins_result = mongoInstance.insert("ports", data, parent)
     iid = ins_result.inserted_id

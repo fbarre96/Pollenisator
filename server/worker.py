@@ -1,6 +1,7 @@
 import json
 from core.Components.mongo import MongoCalendar
-
+from server.ServerModels.Tool import ServerTool
+from datetime import datetime
 mongoInstance = MongoCalendar.getInstance()
 
 
@@ -18,9 +19,9 @@ def listWorkers(pipeline=None):
         ret.append(w)
     return ret
 
-def setExclusion(worker):
+def setExclusion(name, worker):
     "Set a worker exclusion from database"
-    return mongoInstance.setWorkerExclusion(worker["worker"], worker["db"], worker["setExcluded"])
+    return mongoInstance.setWorkerExclusion(name, worker["db"], worker["setExcluded"])
 
 def deleteWorker(name):
     res = mongoInstance.deleteWorker(name)
@@ -34,14 +35,51 @@ def removeInactiveWorkers():
     return {"n":int(count)}
 
 def updateHeartbeat(name):
+    worker = mongoInstance.getWorker(name)
+    if worker is None:
+        # datef "added worker already up"
+        return "Worker not found", 404
     return mongoInstance.updateWorkerLastHeartbeat(name)
 
 def registerCommands(name, command_names):
     res = mongoInstance.registerCommands(name, command_names)
-    if res:
-        return 200, "success"
-    else:
-        return 404, "Not found"
+    return res
 
 def getRegisteredCommands(name):
     return mongoInstance.getRegisteredCommands(name)
+
+def registerWorker(data):
+    name = data["name"]
+    command_names = data["command_names"]
+    res = mongoInstance.registerCommands(name, command_names)
+    return res
+
+def unregister(name):
+    worker = mongoInstance.getWorker(name)
+    calendars = mongoInstance.listCalendars()
+    if worker is not None:
+        for calendar in calendars:
+            toolsToReset = ServerTool.fetchObjects(calendar, {"datef": "None", "scanner_ip": name})
+            for tool in toolsToReset:
+                tool.markAsNotDone()
+        mongoInstance.deleteFromDb("pollenisator", "workers", {"name": name}, False, True)
+        return True
+    return "Worker not Found", 404
+
+def getInstructions(name):
+    worker = mongoInstance.getWorker(name)
+    if worker is None:
+        return "Worker not Found", 404
+    instructions = mongoInstance.findInDb("pollenisator", "instructions", {"worker":name}, True)
+    data = list(instructions)
+    mongoInstance.deleteFromDb("pollenisator", "instructions", {"worker":name}, True, False)
+    return data
+
+def deleteInstruction(name, instruction_iid):
+    worker = mongoInstance.getWorker(name)
+    if worker is None:
+        return "Worker not Found", 404
+    res = mongoInstance.deleteFromDb("pollenisator", "instructions", {"_id":ObjectId(instruction_iid)})
+    if res is None:
+        return "Instruction not found", 404
+    return res.deleted_count

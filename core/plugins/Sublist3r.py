@@ -1,7 +1,7 @@
 """A plugin to parse sublist3r"""
 
 from core.plugins.plugin import Plugin
-from core.Models.Ip import Ip
+from server.ServerModels.Ip import ServerIp
 import re
 
 
@@ -38,7 +38,7 @@ class Sublist3r(Plugin):
         """
         return returncode == 0
 
-    def Parse(self, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -57,6 +57,7 @@ class Sublist3r(Plugin):
         markerSublister = "# Coded By Ahmed Aboul-Ela - @aboul3la"
         markerFound = False
         for line in file_opened:
+            line = line.decode("utf-8")
             if markerSublister in line:
                 markerFound = True
             if not markerFound:
@@ -70,9 +71,9 @@ class Sublist3r(Plugin):
             if domainGroup is not None:
                 # a domain has been found
                 domain = domainGroup.group(1)
-                inserted, _ = Ip().initialize(domain).addInDb()
+                insert_res = ServerIp().initialize(domain).addInDb()
                 # failed, domain is out of wave, still noting thi
-                if not inserted:
+                if not insert_res["res"]:
                     notes += domain+" exists but already added.\n"
                 else:
                     countInserted += 1

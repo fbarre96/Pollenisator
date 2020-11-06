@@ -3,7 +3,7 @@
 # 1. Imports
 import re
 import json
-from core.Models.Ip import Ip
+from server.ServerModels.Ip import ServerIp
 from core.plugins.plugin import Plugin
 
 
@@ -40,7 +40,7 @@ class dnsrecon(Plugin):
         """
         return returncode == 0
 
-    def Parse(self, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
         Example:
@@ -80,7 +80,7 @@ class dnsrecon(Plugin):
         tags = []
         countInserted = 0
         try:
-            dnsrecon_content = json.loads(file_opened.read())
+            dnsrecon_content = json.loads(file_opened.read().decode("utf-8"))
         except json.decoder.JSONDecodeError:
             return None, None, None, None
         if len(dnsrecon_content) == 0:
@@ -95,15 +95,15 @@ class dnsrecon(Plugin):
             ip = record["address"]
             name = record["name"]
             infosToAdd = {"hostname": name}
-            ip_m = Ip().initialize(ip, infos=infosToAdd)
-            res, iid = ip_m.addInDb()
+            ip_m = ServerIp().initialize(ip, infos=infosToAdd)
+            ip_m.addInDb()
             infosToAdd = {"ip": ip}
-            ip_m = Ip().initialize(name, infos=infosToAdd)
-            res, iid = ip_m.addInDb()
+            ip_m = ServerIp().initialize(name, infos=infosToAdd)
+            insert_ret = ip_m.addInDb()
             # failed, domain is out of scope
-            if not res:
+            if not insert_ret["res"]:
                 notes += name+" exists but already added.\n"
-                ip_m = Ip.fetchObject({"_id": iid})
+                ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
                 infosToAdd = {"ip": list(set([ip] +
                                                     ip_m.infos.get("ip", [])))}
                 ip_m.updateInfos(infosToAdd)

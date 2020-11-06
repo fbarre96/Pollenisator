@@ -6,7 +6,6 @@ import tkinter.messagebox
 import tkinter as tk
 from tkinter import TclError
 from core.Views.DefectView import DefectView
-from core.Components.FileStorage import FileStorage
 from core.Components.ScanManager import ScanManager
 from core.Models.Defect import Defect
 from core.Controllers.DefectController import DefectController
@@ -214,25 +213,15 @@ class ToolView(ViewElement):
         Args:
             _event: not used 
         """
-        fs = FileStorage()
-        fs.open()
-        path = None
-        if fs.sftp_connection is not None:
-            dialog = ChildDialogInfo(
-                self.appliViewFrame, "Download Started", "Downloading...")
-            resultFile = self.controller.getResultFile()
-            dialog.show()
-            if resultFile != "" and resultFile is not None:
-                path = fs.getToolResult(resultFile)
-            else:
-                tkinter.messagebox.showerror(
-                    "Download failed", "The result file does not exist.")
-            dialog.destroy()
-        else:
-            tkinter.messagebox.showerror(
-                "Download failed", "The sftp connection failed.")
-            return
-        fs.close()
+        apiclient = APIClient.getInstance()
+        dialog = ChildDialogInfo(
+            self.appliViewFrame, "Download Started", "Downloading...")
+        dialog.show()
+        abs_path = os.path.dirname(os.path.abspath(__file__))
+        outputDir = os.path.join(abs_path, "../../results")
+        path = self.controller.getOutputDir(apiclient.getCurrentPentest())
+        path = apiclient.getResult(self.controller.getDbId(), os.path.join(outputDir,path, str(self)))
+        dialog.destroy()
         if path is not None:
             if os.path.isfile(path):
                 if which("xdg-open") is not None:
@@ -269,8 +258,7 @@ class ToolView(ViewElement):
             event: Automatically generated with a button Callback, not used.
         """
         self.mainApp.scanManager.launchTask(self.controller.model)
-        self.controller.model.markAsRunning("localhost")
-        self.controller.update()
+       
         self.form.clear()
         for widget in self.appliViewFrame.winfo_children():
             widget.destroy()
@@ -285,7 +273,7 @@ class ToolView(ViewElement):
             None if failed. 
         """
         apiclient = APIClient.getInstance()
-        apiclient.sendLaunchTask(self.controller.model)
+        return apiclient.sendLaunchTask(self.controller.model.getId()) is not None
 
     def launchCallback(self, _event=None):
         """
@@ -296,16 +284,15 @@ class ToolView(ViewElement):
             _event: Automatically generated with a button Callback, not used.
         """
         res = self.safeLaunchCallback()
-        apiclient = APIClient.getInstance()
         if not res:
             dialog = ChildDialogQuestion(self.appliViewFrame,
                                          "Safe queue failed", "This tool cannot be launched because no worker add space for its thread.\nDo you want to launch it anyway?")
             self.appliViewFrame.wait_window(dialog.app)
             answer = dialog.rvalue
             if answer == "Yes":
-                apiclient.sendLaunchTask(self.controller.model)
+                apiclient = APIClient.getInstance()
+                apiclient.sendLaunchTask(self.controller.model.getId())
         if res:
-            self.controller.update()
             self.form.clear()
             for widget in self.appliViewFrame.winfo_children():
                 widget.destroy()

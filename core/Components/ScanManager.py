@@ -244,7 +244,6 @@ class ScanManager:
             item = tv.identify("item", event.x, event.y)
             parent = self.workerTv.parent(item)
             if str(parent) != "": # child node = tool
-                print(str(item))
                 command_name = item.split("|")[1]
                 dialog = ChildDialogEditCommandSettings(self.parent, "Edit worker tools config")
                 self.parent.wait_window(dialog.app)
@@ -255,22 +254,24 @@ class ScanManager:
     
     def setUseForPentest(self, worker_hostname):
         apiclient = APIClient.getInstance()
-        worker = apiclient.getWorkers({"name":worker_hostname})
+        worker = apiclient.getWorker({"name":worker_hostname})
         if worker is not None:
-            isExcluded = apiclient.getCurrentPentest() in worker["excludedDatabases"]
+            isExcluded = apiclient.getCurrentPentest() in worker.get("excludedDatabases", [])
             apiclient.setWorkerExclusion(worker_hostname, not (isExcluded))
 
     def launchTask(self, toolModel, parser="", checks=True, worker=""):
         apiclient = APIClient.getInstance()
         launchableToolId = toolModel.getId()
-        toolModel.markAsRunning(worker)
         if worker == "" or worker == "localhost":
             thread = None
             thread = multiprocessing.Process(target=executeCommand, args=(
                 apiclient.getCurrentPentest(), str(launchableToolId), parser))
             thread.start()
+            toolModel.markAsRunning(worker)
+
         else:
-            apiclient.sendLaunchTask(toolModel, parser, checks, worker)
+            apiclient.sendLaunchTask(toolModel.getId(), parser, checks, worker)
+
 
     def OnWorkerDelete(self, event):
         """Callback for a delete key press on a worker.

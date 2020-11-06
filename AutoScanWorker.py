@@ -5,9 +5,9 @@ import errno
 import os
 import ssl
 import sys
+import uuid
 import time
 from datetime import datetime, timedelta
-import io
 from bson.objectid import ObjectId
 from multiprocessing import Process
 from core.Components.apiclient import APIClient
@@ -16,54 +16,54 @@ from core.Models.Interval import Interval
 from core.Models.Tool import Tool
 from core.Models.Wave import Wave
 from core.Models.Command import Command
-from core.Components.Worker import Worker
 from shutil import copyfile
-
-# Module variables
-dir_path = os.path.dirname(os.path.realpath(__file__))  # fullpath to this file
-ssldir = os.path.join(dir_path, "./ssl/")  # fullepath to ssl directory
-certs = {
-    'keyfile': ssldir+'client.pem',
-    'certfile': ssldir+'server.pem',
-    'ca_certs': ssldir+'ca.pem',
-    'cert_reqs': ssl.CERT_REQUIRED
-}
-config_dir = os.path.join(dir_path, "./config/")
-if not os.path.isfile(os.path.join(config_dir, "server.cfg")):
-    if os.path.isfile(os.path.join(config_dir, "server.cfg")):
-        copyfile(os.path.join(config_dir, "server.cfg"), os.path.join(config_dir, "server.cfg"))
-
-if os.path.isfile(os.path.join(config_dir, "server.cfg")):
-    cfg = Utils.loadCfg(os.path.join(config_dir, "server.cfg"))
-else:
-    print("No client config file found under "+str(config_dir))
-    sys.exit(1)
+import socket
 
 
-def getWaveTimeLimit(waveName):
+def main():
+    """Main function. Start a worker instance
     """
-    Return the latest time limit in which this tool fits. The tool should timeout after that limit
+    apiclient = APIClient.getInstance()
+    tools_to_register = Utils.loadToolsConfig()
+    print("Registering commands : "+str(list(tools_to_register.keys())))
+    myname = str(uuid.uuid4())+"@"+socket.gethostname()
+    apiclient.registeredCommands(myname, list(tools_to_register.keys()))
+    p = Process(target=workerLoop, args=(myname,))
+    try:
+        p.start()
+        p.join()
+    except(KeyboardInterrupt, SystemExit):
+        pass
 
+def workerLoop(workerName):
+    """
+    Start monitoring events
+    Will stop when receiving a KeyboardInterrupt
     Args:
-        tool: a tool belonging to a wave to get the time limit of.
-
-    Returns:
-        Return the latest time limit in which this tool fits.
+        calendar: the pentest database name to monitor
     """
-    intervals = Interval.fetchObjects({"wave": waveName})
-    furthestTimeLimit = datetime.now()
-    for intervalModel in intervals:
-        if Utils.fitNowTime(intervalModel.dated, intervalModel.datef):
-            endingDate = intervalModel.getEndingDate()
-            if endingDate is not None:
-                if endingDate > furthestTimeLimit:
-                    furthestTimeLimit = endingDate
-    return furthestTimeLimit
+    print("Starting worker thread")
+    functions = {
+        "executeCommand": executeCommand
+    }
+    apiclient = APIClient.getInstance()
+    try:
+        while(True):
+            time.sleep(3)
+            apiclient.updateWorkerHeartbeat(workerName)
+            instructions = apiclient.fetchWorkerInstruction(workerName)
+            for instruction in instructions:
+                if instruction["function"] in functions:
+                    functions[instruction["function"]](*instruction["args"])
 
+
+    except(KeyboardInterrupt, SystemExit):
+        print("stop received...")
+        apiclient.unregisterWorker(workerName)
 
 def launchTask(calendarName, worker, launchableTool):
     launchableToolId = launchableTool.getId()
-    launchableTool.markAsRunning(worker.name)
+    launchableTool.markAsRunning(worker)
     # Mark the tool as running (scanner_ip is set and dated is set, datef is "None")
     from AutoScanWorker import executeCommand
     print("Launching command "+str(launchableTool))
@@ -83,10 +83,10 @@ def dispatchLaunchableToolsv2(launchableTools, worker):
     apiclient = APIClient.getInstance()
     for launchableTool in launchableTools:
         tool = Tool.fetchObject({"_id": ObjectId(launchableTool["_id"])})
-        if worker.hasSpaceFor(tool, apiclient.getCurrentPentest()):
-            launchTask(apiclient.getCurrentPentest(), worker, tool)
+        if hasSpaceFor(worker, tool, apiclient.getCurrentPentest()):
+            launchTask(apiclient.getCurrentPentest(), launchableTool["_id"], worker)
 
-def findLaunchableToolsOnWorker(worker, calendarName):
+def findLaunchableToolsOnWorker(workername, calendarName):
     """ 
     Try to find tools that matches all criteria.
     Args:
@@ -99,7 +99,7 @@ def findLaunchableToolsOnWorker(worker, calendarName):
     apiclient = APIClient.getInstance()
     apiclient.setCurrentPentest(calendarName)
     toolsLaunchable = []
-    commands_registered = apiclient.getRegisteredCommands(worker.name)
+    commands_registered = apiclient.getRegisteredCommands(workername)
     
     waiting = {}
     time_compatible_waves_id = Wave.searchForAddressCompatibleWithTime()
@@ -110,7 +110,7 @@ def findLaunchableToolsOnWorker(worker, calendarName):
             toolModel = Tool.fetchObject({"_id": tool})
             if toolModel.name not in commands_registered:
                 continue
-            if worker.hasRegistered(toolModel):
+            if hasRegistered(workername, toolModel):
                 
                 try:
                     waiting[str(toolModel)] += 1
@@ -170,18 +170,16 @@ def autoScanv2(databaseName, workerName):
     apiclient = APIClient.getInstance()
     apiclient.setCurrentPentest(databaseName)
     time_compatible_waves_id = Wave.searchForAddressCompatibleWithTime()
-    worker = Worker(workerName)
     while True:
         # Extract commands with compatible time and not yet done
-        launchableTools, waiting = findLaunchableToolsOnWorker(worker, databaseName)
+        launchableTools, waiting = findLaunchableToolsOnWorker(workerName, databaseName)
         # Sort by command priority
         launchableTools.sort(key=lambda tup: (tup["errored"], int(tup["priority"])))
         # print(str(launchableTools))
-        dispatchLaunchableToolsv2(launchableTools, worker)
+        dispatchLaunchableToolsv2(launchableTools, workerName)
         
         time.sleep(3)
 
-#@app.task
 def executeCommand(calendarName, toolId, parser=""):
     """
      remote task
@@ -202,22 +200,19 @@ def executeCommand(calendarName, toolId, parser=""):
     # Connect to given calendar
     apiclient = APIClient.getInstance()
     apiclient.setCurrentPentest(calendarName)
+    toolModel = Tool.fetchObject({"_id":ObjectId(toolId)})
+    command_o = toolModel.getCommand()
     msg = ""
-    # retrieve tool from tool sid
-    toolModel = Tool.fetchObject({"_id": ObjectId(toolId)})
-    if toolModel is None:
-        raise Exception("Tool does not exist : "+str(toolId))
-    command = Command.fetchObject({"name": toolModel.name}, calendarName)
-    # Get time limit and output directory
-    if toolModel.wave == "Custom commands":
-        timeLimit = None
-    else:
-        timeLimit = getWaveTimeLimit(toolModel.wave)
-    if command is not None:
-        timeLimit = min(datetime.now()+timedelta(0, int(command.timeout)), timeLimit)
+    ##
+    success, comm, fileext = apiclient.getCommandline(toolId, parser)
+    if not success:
+        raise Exception(comm)
     outputRelDir = toolModel.getOutputDir(calendarName)
     abs_path = os.path.dirname(os.path.abspath(__file__))
+    toolFileName = toolModel.name+"_" + \
+            str(time.time()) # ext already added in command
     outputDir = os.path.join(abs_path, "./results", outputRelDir)
+    
     # Create the output directory
     try:
         os.makedirs(outputDir)
@@ -226,89 +221,56 @@ def executeCommand(calendarName, toolId, parser=""):
             pass
         else:
             raise exc
-    # Read Tool config file
-    tools_infos = Utils.loadToolsConfig()
-    comm = toolModel.getCommandToExecute(outputDir)
-
-    if parser.strip() == "":
-        if toolModel.name not in list(tools_infos.keys()):
-            msg = "TASK FAILED Received tool that was not registered : " + \
-                str(toolModel.name)+" not in "+str(list(tools_infos.keys()))
-            raise Exception(msg)
-    # Fetch the command to execute
-    if tools_infos.get(toolModel.name, None) is None:
-        bin_path = ""
+    outputDir = os.path.join(outputDir, toolFileName)
+    comm = comm.replace("|outputDir|", outputDir)
+    # Get tool's wave time limit searching the wave intervals
+    if toolModel.wave == "Custom commands":
+        timeLimit = None
     else:
-        bin_path = tools_infos[toolModel.name].get("bin")
-        if bin_path is not None:
-            if not bin_path.endswith(" "):
-                bin_path = bin_path+" "
-    comm = bin_path+comm
-    if comm != "":
-        try:
+        timeLimit = getWaveTimeLimit(toolModel.wave)
+    # adjust timeLimit if the command has a lower timeout
+    if command_o is not None:
+        timeLimit = min(datetime.now()+timedelta(0, int(command_o.get("timeout", 0))), timeLimit)
+    ##
+    try:
+        print(('TASK STARTED:'+toolModel.name))
+        print("Will timeout at "+str(timeLimit))
+        # Execute the command with a timeout
+        returncode = Utils.execute(comm, timeLimit, True)
+    except Exception as e:
+        raise e
+    # Execute found plugin if there is one
+    outputfile = outputDir+fileext
+    msg = apiclient.importToolResult(toolId, parser, outputfile, returncode)
+    if msg != "Success":
+        toolModel.markAsNotDone()
+        raise Exception(msg)
+          
+    # Delay
+    if command_o is not None:
+        if float(command_o.get("sleep_between", 0)) > 0.0:
+            msg += " (will sleep for " + \
+                str(float(command_o.get("sleep_between", 0)))+")"
+        print(msg)
+        time.sleep(float(command_o.get("sleep_between", 0)))
+    return
+    
+def getWaveTimeLimit(waveName):
+    """
+    Return the latest time limit in which this tool fits. The tool should timeout after that limit
 
-            # Load the plugin
-            if parser.strip() == "":
-                mod = Utils.loadPlugin(tools_infos[toolModel.name]["plugin"])
-            elif parser.strip() == "auto-detect":
-                mod = Utils.loadPluginByBin(toolModel.name.split("::")[0])
-            else:
-                mod = Utils.loadPlugin(parser)
-            # Complete command with file output
-            toolFileName = toolModel.name+"_" + \
-                str(time.time())+mod.getFileOutputExt()
-            comm = mod.changeCommand(comm, outputDir, toolFileName)
-            print(('TASK STARTED:'+toolModel.name))
-            print("Will timeout at "+str(timeLimit))
-            # Execute the command with a timeout
-            returncode = Utils.execute(comm, timeLimit, True)
-        except Exception as e:
-            raise e
-        # Execute found plugin if there is one
-        if mod is not None:
-            filepath = mod.getFileOutputPath(comm)
-            try:
-                # Open generated file as utf8
-                with io.open(filepath, "r", encoding="utf-8", errors='ignore') as file_opened:
-                    # Check return code by plugin (can be always true if the return code is inconsistent)
-                    if mod.checkReturnCode(returncode):
-                        notes, tags, _, _ = mod.Parse(file_opened)
-                        if notes is None:
-                            notes = "No results found by plugin."
-                        if tags is None:
-                            tags = []
-                        if isinstance(tags, str):
-                            tags = [tags]
-                        # Success could be change to False by the plugin function (evaluating the return code for exemple)
-                        # if the success is validated, mark tool as done
-                        toolModel.markAsDone(
-                            os.path.join(outputRelDir, os.path.basename(filepath)))
-                        # And update the tool in database
-                        toolModel.notes = notes
-                        toolModel.tags = tags
-                        toolModel.update()
-                        # Upload file to SFTP
-                        mod.centralizeFile(filepath, outputDir)
-                        msg = "TASK SUCCESS : "+toolModel.name
-                    else:  # BAS RESULT OF PLUGIN
-                        msg = "TASK FAILED (says the mod) : "+toolModel.name
-                        msg += "The return code was not the expected one. ("+str(
-                            returncode)+")."
-                        toolModel.markAsError()
-                        raise Exception(msg)
-            except IOError as e:
-                toolModel.tags = ["todo"]
-                toolModel.notes = "Failed to read results file"
-                toolModel.markAsDone()
-        else:
-            msg = "TASK FAILED (no plugin found) : "+toolModel.name
-            toolModel.markAsNotDone()
-            raise Exception(msg)
-        # Delay
-        if command is not None:
-            if float(command.sleep_between) > 0.0:
-                msg += " (will sleep for " + \
-                    str(float(command.sleep_between))+")"
-            print(msg)
-            time.sleep(float(command.sleep_between))
-        return
+    Returns:
+        Return the latest time limit in which this tool fits.
+    """
+    intervals = Interval.fetchObjects({"wave": waveName})
+    furthestTimeLimit = datetime.now()
+    for intervalModel in intervals:
+        if Utils.fitNowTime(intervalModel.dated, intervalModel.datef):
+            endingDate = intervalModel.getEndingDate()
+            if endingDate is not None:
+                if endingDate > furthestTimeLimit:
+                    furthestTimeLimit = endingDate
+    return furthestTimeLimit
+
+if __name__ == '__main__':
+    main()

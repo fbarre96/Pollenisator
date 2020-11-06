@@ -1,8 +1,8 @@
 """A plugin to parse nikto scan"""
 
 from core.plugins.plugin import Plugin
-from core.Models.Ip import Ip
-from core.Models.Port import Port
+from server.ServerModels.Ip import ServerIp
+from server.ServerModels.Port import ServerPort
 import re
 import webbrowser
 
@@ -58,7 +58,7 @@ class Nikto(Plugin):
         Args:
             _event: not used but mandatory
         """
-        port_m = Port.fetchObject(
+        port_m = ServerPort.fetchObject(
             {"ip": self.toolmodel.ip, "port": self.toolmodel.port, "proto": self.toolmodel.proto})
         if port_m is None:
             return
@@ -100,7 +100,7 @@ class Nikto(Plugin):
         """
         return returncode == 0
 
-    def Parse(self, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -115,7 +115,7 @@ class Nikto(Plugin):
         """
         tags = ["todo"]
         targets = {}
-        notes = file_opened.read()
+        notes = file_opened.read().decode("utf-8")
         if notes == "":
             return None, None, None, None
         if not notes.startswith("- Nikto v"):
@@ -123,13 +123,13 @@ class Nikto(Plugin):
         host, port, service, infos = parse_nikto_plain_text(notes)
         if host:
             if port:
-                Ip().initialize(host).addInDb()
-                p_o = Port().initialize(host, port, "tcp", service)
-                res, iid = p_o.addInDb()
-                if not res:
-                    p_o = Port.fetchObject({"_id": iid})
+                Server().initialize(host).addInDb()
+                p_o = ServerPort().initialize(host, port, "tcp", service)
+                insert_res = p_o.addInDb()
+                if not insert_res["res"]:
+                    p_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})
                 p_o.updateInfos(
                     {"Nikto": infos, "SSL": "True" if service == "https" else "False"})
-                targets[str(iid)] = {
+                targets[str(insert_res["iid"])] = {
                     "ip": host, "port": port, "proto": "tcp"}
         return notes, tags, "port", targets

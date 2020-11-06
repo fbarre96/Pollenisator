@@ -1,9 +1,9 @@
 """A plugin to parse namp script ms17-010 scan"""
 
 from core.plugins.plugin import Plugin
-from core.Models.Defect import Defect
-from core.Models.Ip import Ip
-from core.Models.Port import Port
+from server.ServerModels.Defect import ServerDefect
+from server.ServerModels.Ip import ServerIp
+from server.ServerModels.Port import ServerPort
 import re
 
 
@@ -40,7 +40,7 @@ class EternalBlue(Plugin):
         """
         return returncode == 0
 
-    def Parse(self, file_opened, **kwargs):
+    def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -54,7 +54,7 @@ class EternalBlue(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         targets = {}
-        notes = file_opened.read()
+        notes = file_opened.read().decode("utf-8")
         regex_ip = r"Nmap scan report for (\S+)"
         ip_group = re.search(regex_ip, notes)
         if ip_group is None:
@@ -64,7 +64,7 @@ class EternalBlue(Plugin):
             return None, None, None, None
         # Parsing
         ip = ip_group.group(1).strip()
-        Ip().initialize(ip).addInDb()
+        ServerIp().initialize(ip).addInDb()
         port_re = r"(\d+)\/(\S+)\s+open\s+microsoft-ds"
         res_search = re.search(port_re, notes)
         res_insert = None
@@ -74,13 +74,14 @@ class EternalBlue(Plugin):
         else:
             port = res_search.group(1)
             proto = res_search.group(2)
-            p_o = Port()
+            p_o = ServerPort()
             p_o.initialize(ip, port, proto, "microsoft-ds")
-            res_insert = p_o.addInDb()
+            insert_res = p_o.addInDb()
+            res_insert = insert_res["res"]
             targets[str(p_o.getId())] = {
                 "ip": ip, "port": port, "proto": proto}
         if "VULNERABLE" in notes:
-            d_o = Defect()
+            d_o = ServerDefect()
             d_o.initialize(ip, port, proto, "Serveur vulnérable à EternalBlue",
                            "Difficile", "Critique", "Critique", "N/A", ["Socle"], notes=notes, proofs=[])
             d_o.addInDb()

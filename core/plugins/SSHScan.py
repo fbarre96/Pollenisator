@@ -2,10 +2,9 @@
 
 import json
 from core.plugins.plugin import Plugin
-from core.Models.Ip import Ip
-from core.Models.Port import Port
-from core.Models.Defect import Defect
-
+from server.ServerModels.Ip import ServerIp
+from server.ServerModels.Port import ServerPort
+from server.ServerModels.Defect import ServerDefect
 
 class SSHScan(Plugin):
     def getFileOutputArg(self):
@@ -34,7 +33,7 @@ class SSHScan(Plugin):
     def checkReturnCode(self, _returncode):
         return True
 
-    def Parse(self, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -49,7 +48,7 @@ class SSHScan(Plugin):
         """
         notes = ""
         tags = []
-        content = file_opened.read()
+        content = file_opened.read().decode("utf-8")
         targets = {}
         try:
             notes_json = json.loads(content)
@@ -65,11 +64,11 @@ class SSHScan(Plugin):
                 for ip in ips:
                     if ip.strip() == "":
                         continue
-                    Ip().initialize(ip).addInDb()
-                    port_o = Port().initialize(ip, port, "tcp", "ssh")
-                    res, iid = port_o.addInDb()
-                    if not res:
-                        port_o = Port.fetchObject({"_id": iid})
+                    ServerIp().initialize(ip).addInDb()
+                    port_o = ServerPort().initialize(ip, port, "tcp", "ssh")
+                    insert_res = port_o.addInDb()
+                    if not insert_res["res"]:
+                        port_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})
                     notes = "\n".join(
                         scan["compliance"].get("recommendations", []))
                     targets[str(port_o.getId())] = {
@@ -82,7 +81,7 @@ class SSHScan(Plugin):
                     if str(is_ok) == "False":
                         port_o.updateInfos({"compliant": "False"})
                         port_o.updateInfos({"auth_methods": scan["auth_methods"]})
-                        Defect().initialize(ip, port, "tcp", "Défauts d’implémentation de la configuration SSH",
+                        ServerDefect().initialize(ip, port, "tcp", "Défauts d’implémentation de la configuration SSH",
                                             "Très difficile", "Majeur", "Important",  "N/A", ["Socle"], notes=notes, proofs=[]).addInDb()
             except KeyError:
                 continue

@@ -118,7 +118,7 @@ class Command(Element):
         """
         if pipeline is None:
             pipeline = {}
-        return [command.name for command in Command.fetchObjects(pipeline, targetdb)]
+        return [command.name for command in cls.fetchObjects(pipeline, targetdb)]
 
     @classmethod
     def fetchObject(cls, pipeline, targetdb="pollenisator"):

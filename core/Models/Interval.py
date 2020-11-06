@@ -56,8 +56,6 @@ class Interval(Element):
             "intervals", {"_id": self._id})
         
 
-    
-
     def addInDb(self):
         """
         Add this interval in database.

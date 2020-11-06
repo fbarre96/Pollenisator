@@ -1,12 +1,12 @@
 """A plugin to parse nmap scan"""
 
 import re
-from core.Models.Ip import Ip
-from core.Models.Port import Port
+from server.ServerModels.Ip import ServerIp
+from server.ServerModels.Port import ServerPort
 from core.plugins.plugin import Plugin
 
 
-def getIpPortsNmap(nmapFile):
+def getIpPortsNmap(pentest, nmapFile):
     """
     Read the given nmap .nmap file results and return a dictionnary with ips and a list of their open ports.
         Args:
@@ -17,7 +17,7 @@ def getIpPortsNmap(nmapFile):
     """
     notes = ""
     countOpen = 0
-    all_text = nmapFile.read().strip()
+    all_text = nmapFile.read().decode("utf-8").strip()
     lines = all_text.split("\n")
     if len(lines) <= 3:
         # print("Not enough lines to be nmap")
@@ -43,9 +43,9 @@ def getIpPortsNmap(nmapFile):
                 2) if ip.group(2) is not None else ""]
             notes_ip = "ip:" + \
                 str(lastIp[1]) if lastIp[1] != "" and lastIp[1] is not None else ""
-            ipCIDR_m = Ip().initialize(str(lastIp[0]), notes=notes_ip)
+            ipCIDR_m = ServerIp(pentest).initialize(str(lastIp[0]), notes=notes_ip)
             if lastIp[1].strip() != "" and lastIp[1] is not None:
-                ipDom_m = Ip().initialize(
+                ipDom_m = ServerIp(pentest).initialize(
                     str(lastIp[1]), notes="domain:"+str(lastIp[0]))
                 
             else:
@@ -70,19 +70,19 @@ def getIpPortsNmap(nmapFile):
                     ipCIDR_m.addInDb()
                     validIps.append(ipCIDR_m.ip)
                     if ipDom_m is not None:
-                        res, iid = ipDom_m.addInDb()
-                        if not res:
-                            ipDom_m = Ip.fetchObject({"_id": iid})
+                        insert_res = ipDom_m.addInDb()
+                        if not insert_res["res"]:
+                            ipDom_m = ServerIp.fetchObject(pentest, {"_id": insert_res["iid"]})
                         ipDom_m.updateInfos({"hostname": list(set(list(ipDom_m.infos.get(
                             "hostname", []))+[str(ipCIDR_m.ip)]))})
                         validIps.append(ipDom_m.ip)
                 for ipFound in validIps:
                     if ip == "":
                         continue
-                    port_o = Port().initialize(ipFound, port_number, proto, service, product)
-                    res_insert, iid = port_o.addInDb()
-                    if not res_insert:
-                        port_o = Port.fetchObject({"_id": iid})
+                    port_o = ServerPort(pentest).initialize(ipFound, port_number, proto, service, product)
+                    insert_res = port_o.addInDb()
+                    if not insert_res["res"]:
+                        port_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})
                     port_o.service = service
                     port_o.update()
 
@@ -96,14 +96,14 @@ class Nmap(Plugin):
         Returns:
             string
         """
-        return " -oA "
+        return " -oN "
 
     def getFileOutputExt(self):
         """Returns the expected file extension for this command result file
         Returns:
             string
         """
-        return ""
+        return ".nmap"
 
     def getFileOutputPath(self, commandExecuted):
         """Returns the output file path given in the executed command using getFileOutputArg
@@ -123,7 +123,7 @@ class Nmap(Plugin):
         """
         return returncode == 0
 
-    def Parse(self, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -137,7 +137,7 @@ class Nmap(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         tags = []
-        notes = getIpPortsNmap(file_opened)
+        notes = getIpPortsNmap(pentest, file_opened)
         if notes is None:
             return None, None, None, None
         return notes, tags, "scope", {}

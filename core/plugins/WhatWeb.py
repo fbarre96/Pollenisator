@@ -4,9 +4,8 @@ import json
 import re
 import webbrowser
 from core.plugins.plugin import Plugin
-from core.Models.Ip import Ip
-from core.Models.Port import Port
-
+from server.ServerModels.Ip import ServerIp
+from server.ServerModels.Port import ServerPort
 
 class WhatWeb(Plugin):
     def __init__(self):
@@ -29,7 +28,7 @@ class WhatWeb(Plugin):
         Args:
             _event: not used but mandatory
         """
-        port_m = Port.fetchObject(
+        port_m = ServerPort.fetchObject(
             {"ip": self.toolmodel.ip, "port": self.toolmodel.port, "proto": self.toolmodel.proto})
         if port_m is None:
             return
@@ -69,7 +68,7 @@ class WhatWeb(Plugin):
         """
         return returncode == 0
 
-    def Parse(self, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -84,7 +83,7 @@ class WhatWeb(Plugin):
         """
         tags = ["todo"]
         targets = {}
-        notes = file_opened.read()
+        notes = file_opened.read().decode("utf-8")
         if notes == "":
             return None, None, None, None
         try:
@@ -115,11 +114,11 @@ class WhatWeb(Plugin):
             else:
                 host = host_port
                 port = "443" if "https://" in website["target"] else "80"
-            Ip().initialize(host).addInDb()
-            p_o = Port().initialize(host, port, "tcp", service)
-            inserted, iid = p_o.addInDb()
-            if not inserted:
-                p_o = Port.fetchObject({"_id": iid})
+            ServerIp().initialize(host).addInDb()
+            p_o = ServerPort().initialize(host, port, "tcp", service)
+            insert_res = p_o.addInDb()
+            if not insert_res["res"]:
+                p_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})
             infosToAdd = {"URL": website["target"]}
             for plugin in website.get("plugins", {}):
                 item = website["plugins"][plugin].get("string")

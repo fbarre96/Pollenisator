@@ -1,7 +1,7 @@
 """A plugin to parse knockpy scan"""
 
 from core.plugins.plugin import Plugin
-from core.Models.Ip import Ip
+from server.ServerModels.Ip import ServerIp
 import re
 
 
@@ -62,7 +62,7 @@ class Knockpy(Plugin):
         """
         return returncode == 0
 
-    def Parse(self, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -81,6 +81,7 @@ class Knockpy(Plugin):
         markerFound = False
         countFound = 0
         for line in file_opened:
+            line = line.decode("utf-8")
             if marker == line.strip():
                 markerFound = True
             if not markerFound:
@@ -88,15 +89,15 @@ class Knockpy(Plugin):
             ip, domain, alias = parse_knockpy_line(line)
             if ip is not None and domain is not None:
                 # a domain has been found
-                res, iid = Ip().initialize(domain).addInDb()
-                if res:
-                    Ip().initialize(ip).addInDb()
+                insert_res = ServerIp().initialize(domain).addInDb()
+                if insert_res["res"]:
+                    ServerIp().initialize(ip).addInDb()
                     notes += line+"\n"
                     countFound += 1
                 # failed, domain is out of scope
                 else:
                     notes += domain+" exists but already added.\n"
-                ip_m = Ip.fetchObject({"_id": iid})
+                ip_m = ServerIp.fetchObject(pentest, {"_id": insert_res["iid"]})
                 if alias:
                     ip_m.updateInfos({"alias": ip})
         if notes.strip() == "":

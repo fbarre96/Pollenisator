@@ -76,7 +76,7 @@ class Plugin(metaclass=MetaPlugin):
         """
         return True
 
-    def Parse(self, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -91,7 +91,7 @@ class Plugin(metaclass=MetaPlugin):
         """
         notes = ""
         tags = ["todo"]
-        notes = file_opened.read()
+        notes = file_opened.read().decode("utf-8")
         return notes, tags, "wave", {"wave": None}
 
     def getFilePath(self, commandExecuted):
@@ -102,18 +102,6 @@ class Plugin(metaclass=MetaPlugin):
             string: the path to file created
         """
         return self.getFileOutputPath(commandExecuted)
-
-    def centralizeFile(self, filepath, remoteDir):
-        """Upload the result file to sftp
-        Args:
-            filepath: local result file path
-            remoteDir: remote path
-        """
-        from core.Components.FileStorage import FileStorage
-        fs = FileStorage()
-        fs.open()
-        fs.putResult(filepath, remoteDir)
-        fs.close()
 
     def getActions(self, _toolmodel):
         """

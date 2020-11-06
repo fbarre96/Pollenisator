@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 from flask import jsonify
 from bson import ObjectId
-
+import threading
 from core.Components.Utils import JSONEncoder
 
 # Create the application instance
@@ -24,8 +24,16 @@ def home():
     """
     return "Api working"
 
-
+def removeInactiveWorkers():
+    mongoInstance.removeInactiveWorkers()
+    removeInactiveWorkersTimer = threading.Timer(
+            30, removeInactiveWorkers)
+    removeInactiveWorkersTimer.start()
 
 # If we're running in stand alone mode, run the application
 if __name__ == '__main__':
+    mongoInstance = MongoCalendar.getInstance()
+    removeInactiveWorkersTimer = threading.Timer(
+            30, removeInactiveWorkers)
+    removeInactiveWorkersTimer.start()
     app.run(host='0.0.0.0', port=5000, debug=True)

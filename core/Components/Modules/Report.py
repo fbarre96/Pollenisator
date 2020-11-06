@@ -249,7 +249,10 @@ class Report:
         Args:
             toDeleteIid: database ID of defect to delete
         """
-        item = self.treevw.item(toDeleteIid)
+        try:
+            item = self.treevw.item(toDeleteIid)
+        except tk.TclError:
+            return
         dialog = ChildDialogQuestion(self.parent,
                                      "DELETE WARNING", "Are you sure you want to delete defect "+str(item["text"])+" ?", ["Delete", "Cancel"])
         self.parent.wait_window(dialog.app)
@@ -263,7 +266,7 @@ class Report:
                 children = self.treevw.get_children()
                 for i in range(index+1,len(children),1):
                     d_o = Defect({"_id":children[i]})
-                    d_o.update({"index":str(i)})
+                    d_o.update({"index":int(i)})
             defectToDelete.delete()
             self.resizeDefectTreeview()
 
@@ -288,9 +291,9 @@ class Report:
             selected = children[currentIndice]
             moved_by_side_effect = children[currentIndice-1]
             apiclient.update(Defect.coll_name,
-                             {"_id": ObjectId(selected)}, {"$set": {"index":str(currentIndice-1)}})
+                             {"_id": ObjectId(selected)}, {"$set": {"index":int(currentIndice-1)}})
             apiclient.update(Defect.coll_name,
-                             {"_id": ObjectId(moved_by_side_effect)}, {"$set": {"index":str(currentIndice)}})
+                             {"_id": ObjectId(moved_by_side_effect)}, {"$set": {"index":int(currentIndice)}})
         return "break"
 
     def moveItemDown(self, _event=None):
@@ -315,9 +318,9 @@ class Report:
             selected = children[currentIndice]
             moved_by_side_effect = children[currentIndice+1]
             apiclient.update(Defect.coll_name,
-                             {"_id": ObjectId(selected)}, {"$set": {"index":str(currentIndice+1)}})
+                             {"_id": ObjectId(selected)}, {"$set": {"index":int(currentIndice+1)}})
             apiclient.update(Defect.coll_name,
-                             {"_id": ObjectId(moved_by_side_effect)}, {"$set": {"index":str(currentIndice)}})
+                             {"_id": ObjectId(moved_by_side_effect)}, {"$set": {"index":int(currentIndice)}})
         return "break"
 
     def on_click(self, _event=None):
@@ -460,7 +463,7 @@ class Report:
                         new_ind += 1
                     d_list[new_ind] = defect
                     defect.index = new_ind
-                    defect.update({"index":str(new_ind)})
+                    defect.update({"index":int(new_ind)})
         # Fix dict order to index between 0 and *
         keys_ordered = sorted(list(d_list.keys()))
         for i in range(len(keys_ordered)):
@@ -502,7 +505,7 @@ class Report:
             if str(indToInsert) != "end":
                 for i in range(int(indToInsert), len(children), 1):
                     d_o = Defect({"_id":children[i]})
-                    d_o.update({"index":str(i+1)})
+                    d_o.update({"index":int(i+1)})
         else:
             indToInsert = defect_o.index
         types = defect_o.mtype
@@ -522,7 +525,7 @@ class Report:
                 self.treevw.insert('', indToInsert, defect_o.getId(), text=defect_o.title,
                                    values=new_values,
                                    tags=(defect_o.risk))
-                defect_o.update({"index":str(indToInsert)})
+                defect_o.update({"index":int(indToInsert)})
             except tk.TclError:
                 # The defect already exists
                 already_inserted = True

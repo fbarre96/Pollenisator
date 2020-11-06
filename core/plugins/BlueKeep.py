@@ -1,8 +1,8 @@
 """A plugin to parse a bluekeep scan : rdpscan"""
 from core.plugins.plugin import Plugin
-from core.Models.Ip import Ip
-from core.Models.Port import Port
-from core.Models.Defect import Defect
+from server.ServerModels.Ip import ServerIp
+from server.ServerModels.Port import ServerPort
+from server.ServerModels.Defect import ServerDefect
 
 
 class BlueKeep(Plugin):
@@ -41,7 +41,7 @@ class BlueKeep(Plugin):
         """
         return returncode == 0
 
-    def Parse(self, file_opened, **kwargs):
+    def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
         Example file:
@@ -65,28 +65,29 @@ class BlueKeep(Plugin):
         targets = {}
         for line in file_opened:
             # Auto Detect
+            line = line.decode("utf-8")
             infos = line.split(" - ")
             if len(infos) < 3:
                 return None, None, None, None
-            if not Ip.isIp(infos[0]):
+            if not ServerIp.isIp(infos[0]):
                 return None, None, None, None
             if infos[1] not in ["UNKNOWN", "SAFE", "VULNERABLE"]:
                 return None, None, None, None
             # Parse
             ip = line.split(" ")[0].strip()
-            Ip().initialize(ip).addInDb()
-            p_o = Port.fetchObject({"ip": ip, "port": kwargs.get(
+            ServerIp().initialize(ip).addInDb()
+            p_o = ServerPort.fetchObject(pentest, {"ip": ip, "port": kwargs.get(
                 "port", None), "proto": kwargs.get("proto", None)})
             if p_o is not None:
                 targets[str(p_o.getId())] = {"ip": ip, "port": kwargs.get(
                     "port", None), "proto": kwargs.get("proto", None)}
             if "VULNERABLE" in line:
-                Defect().initialize(ip, kwargs.get("port", None), kwargs.get("proto", None), "Serveur vulnérable à BlueKeep",
+                ServerDefect().initialize(ip, kwargs.get("port", None), kwargs.get("proto", None), "Serveur vulnérable à BlueKeep",
                                     "Difficile", "Critique", "Critique", "N/A", ["Socle"], notes=notes, proofs=[]).addInDb()
                 tags=["P0wned!"]
                 if p_o is not None:
                     p_o.addTag("P0wned!")
-                ip_o = Ip.fetchObject({"ip": ip})
+                ip_o = ServerIp.fetchObject(pentest, {"ip": ip})
                 if ip_o is not None:
                     ip_o.addTag("P0wned!")
             elif "UNKNOWN" in line:

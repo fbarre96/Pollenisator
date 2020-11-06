@@ -2,17 +2,31 @@ from bson import ObjectId
 from core.Components.mongo import MongoCalendar
 from core.Components.Utils import JSONEncoder
 from core.Models.Defect import Defect
+from core.Controllers.DefectController import DefectController
+from server.FileManager import getProofPath
+from server.ServerModels.Element import ServerElement
 import json
+import os
 
 mongoInstance = MongoCalendar.getInstance()
 
-class ServerDefect(Defect):
-    def __init__(self, pentest, *args, **kwargs):
+class ServerDefect(Defect, ServerElement):
+    def __init__(self, pentest="", *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.pentest = pentest
+        if pentest != "":
+            self.pentest = pentest
+        elif mongoInstance.calendarName != "":
+            self.pentest = mongoInstance.calendarName
+        else:
+            raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
+        mongoInstance.connectToDb(self.pentest)
+
 
     def addInDb(self):
-        insert(self.pentest, ToolController(self).getData())
+        return insert(self.pentest, DefectController(self).getData())
+
+    def update(self):
+        return update("defects", {"_id":ObjectId(self._id)}, {"$set":DefectController(self).getData()}, False, True)
 
     def getParentId(self):
         try:
@@ -27,14 +41,51 @@ class ServerDefect(Defect):
         else:
             obj = mongoInstance.find(
                 "ports", {"ip": self.ip, "port": self.port, "proto": self.proto}, False)
-        return obj["_id"]
+        if obj is None:
+            return ""
+        return obj.get("_id", None)
+
+    @classmethod
+    def fetchObjects(cls, pentest, pipeline):
+        """Fetch many commands from database and return a Cursor to iterate over model objects
+        Args:
+            pipeline: a Mongo search pipeline (dict)
+        Returns:
+            Returns a cursor to iterate on model objects
+        """
+        mongoInstance.connectToDb(pentest)
+        ds = mongoInstance.find(cls.coll_name, pipeline, True)
+        if ds is None:
+            return None
+        for d in ds:
+            # disabling this error as it is an abstract function
+            yield cls(pentest, d)  #  pylint: disable=no-value-for-parameter
+    
+    @classmethod
+    def fetchObject(cls, pentest, pipeline):
+        """Fetch many commands from database and return a Cursor to iterate over model objects
+        Args:
+            pipeline: a Mongo search pipeline (dict)
+        Returns:
+            Returns a cursor to iterate on model objects
+        """
+        mongoInstance.connectToDb(pentest)
+        ds = mongoInstance.find(cls.coll_name, pipeline, False)
+        if ds is None:
+            return None
+        return cls(pentest, d) 
 
 def delete(pentest, defect_iid):
     mongoInstance.connectToDb(pentest)
     defect = ServerDefect(pentest, mongoInstance.find("defects", {"_id": ObjectId(defect_iid)}, False))
     if defect is None:
         return 0
-    rmProofs(defect)
+    proofs_path = getProofPath(pentest, defect_iid)
+    if os.path.isdir(proofs_path):
+        files = os.listdir(proofs_path)
+        for filetodelete in files:
+            os.remove(os.path.join(proofs_path, filetodelete))
+        os.rmdir(proofs_path)
     res = mongoInstance.delete("defects", {"_id": ObjectId(defect_iid)}, False)
     if res is None:
         return 0
@@ -49,8 +100,9 @@ def insert(pentest, data):
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
     parent = defect_o.getParentId()
-    data["parent"] = parent
-    ins_result = mongoInstance.insert("defects", data, '')
+    if "_id" in data:
+        del data["_id"]
+    ins_result = mongoInstance.insert("defects", data, parent)
     iid = ins_result.inserted_id
     defect_o._id = iid
     if defect_o.isAssigned():
@@ -60,22 +112,10 @@ def insert(pentest, data):
         defect_o.proto = ""
         defect_o.parent = ""
         defect_o.notes = ""
-        defect_o.addInDb()
+        insert(pentest, DefectController(defect_o).getData())
     return {"res":True, "iid":iid}
 
 def update(pentest, defect_iid, data):
     mongoInstance.connectToDb(pentest)
     return mongoInstance.update("defects", {"_id":ObjectId(defect_iid)}, {"$set":data}, False, True)
 
-def rmProofs(defect):
-    """Removes all the proof file in this defect
-    """
-    proofs = defect.proofs
-    fs = FileStorage()
-    fs.open()
-    remote_dirpath = defect.calcDirPath()
-    fs.rmProofs(remote_dirpath)
-    fs.close()
-    del proofs
-    defect.proofs = []
-    defect.update()

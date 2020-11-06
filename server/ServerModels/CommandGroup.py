@@ -6,6 +6,26 @@ import json
 
 mongoInstance = MongoCalendar.getInstance()
 
+class ServerCommandGroup(CommandGroup):
+
+    def __init__(self, pentest, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pentest = pentest
+
+    @classmethod
+    def fetchObjects(cls, pipeline):
+        """Fetch many commands from database and return a Cursor to iterate over Command Group objects
+        Args:
+            pipeline: a Mongo search pipeline (dict)
+        Returns:
+            Returns a cursor to iterate on Command Group objects
+        """
+        results = mongoInstance.findInDb("pollenisator", "group_commands", pipeline, True)
+        if results is None:
+            return None
+        for result in results:
+            yield(ServerCommandGroup("pollenisator", result))
+    
 def delete(pentest, command_group_iid):
     res = mongoInstance.deleteFromDb("pollenisator", "group_commands", {
                                    "_id": ObjectId(command_group_iid)}, False, True)
@@ -15,6 +35,8 @@ def delete(pentest, command_group_iid):
         return res.deleted_count
 
 def insert(pentest, data):
+    if "_id" in data:
+        del data["_id"]
     existing = mongoInstance.findInDb(
             "pollenisator", "group_commands", {"name": data["name"]}, False)
     if existing is not None:

@@ -1,8 +1,8 @@
 """A plugin to parse a dirsearch scan"""
 
 from core.plugins.plugin import Plugin
-from core.Models.Ip import Ip
-from core.Models.Port import Port
+from server.ServerModels.Ip import ServerIp
+from server.ServerModels.Port import ServerPort
 from core.Application.Dialogs.ChildDialogQuestion import ChildDialogQuestion
 import re
 import webbrowser
@@ -84,7 +84,7 @@ class Dirsearch(Plugin):
         Return:
             A dictionary with buttons text as key and function callback as value.
         """
-        self.port_m = Port.fetchObject(
+        self.port_m = ServerPort.fetchObject(
             {"ip": toolmodel.ip, "port": toolmodel.port, "proto": toolmodel.proto})
         if self.port_m is None:
             return {}
@@ -135,7 +135,7 @@ class Dirsearch(Plugin):
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
 
-    def Parse(self, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -149,7 +149,7 @@ class Dirsearch(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         tags = ["todo"]
-        data = file_opened.read()
+        data = file_opened.read().decode("utf-8")
         notes = ""
         if data.strip() == "":
             return None, None, None, None
@@ -159,14 +159,14 @@ class Dirsearch(Plugin):
                 return None, None, None, None
             targets = {}
             for host in hosts:
-                Ip().initialize(host).addInDb()
+                ServerIp().initialize(host).addInDb()
                 for port in hosts[host]:
-                    port_o = Port()
+                    port_o = ServerPort()
                     port_o.initialize(host, port, "tcp",
                                       hosts[host][port]["service"])
-                    res, iid = port_o.addInDb()
-                    if not res:
-                        port_o = Port.fetchObject({"_id": iid})
+                    insert_ret = port_o.addInDb()
+                    if not insert_ret["res"]:
+                        port_o = ServerPort.fetchObject(pentest, {"_id": insert_ret["idi"]})
                     targets[str(port_o.getId())] = {
                         "ip": host, "port": port, "proto": "tcp"}
                     hosts[host][port]["paths"].sort(key=lambda x: int(x[0]))

@@ -3,6 +3,17 @@ from bson import ObjectId
 from datetime import datetime
 from core.Components.mongo import MongoCalendar
 from core.Components.Utils import JSONDecoder
+from core.Controllers.CommandController import CommandController
+from core.Controllers.WaveController import WaveController
+from core.Controllers.IntervalController import IntervalController
+from core.Models.Wave import Wave
+from core.Models.Interval import Interval
+from server.ServerModels.Command import ServerCommand
+from server.ServerModels.Command import insert as insert_command
+from server.ServerModels.Wave import insert as insert_wave
+from server.ServerModels.Interval import insert as insert_interval
+from server.ServerModels.Scope import insert as insert_scope
+from server.FileManager import deletePentestFiles
 mongoInstance = MongoCalendar.getInstance()
 
 validCollections = ["group_commands", "commands", "settings"]
@@ -131,16 +142,62 @@ def listPentests():
 def deletePentest(pentest):
     ret = mongoInstance.doDeleteCalendar(pentest)
     if ret:
+        deletePentestFiles(pentest)
         return "Successful deletion"
     else:
         return  "Unknown pentest", 404
 
-def registerCalendar(pentest):
+def registerCalendar(pentest, data):
     ret, msg = mongoInstance.registerCalendar(pentest, False, False)
     if ret:
+        prepareCalendar(pentest, data["pentest_type"], data["start_date"], data["end_date"], data["scope"], data["settings"], data["pentesters"])
         return msg
     else:
         return msg, 403
+
+def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings, pentesters):
+    """
+    Initiate a pentest database with wizard info
+    Args:
+        dbName: the database name
+        pentest_type: a pentest type choosen from settings pentest_types. Used to select commands that will be launched by default
+        start_date: a begining date and time for the pentest
+        end_date: ending date and time for the pentest
+        scope: a list of scope valid string (IP, network IP or host name)
+        settings: a dict of settings with keys:
+            * "Add domains whose IP are in scope": if 1, will do a dns lookup on new domains and check if found IP is in scope
+            * "Add domains who have a parent domain in scope": if 1, will add a new domain if a parent domain is in scope
+            * "Add all domains found":  Unsafe. if 1, all new domains found by tools will be considered in scope.
+    """
+    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance.connectToDb(dbName)
+    commands = ServerCommand.getList({"$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}]})
+    if not commands:
+        commandslist = ServerCommand.getList()
+        if not commandslist:
+            default = os.path.join(Utils.getMainDir(), "exports/pollenisator_commands.gzip")
+            res = mongoInstance.importCommands(default)
+            if res:
+                default = os.path.join(Utils.getMainDir(), "exports/pollenisator_group_commands.gzip")
+                res = mongoInstance.importCommands(default)
+        commands = ServerCommand.getList({"$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}]})
+    # Duplicate commands in local database
+    allcommands = ServerCommand.fetchObjects({})
+    for command in allcommands:
+        command.indb = dbName
+        insert_command(command.indb, CommandController(command).getData())
+    wave_o = Wave().initialize(dbName, commands)
+    insert_wave(dbName, WaveController(wave_o).getData())
+    interval_o = Interval().initialize(dbName, start_date, end_date)
+    insert_interval(dbName, IntervalController(interval_o).getData())
+    for scope in scope.split("\n"):
+        if scope.strip() != "":
+            insert_scope(dbName, {"wave":dbName, "scope":scope.strip()})
+    mongoInstance.insert("settings", {"key":"pentest_type", "value":pentest_type})
+    mongoInstance.insert("settings", {"key":"include_domains_with_ip_in_scope", "value": settings['Add domains whose IP are in scope'] == 1})
+    mongoInstance.insert("settings", {"key":"include_domains_with_topdomain_in_scope", "value":settings["Add domains who have a parent domain in scope"] == 1})
+    mongoInstance.insert("settings", {"key":"include_all_domains", "value":settings["Add all domains found"] == 1})
+    mongoInstance.insert("settings", {"key":"pentesters", "value":list(map(lambda x: x.strip(), pentesters.split("\n")))})
 
 def getSettings():
     res = mongoInstance.findInDb("pollenisator", "settings", {}, True)
@@ -148,8 +205,7 @@ def getSettings():
         return []
     return [s for s in res]
 
-def getSetting(data):
-    pipeline = data["pipeline"]
+def getSetting(pipeline):
     if isinstance(pipeline, str):
         pipeline = json.loads(pipeline, cls=JSONDecoder)
     if not isinstance(pipeline, dict):
@@ -159,8 +215,11 @@ def getSetting(data):
 def createSetting(data):
     key = data['key']
     value = data["value"]
-    return mongoInstance.insertInDb("pollenisator", "settings", {"key":key, "value":value})
-
+    res = mongoInstance.insertInDb("pollenisator", "settings", {"key":key, "value":value})
+    if res:
+        return True
+    return False
+    
 def updateSetting(data):
     key = data['key']
     value = data["value"]

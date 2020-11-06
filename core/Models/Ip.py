@@ -77,6 +77,8 @@ class Ip(Element):
         ret = []
         apiclient = APIClient.getInstance()
         scopes = apiclient.find("scopes", {})
+        if scopes is None:
+            return ret
         for scope in scopes:
             if self.fitInScope(scope["scope"]):
                 ret.append(str(scope["_id"]))
@@ -217,7 +219,7 @@ class Ip(Element):
             list of defect raw mongo data dictionnaries
         """
         apiclient = APIClient.getInstance()
-        return apiclient.find("defects", {"ip": self.ip, "$or": [{"port": {"$exists": False}}, {"port": None}]})
+        return apiclient.find("defects", {"ip": self.ip, "$or": [{"port": {"$exists": False}}, {"port": None}, {"port": ""}]})
 
     def getDbKey(self):
         """Return a dict from model to use as unique composed key.

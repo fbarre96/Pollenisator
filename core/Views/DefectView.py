@@ -223,20 +223,6 @@ class DefectView(ViewElement):
             widget.destroy()
         self.openModifyWindow()
 
-    def beforeDelete(self, iid=None):
-        """Called before defect deletion.
-        Will attempt to remove this defect from global defect table.
-        Args:
-            iid: the mongo ID of the deleted defect
-        """
-        if iid is None:
-            if self.controller is not None:
-                iid = self.controller.getDbId()
-        if iid is not None:
-            for module in self.mainApp.modules:
-                if callable(getattr(module["object"], "removeItem", None)):
-                    module["object"].removeItem(iid)
-
     def addInTreeview(self, parentNode=None, _addChildren=True):
         """Add this view in treeview. Also stores infos in application treeview.
         Args:

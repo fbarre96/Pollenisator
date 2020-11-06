@@ -71,7 +71,13 @@ class MongoCalendar:
             Mongo result of workers. Cursor of dictionnary."""
         pipeline = {} if pipeline is None else pipeline
         return self.findInDb("pollenisator", "workers", pipeline)
-    
+
+    def getWorker(self, name):
+        """Return workers documents from database
+        Returns:
+            Mongo result of workers. Cursor of dictionnary."""
+        return self.findInDb("pollenisator", "workers", {"name":name}, False)
+
     def setWorkerExclusion(self, name, db, setExcluded):
         if setExcluded:
             return self.updateInDb("pollenisator", "workers", {"name": name}, {
@@ -202,7 +208,7 @@ class MongoCalendar:
                     raise IOError("Failed to register commands")
             res = self.findInDb("pollenisator", "workers", {
                 "name": worker_name}, False)
-            worker_shortname = worker_name.split("@")[-1]
+            worker_shortname = worker_name.split("@")[0]
             if res is not None:
                 print("UPDATE COMMANDS")
                 self.updateInDb("pollenisator", "workers",
@@ -210,7 +216,7 @@ class MongoCalendar:
             else:
                 print("INSERT COMMANDS")
                 self.insertInDb("pollenisator", "workers", {
-                    "name": worker_name, "shortname": worker_shortname, "registeredCommands": command_names}, '', True)
+                    "name": worker_name, "shortname": worker_shortname, "registeredCommands": command_names, "last_heartbeat":datetime.datetime.now(), "excludedDatabases":[]}, '', True)
             print("Registered commands "+str(command_names) +
                   " for  "+str(worker_name))
             return True
@@ -317,6 +323,8 @@ class MongoCalendar:
         Returns:
             Return the pymongo result of the insert_one function.
         """
+        if values.get("parent", None) is None:
+            values["parent"] = parent
         ret = self._insert(self.calendarName, collection, values, True, parent)
         return ret
 
@@ -574,8 +582,6 @@ class MongoCalendar:
         if result is not None:
             if result.deleted_count == 1:
                 self.client.drop_database(calendarName)
-                tkinter.messagebox.showinfo(
-                    "Success", "Deleted from "+"calendars"+" \""+str(calendarName)+"\"")
                 return True
 
         tkinter.messagebox.showinfo(
@@ -621,30 +627,21 @@ class MongoCalendar:
         authorized, msg = self.validateCalendarName(saveAsName.strip().lower())
         # check for forbidden names
         if not authorized:
-            tkinter.messagebox.showinfo("add database attempt:", msg)
-            return False, "msg"
+            print("LOG : add database attempt failed:", msg)
+            return False, msg
+        # check if already exists
+        self.connectToDb("pollenisator")
+        if self.db.calendars.find_one({"nom": saveAsName.strip()}) is not None and askDeleteIfExists:
+            msg = "The database has not been overwritten choose a different name to save it."
+            return False, msg
+        # insert in database  calendars
+        self.connectToDb("pollenisator")
+        self.db.calendars.insert({"nom": saveAsName.strip()})
+        self.connectToDb(saveAsName.strip())
+        if autoconnect:
+            self.connectToDb(saveAsName.strip())
         else:
-            # check if already exists
-            self.connectToDb("pollenisator")
-            if self.db.calendars.find_one({"nom": saveAsName.strip()}) is not None and askDeleteIfExists:
-                authorized = tkinter.messagebox.askyesno(
-                    "Already exists", "A database already exists with that name, override (cannot be reversed)?")
-                if not authorized:
-                    msg = "The database has not been overwritten choose a different name to save it."
-                else:
-                    self.doDeleteCalendar(saveAsName.strip())
-            # If authorized to registered from previous tests
-            if authorized:
-                # insert in database  calendars
-                self.connectToDb("pollenisator")
-                self.db.calendars.insert({"nom": saveAsName.strip()})
-                self.connectToDb(saveAsName.strip())
-            else:
-                return False, msg
-            if autoconnect:
-                self.connectToDb(saveAsName.strip())
-            else:
-                self.connectToDb(oldConnection)
+            self.connectToDb(oldConnection)
         return True, "Success"
 
     def copyDb(self, ToCopyName="", fromCopyName=""):

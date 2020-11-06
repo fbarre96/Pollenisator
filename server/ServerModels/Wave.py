@@ -3,16 +3,23 @@ from core.Components.mongo import MongoCalendar
 from core.Models.Wave import Wave
 from server.ServerModels.Tool import ServerTool
 from server.ServerModels.Scope import ServerScope
+from server.ServerModels.Element import ServerElement
 from core.Components.Utils import JSONEncoder
 import json
 
 mongoInstance = MongoCalendar.getInstance()
 
-class ServerWave(Wave):
+class ServerWave(Wave, ServerElement):
 
-    def __init__(self, pentest, *args, **kwargs):
-        self.pentest = pentest
+    def __init__(self, pentest="", *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if pentest != "":
+            self.pentest = pentest
+        elif mongoInstance.calendarName != "":
+            self.pentest = mongoInstance.calendarName
+        else:
+            raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
+        mongoInstance.connectToDb(self.pentest)
 
     def addAllTool(self, command_name):
         """
@@ -67,12 +74,14 @@ def insert(pentest, data):
     existing = mongoInstance.find("waves", {"wave": wave_o.wave}, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
+    if "_id" in data:
+        del data["_id"]
     # Inserting scope
-    res_insert = mongoInstance.insert("waves", {"wave": self.wave, "wave_commands": list(self.wave_commands)})
+    res_insert = mongoInstance.insert("waves", {"wave": wave_o.wave, "wave_commands": list(wave_o.wave_commands)})
     ret = res_insert.inserted_id
     wave_o._id = ret
     for commName in wave_o.wave_commands:
-            wave_o.addAllTool(commName)
+        wave_o.addAllTool(commName)
     return {"res":True, "iid":ret}
 
 

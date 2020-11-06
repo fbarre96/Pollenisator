@@ -1,8 +1,8 @@
 """A plugin to parse nmap httpmethods scan"""
 
-from core.Models.Defect import Defect
-from core.Models.Ip import Ip
-from core.Models.Port import Port
+from server.ServerModels.Defect import ServerDefect
+from server.ServerModels.Ip import ServerIp
+from server.ServerModels.Port import ServerPort
 from core.plugins.plugin import Plugin
 import re
 
@@ -84,7 +84,7 @@ class HttpMethods(Plugin):
     def checkReturnCode(self, _returncode):
         return True
 
-    def Parse(self, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -97,7 +97,7 @@ class HttpMethods(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
-        notes = file_opened.read()
+        notes = file_opened.read().decode("utf-8")
         targets = {}
         tags = []
         if "| http-methods:" not in notes:
@@ -106,16 +106,16 @@ class HttpMethods(Plugin):
             notes)
         if host == "":
             return None, None, None, None
-        Ip().initialize(host).addInDb()
-        p_o = Port().initialize(host, port, proto, service)
-        res, iid = p_o.addInDb()
-        if not res:
-            p_o = Port.fetchObject({"_id": iid})
+        ServerIp().initialize(host).addInDb()
+        p_o = ServerPort().initialize(host, port, proto, service)
+        insert_res = p_o.addInDb()
+        if not insert_res["res"]:
+            p_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})
 
         p_o.updateInfos({"Methods": ", ".join(supported_methods)})
         targets[str(p_o.getId())] = {"ip": host, "port": port, "proto": proto}
         if "TRACE" in risky_methods:
-            Defect().initialize(host, port, proto, "Méthode TRACE activée", "Difficile", "Important", "Important",
+            ServerDefect().initialize(host, port, proto, "Méthode TRACE activée", "Difficile", "Important", "Important",
                                  "N/A", ["Socle"], notes="TRACE detected", proofs=[]).addInDb()
             risky_methods.remove("TRACE")
         if len(risky_methods) > 0:

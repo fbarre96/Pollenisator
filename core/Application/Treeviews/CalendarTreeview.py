@@ -269,8 +269,7 @@ class CalendarTreeview(PollenisatorTreeview):
             if collection == "defects":
                 view = self.getViewFromId(str(iid))
                 if view is not None:
-                    view.beforeDelete()
-                    self.appli.statusbar.notify([],view.controller.getTags())
+                    self.appli.statusbar.notify([], view.controller.getTags())
             try:
                 self.delete(ObjectId(iid))
             except tk.TclError:
@@ -409,7 +408,6 @@ class CalendarTreeview(PollenisatorTreeview):
                         "proto", None), lvl, commArgs, dated="None", datef="None", scanner_ip="None", notes="Arguments: "+commArgs)
                     tool.addInDb()
                     if tool is None:
-                        print("Tool already existing.")
                         return
                     self.mainApp.scanManager.launchTask(tool, parser, False, worker)
 
@@ -534,75 +532,75 @@ class CalendarTreeview(PollenisatorTreeview):
         for wave in waves:
             wave_o = WaveController(wave)
             wave_vw = WaveView(self, self.appli.viewframe, self.appli, wave_o)
-            wave_vw.addInTreeview(self.waves_node, True)
+            wave_vw.addInTreeview(self.waves_node, False)
             nbObjectTreated += 1
             if nbObjectTreated % onePercentNbObject == 0:
                 step += 1
                 dialog.update(step)
-        # scopes = Scope.fetchObjects({})
-        # for scope in scopes:
-        #     scope_o = ScopeController(scope)
-        #     scope_vw = ScopeView(self, self.appli.viewframe, self.appli, scope_o)
-        #     scope_vw.addInTreeview(None, False)
-        #     nbObjectTreated += 1
-        #     if nbObjectTreated % onePercentNbObject == 0:
-        #         step += 1
-        #         dialog.update(step)
-        # intervals = Interval.fetchObjects({})
-        # for interval in intervals:
-        #     interval_o = IntervalController(interval)
-        #     interval_vw = IntervalView(self, self.appli.viewframe, self.appli, interval_o)
-        #     interval_vw.addInTreeview(None, False)
-        #     nbObjectTreated += 1
-        #     if nbObjectTreated % onePercentNbObject == 0:
-        #         step += 1
-        #         dialog.update(step)
-        # Adding ip objects
+        scopes = Scope.fetchObjects({})
+        for scope in scopes:
+            scope_o = ScopeController(scope)
+            scope_vw = ScopeView(self, self.appli.viewframe, self.appli, scope_o)
+            scope_vw.addInTreeview(None, False)
+            nbObjectTreated += 1
+            if nbObjectTreated % onePercentNbObject == 0:
+                step += 1
+                dialog.update(step)
+        intervals = Interval.fetchObjects({})
+        for interval in intervals:
+            interval_o = IntervalController(interval)
+            interval_vw = IntervalView(self, self.appli.viewframe, self.appli, interval_o)
+            interval_vw.addInTreeview(None, False)
+            nbObjectTreated += 1
+            if nbObjectTreated % onePercentNbObject == 0:
+                step += 1
+                dialog.update(step)
+        #Adding ip objects
         self.ips_node = self.insert("", "end", str(
             "ips"), text="IPs", image=IpView.getClassIcon())
         ips = Ip.fetchObjects({})
         for ip in ips:
             ip_o = IpController(ip)
             ip_vw = IpView(self, self.appli.viewframe, self.appli, ip_o)
-            ip_vw.addInTreeview(None, True)
+            ip_vw.addInTreeview(None, False)
             self.appli.statusbar.notify(ip_vw.controller.getTags())
             nbObjectTreated += 1
             if nbObjectTreated % onePercentNbObject == 0:
                 step += 1
                 dialog.update(step)
         # Adding port objects
-        # ports = Port.fetchObjects({})
-        # for port in ports:
-        #     port_o = PortController(port)
-        #     port_vw = PortView(self, self.appli.viewframe, self.appli, port_o)
-        #     port_vw.addInTreeview(None, False)
-        #     self.appli.statusbar.notify(port_vw.controller.getTags())
-        #     nbObjectTreated += 1
-        #     if nbObjectTreated % onePercentNbObject == 0:
-        #         step += 1
-        #         dialog.update(step)
+        ports = Port.fetchObjects({})
+        for port in ports:
+            port_o = PortController(port)
+            port_vw = PortView(self, self.appli.viewframe, self.appli, port_o)
+            port_vw.addInTreeview(None, False)
+            self.appli.statusbar.notify(port_vw.controller.getTags())
+            nbObjectTreated += 1
+            if nbObjectTreated % onePercentNbObject == 0:
+                step += 1
+                dialog.update(step)
         # Adding defect objects
-        # defects = Defect.fetchObjects({"ip":{"$ne":""}})
-        # for defect in defects:
-        #     defect_o = DefectController(defect)
-        #     defect_vw = DefectView(
-        #         self, self.appli.viewframe, self.appli, defect_o)
-        #     defect_vw.addInTreeview(None)
-        #     nbObjectTreated += 1
-        #     if nbObjectTreated % onePercentNbObject == 0:
-        #         step += 1
-        #         dialog.update(step)
+        defects = Defect.fetchObjects({"ip":{"$ne":""}})
+        for defect in defects:
+            defect_o = DefectController(defect)
+            defect_vw = DefectView(
+                self, self.appli.viewframe, self.appli, defect_o)
+            defect_vw.addInTreeview(None)
+            nbObjectTreated += 1
+            if nbObjectTreated % onePercentNbObject == 0:
+                step += 1
+                dialog.update(step)
         # Adding tool objects
-        # tools = Tool.fetchObjects({})
-        # for tool in tools:
-        #     tool_o = ToolController(tool)
-        #     tool_vw = ToolView(self, self.appli.viewframe, self.appli, tool_o)
-        #     tool_vw.addInTreeview(None, False)
-        #     self.appli.statusbar.notify(tool_vw.controller.getTags())
-        #     nbObjectTreated += 1
-        #     if nbObjectTreated % onePercentNbObject == 0:
-        #         step += 1
-        #         dialog.update(step)
+        tools = Tool.fetchObjects({})
+        for tool in tools:
+            tool_o = ToolController(tool)
+            tool_vw = ToolView(self, self.appli.viewframe, self.appli, tool_o)
+            tool_vw.addInTreeview(None, False)
+            self.appli.statusbar.notify(tool_vw.controller.getTags())
+            nbObjectTreated += 1
+            if nbObjectTreated % onePercentNbObject == 0:
+                step += 1
+                dialog.update(step)
         self.sort(self.ips_node)
         self.appli.statusbar.update()
         dialog.destroy()

@@ -1,8 +1,6 @@
 """A plugin to parse smbmap scan"""
 
 from core.plugins.plugin import Plugin
-from core.Models.Ip import Ip
-from core.Models.Port import Port
 import re
 import csv
 
@@ -60,7 +58,7 @@ class SmbMap(Plugin):
         """
         return returncode == 0
 
-    def Parse(self, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
         Args:

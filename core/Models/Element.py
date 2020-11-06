@@ -168,8 +168,7 @@ class Element(object):
         if tagToDelete in tags:
             del tags[tags.index(tagToDelete)]
             notify = tagToDelete != "hidden"
-            apiclient.update(self.__class__.coll_name, {"_id": ObjectId(self._id)}, {
-                "$set": {"tags": tags}}, False, notify)
+            apiclient.update(self.__class__.coll_name, ObjectId(self._id), {"tags": tags}, False, notify)
 
     def setTags(self, tags):
         """Change all tags for the given new ones  and update database
@@ -178,8 +177,7 @@ class Element(object):
         """
         self.tags = tags
         apiclient = APIClient.getInstance()
-        apiclient.update(self.__class__.coll_name, {"_id": ObjectId(self._id)}, {
-            "$set": {"tags": tags}})
+        apiclient.update(self.__class__.coll_name, ObjectId(self._id), {"tags": tags})
 
     def getDetailedString(self):
         """To be inherited and overriden

@@ -6,7 +6,6 @@ from PIL import ImageTk, Image
 from paramiko.ssh_exception import SSHException
 from pymongo.errors import ServerSelectionTimeoutError, OperationFailure
 from core.Components.mongo import MongoCalendar
-from core.Components.FileStorage import FileStorage
 from core.Components.Utils import loadServerConfig, saveServerConfig, getValidMarkIconPath, getBadMarkIconPath, getWaitingMarkIconPath
 
 
@@ -156,29 +155,6 @@ class ChildDialogConnect:
         config["sftp_password"] = self.ent_password_sftp.get()
         return config
 
-    def trySFTP(self, config):
-        """Try to connect to the given host on the given sftp port with the given sftp_user/sftp_password
-        Args:
-            - config: A dictionnary with thoses values set : host, sftp_port, sftp_user, sftp_password
-        Returns:
-            - True if connected, False otherwaise
-        Raise:
-            - ValueError : if the host/port is correct but the authentication failed
-            - SSHException : from the paramiko.ssh_exception package if the host/port does not respond to an sftp connection.
-        """
-        fs = FileStorage(config)
-        try:
-            fs.open()
-        except SSHException as e:
-            # SSH unreachable
-            raise e
-        except ValueError as e:
-            # password incorrect
-            raise e
-        if fs.isConnected():
-            fs.close()
-            return True
-        return False
 
     def tryConnection(self, config):
         """Try to connect to the given host with mongo and with sftp.

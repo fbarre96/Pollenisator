@@ -36,7 +36,6 @@ from core.Models.Command import Command
 from core.Models.Scope import Scope
 from core.Models.Wave import Wave
 from core.Models.Interval import Interval
-from core.Components.FileStorage import FileStorage
 import core.Components.Modules
 
 
@@ -361,15 +360,6 @@ class Appli(ttk.Frame):
         self.wait_window(connectDialog.app)
         return connectDialog.rvalue
 
-    def getCentralizedFiles(self):
-        """Download from SFTP server all files of current database in local directory
-        """
-        fs = FileStorage()
-        fs.open()
-        fs.getResults()
-        fs.close()
-        tkinter.messagebox.showinfo(
-            "Centralization completed", "Files were download in results/")
 
     def submitIssue(self):
         """Open git issues in browser"""
@@ -465,8 +455,6 @@ class Appli(ttk.Frame):
                               command=self.resetUnfinishedTools)
         fileMenu2.add_command(label="Refresh (F5)",
                               command=self.refreshView)
-        fileMenu2.add_command(label="Get centralized files",
-                              command=self.getCentralizedFiles)
         fileMenu3 = tk.Menu(menubar, tearoff=0, background='#73B723', foreground='white', activebackground='#73B723', activeforeground='white')
         fileMenu3.add_command(label="Submit a bug or feature",
                               command=self.submitIssue)
@@ -969,19 +957,14 @@ class Appli(ttk.Frame):
         self.wait_window(dialog.app)
         if isinstance(dialog.rvalue, str):
             calendarName = dialog.rvalue
-            ret = tkinter.messagebox.askokcancel(
-                "Delete tools on server", "Do you also want to delete resulting tool files on server sftp ?")
-            if ret:
-                self.removeFiles(calendarName)
-
-            ret = tkinter.messagebox.askokcancel(
-                "The document will be deleted", "You are going to delete permanently the database \""+calendarName+"\". Are you sure ?")
-            if ret:
+            dialog = ChildDialogQuestion(
+                self, "Pentest deletion confirmation", "You are going to delete permanently the database \""+calendarName+"\". Are you sure ?")
+            self.wait_window(dialog.app)
+            if dialog.rvalue == "Yes":
                 apiclient.doDeletePentest(calendarName)
+                self.treevw.deleteState(calendarName)
 
-            self.treevw.deleteState(calendarName)
-
-    def newCalendar(self, calendarName):
+    def newCalendar(self, calendarName, pentest_type, start_date, end_date, scope, settings, pentesters):
         """
         Register the given calendar name into database and opens it.
 
@@ -991,7 +974,9 @@ class Appli(ttk.Frame):
         succeed = False
         if calendarName is not None:
             apiclient = APIClient.getInstance()
-            succeed = apiclient.registerPentest(calendarName)
+            succeed, msg = apiclient.registerPentest(calendarName, pentest_type, start_date, end_date, scope, settings, pentesters)
+            if not succeed:
+                tkinter.messagebox.showinfo("Forbidden", msg)
         return succeed
 
     def selectNewCalendar(self):
@@ -1012,65 +997,13 @@ class Appli(ttk.Frame):
                 scope = dialog.rvalue["scope"]
                 settings = dialog.rvalue["settings"]
                 pentesters = dialog.rvalue["pentesters"]
-                validCalendar = self.newCalendar(dbName)
+                validCalendar = self.newCalendar(dbName, pentest_type, start_date, end_date, scope, settings, pentesters)
                 if validCalendar:
+                    self.lastNotifReadTime = datetime.datetime.now()
                     self.openCalendar(dbName)
-                    dialog = ChildDialogInfo(
-                         self.parent, "New database created", "Database setup ...")
-                    dialog.show()
-                    self.prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings, pentesters)
-                    dialog.destroy()
-
-
             else:
                 return
-            
-
-    def prepareCalendar(self, dbName, pentest_type, start_date, end_date, scope, settings, pentesters):
-        """
-        Initiate a pentest database with wizard info
-        Args:
-            dbName: the database name
-            pentest_type: a pentest type choosen from settings pentest_types. Used to select commands that will be launched by default
-            start_date: a begining date and time for the pentest
-            end_date: ending date and time for the pentest
-            scope: a list of scope valid string (IP, network IP or host name)
-            settings: a dict of settings with keys:
-                * "Add domains whose IP are in scope": if 1, will do a dns lookup on new domains and check if found IP is in scope
-                * "Add domains who have a parent domain in scope": if 1, will add a new domain if a parent domain is in scope
-                * "Add all domains found":  Unsafe. if 1, all new domains found by tools will be considered in scope.
-        """
-        commands = Command.getList({"$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}]})
-        if not commands:
-            commandslist = Command.getList()
-            if not commandslist:
-                dialog = ChildDialogQuestion(self.parent, "No command found", "There is no registered command in the database. Would you like to import the default set?")
-                self.parent.wait_window(dialog.app)
-                if dialog.rvalue != "Yes":
-                    return
-                default = os.path.join(Utils.getMainDir(), "exports/pollenisator_commands.gzip")
-                res = self.importCommands(default)
-                if res:
-                    default = os.path.join(Utils.getMainDir(), "exports/pollenisator_group_commands.gzip")
-                    res = self.importCommands(default)
-            commands = Command.getList({"$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}]})
-        # Duplicate commands in local database
-        allcommands = Command.fetchObjects({})
-        for command in allcommands:
-            command.indb = APIClient.getInstance().getCurrentPentest()
-            command.addInDb()
-        Wave().initialize(dbName, commands).addInDb()
-        Interval().initialize(dbName, start_date, end_date).addInDb()
-        values = {"wave":dbName, "Scopes":scope, "Settings":False}
-        ScopeController(Scope()).doInsert(values)
-        self.settings.reloadSettings()
-        self.settings.db_settings["pentest_type"] = pentest_type
-        self.settings.db_settings["include_domains_with_ip_in_scope"] = settings['Add domains whose IP are in scope'] == 1
-        self.settings.db_settings["include_domains_with_topdomain_in_scope"] = settings["Add domains who have a parent domain in scope"] == 1
-        self.settings.db_settings["include_all_domains"] = settings["Add all domains found"] == 1
-        self.settings.db_settings["pentesters"] = list(map(lambda x: x.strip(), pentesters.split("\n")))
-        self.settings.savePentestSettings()
-
+    
     def openCalendar(self, filename=""):
         """
         Open the given database name. Loads it in treeview.

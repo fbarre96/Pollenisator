@@ -1,7 +1,7 @@
 """A plugin to parse python reverse lookup scan"""
 
 from core.plugins.plugin import Plugin
-from core.Models.Ip import Ip
+from server.ServerModels.Ip import ServerIp
 import re
 
 
@@ -53,7 +53,7 @@ class PythonReverseLookup(Plugin):
     def checkReturnCode(self, _returncode):
         return True
 
-    def Parse(self, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -69,15 +69,15 @@ class PythonReverseLookup(Plugin):
         notes = ""
         tags = []
         targets = {}
-        result_socket = file_opened.read()
+        result_socket = file_opened.read().decode("utf-8")
         domain, ip = parse_reverse_python(result_socket)
         if domain is None:
             return None, None, None, None
-        Ip().initialize(domain).addInDb()
-        ip_m = Ip().initialize(ip)
-        res, iid = ip_m.addInDb()
-        if not res:
-            ip_m = Ip.fetchObject({"_id": iid})
+        ServerIp().initialize(domain).addInDb()
+        ip_m = ServerIp().initialize(ip)
+        insert_res = ip_m.addInDb()
+        if not insert_res["res"]:
+            ip_m = ServerIp.fetchObject(pentest, {"_id": insert_res["iid"]})
         hostnames = list(set(ip_m.infos.get("hostname", []) + [domain]))
         ip_m.updateInfos({"hostname": hostnames})
         targets["ip"] = {"ip": ip}

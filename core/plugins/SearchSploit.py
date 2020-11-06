@@ -1,8 +1,6 @@
 """A plugin to parse python reverse searchsploit scan"""
 
 import re
-from core.Models.Ip import Ip
-from core.Models.Port import Port
 from core.plugins.plugin import Plugin
 from pprint import pprint
 import json
@@ -41,7 +39,7 @@ class SearchSploit(Plugin):
         """
         return returncode == 0
 
-    def Parse(self, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -55,7 +53,7 @@ class SearchSploit(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         tags = []
-        notes = file_opened.read()
+        notes = file_opened.read().decode("utf-8")
         try:
             jsonFile = json.loads(notes)
             if jsonFile.get("RESULTS_EXPLOIT", None) is None or jsonFile.get("RESULTS_SHELLCODE", None) is None:

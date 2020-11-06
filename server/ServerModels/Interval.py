@@ -2,25 +2,58 @@ from bson import ObjectId
 from core.Components.mongo import MongoCalendar
 from core.Models.Interval import Interval
 from server.ServerModels.Tool import ServerTool
-from core.Components.Utils import JSONEncoder
+from core.Components.Utils import JSONEncoder, fitNowTime
 import json
 
 mongoInstance = MongoCalendar.getInstance()
 
 class ServerInterval(Interval):
 
-    def __init__(self, pentest, *args, **kwargs):
-        self.pentest = pentest
+    def __init__(self, pentest="", *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        if pentest != "":
+            self.pentest = pentest
+        elif mongoInstance.calendarName != "":
+            self.pentest = mongoInstance.calendarName
+        else:
+            raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
+        mongoInstance.connectToDb(self.pentest)
+            
     def setToolsInTime(self):
         """Get all OOT (Out of Time) tools in this wave and checks if this Interval makes them in time. 
         If it is the case, set them in time.
         """
-        if Utils.fitNowTime(self.dated, self.datef):
+        if fitNowTime(self.dated, self.datef):
             tools = ServerTool.fetchObjects(self.pentest, {"wave": self.wave, "status": "OOT"})
             for tool in tools:
                 tool.setInTime()
+    
+    def getParentId(self):
+        """
+        Return the mongo ObjectId _id of the first parent of this object. For an interval it is the wave.
+
+        Returns:
+            Returns the parent wave's ObjectId _id".
+        """
+        mongoInstance.connectToDb(self.pentest)
+        return mongoInstance.find("waves", {"wave": self.wave}, False)["_id"]
+
+    @classmethod
+    def fetchObjects(cls, pentest, pipeline):
+        """Fetch many commands from database and return a Cursor to iterate over model objects
+        Args:
+            pipeline: a Mongo search pipeline (dict)
+        Returns:
+            Returns a cursor to iterate on model objects
+        """
+        mongoInstance.connectToDb(pentest)
+        ds = mongoInstance.find(cls.coll_name, pipeline, True)
+        if ds is None:
+            return None
+        for d in ds:
+            # disabling this error as it is an abstract function
+            yield cls(pentest, d)  #  pylint: disable=no-value-for-parameter
+
 
 def delete(pentest, interval_iid):
     mongoInstance.connectToDb(pentest)
@@ -49,6 +82,8 @@ def delete(pentest, interval_iid):
 
 def insert(pentest, data):
     mongoInstance.connectToDb(pentest)
+    if "_id" in data:
+        del data["_id"]
     interval_o = ServerInterval(pentest, data)
     parent = interval_o.getParentId()
     ins_result = mongoInstance.insert("intervals", data, parent)

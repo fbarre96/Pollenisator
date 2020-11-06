@@ -4,7 +4,6 @@ import os
 from bson.objectid import ObjectId
 from core.Models.Element import Element
 from core.Components.apiclient import APIClient
-from core.Components.FileStorage import FileStorage
 
 
 class Defect(Element):
@@ -37,9 +36,9 @@ class Defect(Element):
                         valuesFromDb.get(
                             "risk", ""), valuesFromDb.get("redactor", "N/A"), list(valuesFromDb.get("type", [])),
                         valuesFromDb.get("notes", ""), valuesFromDb.get("proofs", []), valuesFromDb.get("infos", {}),
-                        valuesFromDb.get("index", None))
+                        int(valuesFromDb.get("index", 0)))
 
-    def initialize(self, ip, port, proto, title="", ease="", impact="", risk="", redactor="N/A", mtype=None, notes="", proofs=None, infos=None, index=None):
+    def initialize(self, ip, port, proto, title="", ease="", impact="", risk="", redactor="N/A", mtype=None, notes="", proofs=None, infos=None, index=0):
         """Set values of defect
         Args:
             ip: defect will be assigned to this IP, can be empty
@@ -70,7 +69,7 @@ class Defect(Element):
         self.proto = proto
         self.infos = infos if infos is not None else {}
         self.proofs = proofs if proofs is not None else []
-        self.index = index
+        self.index = int(index)
         return self
 
     @classmethod
@@ -113,7 +112,7 @@ class Defect(Element):
         base["type"] = list(self.mtype)
         base["proofs"] = self.proofs
         if self.index is not None:
-            base["index"] = self.index
+            base["index"] = int(self.index)
         res, id = apiclient.insert("defects", base)
         if not res:
             return False, id
@@ -131,7 +130,7 @@ class Defect(Element):
         if pipeline_set is None:
             apiclient.update("defects", ObjectId(self._id), {"ip": self.ip, "title": self.title, "port": self.port,
                          "proto": self.proto, "notes": self.notes, "ease": self.ease, "impact": self.impact,
-                         "risk": self.risk, "redactor": self.redactor, "type": list(self.mtype), "proofs": self.proofs, "infos": self.infos, "index":self.index})
+                         "risk": self.risk, "redactor": self.redactor, "type": list(self.mtype), "proofs": self.proofs, "infos": self.infos, "index":int(self.index)})
         else:
             apiclient.update("defects", ObjectId(self._id), pipeline_set)
 
@@ -146,6 +145,7 @@ class Defect(Element):
             port = self.port
         except AttributeError:
             port = None
+        
         apiclient = APIClient.getInstance()
         if port is None:
             port = ""
@@ -179,42 +179,34 @@ class Defect(Element):
         Returns:
             the basename of the file 
         """
-        fs = FileStorage()
-        fs.open()
-        remote_dirpath = self.calcDirPath()
-        fs.putProof(proof_local_path, remote_dirpath)
-        fs.close()
+        apiclient = APIClient.getInstance()
+        apiclient.putProof(self._id, proof_local_path)
         return os.path.basename(proof_local_path)
 
-    def getProof(self, index):
+    def getProof(self, ind):
         """Download the proof file at given proof index
-        Args:
-            index: an integer refering to self.proofs list. The proof to be downloaded.
         Returns:
             A string giving the local path of the downloaded proof
         """
-        ret = None
-        fs = FileStorage()
-        fs.open()
-        remote_dirpath = self.calcDirPath()
-        ret = fs.getProof(remote_dirpath+"/"+self.proofs[index])
-        fs.close()
+        apiclient = APIClient.getInstance()
+        current_dir = os.path.dirname(os.path.realpath(__file__))
+        local_path = os.path.join(current_dir, "../../results", self.calcDirPath())
+        try:
+            os.makedirs(local_path)
+        except FileExistsError:
+            pass
+        local_path = os.path.join(local_path, self.proofs[ind])
+        ret = apiclient.getProof(self._id, self.proofs[ind], local_path)
         return ret
 
-    def removeProof(self, index):
+    def removeProof(self, ind):
         """Removes the proof file at given proof index
-        Args:
-            index: an integer refering to self.proofs list. The proof to be removed.
         """
-        fs = FileStorage()
-        fs.open()
-        remote_dirpath = self.calcDirPath()
-        fs.rmProof(remote_dirpath+"/"+self.proofs[index])
-        fs.close()
-        self.proofs.remove(self.proofs[index])
-        self.update()
-
-    
+        apiclient = APIClient.getInstance()
+        filename = self.proofs[ind]
+        ret = apiclient.rmProof(self._id, filename)
+        del self.proofs[ind]
+        return ret
 
     def __str__(self):
         """

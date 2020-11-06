@@ -4,15 +4,23 @@ from core.Models.Scope import Scope
 from server.ServerModels.Tool import delete as tool_delete
 from server.ServerModels.Tool import ServerTool
 from server.ServerModels.Ip import ServerIp
+from server.ServerModels.Element import ServerElement
 from core.Components.Utils import JSONEncoder, isNetworkIp, performLookUp, isIp
 import json
 
 mongoInstance = MongoCalendar.getInstance()
 
-class ServerScope(Scope):
-    def __init__(self, pentest, *args, **kwargs):
-        self.pentest = pentest
+class ServerScope(Scope, ServerElement):
+    
+    def __init__(self, pentest="", *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if pentest != "":
+            self.pentest = pentest
+        elif mongoInstance.calendarName != "":
+            self.pentest = mongoInstance.calendarName
+        else:
+            raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
+        mongoInstance.connectToDb(self.pentest)
 
     def getParentId(self):
         mongoInstance.connectToDb(self.pentest)
@@ -105,6 +113,8 @@ def insert(pentest, data):
     existing = mongoInstance.find("scopes", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
+    if "_id" in data:
+        del data["_id"]
     # Inserting scope
     parent = scope_o.getParentId()
     res_insert = mongoInstance.insert("scopes", base, parent)
