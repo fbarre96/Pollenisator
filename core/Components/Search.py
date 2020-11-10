@@ -155,7 +155,6 @@ every ip starting as 1.2    || ip:1\.2\..* class:ip"""
             mongoLine[key] = val
         found_res = apiclient.find(
             Search.classes[self.coll]["collection"], mongoLine)
-        print("Searchinging in "+str(self.coll)+" mogoline:"+str(mongoLine))
         ret = []
         for found in found_res:
             view_cls = Search.classes[self.coll]["view"]

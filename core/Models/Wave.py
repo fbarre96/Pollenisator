@@ -140,20 +140,7 @@ class Wave(Element):
                 return True
         return False
 
-    @classmethod
-    def searchForAddressCompatibleWithTime(cls):
-        """
-        Return a list of wave which have at least one interval fitting the actual time.
-
-        Returns:
-            A set of wave name
-        """
-        waves_to_launch = set()
-        intervals = Interval.fetchObjects({})
-        for intervalModel in intervals:
-            if Utils.fitNowTime(intervalModel.dated, intervalModel.datef):
-                waves_to_launch.add(intervalModel.wave)
-        return waves_to_launch
+    
 
     @classmethod
     def listWaves(cls):
@@ -168,23 +155,4 @@ class Wave(Element):
             ret.append(wave["wave"])
         return ret
 
-    @classmethod
-    def getNotDoneTools(cls, waveName):
-        """Returns a set of tool mongo ID that are not done yet.
-        """
-        notDoneTools = set()
-        apiclient = APIClient.getInstance()
-        tools = apiclient.find("tools", {
-                                   "wave": waveName, "ip": "", "scanner_ip": "None", "dated": "None", "datef": "None"})
-        for tool in tools:
-            notDoneTools.add(tool["_id"])
-        scopes = Scope.fetchObjects({"wave": waveName})
-        for scope in scopes:
-            scopeId = scope.getId()
-            ips = Ip.getIpsInScope(scopeId)
-            for ip in ips:
-                tools = apiclient.find("tools", {
-                                           "wave": waveName, "ip": ip.ip, "scanner_ip": "None", "dated": "None", "datef": "None"})
-                for tool in tools:
-                    notDoneTools.add(tool["_id"])
-        return notDoneTools
+  

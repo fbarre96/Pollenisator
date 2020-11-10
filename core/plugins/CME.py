@@ -125,7 +125,7 @@ def editScopeIPs(pentest, hostsInfos):
                 infos["port"]), "tcp", "netbios-ssn")
             insert_ret = port_m.addInDb()
             if not insert_ret["res"]:
-                port_m = ServerPort.fetchObject(pentest{"_id": insert_ret["iid"]})
+                port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
             port_m.updateInfos(infosToAdd)
             if infos.get("powned", False):
                 port_m.addTag("P0wned!")

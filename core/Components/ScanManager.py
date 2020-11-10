@@ -20,7 +20,6 @@ class ScanManager:
     def __init__(self, nbk, linkedTreeview, calendarToScan, settings):
         self.calendarToScan = calendarToScan
         self.nbk = nbk
-        self.running_auto_scans = []
         self.settings = settings
         self.btn_autoscan = None
         
@@ -63,7 +62,7 @@ class ScanManager:
         for children in self.scanTv.get_children():
             self.scanTv.delete(children)
         for running_scan in running_scans:
-            self.scanTv.insert('','end', running_scan.getId(), text=running_scan.name, values=(running_scan.dated), image=self.ok_icon)
+            self.scanTv.insert('','end', running_scan.getId(), text=running_scan.name, values=(running_scan.dated), image=self.running_icon)
         for children in self.workerTv.get_children():
             self.workerTv.delete(children)
         registeredCommands = set()
@@ -83,7 +82,7 @@ class ScanManager:
             for command in commands_registered:
                 try:
                     self.workerTv.insert(
-                        worker_node, 'end', command, text=command, image=self.tool_icon)
+                        worker_node, 'end', 'registered|'+command, text=command, image=self.tool_icon)
                 except tk.TclError:
                     pass
                 registeredCommands.add(str(command))
@@ -101,7 +100,7 @@ class ScanManager:
                     except tk.TclError:
                         pass
         if len(registeredCommands) > 0 and self.btn_autoscan is None:
-            if self.running_auto_scans:
+            if apiclient.getAutoScanStatus():
                 self.btn_autoscan = ttk.Button(
                     self.parent, text="Stop Scanning", command=self.stopAutoscan)
                 self.btn_autoscan.pack()
@@ -172,10 +171,10 @@ class ScanManager:
         self.scanTv.bind("<Double-Button-1>", self.OnDoubleClick)
         running_scans = Tool.fetchObjects({"status":"running"})
         for running_scan in running_scans:
-            self.scanTv.insert('','end', running_scan.getId(), text=running_scan.name, values=(running_scan.dated), image=self.ok_icn)
+            self.scanTv.insert('','end', running_scan.getId(), text=running_scan.name, values=(running_scan.dated), image=self.running_icon)
         #### BUTTONS FOR AUTO SCANNING ####
         if total_registered_commands > 0:
-            if self.running_auto_scans:
+            if apiclient.getAutoScanStatus():
                 self.btn_autoscan = ttk.Button(
                     self.parent, text="Stop Scanning", command=self.stopAutoscan)
                 self.btn_autoscan.pack()
@@ -212,8 +211,8 @@ class ScanManager:
         except tk.TclError:
             pass
         print("Stopping auto... ")
-        for task in self.running_auto_scans:
-            task.revoke(terminate=True)
+        apiclient = APIClient.getInstance()
+        apiclient.sendStopAutoScan()
 
     def parseFiles(self):
         """
@@ -267,6 +266,7 @@ class ScanManager:
             thread = multiprocessing.Process(target=executeCommand, args=(
                 apiclient.getCurrentPentest(), str(launchableToolId), parser))
             thread.start()
+            print("Mark as running tool "+str(toolModel))
             toolModel.markAsRunning(worker)
 
         else:

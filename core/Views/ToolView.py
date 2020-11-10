@@ -306,14 +306,15 @@ class ToolView(ViewElement):
             _event: Automatically generated with a button Callback, not used.
         """
         apiclient = APIClient.getInstance()
-        success = apiclient.sendStopTask(self.controller.getData())
+        success = apiclient.sendStopTask(self.controller.model.getId())
         delete_anyway = False
         if success == False:
             delete_anyway = tkinter.messagebox.askyesno(
                 "Stop failed", """This tool cannot be stopped because its trace has been lost (The application has been restarted and the tool is still not finished).\n
                     Reset tool anyway?""")
-        if delete_anyway or success:
-            self.controller.markAsNotDone()
+        if delete_anyway:
+            success = apiclient.sendStopTask(self.controller.model.getId(), True)
+        if success:
             self.form.clear()
             for widget in self.appliViewFrame.winfo_children():
                 widget.destroy()

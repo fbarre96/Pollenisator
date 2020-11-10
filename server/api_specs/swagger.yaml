@@ -317,6 +317,85 @@ paths:
         200:
           description: "Successful count command"
 
+  /dumpDb/{dbName}:
+    get:
+      operationId: "server.mongo.dumpDb"
+      tags:
+        - "Mongo"
+      summary: "Dump a database as an archive"
+      parameters:
+        - name: dbName
+          in: path
+          type: string
+          required: true
+        - name: collection
+          in: query
+          type: string
+          required: false
+          default: ''
+      responses:
+        200:
+          description: "archive content"
+
+  /importDb:
+    post:
+      operationId: "server.mongo.importDb"
+      tags:
+        - "Mongo"
+      summary: "Import an existing database file"
+      consumes:
+        - multipart/form-data
+      parameters:
+        - name: upfile
+          in: formData
+          type: file
+          description: The file to upload
+          required: true
+      responses:
+        200:
+          description: "Successfully imported the file"
+
+  /importCommands:
+    post:
+      operationId: "server.mongo.importCommands"
+      tags:
+        - "Mongo"
+      summary: "Import an existing command database file"
+      consumes:
+        - multipart/form-data
+      parameters:
+        - name: upfile
+          in: formData
+          type: file
+          description: The file to upload
+          required: true
+      responses:
+        200:
+          description: "Successfully imported the file"
+
+  /copyDb:
+    post:
+      operationId: "server.mongo.copyDb"
+      tags:
+        - "Mongo"
+      summary: "Duplicate a database"
+      parameters:
+        - name: data
+          in: body
+          schema:
+            type: object
+            required:
+              - fromDb
+              - toDb
+            properties:
+              fromDb:
+                type: string
+              toDb:
+                type: string
+      responses:
+        200:
+          description: "Successfully imported the file"
+
   /aggregate/{pentest}/{collection}:
     post:
       operationId: "server.mongo.aggregate"
@@ -472,7 +551,7 @@ paths:
       operationId: "server.mongo.fetchNotifications"
       tags:
         - "Notification"
-      summary: "Return notifications documents from database"
+      summary: "Return notifications documents from database, also used as keep alive method"
       parameters:
         - name: pentest
           in: path
@@ -485,39 +564,6 @@ paths:
       responses:
         200:
           description: "Successful read notifications operation"
-  /notification:
-    post:
-      operationId: "server.mongo.pushNotification"
-      tags:
-        - "Notification"
-      summary: "Create a notification  in database"
-      parameters:
-        - name: data
-          in: body
-          schema:
-            type: object
-            required:
-              - pentest
-              - collection
-              - iid
-              - action
-            properties:
-              pentest:
-                type: string
-              collection:
-                type: string
-              iid:
-                type: string
-              action:
-                type: string
-                enum: [insert, update, delete]
-              parentId:
-                type: string
-                default: ""
-      responses:
-        200:
-          description: "Successful write notification operation"
-
   /settings/add:
     post: 
       operationId: "server.mongo.createSetting"
@@ -699,32 +745,6 @@ paths:
               updatedExisting:
                 type: boolean
 
-  /workers/{name}/updateHeartbeat:
-    put:
-      operationId: "server.worker.updateHeartbeat"
-      tags:
-        - "Worker"
-      summary: "Update a worker last heart beat sent"
-      parameters:
-        - name: name
-          in: path
-          type: string
-          required: true
-      responses:
-        200:
-          description: "Successful update of worker excluded database"
-          schema:
-            type: "object"
-            properties:
-              n:
-                type: integer
-              nModifider:
-                type: integer
-              ok:
-                type: integer
-              updatedExisting:
-                type: boolean
-
   /workers/register/:
     post:
       operationId: "server.worker.registerWorker"
@@ -772,6 +792,36 @@ paths:
             type: array
             items:
               type: string
+      responses:
+        200:
+          description: "Successful update of worker registed commands"
+  
+  /workers/{name}/setCommandConfig:
+    put:
+      operationId: "server.worker.setCommandConfig"
+      tags:
+        - "Worker"
+      summary: "Set a worker registered command plugin and bin path"
+      parameters:
+        - name: name
+          in: path
+          type: string
+          required: true
+        - name: data
+          in: body
+          schema:
+            type: object
+            required:
+              - command_name
+              - remote_bin
+              - plugin
+            properties:
+              command_name:
+                type: string
+              remote_bin:
+                type: string
+              plugin:
+                type: string
       responses:
         200:
           description: "Successful update of worker registed commands"
@@ -1687,3 +1737,78 @@ paths:
       responses:
         200:
           description: "Successfully launched task"
+  
+  /tools/{pentest}/stopTask/{tool_iid}:
+    post:
+      operationId: "server.ServerModels.Tool.stopTask"
+      tags:
+        - "Tools"
+      summary: "Try to stop a tool"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: tool_iid
+          in: path
+          type: string
+          description: tool id to stop
+          required: true
+        - name: data
+          in: body
+          schema:
+            type: object
+            properties:
+              forceReset:
+                type: boolean
+                default: false
+      responses:
+        200:
+          description: "Successfully stopped task"
+
+  /autoscan/{pentest}/start:
+    post:
+      operationId: "server.AutoScanMaster.startAutoScan"
+      tags:
+        - "Auto scan"
+      summary: "Start an automatic scan"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+      responses:
+        200:
+          description: "Successfully started auto scan"
+  /autoscan/{pentest}/status:
+    get:
+      operationId: "server.AutoScanMaster.getAutoScanStatus"
+      tags:
+        - "Auto scan"
+      summary: "Returns status of automatic scan"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+      responses:
+        200:
+          description: "Successfully returned status of auto scan"
+  /autoscan/{pentest}/stop:
+    post:
+      operationId: "server.AutoScanMaster.stopAutoScan"
+      tags:
+        - "Auto scan"
+      summary: "Stop an automatic scan"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+      responses:
+        200:
+          description: "Successfully stoped auto scan"

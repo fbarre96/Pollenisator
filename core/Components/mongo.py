@@ -210,11 +210,9 @@ class MongoCalendar:
                 "name": worker_name}, False)
             worker_shortname = worker_name.split("@")[0]
             if res is not None:
-                print("UPDATE COMMANDS")
                 self.updateInDb("pollenisator", "workers",
                                 {"name": worker_name}, {"$set": {"registeredCommands": command_names}}, False, True)
             else:
-                print("INSERT COMMANDS")
                 self.insertInDb("pollenisator", "workers", {
                     "name": worker_name, "shortname": worker_shortname, "registeredCommands": command_names, "last_heartbeat":datetime.datetime.now(), "excludedDatabases":[]}, '', True)
             print("Registered commands "+str(command_names) +
@@ -644,40 +642,34 @@ class MongoCalendar:
             self.connectToDb(oldConnection)
         return True, "Success"
 
-    def copyDb(self, ToCopyName="", fromCopyName=""):
+    def copyDb(self, fromCopyName, toCopyName):
         """
         Copy a database.
 
         Args:
-            ToCopyName: the output calendar will have this name. If default empty string is given, a user window prompt will be used.
+            toCopyName: the output calendar will have this name. If default empty string is given, a user window prompt will be used.
             fromCopyName: the calendar name to be copied. If default empty string is given, the opened calendar will be used.
-
-        Returns:
-            Returns the output database name or None if the copy failed.
         """
-        if self.calendarName is None and fromCopyName == "":
-            tkinter.messagebox.showinfo(
-                "Copy database failed:", "You must open a database before duplicating it.")
-            return None
-        if fromCopyName == "" and self.calendarName is not None:
-            fromCopyName = self.calendarName
-        if ToCopyName == "":
-            ToCopyName = tkinter.simpledialog.askstring(
-                "Copy name", "New copy of "+fromCopyName+" database name :")
-        if ToCopyName is not None:
-            succeed = self.registerCalendar(
-                ToCopyName, True, True)
+        if fromCopyName == "":
+            return "database to copy : empty name", 400
+        if toCopyName == "":
+            return "database destination name is empty", 400
+        if fromCopyName not in self.listCalendars():
+            return "database to copy : not found", 404
+        major_version = ".".join(self.client.server_info()["version"].split(".")[:2])
+        if float(major_version) < 4.2:
+            succeed, msg = self.registerCalendar(
+                toCopyName, True, True)
             if succeed:
                 self.client.admin.command('copydb',
                                           fromdb=fromCopyName,
-                                          todb=ToCopyName)
+                                          todb=toCopyName)
             else:
-                return None
-
-            return ToCopyName
+                return msg, 403
+            return "Success", 200
         else:
-            tkinter.messagebox.showinfo("Copy database canceled", "Canceled.")
-            return None
+            outpath = self.dumpDb(fromCopyName)
+            return self.importDatabase(outpath, nsFrom=fromCopyName, nsTo=toCopyName)
 
     def dumpDb(self, dbName, collection=""):
         """
@@ -695,15 +687,16 @@ class MongoCalendar:
         connectionString = '' if self.user == '' else "-u "+self.user + \
             " -p "+self.password + " --authenticationDatabase admin "
         cmd = "mongodump "+connectionString+"--host " + \
-            self.host+"  --db "+dbName+" --archive="+out_path+".gzip --gzip"
+            self.host+"  --db "+dbName+" --archive="+out_path+".gz --gzip"
         if collection.strip() != "":
             cmd += " -c "+str(collection).strip()
         if self.ssl == "True":
             cmd += " --ssl --sslPEMKeyFile "+self.ssldir+"/client.pem --sslCAFile " + \
                 self.ssldir+"/ca.pem --sslAllowInvalidHostnames"
         execute(cmd)
+        return out_path+".gz"
 
-    def importDatabase(self, filename):
+    def importDatabase(self, filename, **kwargs):
         """
         Import a database dump into a calendar database.
             It uses the mongorestore utily installed with mongodb-org-tools
@@ -715,8 +708,9 @@ class MongoCalendar:
             returns True if the import is successfull, False
         """
         from core.Components.Utils import execute
-        success = self.registerCalendar(os.path.splitext(
-            os.path.basename(filename))[0], True, False)
+        if kwargs.get("nsTo", None) is not None:
+            toDbName = kwargs.get("nsTo")
+        success, msg = self.registerCalendar(toDbName, True, False)
         if success:
             connectionString = '' if self.user == '' else "-u "+self.user + \
                 " -p "+self.password + " --authenticationDatabase admin "
@@ -725,8 +719,10 @@ class MongoCalendar:
             if self.ssl == "True":
                 cmd += " --ssl --sslPEMKeyFile "+self.ssldir+"/client.pem --sslCAFile " + \
                     self.ssldir+"/ca.pem --sslAllowInvalidHostnames"
-            execute(cmd, None, False)
-        return success
+            if kwargs.get("nsFrom", None) is not None and kwargs.get("nsTo", None) is not None:
+                cmd += " --nsFrom='"+kwargs.get("nsFrom")+".*' --nsTo='"+toDbName+".*'"
+            execute(cmd, None, True)
+        return msg, 200 if success else 403
 
     def importCommands(self, filename):
         """
@@ -749,6 +745,7 @@ class MongoCalendar:
         if self.ssl == "True":
             cmd += " --ssl --sslPEMKeyFile "+self.ssldir+"/client.pem --sslCAFile " + \
                 self.ssldir+"/ca.pem --sslAllowInvalidHostnames"
+        
 
         execute(cmd, None, False)
         return True

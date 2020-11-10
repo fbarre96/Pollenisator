@@ -366,18 +366,6 @@ class Appli(ttk.Frame):
         import webbrowser
         webbrowser.open_new_tab("https://github.com/AlgoSecure/Pollenisator/issues")
 
-    def removeFiles(self, calendarName):
-        """Open git issues in browser
-        Args:
-            calendarName: database name to be removed.
-        """
-        fs = FileStorage()
-        fs.open()
-        fs.rmDbResults(calendarName.strip())
-        fs.rmDbProofs(calendarName.strip())
-        fs.close()
-        tkinter.messagebox.showinfo(
-            "Deleting tool", "Files were removed on sftp for "+str(calendarName))
 
     def readNotifications(self):
         """
@@ -858,7 +846,11 @@ class Appli(ttk.Frame):
         dialog = ChildDialogCombo(self, apiclient.getPentestList()[::-1], "Choose a pentest to dump:")
         self.wait_window(dialog.app)
         if isinstance(dialog.rvalue, str):
-            apiclient.dumpDb(dialog.rvalue)
+            success, msg = apiclient.dumpDb(dialog.rvalue)
+            if not success:
+                tkinter.messagebox.showerror("Database export error", msg)
+            else:
+                tkinter.messagebox.showinfo("Database export completed", msg)
 
     def exportCommands(self):
         """
@@ -868,7 +860,7 @@ class Appli(ttk.Frame):
         apiclient.dumpDb("pollenisator", "commands")
         apiclient.dumpDb("pollenisator", "group_commands")
         tkinter.messagebox.showinfo(
-            "Export pollenisator database", "Export completed in exports/pollenisator_commands.gzip and exports/pollenisator_group_commands.gzip")
+            "Export pollenisator database", "Export completed in exports/pollenisator_commands.gz and exports/pollenisator_group_commands.gz")
 
     def importCalendar(self, name=None):
         """
@@ -879,13 +871,18 @@ class Appli(ttk.Frame):
         apiclient = APIClient.getInstance()
         filename = ""
         if name is None:
-            f = tkinter.filedialog.askopenfilename(defaultextension=".gzip")
+            f = tkinter.filedialog.askopenfilename(defaultextension=".gz")
             if f is None:  # asksaveasfile return `None` if dialog closed with "cancel".
                 return
             filename = str(f)
         else:
             filename = name
-        apiclient.importDatabase(filename)
+        success = apiclient.importDb(filename)
+        if not success:
+            tkinter.messagebox.showerror("Database import ", "Database import suceeded")
+        else:
+            tkinter.messagebox.showinfo("Database import ", "Database import failed")
+
 
     def importCommands(self, name=None):
         """
@@ -899,7 +896,7 @@ class Appli(ttk.Frame):
         """
         filename = ""
         if name is None:
-            f = tkinter.filedialog.askopenfilename(defaultextension=".gzip")
+            f = tkinter.filedialog.askopenfilename(defaultextension=".gz")
             if f is None:  # asksaveasfile return `None` if dialog closed with "cancel".
                 return
             filename = str(f)
@@ -907,15 +904,17 @@ class Appli(ttk.Frame):
             filename = name
         try:
             apiclient = APIClient.getInstance()
-            apiclient.importCommands(filename)
+            success = apiclient.importCommands(filename)
             self.commandsTreevw.refresh()
         except IOError:
             tkinter.messagebox.showerror(
                 "Import commands", "Import failed. "+str(filename)+" was not found or is not a file.")
             return False
-        tkinter.messagebox.showinfo(
-            "Import commands", "Import of "+filename+" completed")
-        return True
+        if not success:
+            tkinter.messagebox.showerror("Command import", "Command import failed")
+        else:
+            tkinter.messagebox.showinfo("Command import", "Command import completed")
+        return success
 
     def onExit(self):
         """
@@ -1041,7 +1040,9 @@ class Appli(ttk.Frame):
             _event: not used but mandatory
         """
         apiclient = APIClient.getInstance()
-        apiclient.copyDb()
+        toCopyName = tkinter.simpledialog.askstring(
+                "Copy name", "New copy of "+apiclient.getCurrentPentest()+" database name :")
+        apiclient.copyDb(apiclient.getCurrentPentest(), toCopyName)
 
     def importExistingTools(self, _event=None):
         """

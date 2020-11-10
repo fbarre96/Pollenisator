@@ -1,8 +1,12 @@
 import json
+import os
 from bson import ObjectId
 from datetime import datetime
+from flask import send_file
+import tempfile
+import shutil
 from core.Components.mongo import MongoCalendar
-from core.Components.Utils import JSONDecoder
+from core.Components.Utils import JSONDecoder, getMainDir
 from core.Controllers.CommandController import CommandController
 from core.Controllers.WaveController import WaveController
 from core.Controllers.IntervalController import IntervalController
@@ -58,7 +62,6 @@ def insert(pentest, collection, data):
 def find(pentest, collection, data):
     pipeline = data["pipeline"]
     if isinstance(pipeline, str):
-        print(str(pipeline))
         pipeline = json.loads(pipeline, cls=JSONDecoder)
     if not isinstance(pipeline, dict):
         return "Pipeline argument was not valid", 400
@@ -99,10 +102,6 @@ def fetchNotifications(pentest, fromTime):
         return []
     return [n for n in res]
 
-def pushNotification(data):
-    mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.insertInDb("pollenisator", "notifications", {"db":data["pentest"], "collection":data["collection"], "iid":data["iid"], "action":data["action"], "parentId":data["parentId"], "time":datetime.now()}, False)
-    
 def aggregate(pentest, collection, pipelines):
     ret = []
     if pentest == "pollenisator":
@@ -175,10 +174,10 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     if not commands:
         commandslist = ServerCommand.getList()
         if not commandslist:
-            default = os.path.join(Utils.getMainDir(), "exports/pollenisator_commands.gzip")
+            default = os.path.join(getMainDir(), "exports/pollenisator_commands.gz")
             res = mongoInstance.importCommands(default)
             if res:
-                default = os.path.join(Utils.getMainDir(), "exports/pollenisator_group_commands.gzip")
+                default = os.path.join(getMainDir(), "exports/pollenisator_group_commands.gz")
                 res = mongoInstance.importCommands(default)
         commands = ServerCommand.getList({"$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}]})
     # Duplicate commands in local database
@@ -225,3 +224,45 @@ def updateSetting(data):
     value = data["value"]
     return mongoInstance.updateInDb("pollenisator", "settings", {
                     "key": key}, {"$set": {"value": value}})
+
+def dumpDb(dbName, collection=""):
+    """
+    Export a database dump into the exports/ folder as a gzip archive.
+    It uses the mongodump utily installed with mongodb-org-tools
+
+    Args:
+        dbName: the database name to dump
+        collection: (Opt.) the collection to dump.
+    """
+    if dbName != "pollenisator" and dbName not in mongoInstance.listCalendars():
+        return "Database not found", 404
+    mongoInstance.connectToDb(dbName)
+    if collection != "" and collection not in mongoInstance.db.collection_names():
+        return "Collection not found in database provided", 404
+    path = mongoInstance.dumpDb(dbName, collection)
+    if not os.path.isfile(path):
+        return "Failed to export database", 503
+    return send_file(path, attachment_filename=os.path.basename(path))
+
+def importDb(upfile):
+    dirpath = tempfile.mkdtemp()
+    tmpfile = os.path.join(dirpath, os.path.basename(upfile.filename))
+    with open(tmpfile, "wb") as f:
+        f.write(upfile.stream.read())
+    success = mongoInstance.importDatabase(tmpfile)
+    shutil.rmtree(dirpath)
+    return success
+
+def importCommands(upfile):
+    dirpath = tempfile.mkdtemp()
+    tmpfile = os.path.join(dirpath, os.path.basename(upfile.filename))
+    with open(tmpfile, "wb") as f:
+        f.write(upfile.stream.read())
+    success = mongoInstance.importCommands(tmpfile)
+    shutil.rmtree(dirpath)
+    return success
+
+def copyDb(data):
+    toCopyName = data["toDb"]
+    fromCopyName = data["fromDb"]
+    return mongoInstance.copyDb(fromCopyName, toCopyName)

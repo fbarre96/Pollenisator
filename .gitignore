@@ -67,8 +67,8 @@ core/Views/*.pyc
 core/Forms/*.pyc
 core/Components/*.pyc
 exports/*
-!exports/pollenisator_commands.gzip
-!exports/pollenisator_group_commands.gzip
+!exports/pollenisator_commands.gz
+!exports/pollenisator_group_commands.gz
 config/tools.d/*
 !config/tools.d/tools.json
 .vscode

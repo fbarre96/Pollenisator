@@ -2,11 +2,14 @@ import json
 import requests
 import os
 import io
+import sys
 import core.Components.Utils as Utils
 from bson import ObjectId
 from core.Components.Utils import JSONEncoder, JSONDecoder
+from shutil import copyfile
 
 proxies = {"http":"127.0.0.1:8080", "https":"127.0.0.1:8080"}
+# proxies = {}
 dir_path = os.path.dirname(os.path.realpath(__file__))  # fullpath to this file
 config_dir = os.path.join(dir_path, "./../../config/")
 if not os.path.isfile(os.path.join(config_dir, "client.cfg")):
@@ -72,14 +75,6 @@ class APIClient():
         else:
             return None
 
-    def updateWorkerHeartbeat(self, worker_name):
-        api_url = '{0}workers/{1}/updateHeartbeat'.format(self.api_url_base, worker_name)
-        response = requests.put(api_url, headers=self.headers)
-        if response.status_code == 200:
-            return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
-        else:
-            return None
-
     def setWorkerExclusion(self, worker_name, isExcluded):
         api_url = '{0}workers/{1}/setExclusion'.format(self.api_url_base, worker_name)
         data = {"db":self.getCurrentPentest(), "setExcluded":isExcluded}
@@ -128,14 +123,6 @@ class APIClient():
             self._observers.remove(observer)
         except ValueError:
             pass
-
-    def pushNotification(self, pentest, collection, iid, action, parentId=""):
-        api_url = '{0}notification'.format(self.api_url_base)
-        response = requests.post(api_url, headers=self.headers, data={"db":pentest, "collection":colletion, "iid":iid, "action":action, "parentId":parentId})
-        if response.status_code == 200:
-            return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
-        else:
-            return None
 
     def fetchNotifications(self, pentest, fromTime):
         api_url = '{0}notification/{1}'.format(self.api_url_base, pentest)
@@ -273,12 +260,21 @@ class APIClient():
                 return res[0]
         return None
 
+    def sendEditToolConfig(self, worker, command_name, remote_bin, plugin):
+        api_url = '{0}workers/{1}/setCommandConfig'.format(self.api_url_base, worker)
+        data = {"command_name":command_name, "remote_bin":remote_bin, "plugin":plugin}
+        response = requests.put(api_url, headers=self.headers, data=json.dumps(data, cls=JSONEncoder))
+        if response.status_code == 200:
+            return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+        else:
+            return None
+
     def getSettings(self, pipeline=None):
         if pipeline is None:
             api_url = '{0}settings'.format(self.api_url_base)
             params={}
         else:
-            api_url = '{0}settings/search'.format(self.api_url_base, pipeline)
+            api_url = '{0}settings/search'.format(self.api_url_base)
             params = {"pipeline":json.dumps(pipeline, cls=JSONEncoder).replace("'","\"")}
         response = requests.get(api_url, headers=self.headers, params=params)
         if response.status_code == 200:
@@ -306,8 +302,14 @@ class APIClient():
         else:
             return None
 
-    def sendStopTask(self, toolModelData):
-        return False
+    def sendStopTask(self, tool_iid, forceReset=False):
+        api_url = '{0}tools/{1}/stopTask/{2}'.format(self.api_url_base, self.getCurrentPentest(), tool_iid)
+        data = {"forceReset":forceReset}
+        response = requests.post(api_url, headers=self.headers, data=json.dumps(data, cls=JSONEncoder), proxies=proxies, verify=False)
+        if response.status_code == 200:
+            return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+        else:
+            return False
 
     def sendLaunchTask(self, tool_iid, plugin="", checks=True, worker=""):
         api_url = '{0}tools/{1}/launchTask/{2}'.format(self.api_url_base, self.getCurrentPentest(), tool_iid)
@@ -335,7 +337,7 @@ class APIClient():
         return None
 
     def listProofs(self, defect_iid):
-        api_url = '{0}files/{1}/download/{2}/{3}'.format(self.api_url_base, self.getCurrentPentest(), filetype, attached_iid)
+        api_url = '{0}files/{1}/download/proof/{2}'.format(self.api_url_base, self.getCurrentPentest(), defect_iid)
         response = requests.get(api_url, headers=self.headers)
         if response.status_code == 200:
             return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
@@ -380,7 +382,7 @@ class APIClient():
         if response.status_code == 200:
             data = json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
             return True, data["comm"], data["ext"]
-        return False, json.loads(response.content.decode('utf-8'), cls=JSONDecoder), ""
+        return False, response.content.decode('utf-8'), ""
     
     def importToolResult(self, tool_iid, parser, local_path, returncode):
         api_url = '{0}tools/{1}/importResult/{2}'.format(self.api_url_base, self.getCurrentPentest(), tool_iid)
@@ -388,7 +390,7 @@ class APIClient():
             response = requests.post(api_url, files={"upfile": (os.path.basename(local_path) ,f)}, data={"plugin":parser, "returncode":int(returncode)}, proxies=proxies, verify=False)
             if response.status_code == 200:
                 return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
-        return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+        return "Failure"
 
     def importExistingResultFile(self, filepath, plugin):
         api_url = '{0}files/{1}/import'.format(self.api_url_base, self.getCurrentPentest())
@@ -412,4 +414,59 @@ class APIClient():
         if response.status_code == 200:
             data = json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
             return data
+        return None
+
+    def sendStartAutoScan(self):
+        api_url = '{0}autoscan/{1}/start'.format(self.api_url_base, self.getCurrentPentest())
+        response = requests.post(api_url, headers=self.headers, proxies=proxies, verify=False)
+        if response.status_code == 200:
+            return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+        return None
+    
+    def sendStopAutoScan(self):
+        api_url = '{0}autoscan/{1}/stop'.format(self.api_url_base, self.getCurrentPentest())
+        response = requests.post(api_url, headers=self.headers, proxies=proxies, verify=False)
+        if response.status_code == 200:
+            return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+        return None
+
+    def getAutoScanStatus(self):
+        api_url = '{0}autoscan/{1}/status'.format(self.api_url_base, self.getCurrentPentest())
+        response = requests.get(api_url, headers=self.headers, proxies=proxies, verify=False)
+        if response.status_code == 200:
+            return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+        return None        
+
+    def dumpDb(self, pentest, collection=""):
+        api_url = '{0}dumpDb/{1}'.format(self.api_url_base, pentest)
+        response = requests.get(api_url, headers=self.headers, params={"collection":collection}, proxies=proxies, verify=False)
+        if response.status_code == 200:
+            dir_path = os.path.dirname(os.path.realpath(__file__))
+            out_path = os.path.join(
+                dir_path, "../../exports/", pentest if collection == "" else pentest+"_"+collection)+".gz"
+            with open(out_path, 'wb') as f:
+                f.write(response.content)
+                return True, out_path
+        return False, response.text      
+    
+    def importDb(self, filename):
+        api_url = '{0}importDb'.format(self.api_url_base)
+        with io.open(filename, 'r', encoding='utf-8', errors="ignore") as f:
+            response = requests.post(api_url, files={"upfile": (os.path.basename(filename) ,f)}, proxies=proxies, verify=False)
+            return response.status_code == 200
+        return False
+    
+    def importCommands(self, filename):
+        api_url = '{0}importCommands'.format(self.api_url_base)
+        with io.open(filename, 'r', encoding='utf-8', errors="ignore") as f:
+            response = requests.post(api_url, files={"upfile": (os.path.basename(filename) ,f)}, proxies=proxies, verify=False)
+            return response.status_code == 200
+        return False
+
+    def copyDb(self, fromDb, toDb=""):
+        api_url = '{0}copyDb'.format(self.api_url_base)
+        data = {"fromDb":self.getCurrentPentest(), "toDb":toDb}
+        response = requests.post(api_url, headers=self.headers, data=json.dumps(data, cls=JSONEncoder), proxies=proxies, verify=False)
+        if response.status_code == 200:
+            return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
         return None

@@ -22,6 +22,13 @@ class ServerScope(Scope, ServerElement):
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         mongoInstance.connectToDb(self.pentest)
 
+    @classmethod
+    def fetchObjects(cls, pentest, pipeline):
+        mongoInstance.connectToDb(pentest)
+        results = mongoInstance.find("scopes", pipeline)
+        for result in results:
+            yield(cls(pentest, result))
+
     def getParentId(self):
         mongoInstance.connectToDb(self.pentest)
         res = mongoInstance.find("waves", {"wave": self.wave}, False)

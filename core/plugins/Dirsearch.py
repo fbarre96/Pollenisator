@@ -166,7 +166,7 @@ class Dirsearch(Plugin):
                                       hosts[host][port]["service"])
                     insert_ret = port_o.addInDb()
                     if not insert_ret["res"]:
-                        port_o = ServerPort.fetchObject(pentest, {"_id": insert_ret["idi"]})
+                        port_o = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
                     targets[str(port_o.getId())] = {
                         "ip": host, "port": port, "proto": "tcp"}
                     hosts[host][port]["paths"].sort(key=lambda x: int(x[0]))

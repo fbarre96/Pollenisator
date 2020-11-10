@@ -58,6 +58,18 @@ class ServerTool(Tool, ServerElement):
         result = mongoInstance.find("tools", pipeline, False)
         return cls(pentest, result)
 
+    def getCommand(self):
+        """
+        Get the tool associated command.
+
+        Return:
+            Returns the Mongo dict command fetched instance associated with this tool's name.
+        """
+        
+        commandTemplate = mongoInstance.findInDb(self.pentest,
+                                                 "commands", {"name": self.name}, False)
+        return commandTemplate
+
     def setInScope(self):
         """Set this tool as out of scope (not matching any scope in wave)
         Add "OOS" in status
@@ -227,6 +239,9 @@ def insert(pentest, data):
         del data["_id"]
     # Inserting scope
     parent = tool_o.getParentId()
+    base["scanner_ip"] = data.get("scanner_ip", "None")
+    base["dated"] = data.get("dated", "None")
+    base["datef"] = data.get("datef", "None")
     res_insert = mongoInstance.insert("tools", base, parent)
     ret = res_insert.inserted_id
     tool_o._id = ret
@@ -350,13 +365,40 @@ def launchTask(pentest, tool_iid, data):
         return "No worker available", 404
     workerName = choosenWorker
     launchableToolId = launchableTool.getId()
+    print("Mark as running tool "+str(launchableTool))
     launchableTool.markAsRunning(workerName)
     update(pentest, tool_iid, ToolController(launchableTool).getData())
     # Mark the tool as running (scanner_ip is set and dated is set, datef is "None")
     # Add a queue to the selected worker for this tool, So that only this worker will receive this task
     instructions = mongoInstance.insertInDb("pollenisator", "instructions", {"worker":workerName, "date":datetime.now(), "function":"executeCommand",
                                                                              "args":[pentest, str(launchableToolId), plugin]})
-    return instructions.inserted_id
+    return instructions.inserted_id, 200
+
+def stopTask(pentest, tool_iid, data):
+    mongoInstance.connectToDb(pentest)
+    stopableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
+    if stopableTool is None:
+        return "Tool not found", 404
+    workers = mongoInstance.getWorkers({})
+    workerNames = [worker["name"] for worker in workers]
+    forceReset = data["forceReset"]
+    saveScannerip = stopableTool.scanner_ip
+    if forceReset:
+        stopableTool.markAsNotDone()
+        print("mark as not done")
+        update(pentest, tool_iid, ToolController(stopableTool).getData())
+    if saveScannerip == "":
+        return "Empty worker field", 400
+    if saveScannerip == "localhost":
+        return "Tools running in localhost cannot be stopped through API", 405
+    if saveScannerip not in workerNames:
+        return "The worker running this tool is no more running", 404
+    instructions = mongoInstance.insertInDb("pollenisator", "instructions", {"worker":saveScannerip, "date":datetime.now(), "function":"stopCommand",
+                                                                             "args":[pentest, str(tool_iid)]})
+    if not forceReset:
+        stopableTool.markAsNotDone()
+        update(pentest, tool_iid, ToolController(stopableTool).getData())
+    return True
 
 def hasRegistered(worker, launchableTool):
     """

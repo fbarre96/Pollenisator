@@ -34,19 +34,22 @@ def removeInactiveWorkers():
     count = mongoInstance.removeInactiveWorkers()
     return {"n":int(count)}
 
-def updateHeartbeat(name):
-    worker = mongoInstance.getWorker(name)
-    if worker is None:
-        # datef "added worker already up"
-        return "Worker not found", 404
-    return mongoInstance.updateWorkerLastHeartbeat(name)
-
 def registerCommands(name, command_names):
     res = mongoInstance.registerCommands(name, command_names)
     return res
 
 def getRegisteredCommands(name):
     return mongoInstance.getRegisteredCommands(name)
+
+def setCommandConfig(name, data):
+    plugin = data["plugin"]
+    command_name = data["command_name"]
+    remote_bin = data["remote_bin"]
+    worker = mongoInstance.getWorker(name)
+    if worker is None:
+        return "Worker not found", 404
+    mongoInstance.insertInDb("pollenisator", "instructions", {"worker":name, "date":datetime.now(), "function":"editToolConfig", "args":[command_name, remote_bin, plugin]}, False)
+    return True
 
 def registerWorker(data):
     name = data["name"]
@@ -70,6 +73,7 @@ def getInstructions(name):
     worker = mongoInstance.getWorker(name)
     if worker is None:
         return "Worker not Found", 404
+    mongoInstance.updateWorkerLastHeartbeat(name)
     instructions = mongoInstance.findInDb("pollenisator", "instructions", {"worker":name}, True)
     data = list(instructions)
     mongoInstance.deleteFromDb("pollenisator", "instructions", {"worker":name}, True, False)
