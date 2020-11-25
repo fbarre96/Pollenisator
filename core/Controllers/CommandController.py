@@ -25,7 +25,7 @@ class CommandController(ControllerElement):
         else:
             self.model.ports = ""
         self.model.priority = values.get("Priority", self.model.priority)
-        self.model.safe = str(values.get("Safe", self.model.safe))
+        self.model.safe = bool(values.get("Safe", self.model.safe))
         self.model.timeout = str(values.get("Timeout", self.model.timeout))
         types = values.get("Types", {})
         types = [k for k, v in types.items() if v == 1]
@@ -57,7 +57,7 @@ class CommandController(ControllerElement):
         name = values["Name"]
         lvl = values["Level"]
         priority = values["Priority"]
-        safe = str(values["Safe"])
+        safe = bool(values["Safe"])
         types = values["Types"]
         indb = values["indb"]
         timeout = values["Timeout"]
@@ -78,7 +78,7 @@ class CommandController(ControllerElement):
         Returns:
             dict with keys name, lvl, safe, text, ports, sleep_between, max_thread, priority, types, _id, tags and infos
         """
-        return {"name": self.model.name, "lvl": self.model.lvl, "safe": self.model.safe, "text": self.model.text,
+        return {"name": self.model.name, "lvl": self.model.lvl, "safe": bool(self.model.safe), "text": self.model.text,
                 "ports": self.model.ports, "sleep_between": self.model.sleep_between, "timeout": self.model.timeout,
                 "max_thread": self.model.max_thread, "priority": self.model.priority, "types": self.model.types, "indb":self.model.indb, "_id": self.model.getId(), "tags": self.model.tags, "infos": self.model.infos}
 

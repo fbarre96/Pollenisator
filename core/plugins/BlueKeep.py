@@ -32,14 +32,6 @@ class BlueKeep(Plugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
-    def checkReturnCode(self, returncode):
-        """Check if the command was executed successfully using the final exit code.
-        Args:
-            returncode: the exit code of the command executed.
-        Returns:
-            bool: True if successful returncode, False otherwise.
-        """
-        return returncode == 0
 
     def Parse(self, pentest, file_opened, **kwargs):
         """

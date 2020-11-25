@@ -30,15 +30,6 @@ class SearchSploit(Plugin):
         ouputPath = str(commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0])
         return ouputPath
 
-    def checkReturnCode(self, returncode):
-        """Check if the command was executed successfully using the final exit code.
-        Args:
-            returncode: the exit code of the command executed.
-        Returns:
-            bool: True if successful returncode, False otherwise.
-        """
-        return returncode == 0
-
     def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
@@ -62,6 +53,8 @@ class SearchSploit(Plugin):
                 return "No product known detected", tags, "wave", {"wave": None}
             if len(jsonFile["RESULTS_EXPLOIT"]) == 0 :
                 return notes, tags,"wave", {"wave": None}
+            elif not re.match(r"\d", jsonFile["SEARCH"]):
+                return notes, tags, "wave", {"wave": None}
             else:     
                 tags.append("Interesting")
                 for exploit in jsonFile["RESULTS_EXPLOIT"]:

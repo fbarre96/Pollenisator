@@ -36,6 +36,7 @@ from core.Models.Command import Command
 from core.Models.Scope import Scope
 from core.Models.Wave import Wave
 from core.Models.Interval import Interval
+from core.Models.Port import Port
 import core.Components.Modules
 
 
@@ -371,13 +372,14 @@ class Appli(ttk.Frame):
         """
         Read notifications from database every 0.5 or so second. Notifications are used to exchange informations between applications.
         """
+        print("REad notifs")
         apiclient = APIClient.getInstance()
         try:
             lastNotifReadTime = datetime.datetime.now()
             notifications = apiclient.fetchNotifications(apiclient.getCurrentPentest(), self.lastNotifReadTime)
             self.lastNotifReadTime = lastNotifReadTime
             for notification in notifications:
-                # print("Notification received "+str(notification["db"])+"/"+str(notification["collection"])+" iid="+str(notification["iid"])+" action="+str(notification["action"]))
+                print("Notification received "+str(notification["db"])+"/"+str(notification["collection"])+" iid="+str(notification["iid"])+" action="+str(notification["action"]))
                 if notification["db"] == "pollenisator":
                     if notification["collection"] == "workers":
                         self.scanManager.notify(notification["iid"], notification["action"])
@@ -441,6 +443,7 @@ class Appli(ttk.Frame):
                               command=self.importExistingTools)
         fileMenu2.add_command(label="Reset unfinished tools",
                               command=self.resetUnfinishedTools)
+        fileMenu2.add_command(label="Find unscanned port", command=self.findUnscannedPorts)
         fileMenu2.add_command(label="Refresh (F5)",
                               command=self.refreshView)
         fileMenu3 = tk.Menu(menubar, tearoff=0, background='#73B723', foreground='white', activebackground='#73B723', activeforeground='white')
@@ -883,6 +886,14 @@ class Appli(ttk.Frame):
         else:
             tkinter.messagebox.showinfo("Database import ", "Database import failed")
 
+    def findUnscannedPorts(self):
+        ports = Port.fetchObjects({})
+        apiclient = APIClient.getInstance()
+        for port in ports:
+            port_key = port.getDbKey()
+            res = apiclient.find("tools", port_key, False)
+            if res is None:
+                port.setTags(["unscanned"])
 
     def importCommands(self, name=None):
         """
@@ -1021,16 +1032,18 @@ class Appli(ttk.Frame):
                 self.notifications_timers.cancel()
                 self.notifications_timers = None
             apiclient.setCurrentPentest(calendarName)
+            
             for widget in self.viewframe.winfo_children():
                 widget.destroy()
             for module in self.modules:
                 module["object"].initUI(module["view"], self.nbk, self.treevw)
             self.statusbar.reset()
             self.treevw.refresh()
-            self.scanManager = ScanManager(self.nbk, self.treevw, apiclient.getCurrentPentest(), self.settings)
             self.notifications_timers = threading.Timer(
                 5, self.readNotifications)
             self.notifications_timers.start()
+            self.scanManager = ScanManager(self.nbk, self.treevw, apiclient.getCurrentPentest(), self.settings)
+            
 
     def wrapCopyDb(self, _event=None):
         """

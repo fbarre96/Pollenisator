@@ -3,6 +3,7 @@
 from core.plugins.plugin import Plugin
 from server.ServerModels.Ip import ServerIp
 from server.ServerModels.Port import ServerPort
+from core.Models.Port import Port
 import re
 import webbrowser
 
@@ -58,7 +59,7 @@ class Nikto(Plugin):
         Args:
             _event: not used but mandatory
         """
-        port_m = ServerPort.fetchObject(
+        port_m = Port.fetchObject(
             {"ip": self.toolmodel.ip, "port": self.toolmodel.port, "proto": self.toolmodel.proto})
         if port_m is None:
             return
@@ -91,15 +92,6 @@ class Nikto(Plugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
-    def checkReturnCode(self, returncode):
-        """Check if the command was executed successfully using the final exit code.
-        Args:
-            returncode: the exit code of the command executed.
-        Returns:
-            bool: True if successful returncode, False otherwise.
-        """
-        return returncode == 0
-
     def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
@@ -123,7 +115,7 @@ class Nikto(Plugin):
         host, port, service, infos = parse_nikto_plain_text(notes)
         if host:
             if port:
-                Server().initialize(host).addInDb()
+                ServerIp().initialize(host).addInDb()
                 p_o = ServerPort().initialize(host, port, "tcp", service)
                 insert_res = p_o.addInDb()
                 if not insert_res["res"]:

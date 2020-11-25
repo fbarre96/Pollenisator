@@ -36,7 +36,7 @@ class Defect(Element):
                         valuesFromDb.get(
                             "risk", ""), valuesFromDb.get("redactor", "N/A"), list(valuesFromDb.get("type", [])),
                         valuesFromDb.get("notes", ""), valuesFromDb.get("proofs", []), valuesFromDb.get("infos", {}),
-                        int(valuesFromDb.get("index", 0)))
+                        valuesFromDb.get("index", 0))
 
     def initialize(self, ip, port, proto, title="", ease="", impact="", risk="", redactor="N/A", mtype=None, notes="", proofs=None, infos=None, index=0):
         """Set values of defect
@@ -69,7 +69,7 @@ class Defect(Element):
         self.proto = proto
         self.infos = infos if infos is not None else {}
         self.proofs = proofs if proofs is not None else []
-        self.index = int(index)
+        self.index = index
         return self
 
     @classmethod

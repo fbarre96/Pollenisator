@@ -81,9 +81,6 @@ class HttpMethods(Plugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
-    def checkReturnCode(self, _returncode):
-        return True
-
     def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information

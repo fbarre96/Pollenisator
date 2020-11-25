@@ -24,7 +24,7 @@ class FormCheckbox(Form):
         """
         super().__init__(name)
         self.text = text
-        self.default = default
+        self.default = bool(default)
         self.kwargs = kwargs
         self.chk = None
 

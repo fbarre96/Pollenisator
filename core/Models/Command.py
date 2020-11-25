@@ -18,7 +18,7 @@ class Command(Element):
         Args:
             valueFromDb: a dict holding values to load into the object. A mongo fetched command is optimal.
                         possible keys with default values are : _id (None), parent (None), tags([]), infos({}), name(""), sleep_between("0"), priority("0),
-                        max_thread("1"), text(""), lvl("network"), ports(""), safe("True"), types([]), indb="pollenisator", timeout="300"
+                        max_thread("1"), text(""), lvl("network"), ports(""), safe(True), types([]), indb="pollenisator", timeout="300"
         """
         if valuesFromDb is None:
             valuesFromDb = dict()
@@ -30,7 +30,7 @@ class Command(Element):
                         valuesFromDb.get("text", ""), valuesFromDb.get(
                             "lvl", "network"),
                         valuesFromDb.get("ports", ""),
-                        valuesFromDb.get("safe", True), valuesFromDb.get("types", []), valuesFromDb.get("indb", "pollenisator"), valuesFromDb.get("timeout", 300), valuesFromDb.get("infos", {}))
+                        bool(valuesFromDb.get("safe", True)), valuesFromDb.get("types", []), valuesFromDb.get("indb", "pollenisator"), valuesFromDb.get("timeout", 300), valuesFromDb.get("infos", {}))
 
     def initialize(self, name, sleep_between=0, priority=0, max_thread=1, text="", lvl="network", ports="", safe=True, types=None, indb=False, timeout=300, infos=None):
         """Set values of command
@@ -57,7 +57,7 @@ class Command(Element):
         self.text = text
         self.lvl = lvl
         self.ports = ports
-        self.safe = safe
+        self.safe = bool(safe)
         self.infos = infos if infos is not None else {}
         self.indb = indb
         self.timeout = timeout

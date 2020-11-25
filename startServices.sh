@@ -12,4 +12,3 @@ else
 	echo "Launching mongod without ssl"
 	mongod --dbpath=/var/lib/mongodb -f /etc/mongod.conf
 fi
-

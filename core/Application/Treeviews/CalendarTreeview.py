@@ -511,8 +511,7 @@ class CalendarTreeview(PollenisatorTreeview):
         nbObjects += apiclient.count("commands")
         onePercentNbObject = nbObjects//100 if nbObjects > 100 else 1
         nbObjectTreated = 0
-        for child in self.get_children():
-            self.delete(child)
+        self.delete(*self.get_children())
         self._hidden = []
         self._detached = []
         self.waves_node = self.insert("", "end", str(

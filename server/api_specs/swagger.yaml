@@ -86,7 +86,8 @@ definitions:
         items:
           type: string
       index:
-        type: integer
+        type: string
+        default: "end"
 
   Intervals:
     properties:
@@ -670,20 +671,7 @@ paths:
                   type: array
                   items:
                     type: string
-  /workers/removeInactiveWorkers:
-    get:
-      operationId: "server.worker.removeInactiveWorkers"
-      tags:
-        - "Worker"
-      summary: "Remove inactive workers from database"
-      responses:
-        200:
-          description: "Successful removal of inactive worker operation"
-          schema:
-            type: "object"
-            properties:
-              n:
-                type: integer
+
   /workers/{name}:
     delete:
       operationId: "server.worker.deleteWorker"
@@ -1697,11 +1685,6 @@ paths:
           type: string
           required: false
           default: ""
-        - name: returncode
-          in: formData
-          type: integer
-          required: false
-          default: 0
       responses:
         200:
           description: "Successfully uploaded file"
@@ -1767,6 +1750,43 @@ paths:
         200:
           description: "Successfully stopped task"
 
+  /tools/{pentest}/{tool_iid}/changeStatus:
+    post:
+      operationId: "server.ServerModels.Tool.setStatus"
+      tags:
+        - "Tools"
+      summary: "Update a tool staus"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: tool_iid
+          in: path
+          type: string
+          description: tool id to stop
+          required: true
+        - name: data
+          in: body
+          schema:
+            type: object
+            required:
+              - newStatus
+            properties:
+              newStatus:
+                type: array
+                items:
+                  type: string
+                  enum: ["OOS","OOT","not_done","running","error","done", "ready"]
+              arg:
+                type: string
+                default: ""
+
+      responses:
+        200:
+          description: "Successfully updated tool status"
+
   /autoscan/{pentest}/start:
     post:
       operationId: "server.AutoScanMaster.startAutoScan"
@@ -1812,3 +1832,86 @@ paths:
       responses:
         200:
           description: "Successfully stoped auto scan"
+    
+  /report/templates:
+    get:
+      operationId: "server.Report.getTemplateList"
+      tags:
+        - "Report"
+      summary: "Get a lsit of report template"
+      responses:
+        200:
+          description: "A list of avalaible templates names"
+  
+  /report/templates/download:
+    get:
+      operationId: "server.Report.downloadTemplate"
+      tags:
+        - "Report"
+      summary: "Download a report template"
+      parameters:
+        - name: templateName
+          in: query
+          type: string
+          description: template name to download
+          required: true
+      responses:
+        200:
+          description: "A template file docx or pptx"
+  
+  /report/templates/upload:
+    post:
+      operationId: "server.Report.uploadTemplate"
+      tags:
+        - "Report"
+      summary: "Upload a report template"
+      consumes:
+        - multipart/form-data
+      parameters:
+        - name: upfile
+          in: formData
+          type: file
+          description: The file to upload
+          required: true  
+      responses:
+        200:
+          description: "An indication of success for uploadfin template file docx or pptx"       
+          
+  /report/{pentest}/generate:
+    get:
+      operationId: "server.Report.generateReport"
+      tags:
+        - "Report"
+      summary: "Generate a report and returns it"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: templateName
+          in: query
+          type: string
+          description: template name to generate from
+          required: true
+        - name: contractName
+          in: query
+          type: string
+          description: template name to generate from
+          required: true
+        - name: clientName
+          in: query
+          type: string
+          description: template name to generate from
+          required: true  
+        - name: mainRedactor
+          in: query
+          type: string
+          description: template name to generate from
+          required: false
+          default: "N/A"
+      responses:
+        200:
+          description: "A template file docx or pptx"
+
+          

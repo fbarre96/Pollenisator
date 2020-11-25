@@ -73,6 +73,9 @@ def loadPlugin(pluginName):
     except FileNotFoundError:
         __import__("Default")
         return REGISTRY["Default"]
+    except ModuleNotFoundError:
+        __import__("Default")
+        return REGISTRY["Default"]
 
 def listPlugin():
     """

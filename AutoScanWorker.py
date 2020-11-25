@@ -52,6 +52,8 @@ def workerLoop(workerName):
         while(True):
             time.sleep(3)
             instructions = apiclient.fetchWorkerInstruction(workerName)
+            if instructions is None:
+                continue
             for instruction in instructions:
                 if instruction["function"] in functions:
                     task = Process(target = functions[instruction["function"]], args=instruction["args"])
@@ -67,7 +69,6 @@ def workerLoop(workerName):
 
 def launchTask(calendarName, worker, launchableTool):
     launchableToolId = launchableTool.getId()
-    print("Mark as running tool "+str(launchableTool))
     launchableTool.markAsRunning(worker)
     # Mark the tool as running (scanner_ip is set and dated is set, datef is "None")
     from AutoScanWorker import executeCommand
@@ -109,6 +110,7 @@ def executeCommand(calendarName, toolId, parser=""):
     success, comm, fileext = apiclient.getCommandline(toolId, parser)
     if not success:
         print(str(comm))
+        toolModel.setStatus(["error"])
         return False, str(comm)
     outputRelDir = toolModel.getOutputDir(calendarName)
     abs_path = os.path.dirname(os.path.abspath(__file__))
@@ -124,6 +126,7 @@ def executeCommand(calendarName, toolId, parser=""):
             pass
         else:
             print(str(exc))
+            toolModel.setStatus(["error"])
             return False, str(exc)
     outputDir = os.path.join(outputDir, toolFileName)
     comm = comm.replace("|outputDir|", outputDir)
@@ -143,13 +146,15 @@ def executeCommand(calendarName, toolId, parser=""):
         returncode = Utils.execute(comm, timeLimit, True)
     except Exception as e:
         print(str(e))
+        toolModel.setStatus(["error"])
         return False, str(e)
     # Execute found plugin if there is one
     outputfile = outputDir+fileext
-    msg = apiclient.importToolResult(toolId, parser, outputfile, returncode)
+    msg = apiclient.importToolResult(toolId, parser, outputfile)
     if msg != "Success":
         #toolModel.markAsNotDone()
         print(str(msg))
+        toolModel.setStatus(["error"])
         return False, str(msg)
           
     # Delay

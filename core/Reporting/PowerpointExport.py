@@ -312,7 +312,7 @@ def addSerieToChart(presentation, index_chart, serie_name, serie):
                 count_chart += 1
     return False
 
-def createReport(defects_dict, template, out_name, **kwargs):
+def createReport(pentest, defects_dict, template, out_name, **kwargs):
     document = Presentation(template)
     global progressbar
     global SLD_LAYOUT_TO_COPY
@@ -365,3 +365,4 @@ def createReport(defects_dict, template, out_name, **kwargs):
     document.save(out_path)
     progressbar.update()
     print("Generated report at "+str(out_path))
+    return out_path

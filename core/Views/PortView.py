@@ -164,14 +164,7 @@ class PortView(ViewElement):
                 tool_vw = ToolView(
                     self.appliTw, self.appliViewFrame, self.mainApp, tool_o)
                 tool_vw.addInTreeview(str(self.controller.getDbId()))
-        tools = self.controller.getTools()
-        atleastone = False
-        for tool in tools:  # SALE
-            atleastone = True
-            break
-        if not atleastone:
-            if len(self.controller.getTags()) == 0:
-                self.controller.addTag("unscanned")
+        
         self.appliTw.sort(parentNode)
         if "hidden" in self.controller.getTags():
             self.hide()

@@ -10,12 +10,11 @@ from os.path import isfile, join
 from bson.objectid import ObjectId
 from datetime import datetime
 from core.Components.apiclient import APIClient
-import core.Reporting.WordExport as WordExport
-import core.Reporting.PowerpointExport as PowerpointExport
-import core.Reporting.ExcelExport as ExcelExport
+
 from core.Models.Defect import Defect
 from core.Application.Dialogs.ChildDialogCombo import ChildDialogCombo
 from core.Application.Dialogs.ChildDialogProgress import ChildDialogProgress
+from core.Application.Dialogs.ChildDialogInfo import ChildDialogInfo
 from core.Application.Dialogs.ChildDialogQuestion import ChildDialogQuestion
 from core.Application.Dialogs.ChildDialogDefectView import ChildDialogDefectView
 from core.Forms.FormHelper import FormHelper
@@ -214,12 +213,6 @@ class Report:
             powerpointFrame, text="Generate Powerpoint report", command=self.generateReportPowerpoint, width=30)
         btn_ppt.pack(side=tk.RIGHT, padx=10)
         powerpointFrame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=10)
-        #### EXCEL EXPORT FRAME ###
-        excelFrame = ttk.Frame(officeFrame)
-        btn_excel = ttk.Button(
-            excelFrame, text="Generate Excel report", command=self.generateReportExcel, width=30)
-        btn_excel.pack(side=tk.RIGHT, padx=10)
-        excelFrame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=10)
         officeFrame.pack(side=tk.TOP, fill=tk.BOTH, padx=10, pady=10)
         self.paned.add(self.frameTw)
         self.paned.add(belowFrame)
@@ -525,7 +518,7 @@ class Report:
                 self.treevw.insert('', indToInsert, defect_o.getId(), text=defect_o.title,
                                    values=new_values,
                                    tags=(defect_o.risk))
-                defect_o.update({"index":int(indToInsert)})
+                defect_o.update({"index":str(indToInsert)})
             except tk.TclError:
                 # The defect already exists
                 already_inserted = True
@@ -548,71 +541,26 @@ class Report:
             if sy <= (currentHeight)*self.rowHeight + self.pane_base_height:
                 self.paned.paneconfigure(self.frameTw, height=(currentHeight)*self.rowHeight + self.pane_base_height)
 
-    def getDefectsAsDict(self):
-        """
-        Returns a dictionnary with treeview defects stored inside
-        Returns:
-            The returned dict will be formed this way (shown as json):
-            {
-                "Risk level describer 1":{
-                    "defect title 1": {
-                        "description":{
-                            "title": "defect title 1",
-                            "risk": "Risk level 1",
-                            "ease": "Ease of exploitation 1",
-                            "impact": "Impact 1",
-                            "redactor": "Redactor name",
-                            "type": ['D', 'T', ...]
-                        },
-                        "defects_ids":[
-                            id 1,
-                            id 2...
-                        ]
-                    },
-                    "defect title 2":{
-                        ...
-                    }
-                    ...
-                },
-                "Risk level describer 2":{
-                    ...
-                }
-                ...
-            }
-        """
-        defects_dict = dict()
-        defects_dict["Critique"] = dict()
-        defects_dict["Majeur"] = dict()
-        defects_dict["Important"] = dict()
-        defects_dict["Mineur"] = dict()
-        columnEase = self.treevw['columns'].index("ease")
-        columnImpact = self.treevw['columns'].index("impact")
-        columnType = self.treevw['columns'].index("type")
-        columnRisk = self.treevw['columns'].index("risk")
-        columnRedactor = self.treevw['columns'].index("redactor")
-        for children_id in self.treevw.get_children():
-            children = self.treevw.item(children_id)
-            title = children["text"]
-            defect_recap = dict()
-            defect_recap["title"] = title
-            defect_recap["risk"] = children["values"][columnRisk]
-            defect_recap["ease"] = children["values"][columnEase]
-            defect_recap["impact"] = children["values"][columnImpact]
-            defect_recap["redactor"] = children["values"][columnRedactor]
-            types = children["values"][columnType].split(",")
-            d_types = []
-            for d_type in types:
-                d_types.append(d_type.strip())
-            defect_recap["type"] = d_types
-            defects_dict[defect_recap["risk"]][title] = dict()
-            defects_dict[defect_recap["risk"]
-                         ][title]["description"] = defect_recap
-            defects_dict[defect_recap["risk"]][title]["defects_ids"] = []
-            defects = Defect.fetchObjects({"title": title})
-            for defect in defects:
-                defects_dict[defect_recap["risk"]
-                             ][title]["defects_ids"].append(defect.getId())
-        return defects_dict
+    def generateReportPowerpoint(self):
+        if self.ent_client.get().strip() == "":
+            tk.messagebox.showerror(
+                "Missing required field", "The client's name input must be filled.")
+            return
+        if self.ent_contract.get().strip() == "":
+            tk.messagebox.showerror(
+                "Missing required field", "The contract's name input must be filled.")
+            return
+        apiclient = APIClient.getInstance()
+        toExport = apiclient.getCurrentPentest()
+        if toExport != "":
+            modele_pptx = str(self.val_ppt.get())
+            dialog = ChildDialogInfo(
+                self.parent, "PowerPoint Report", "Creating report . Please wait.")
+            dialog.show()
+            out_name = apiclient.generateReport(modele_pptx, self.ent_client.get().strip(), self.ent_contract.get().strip(), self.mainRedac)
+            dialog.destroy()
+            tkinter.messagebox.showinfo(
+                "Success", "The document was generated in ./exports/"+str(out_name))
 
     def generateReportWord(self):
         """
@@ -630,53 +578,13 @@ class Report:
         toExport = apiclient.getCurrentPentest()
         if toExport != "":
             modele_docx = str(self.val_word.get())
-            timestr = datetime.now().strftime("%Y%m%d-%H%M%S")
-            basename = self.ent_client.get().strip() + " - "+self.ent_contract.get().strip()
-            out_name = str(timestr)+" - "+basename
-            dialog = ChildDialogProgress(
-                self.parent, "Word Report", "Creating report "+str(out_name) + ". Please wait.", 200, "determinate")
-            WordExport.createReport(self.getDefectsAsDict(), modele_docx, out_name, main_redactor=self.mainRedac,
-                                    client=self.ent_client.get().strip(), contract=self.ent_contract.get().strip(), root=self.parent, progressbar=dialog)
+            dialog = ChildDialogInfo(
+                self.parent, "Word Report", "Creating report . Please wait.")
+            dialog.show()
+            res = apiclient.generateReport(modele_docx, self.ent_client.get().strip(), self.ent_contract.get().strip(), self.mainRedac)
             dialog.destroy()
+            if res == None:
+                tkinter.messagebox.showerror(
+                    "Failure", str(res))
             tkinter.messagebox.showinfo(
-                "Success", "The document was generated in ./exports/"+str(out_name))
-
-    def generateReportPowerpoint(self):
-        """
-        Export a calendar defects to a pptx formatted file.
-        """
-        if self.ent_client.get().strip() == "":
-            tk.messagebox.showerror(
-                "Missing required field", "The client's name input must be filled.")
-            return
-        if self.ent_contract.get().strip() == "":
-            tk.messagebox.showerror(
-                "Missing required field", "The contract's name input must be filled.")
-            return
-        apiclient = APIClient.getInstance()
-        toExport = apiclient.getCurrentPentest()
-        if toExport != "":
-            modele_pptx = str(self.val_ppt.get())
-            timestr = datetime.now().strftime("%Y%m%d-%H%M%S")
-            basename = self.ent_client.get().strip() + " - "+self.ent_contract.get().strip()
-            out_name = str(timestr)+" - "+basename
-            dialog = ChildDialogProgress(
-                self.parent, "Powerpoint Report", "Creating report "+str(out_name) + ". Please wait.", 200, progress_mode="determinate")
-            PowerpointExport.createReport(self.getDefectsAsDict(), modele_pptx, out_name, client=self.ent_client.get(
-            ).strip(), contract=self.ent_contract.get().strip(), root=self.parent, progressbar=dialog)
-            dialog.destroy()
-            tkinter.messagebox.showinfo(
-                "Success", "The document was generated in ./exports/"+str(out_name))
-
-    def generateReportExcel(self):
-        """
-        Export a calendar status to an excel file.
-        """
-        apiclient = APIClient.getInstance()
-        toExport = apiclient.getCurrentPentest()
-        if toExport != "":
-            timestr = datetime.now().strftime("%Y%m%d-%H%M%S")
-            out_name = toExport+"_"+str(timestr)+".xlsx"
-            ExcelExport.exportExcel(self.getDefectsAsDict(), out_name)
-            tkinter.messagebox.showinfo(
-                "Success", "The document was generated in ./exports/"+str(out_name))
+                "Success", "The document was generated in ./exports/"+str(res))

@@ -69,7 +69,7 @@ class CommandView(ViewElement):
         panel_safe = self.form.addFormPanel(grid=True)
         panel_safe.addFormLabel("Safe")
         panel_safe.addFormCheckbox(
-            "Safe", "Safe", modelData["safe"] == "True", column=1)
+            "Safe", "Safe", modelData["safe"], column=1)
         panel_safe.addFormHelper(
             "If checked, this command can be run by an auto scan.", column=2)
         panel_text = self.form.addFormPanel()
@@ -110,7 +110,7 @@ class CommandView(ViewElement):
         panel_safe = self.form.addFormPanel(grid=True)
         panel_safe.addFormLabel("Safe")
         panel_safe.addFormCheckbox(
-            "Safe", "Safe", "False", column=1)
+            "Safe", "Safe", False, column=1)
         panel_safe.addFormHelper(
             "If checked, this command can be run by an auto scan.", column=2)
         panel_text = self.form.addFormPanel()

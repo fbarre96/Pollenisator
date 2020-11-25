@@ -74,8 +74,10 @@ class ToolView(ViewElement):
         else:
             ui = self.__class__.not_ready_icon
             cache = self.__class__.cached_not_ready_icon
-        if status == [] or iconStatus not in status :
-            self.controller.setStatus([iconStatus])
+        # FIXME, always get triggered
+        # if status == [] or iconStatus not in status :
+        #     print("status is "+str(status)+ " or "+str(iconStatus)+" not in "+str(status))
+        #     self.controller.setStatus([iconStatus])
 
         if cache is None:
             from PIL import Image, ImageTk
@@ -127,13 +129,11 @@ class ToolView(ViewElement):
         top_panel = self.form.addFormPanel()
         top_panel.addFormLabel("Notes", side="top")
         top_panel.addFormText("Notes", r"", notes, None, side="top", height=15)
-
         actions_panel = self.form.addFormPanel()
         apiclient = APIClient.getInstance()
         hasWorkers = len(apiclient.getWorkers({"excludedDatabases":{"$nin":[apiclient.getCurrentPentest()]}}))
-
         #Ready is legacy, OOS and/or OOT should be used
-        if "ready" in self.controller.getStatus() or "error" in self.controller.getStatus():
+        if "ready" in self.controller.getStatus() or "error" in self.controller.getStatus() or len(self.controller.getStatus()) == 0:
             actions_panel.addFormButton(
                 "Local launch", self.localLaunchCallback, side="right")
             if hasWorkers:

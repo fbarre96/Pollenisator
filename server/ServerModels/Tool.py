@@ -76,7 +76,7 @@ class ServerTool(Tool, ServerElement):
         """
         if "OOS" in self.status:
             self.status.remove("OOS")
-            update(pentest, self._id, ToolController(self).getData())
+            update(self.pentest, self._id, ToolController(self).getData())
 
     def setInTime(self):
         """Set this tool as in time (matching any interval in wave)
@@ -84,7 +84,7 @@ class ServerTool(Tool, ServerElement):
         """
         if "OOT" in self.status:
             self.status.remove("OOT")
-            update(pentest, self._id, ToolController(self).getData())
+            update(self.pentest, self._id, ToolController(self).getData())
 
     def delete(self):
         """
@@ -214,6 +214,28 @@ class ServerTool(Tool, ServerElement):
             newStatus.append("OOT")
         self.status = newStatus
         self.scanner_ip = workerName
+    
+def setStatus(pentest, tool_iid, data):
+    newStatus = data["newStatus"]
+    arg = data.get("arg", "")
+    tool_o = ServerTool.fetchObject(pentest, {"_id":ObjectId(tool_iid)})
+    if tool_o is None:
+        return "Tool not found", 404
+    if "done" in newStatus:
+        if arg == "":
+            arg = None
+        tool_o.markAsDone(arg)
+    elif "running" in newStatus:
+        tool_o.markAsRunning(arg)
+    elif "not_done" in newStatus:
+        tool_o.markAsNotDone()
+    elif "ready" in newStatus:
+        tool_o.markAsNotDone()
+    elif "error" in newStatus:
+        tool_o.markAsError()
+    elif len(newStatus) == 0:
+        tool_o.markAsNotDone()
+    return update(pentest, tool_o.getId(), ToolController(tool_o).getData())
 
 def delete(pentest, tool_iid):
     mongoInstance.connectToDb(pentest)
@@ -288,7 +310,7 @@ def craftCommandLine(pentest, tool_iid, plugin):
     comm = mod.changeCommand(comm, "|outputDir|", mod.getFileOutputExt())
     return {"comm":comm, "ext":mod.getFileOutputExt()}
     
-def importResult(pentest, tool_iid, upfile, plugin, returncode):
+def importResult(pentest, tool_iid, upfile, plugin):
     #STORE FILE
     res, status, filepath = _upload(pentest, tool_iid, "result", upfile)
     if status != 200:
@@ -307,30 +329,22 @@ def importResult(pentest, tool_iid, upfile, plugin, returncode):
     if mod is not None:
         try:
             # Check return code by plugin (can be always true if the return code is inconsistent)
-            if mod.checkReturnCode(returncode):
-                notes, tags, _, _ = mod.Parse(pentest, upfile)
-                if notes is None:
-                    notes = "No results found by plugin."
-                if tags is None:
-                    tags = []
-                if isinstance(tags, str):
-                    tags = [tags]
-                # Success could be change to False by the plugin function (evaluating the return code for exemple)
-                # if the success is validated, mark tool as done
-                toolModel.notes = notes
-                toolModel.tags = tags
-                toolModel.markAsDone(filepath)
-                # And update the tool in database
-                update(pentest, tool_iid, ToolController(toolModel).getData())
-                # Upload file to SFTP
-                msg = "TASK SUCCESS : "+toolModel.name
-            else:  # BAS RESULT OF PLUGIN
-                msg = "TASK FAILED (says the mod) : "+toolModel.name
-                msg += "The return code was not the expected one. ("+str(
-                    returncode)+")."
-                toolModel.markAsError()
-                update(pentest, tool_iid, ToolController(toolModel).getData())
-                raise Exception(msg)
+            notes, tags, _, _ = mod.Parse(pentest, upfile)
+            if notes is None:
+                notes = "No results found by plugin."
+            if tags is None:
+                tags = []
+            if isinstance(tags, str):
+                tags = [tags]
+            # Success could be change to False by the plugin function (evaluating the return code for exemple)
+            # if the success is validated, mark tool as done
+            toolModel.notes = notes
+            toolModel.tags = tags
+            toolModel.markAsDone(filepath)
+            # And update the tool in database
+            update(pentest, tool_iid, ToolController(toolModel).getData())
+            # Upload file to SFTP
+            msg = "TASK SUCCESS : "+toolModel.name
         except IOError as e:
             toolModel.tags = ["todo"]
             toolModel.notes = "Failed to read results file"
@@ -356,7 +370,7 @@ def launchTask(pentest, tool_iid, data):
     for worker in workers:
         workerName = worker["name"]
         if hasRegistered(workerName, launchableTool):
-            if checks == False:
+            if not checks:
                 choosenWorker = workerName
             elif hasSpaceFor(workerName, launchableTool, pentest):
                 choosenWorker = workerName
@@ -365,7 +379,6 @@ def launchTask(pentest, tool_iid, data):
         return "No worker available", 404
     workerName = choosenWorker
     launchableToolId = launchableTool.getId()
-    print("Mark as running tool "+str(launchableTool))
     launchableTool.markAsRunning(workerName)
     update(pentest, tool_iid, ToolController(launchableTool).getData())
     # Mark the tool as running (scanner_ip is set and dated is set, datef is "None")
@@ -377,6 +390,8 @@ def launchTask(pentest, tool_iid, data):
 def stopTask(pentest, tool_iid, data):
     mongoInstance.connectToDb(pentest)
     stopableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
+    print("Trying to stop task "+str(stopableTool))
+
     if stopableTool is None:
         return "Tool not found", 404
     workers = mongoInstance.getWorkers({})
@@ -398,7 +413,7 @@ def stopTask(pentest, tool_iid, data):
     if not forceReset:
         stopableTool.markAsNotDone()
         update(pentest, tool_iid, ToolController(stopableTool).getData())
-    return True
+    return "Success", 200
 
 def hasRegistered(worker, launchableTool):
     """
@@ -423,14 +438,13 @@ def hasSpaceFor(worker, launchableTool, calendarName):
     Returns:
         Return True if a command of the tool's type can be launched on this worker, False otherwise.
     """
-
     # 1. Find command with command id
     command = ServerCommand.fetchObject({"name": launchableTool.name}, calendarName)
-    if command.safe == "False":
+    if str(command.safe) == "False":
+        #print("Can't launch "+command.name+" on worker cause not safe")
         return False
     # 2. Calculate individual command limit for the server
-    nb = getNbOfLaunchedCommand(worker, command.name) + 1
-    
+    nb = getNbOfLaunchedCommand(calendarName, worker, command.name) + 1
     if nb > int(command.max_thread):
         #print("Can't launch "+command.name+" on worker cause command max_trhad "+str(nb)+" > "+str(int(command.max_thread)))
         return False
@@ -441,13 +455,13 @@ def hasSpaceFor(worker, launchableTool, calendarName):
     for group in command_groups:
         tots = 0
         for commandName in group.commands:
-            tots += getNbOfLaunchedCommand(worker, commandName)
+            tots += getNbOfLaunchedCommand(calendarName, worker, commandName)
         if tots + 1 > int(group.max_thread):
             #print("Can't launch "+command.name+" on worker cause group_max_thread "+str(tots + 1)+" > "+str(int(group.max_thread)))
             return False
     return True
 
-def getNbOfLaunchedCommand(worker, commandName):
+def getNbOfLaunchedCommand(calendarName, worker, commandName):
     """
     Get the total number of running commands which have the given command name
 
@@ -457,8 +471,8 @@ def getNbOfLaunchedCommand(worker, commandName):
     Returns:
         Return the total of running tools with this command's name as an integer.
     """
-    t = mongoInstance.findInDb("tools", {"name": commandName, "scanner_ip": worker, "dated": {
-                            "$ne": "None"}, "datef": {"$eq": "None"}})
+    t = mongoInstance.findInDb(calendarName, "tools", {"name": commandName, "scanner_ip": worker, "dated": {
+                            "$ne": "None"}, "datef": "None"})
     if t is not None:
         return t.count()
     return 0

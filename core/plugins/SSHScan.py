@@ -30,8 +30,6 @@ class SSHScan(Plugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
-    def checkReturnCode(self, _returncode):
-        return True
 
     def Parse(self, pentest, file_opened, **_kwargs):
         """
@@ -69,6 +67,8 @@ class SSHScan(Plugin):
                     insert_res = port_o.addInDb()
                     if not insert_res["res"]:
                         port_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})
+                    if port_o is None:
+                        continue
                     notes = "\n".join(
                         scan["compliance"].get("recommendations", []))
                     targets[str(port_o.getId())] = {

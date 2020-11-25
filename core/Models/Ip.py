@@ -84,16 +84,6 @@ class Ip(Element):
                 ret.append(str(scope["_id"]))
         return ret
 
-    
-    @classmethod
-    def getIpsInScope(cls, scopeId):
-        """Returns a list of IP objects that have the given scope id in there matching scopes.
-        Args:
-            scopeId: a mongo ObjectId of a scope object.
-        Returns:
-            a mongo cursor of IP objects matching the given scopeId
-        """
-        return Ip.fetchObjects({"in_scopes": {"$elemMatch": {"$eq": str(scopeId)}}})
 
     def delete(self):
         """

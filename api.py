@@ -36,5 +36,7 @@ if __name__ == '__main__':
     removeInactiveWorkersTimer = threading.Timer(
             30, removeInactiveWorkers)
     removeInactiveWorkersTimer.start()
+    #import logging
+    #logging.basicConfig(filename='error.log',level=logging.DEBUG)
     app.run(host='0.0.0.0', port=5000, debug=True)
     removeInactiveWorkersTimer.cancel()

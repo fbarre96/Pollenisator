@@ -26,7 +26,7 @@ class ServerDefect(Defect, ServerElement):
         return insert(self.pentest, DefectController(self).getData())
 
     def update(self):
-        return update("defects", {"_id":ObjectId(self._id)}, {"$set":DefectController(self).getData()}, False, True)
+        return update("defects", ObjectId(self._id), DefectController(self).getData())
 
     def getParentId(self):
         try:
@@ -70,8 +70,8 @@ class ServerDefect(Defect, ServerElement):
             Returns a cursor to iterate on model objects
         """
         mongoInstance.connectToDb(pentest)
-        ds = mongoInstance.find(cls.coll_name, pipeline, False)
-        if ds is None:
+        d = mongoInstance.find(cls.coll_name, pipeline, False)
+        if d is None:
             return None
         return cls(pentest, d) 
 

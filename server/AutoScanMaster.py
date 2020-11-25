@@ -42,11 +42,10 @@ def autoScan(pentest):
     check = True
     try:
         while check:
-            print("Continuing autoscan")
             launchableTools, waiting = findLaunchableTools(pentest)
             launchableTools.sort(key=lambda tup: (tup["errored"], int(tup["priority"])))
+            #TODO CHECK SPACE 
             for launchableTool in launchableTools:
-                mongoInstance.insert("autoscan", {"toolId":launchableTool["tool"].getId()})
                 res, statuscode = launchTask(pentest, launchableTool["tool"].getId(), {"checks":True, "plugin":""})
             check = getAutoScanStatus(pentest)
             time.sleep(3)
@@ -56,14 +55,16 @@ def autoScan(pentest):
 
 def stopAutoScan(pentest):
     mongoInstance.connectToDb(pentest)
-    tools = mongoInstance.find("autoscan", {})
     toolsRunning = []
-    for tool in tools:
-        if tool.get("toolId", None) is not None:
-            toolsRunning.append(tool["toolId"])
+    workers = mongoInstance.getWorkers({"excludedDatabases":{"$nin":[pentest]}})
+    for worker in workers:
+        tools = mongoInstance.find("tools", {"scanner_ip": worker["name"]}, True)
+        for tool in tools:
+            toolsRunning.append(tool["_id"])
     mongoInstance.delete("autoscan", {}, True)
     for toolId in toolsRunning:
-        stopTask(pentest, toolId, {"forceReset":True})
+        res, msg = stopTask(pentest, toolId, {"forceReset":True})
+        print("STOPTASK : "+str(msg))
 
 def getAutoScanStatus(pentest):
     #commandsRunning = mongoInstance.aggregate("tools", [{"$match": {"datef": "None", "dated": {
@@ -122,7 +123,7 @@ def getNotDoneTools(pentest, waveName):
     """Returns a set of tool mongo ID that are not done yet.
     """
     notDoneTools = set()
-    tools = ServerTool.fetchObjects(pentest, {"wave": waveName, "ip": "", "scanner_ip": "None", "dated": "None", "datef": "None"})
+    tools = ServerTool.fetchObjects(pentest, {"wave": waveName, "ip": "", "dated": "None", "datef": "None"})
     for tool in tools:
         notDoneTools.add(tool.getId())
     scopes = ServerScope.fetchObjects(pentest, {"wave": waveName})
@@ -131,7 +132,7 @@ def getNotDoneTools(pentest, waveName):
         ips = ServerIp.getIpsInScope(pentest, scopeId)
         for ip in ips:
             tools = ServerTool.fetchObjects(pentest, {
-                                        "wave": waveName, "ip": ip.ip, "scanner_ip": "None", "dated": "None", "datef": "None"})
+                                        "wave": waveName, "ip": ip.ip, "dated": "None", "datef": "None"})
             for tool in tools:
                 notDoneTools.add(tool.getId())
     return notDoneTools

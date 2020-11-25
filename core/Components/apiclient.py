@@ -2,6 +2,7 @@ import json
 import requests
 import os
 import io
+from datetime import datetime
 import sys
 import core.Components.Utils as Utils
 from bson import ObjectId
@@ -31,7 +32,6 @@ class APIClient():
     def getInstance():
         """ Singleton Static access method.
         """
-        print("Called getInstance")
         pid = os.getpid()  # HACK : One api client per process.
         instance = APIClient.__instances.get(pid, None)
         if instance is None:
@@ -58,14 +58,6 @@ class APIClient():
 
     def getCurrentPentest(self):
         return self.currentPentest
-
-    def removeInactiveWorkers(self):
-        api_url = '{0}workers/removeInactiveWorkers'.format(self.api_url_base)
-        response = requests.get(api_url, headers=self.headers)
-        if response.status_code == 200:
-            return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
-        else:
-            return None
 
     def unregisterWorker(self, worker_name):
         api_url = '{0}workers/{1}/unregister'.format(self.api_url_base, worker_name)
@@ -189,7 +181,7 @@ class APIClient():
 
     def update(self, collection, iid, updatePipeline):
         api_url = '{0}{1}/update/{2}/{3}'.format(self.api_url_base, collection, self.getCurrentPentest(), iid)
-        response = requests.put(api_url, headers=self.headers,data=json.dumps(updatePipeline, cls=JSONEncoder))
+        response = requests.put(api_url, headers=self.headers,data=json.dumps(updatePipeline, cls=JSONEncoder), proxies=proxies, verify=False)
         if response.status_code == 200:
             return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
         else:
@@ -384,14 +376,22 @@ class APIClient():
             return True, data["comm"], data["ext"]
         return False, response.content.decode('utf-8'), ""
     
-    def importToolResult(self, tool_iid, parser, local_path, returncode):
+    def importToolResult(self, tool_iid, parser, local_path):
         api_url = '{0}tools/{1}/importResult/{2}'.format(self.api_url_base, self.getCurrentPentest(), tool_iid)
+        if not os.path.isfile(local_path):
+            return "Failure to open provided file"
         with io.open(local_path, 'r', encoding='utf-8', errors="ignore") as f:
-            response = requests.post(api_url, files={"upfile": (os.path.basename(local_path) ,f)}, data={"plugin":parser, "returncode":int(returncode)}, proxies=proxies, verify=False)
+            response = requests.post(api_url, files={"upfile": (os.path.basename(local_path) ,f)}, data={"plugin":parser}, proxies=proxies, verify=False)
             if response.status_code == 200:
                 return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
-        return "Failure"
+            return response.content.decode('utf-8')
 
+    def setToolStatus(self, toolmodel, newStatus, arg=""):
+        api_url = '{0}tools/{1}/{2}/changeStatus'.format(self.api_url_base, self.getCurrentPentest(), toolmodel.getId())
+        response = requests.post(api_url, headers=self.headers, data=json.dumps({"newStatus":newStatus, "arg":arg}), proxies=proxies, verify=False)
+        if response.status_code == 200:
+            return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
+        return None
     def importExistingResultFile(self, filepath, plugin):
         api_url = '{0}files/{1}/import'.format(self.api_url_base, self.getCurrentPentest())
         with io.open(filepath, 'r', encoding='utf-8', errors="ignore") as f:
@@ -470,3 +470,17 @@ class APIClient():
         if response.status_code == 200:
             return json.loads(response.content.decode('utf-8'), cls=JSONDecoder)
         return None
+    
+    def generateReport(self, modele, clientName, contractName, mainRedac):
+        api_url = '{0}report/{1}/generate'.format(self.api_url_base, self.getCurrentPentest())
+        response = requests.get(api_url, headers=self.headers, params={"templateName":modele, "contractName":contractName, "clientName":clientName, "mainRedactor":mainRedac}, proxies=proxies, verify=False)
+        if response.status_code == 200:
+            timestr = datetime.now().strftime("%Y%m%d-%H%M%S")
+            ext = os.path.splitext(modele)[-1]
+            basename = clientName.strip()+"_"+contractName.strip()
+            out_name = str(timestr)+"_"+basename
+            out_path = os.path.join(dir_path, "../../exports/",out_name+ext)
+            with open(out_path, 'wb') as f:
+                f.write(response.content)
+                return os.path.normpath(out_path)
+        return response.content.decode("utf-8")

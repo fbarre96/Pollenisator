@@ -46,7 +46,8 @@ CONNECTED
     kthxbyeFound = False
     cmeFound = False
     for line in cme_file:
-        line = line.decode("utf-8")
+        if isinstance(line, bytes):
+            line = line.decode("utf-8")
         # Search ip in file
         if "\x1b[1m\x1b[34mCME\x1b[0m" in line:
             cmeFound = True
@@ -158,14 +159,6 @@ class CME(Plugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
-    def checkReturnCode(self, returncode):
-        """Check if the command was executed successfully using the final exit code.
-        Args:
-            returncode: the exit code of the command executed.
-        Returns:
-            bool: True if successful returncode, False otherwise.
-        """
-        return returncode == 0
 
     def Parse(self, pentest, file_opened, **_kwargs):
         """

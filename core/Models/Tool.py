@@ -134,7 +134,8 @@ class Tool(Element):
             list of string with status inside (accepted values are OOS, OOT, running, done)
         """
         self.status = status
-        self.update({"status": self.status})
+        apiclient = APIClient.getInstance()
+        apiclient.setToolStatus(self, self.status)
 
     def getStatus(self):
         """
@@ -296,6 +297,8 @@ class Tool(Element):
             self.status.remove("done")
         if "running" in self.status:
             self.status.remove("running")
+        if not self.status:
+            self.status = ["ready"]
         self.update()
 
     

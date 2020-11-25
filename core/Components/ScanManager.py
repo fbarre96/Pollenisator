@@ -247,7 +247,7 @@ class ScanManager:
                 dialog = ChildDialogEditCommandSettings(self.parent, "Edit worker tools config")
                 self.parent.wait_window(dialog.app)
                 if isinstance(dialog.rvalue, tuple):
-                    tasks = self.sendEditToolConfig(parent, command_name, dialog.rvalue[0], dialog.rvalue[1])
+                    self.sendEditToolConfig(parent, command_name, dialog.rvalue[0], dialog.rvalue[1])
             else: # no parent node = worker node
                 self.setUseForPentest(item)
     
@@ -266,7 +266,6 @@ class ScanManager:
             thread = multiprocessing.Process(target=executeCommand, args=(
                 apiclient.getCurrentPentest(), str(launchableToolId), parser))
             thread.start()
-            print("Mark as running tool "+str(toolModel))
             toolModel.markAsRunning(worker)
 
         else:

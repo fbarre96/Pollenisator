@@ -6,6 +6,7 @@ from core.Models.Ip import Ip
 from core.Controllers.IpController import IpController
 from server.ServerModels.Tool import ServerTool
 from server.ServerModels.Tool import delete as tool_delete
+from server.ServerModels.Port import ServerPort
 from server.ServerModels.Port import delete as port_delete
 from server.ServerModels.Defect import delete as defect_delete
 from server.ServerModels.Element import ServerElement
@@ -87,7 +88,7 @@ class ServerIp(Ip, ServerElement):
         ds = mongoInstance.find(cls.coll_name, pipeline, False)
         if ds is None:
             return None
-        return cls(pentest, d) 
+        return cls(pentest, ds) 
 
     @classmethod
     def getIpsInScope(cls, pentest, scopeId):
@@ -109,7 +110,7 @@ class ServerIp(Ip, ServerElement):
         """
         if str(scopeId) in self.in_scopes:
             self.in_scopes.remove(str(scopeId))
-            update(pentest, self._id, ControllerIp(self).getData())
+            update(pentest, self._id, IpController(self).getData())
             if not self.in_scopes:
                 tools = ServerTool.fetchObjects(pentest, {"ip": self.ip})
                 for tool in tools:
@@ -126,7 +127,7 @@ class ServerIp(Ip, ServerElement):
                 tool.setInScope()
         if str(scopeId) not in self.in_scopes:
             self.in_scopes.append(str(scopeId))
-            update(pentest, self._id, ControllerIp(self).getData())
+            update(pentest, self._id, IpController(self).getData())
 
 
     def getParentId(self):
@@ -182,7 +183,7 @@ class ServerIp(Ip, ServerElement):
         return insert(self.pentest, IpController(self).getData())
 
     def update(self):
-        return update("ips", {"_id":ObjectId(self._id)}, {"$set":IpController(self).getData()}, False, True)
+        return update("ips", self._id, IpController(self).getData())
 
 
 def delete(pentest, ip_iid):

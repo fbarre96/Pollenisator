@@ -3,6 +3,7 @@
 from core.plugins.plugin import Plugin
 from server.ServerModels.Ip import ServerIp
 from server.ServerModels.Port import ServerPort
+from core.Models.Port import Port
 from core.Application.Dialogs.ChildDialogQuestion import ChildDialogQuestion
 import re
 import webbrowser
@@ -84,7 +85,7 @@ class Dirsearch(Plugin):
         Return:
             A dictionary with buttons text as key and function callback as value.
         """
-        self.port_m = ServerPort.fetchObject(
+        self.port_m = Port.fetchObject(
             {"ip": toolmodel.ip, "port": toolmodel.port, "proto": toolmodel.proto})
         if self.port_m is None:
             return {}

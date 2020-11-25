@@ -1,3 +1,1 @@
-pymongo==3.3.0
 netaddr>=0.7.19
-pysftp>=0.2.9

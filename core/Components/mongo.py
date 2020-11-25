@@ -710,6 +710,8 @@ class MongoCalendar:
         from core.Components.Utils import execute
         if kwargs.get("nsTo", None) is not None:
             toDbName = kwargs.get("nsTo")
+        else:
+            toDbName = os.path.splitext(os.path.basename(filename))[0]
         success, msg = self.registerCalendar(toDbName, True, False)
         if success:
             connectionString = '' if self.user == '' else "-u "+self.user + \

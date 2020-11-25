@@ -84,7 +84,7 @@ class ServerScope(Scope, ServerElement):
                     if my_ip == ip["ip"]:
                         ips_fitting.append(ip)
             else:
-                if Ip.checkIpScope(self.scope, ip["ip"]):
+                if ServerIp.checkIpScope(self.scope, ip["ip"]):
                     ips_fitting.append(ip)
         return ips_fitting
 

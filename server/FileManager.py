@@ -153,7 +153,7 @@ def rmProof(pentest, defect_iid, filename):
     return "Successfully deleted "+str(filename)
 
 def getProofPath(pentest, defect_iid):
-    return os.path.join(local_path, pentest, "proof", defect_iid)
+    return os.path.join(local_path, pentest, "proof", str(defect_iid))
 
 def deletePentestFiles(pentest):
     proofspath = os.path.join(local_path, pentest, "proof")

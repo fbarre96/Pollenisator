@@ -34,7 +34,7 @@ class ToolController(ControllerElement):
         """
         return self.model.getStatus()
         
-    def setStatus(self,status):
+    def setStatus(self, status):
         """Set the tool model status
         Args:
             status: string with possible values : "OOS"/"OOT"/"running"/"done". OOS = Out of Scope, OOT = Out of Time range

@@ -272,7 +272,7 @@ class DashBoard:
         frameDefaults.columnconfigure(0, weight=1)
         frameDefaults.rowconfigure(0, weight=1)
         frameDefaults.grid(row=2, sticky=tk.NSEW, padx=5, columnspan=2, pady=5)
-
+              
         self.dashboardFrame.columnconfigure(0, weight=1)
         self.dashboardFrame.columnconfigure(1, weight=1)
         self.dashboardFrame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)

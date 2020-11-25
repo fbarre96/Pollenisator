@@ -23,9 +23,9 @@ from datetime import datetime
 import requests
 import re
 import io
-from core.Models.Ip import Ip
-from core.Models.Port import Port
-from core.Models.Defect import Defect
+from server.ServerModels.Ip import ServerIp
+from server.ServerModels.Port import ServerPort
+from server.ServerModels.Defect import ServerDefect
 from core.Application.Dialogs.ChildDialogQuestion import ChildDialogQuestion
 import tkinter as tk
 
@@ -653,7 +653,7 @@ def write_defect_from_input(result, document, table_d, separator, o_defect, coun
 
 
 
-def write_each_defect(document, defects_dict):
+def write_each_defect(pentest, document, defects_dict):
     """
     for each default
        Copy a table and a paragraph form the template marked with var_d_id and var_d_separator.
@@ -707,7 +707,7 @@ def write_each_defect(document, defects_dict):
             o_defect["details"] = {}
             for ids in defect_dict.get("defects_ids", []):
                 o_defect["details"][ids] = o_defect["details"].get(ids, {})
-                defect_m = Defect.fetchObject({"_id":ObjectId(ids)})
+                defect_m = ServerDefect.fetchObject(pentest, {"_id":ObjectId(ids)})
                 target = ""
                 notes = ""
                 if defect_m.ip != "" and defect_m.ip is not None:
@@ -788,7 +788,7 @@ def fill_cell(cell, text, font_color=None, bg_color=None, bold=False):
         cell._tc.get_or_add_tcPr().append(shading_elm_1)  # pylint: disable=protected-access
 
 
-def populate_services_table(document, parent):
+def populate_services_table(pentest, document, parent):
     table, _ = findRowContaining(document, "var_ssum_ip")
     if table is None:
         return
@@ -796,7 +796,7 @@ def populate_services_table(document, parent):
     replaceTextInTable(table, "var_ssum_port", "Port")
     replaceTextInTable(table, "var_ssum_proto", "Protocole")
     replaceTextInTable(table, "var_ssum_comment", "Commentaires")
-    ips = Ip.fetchObjects({"in_scopes": {"$ne":[]}})
+    ips = ServerIp.fetchObjects(pentest, {"in_scopes": {"$ne":[]}})
     cursorAsList = [c for c in ips] # NOT OPTIMIZED
     nbOfIp = len(cursorAsList)
     if nbOfIp >= 10:
@@ -810,7 +810,7 @@ def populate_services_table(document, parent):
             return
     for ip in cursorAsList:
         ligne_deb = len(table.rows)
-        ports = Port.fetchObjects({"ip":ip.ip})
+        ports = ServerPort.fetchObjects(pentest, {"ip":ip.ip})
         for port in ports:
             new_row_cells = table.add_row().cells
             fill_cell(new_row_cells[1], port.port if port.proto == "tcp" else port.proto+"/"+port.port)
@@ -1069,7 +1069,7 @@ def markdownToWordInDocument(document):
                     for run in paragraph.runs:
                         markdownToWordInRun(paragraph, run, document.styles)
 
-def createReport(defects_dict, template, out_name, **kwargs):
+def createReport(pentest, defects_dict, template, out_name, **kwargs):
     #print("Defect dict: "+str(defects_dict))
     document = Document(template)
     global cell_style
@@ -1121,9 +1121,9 @@ def createReport(defects_dict, template, out_name, **kwargs):
         print("Skipping  defect summary: "+str(e))
     progressbar.update() # defect summary step
     print("Write each defect ...")
-    write_each_defect(document, defects_dict)
+    write_each_defect(pentest, document, defects_dict)
     print("Write services table ...")
-    populate_services_table(document, kwargs.get("root", None))
+    populate_services_table(pentest, document, kwargs.get("root", None))
     progressbar.update() # service table step
     print("Converting Markdown ...")
     markdownToWordInDocument(document)
@@ -1135,3 +1135,4 @@ def createReport(defects_dict, template, out_name, **kwargs):
     print("Generated report at "+str(out_path))
     document.save(out_path)
     progressbar.update() # saving step
+    return out_path

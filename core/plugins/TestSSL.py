@@ -115,9 +115,6 @@ class TestSSL(Plugin):
             return " ".join(args[:-1]) + self.getFileOutputArg()+outputDir+toolname + " "+args[-1]
         return command
 
-    def checkReturnCode(self, _returncode):
-        return True
-
     def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
