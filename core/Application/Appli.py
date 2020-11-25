@@ -372,14 +372,13 @@ class Appli(ttk.Frame):
         """
         Read notifications from database every 0.5 or so second. Notifications are used to exchange informations between applications.
         """
-        print("REad notifs")
         apiclient = APIClient.getInstance()
         try:
             lastNotifReadTime = datetime.datetime.now()
             notifications = apiclient.fetchNotifications(apiclient.getCurrentPentest(), self.lastNotifReadTime)
             self.lastNotifReadTime = lastNotifReadTime
             for notification in notifications:
-                print("Notification received "+str(notification["db"])+"/"+str(notification["collection"])+" iid="+str(notification["iid"])+" action="+str(notification["action"]))
+                # print("Notification received "+str(notification["db"])+"/"+str(notification["collection"])+" iid="+str(notification["iid"])+" action="+str(notification["action"]))
                 if notification["db"] == "pollenisator":
                     if notification["collection"] == "workers":
                         self.scanManager.notify(notification["iid"], notification["action"])

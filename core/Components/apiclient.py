@@ -9,8 +9,8 @@ from bson import ObjectId
 from core.Components.Utils import JSONEncoder, JSONDecoder
 from shutil import copyfile
 
-proxies = {"http":"127.0.0.1:8080", "https":"127.0.0.1:8080"}
-# proxies = {}
+#proxies = {"http":"127.0.0.1:8080", "https":"127.0.0.1:8080"}
+proxies = {}
 dir_path = os.path.dirname(os.path.realpath(__file__))  # fullpath to this file
 config_dir = os.path.join(dir_path, "./../../config/")
 if not os.path.isfile(os.path.join(config_dir, "client.cfg")):

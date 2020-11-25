@@ -229,6 +229,7 @@ def execute(command, timeout=None, printStdout=True):
         except Exception as e:
             print(str(e))
             proc.kill()
+            return -1
         finally:
             if timeout is not None:
                 if isinstance(timeout, float):

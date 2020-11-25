@@ -6,6 +6,7 @@ from flask import jsonify
 from bson import ObjectId
 import threading
 from core.Components.Utils import JSONEncoder
+from server.worker import removeInactiveWorkers
 
 # Create the application instance
 app = connexion.App(__name__, specification_dir='./server/api_specs/')
@@ -24,17 +25,17 @@ def home():
     """
     return "Api working"
 
-def removeInactiveWorkers():
-    mongoInstance.removeInactiveWorkers()
+def removeInactiveWorkersTimerSet():
+    removeInactiveWorkers()
     removeInactiveWorkersTimer = threading.Timer(
-            30, removeInactiveWorkers)
+            30, removeInactiveWorkersTimerSet)
     removeInactiveWorkersTimer.start()
 
 # If we're running in stand alone mode, run the application
 if __name__ == '__main__':
     mongoInstance = MongoCalendar.getInstance()
     removeInactiveWorkersTimer = threading.Timer(
-            30, removeInactiveWorkers)
+            30, removeInactiveWorkersTimerSet)
     removeInactiveWorkersTimer.start()
     #import logging
     #logging.basicConfig(filename='error.log',level=logging.DEBUG)

@@ -173,6 +173,7 @@ class ServerTool(Tool, ServerElement):
             newStatus.append("OOT")
         self.status = newStatus
         self.resultfile = file_name
+        mongoInstance.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
 
     def markAsError(self):
         """Set this tool status as not done by removing "done" or "running" and adding an error status.
@@ -180,6 +181,7 @@ class ServerTool(Tool, ServerElement):
         """
         self.dated = "None"
         self.datef = "None"
+        mongoInstance.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
         self.scanner_ip = "None"
         if "done" in self.status:
             self.status.remove("done")
@@ -193,6 +195,8 @@ class ServerTool(Tool, ServerElement):
         """
         self.dated = "None"
         self.datef = "None"
+        if self.scanner_ip != "None":
+            mongoInstance.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
         self.scanner_ip = "None"
         if "done" in self.status:
             self.status.remove("done")
@@ -214,6 +218,7 @@ class ServerTool(Tool, ServerElement):
             newStatus.append("OOT")
         self.status = newStatus
         self.scanner_ip = workerName
+        mongoInstance.updateInDb("pollenisator", "workers", {"name":workerName}, {"$push":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
     
 def setStatus(pentest, tool_iid, data):
     newStatus = data["newStatus"]

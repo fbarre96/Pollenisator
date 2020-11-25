@@ -81,9 +81,10 @@ class Settings:
             if pentest_types is not None:
                 if isinstance(pentest_types["value"], str):
                     cls.__pentest_types = json.loads(pentest_types["value"])
-                if isinstance(pentest_types["value"], dict):
+                elif isinstance(pentest_types["value"], dict):
                     cls.__pentest_types = pentest_types["value"]
-                
+                else:
+                    cls.__pentest_types = {"Web":["Socle", "Application", "Données", "Politique"], "LAN":["Infrastructure", "Active Directory", "Données", "Politique"]}
             else:
                 cls.__pentest_types = {"Web":["Socle", "Application", "Données", "Politique"], "LAN":["Infrastructure", "Active Directory", "Données", "Politique"]}
         return cls.__pentest_types

@@ -1,6 +1,7 @@
 import json
 from core.Components.mongo import MongoCalendar
-from server.ServerModels.Tool import ServerTool
+from core.Controllers.ToolController import ToolController
+from server.ServerModels.Tool import ServerTool, update as tool_update
 from bson import ObjectId
 from datetime import datetime
 mongoInstance = MongoCalendar.getInstance()
@@ -32,7 +33,17 @@ def deleteWorker(name):
     return {"n":int(res.deleted_count)}
 
 def removeInactiveWorkers():
-    count = mongoInstance.removeInactiveWorkers()
+    workers = mongoInstance.getInactiveWorkers()
+    count = 0
+    for worker in workers:
+        running_tools = worker.get("running_tools", [])
+        for running_tool in running_tools:
+            tool_m = ServerTool.fetchObject(running_tool["pentest"], {"_id":ObjectId(running_tool["iid"])})
+            if "running" in tool_m.getStatus():
+                tool_m.markAsNotDone()
+                tool_update(running_tool["pentest"], running_tool["iid"], ToolController(tool_m).getData())
+        deleteWorker(worker["name"])
+        count += 1
     return {"n":int(count)}
 
 def registerCommands(name, command_names):
@@ -60,12 +71,13 @@ def registerWorker(data):
 
 def unregister(name):
     worker = mongoInstance.getWorker(name)
-    calendars = mongoInstance.listCalendars()
     if worker is not None:
-        for calendar in calendars:
-            toolsToReset = ServerTool.fetchObjects(calendar, {"datef": "None", "scanner_ip": name})
-            for tool in toolsToReset:
-                tool.markAsNotDone()
+        running_tools = worker.get("running_tools", [])
+        for running_tool in running_tools:
+            tool_m = ServerTool.fetchObject(running_tool["pentest"], {"_id":ObjectId(running_tool["iid"])})
+            if "running" in tool_m.getStatus():
+                tool_m.markAsNotDone()
+                tool_update(running_tool["pentest"], running_tool["iid"], ToolController(tool_m).getData())
         mongoInstance.deleteFromDb("pollenisator", "workers", {"name": name}, False, True)
         return True
     return "Worker not Found", 404
