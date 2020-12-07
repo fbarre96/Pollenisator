@@ -2,7 +2,6 @@
 
 from core.Models.Element import Element
 from core.Models.Tool import Tool
-from core.Components.apiclient import APIClient
 import core.Components.Utils as Utils
 from bson.objectid import ObjectId
 from datetime import datetime
@@ -47,50 +46,7 @@ class Interval(Element):
         self.infos = infos if infos is not None else {}
         return self
 
-    def delete(self):
-        """
-        Delete the Interval represented by this model in database.
-        """
-        apiclient = APIClient.getInstance()
-        apiclient.delete(
-            "intervals", {"_id": self._id})
-        
-
-    def addInDb(self):
-        """
-        Add this interval in database.
-
-        Returns: a tuple with :
-                * bool for success
-                * mongo ObjectId : already existing object if duplicate, create object id otherwise 
-        """
-        base = {"wave": self.wave, "dated": self.dated, "datef": self.datef}
-        apiclient = APIClient.getInstance()
-        res, iid = apiclient.insert("intervals", base)
-        self._id = iid
-        return True, iid
-
-    def update(self, pipeline_set=None):
-        """Update this object in database.
-        Args:
-            pipeline_set: (Opt.) A dictionnary with custom values. If None (default) use model attributes.
-        """
-        
-        apiclient = APIClient.getInstance()
-        if pipeline_set is None:
-            apiclient.update("intervals", ObjectId(self._id), {"dated": self.dated, "datef": self.datef})
-        else:
-            apiclient.update("intervals", ObjectId(self._id), pipeline_set)
-
-    def _getParentId(self):
-        """
-        Return the mongo ObjectId _id of the first parent of this object. For an interval it is the wave.
-
-        Returns:
-            Returns the parent wave's ObjectId _id".
-        """
-        apiclient = APIClient.getInstance()
-        return apiclient.find("waves", {"wave": self.wave}, False)["_id"]
+ 
 
     def __str__(self):
         """

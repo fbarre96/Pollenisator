@@ -3,7 +3,6 @@
 import os
 from bson.objectid import ObjectId
 from core.Models.Element import Element
-from core.Components.apiclient import APIClient
 
 
 class Defect(Element):
@@ -87,126 +86,7 @@ class Defect(Element):
                           "Très difficile": {"Mineur": "Mineur", "Important": "Mineur", "Majeur": "Important", "Critique": "Important"}}
         return risk_from_ease.get(ease, {}).get(impact, "N/A")
 
-    def delete(self):
-        """
-        Delete the defect represented by this model in database.
-        """
-        ret = self._id
-        apiclient = APIClient.getInstance()
-        apiclient.delete("defects", ret)
 
-    def addInDb(self):
-        """
-        Add this defect to pollenisator database.
-        Returns: a tuple with :
-                * bool for success
-                * mongo ObjectId : already existing object if duplicate, create object id otherwise 
-        """
-        apiclient = APIClient.getInstance()
-        base = self.getDbKey()
-        base["notes"] = self.notes
-        base["ease"] = self.ease
-        base["impact"] = self.impact
-        base["risk"] = self.risk
-        base["redactor"] = self.redactor
-        base["type"] = list(self.mtype)
-        base["proofs"] = self.proofs
-        if self.index is not None:
-            base["index"] = int(self.index)
-        res, id = apiclient.insert("defects", base)
-        if not res:
-            return False, id
-        self._id = id
-        return True, id
-
-    
-
-    def update(self, pipeline_set=None):
-        """Update this object in database.
-        Args:
-            pipeline_set: (Opt.) A dictionnary with custom values. If None (default) use model attributes.
-        """
-        apiclient = APIClient.getInstance()
-        if pipeline_set is None:
-            apiclient.update("defects", ObjectId(self._id), {"ip": self.ip, "title": self.title, "port": self.port,
-                         "proto": self.proto, "notes": self.notes, "ease": self.ease, "impact": self.impact,
-                         "risk": self.risk, "redactor": self.redactor, "type": list(self.mtype), "proofs": self.proofs, "infos": self.infos, "index":int(self.index)})
-        else:
-            apiclient.update("defects", ObjectId(self._id), pipeline_set)
-
-    def _getParentId(self):
-        """
-        Return the mongo ObjectId _id of the first parent of this object. For a Defect it is either an ip or a port depending on the Defect's level.
-
-        Returns:
-            Returns the parent's ObjectId _id".
-        """
-        try:
-            port = self.port
-        except AttributeError:
-            port = None
-        
-        apiclient = APIClient.getInstance()
-        if port is None:
-            port = ""
-        if port == "":
-            obj = apiclient.find("ips", {"ip": self.ip}, False)
-        else:
-            obj = apiclient.find(
-                "ports", {"ip": self.ip, "port": self.port, "proto": self.proto}, False)
-        return obj["_id"]
-
-    def calcDirPath(self):
-        """Returns a directory path constructed for this defect.
-        Returns:
-            path as string
-        """
-        apiclient = APIClient.getInstance()
-        path_calc = str(apiclient.getCurrentPentest())+"/"+str(self.ip)
-        try:
-            port = self.port
-        except AttributeError:
-            port = None
-        if port is not None:
-            path_calc += "/"+str(self.port)+"_"+str(self.proto)
-        path_calc += "/"+str(self._id)
-        return path_calc
-
-    def uploadProof(self, proof_local_path):
-        """Upload the given proof file to the server
-        Args:
-            proof_local_path: a path to a local proof file
-        Returns:
-            the basename of the file 
-        """
-        apiclient = APIClient.getInstance()
-        apiclient.putProof(self._id, proof_local_path)
-        return os.path.basename(proof_local_path)
-
-    def getProof(self, ind):
-        """Download the proof file at given proof index
-        Returns:
-            A string giving the local path of the downloaded proof
-        """
-        apiclient = APIClient.getInstance()
-        current_dir = os.path.dirname(os.path.realpath(__file__))
-        local_path = os.path.join(current_dir, "../../results", self.calcDirPath())
-        try:
-            os.makedirs(local_path)
-        except FileExistsError:
-            pass
-        local_path = os.path.join(local_path, self.proofs[ind])
-        ret = apiclient.getProof(self._id, self.proofs[ind], local_path)
-        return ret
-
-    def removeProof(self, ind):
-        """Removes the proof file at given proof index
-        """
-        apiclient = APIClient.getInstance()
-        filename = self.proofs[ind]
-        ret = apiclient.rmProof(self._id, filename)
-        del self.proofs[ind]
-        return ret
 
     def __str__(self):
         """

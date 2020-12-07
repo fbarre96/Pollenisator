@@ -2,7 +2,6 @@
 
 from core.Models.Element import Element
 from bson.objectid import ObjectId
-from core.Components.apiclient import APIClient
 from netaddr import IPNetwork, IPAddress
 from netaddr.core import AddrFormatError
 from core.Models.Port import Port
@@ -69,33 +68,6 @@ class Ip(Element):
             return True
         return False
 
-    def getScopesFittingMe(self):
-        """Returns a list of scope objects ids where this IP object fits.
-        Returns:
-            a list of scopes objects Mongo Ids where this IP/Domain is in scope.
-        """
-        ret = []
-        apiclient = APIClient.getInstance()
-        scopes = apiclient.find("scopes", {})
-        if scopes is None:
-            return ret
-        for scope in scopes:
-            if self.fitInScope(scope["scope"]):
-                ret.append(str(scope["_id"]))
-        return ret
-
-
-    def delete(self):
-        """
-        Deletes the Ip represented by this model in database.
-        Also deletes the tools associated with this ip
-        Also deletes the ports associated with this ip
-        Also deletes the defects associated with this ip and its ports
-        """
-        apiclient = APIClient.getInstance()
-        apiclient.delete("ips", ObjectId(self._id))
-        
-
     def addPort(self, values):
         """
         Add a port object to database associated with this Ip.
@@ -141,40 +113,6 @@ class Ip(Element):
             return True
         return False
 
-    def update(self, pipeline_set=None):
-        """Update this object in database.
-        Args:
-            pipeline_set: (Opt.) A dictionnary with custom values. If None (default) use model attributes.
-        """
-        apiclient = APIClient.getInstance()
-        if pipeline_set is None:
-            apiclient.update("ips", ObjectId(self._id), {"notes": self.notes, "in_scopes": self.in_scopes, "tags": self.tags, "infos": self.infos})
-        else:
-            apiclient.update("ips", ObjectId(self._id), pipeline_set)
-
-    def addInDb(self):
-        """
-        Add this IP in database.
-
-        Returns: a tuple with :
-                * bool for success
-                * mongo ObjectId : already existing object if duplicate, create object id otherwise 
-        """
-        # Checking unicity
-        if self.ip.strip() == "":
-            raise ValueError("Ip insertion error: Cannot insert empty ip")
-        base = self.getDbKey()
-        apiclient = APIClient.getInstance()
-        # Add ip as it is unique
-        base["notes"] = self.notes
-        base["tags"] = self.tags
-        base["in_scopes"] = self.in_scopes
-        base["infos"] = self.infos
-        resInsert, idInsert = apiclient.insert("ips", base)
-        self._id = idInsert
-        # adding the appropriate tools for this port.
-        # 1. fetching the wave's commands
-        return resInsert, self._id
 
     
 
@@ -186,30 +124,6 @@ class Ip(Element):
             Returns the string ipv4 of this ip.
         """
         return self.ip
-
-    def getTools(self):
-        """Return ip assigned tools as a list of mongo fetched defects dict
-        Returns:
-            list of tool raw mongo data dictionnaries
-        """
-        apiclient = APIClient.getInstance()
-        return apiclient.find("tools", {"lvl": "ip", "ip": self.ip})
-
-    def getPorts(self):
-        """Returns ip assigned ports as a list of mongo fetched defects dict
-        Returns:
-            list of port raw mongo data dictionnaries
-        """
-        apiclient = APIClient.getInstance()
-        return apiclient.find("ports", {"ip": self.ip})
-
-    def getDefects(self):
-        """Returns ip assigned tools as a list of mongo fetched defects dict
-        Returns:
-            list of defect raw mongo data dictionnaries
-        """
-        apiclient = APIClient.getInstance()
-        return apiclient.find("defects", {"ip": self.ip, "$or": [{"port": {"$exists": False}}, {"port": None}, {"port": ""}]})
 
     def getDbKey(self):
         """Return a dict from model to use as unique composed key.
@@ -245,29 +159,3 @@ class Ip(Element):
         """
         return re.search(r"([0-9]{1,3}\.){3}[0-9]{1,3}", ip) is not None
 
-    def _getParentId(self):
-        """
-        Return the mongo ObjectId _id of the first parent of this object.
-
-        Returns:
-            Returns the parent's ObjectId _id".
-        """
-        if self.parent is not None:
-            return self.parent
-        try:
-            if IPAddress(self.ip).is_private():
-                return None
-        except AddrFormatError:
-            return None
-        except ValueError:
-            return None
-        ip_real = performLookUp(self.ip)
-        if ip_real is not None:
-            apiclient = APIClient.getInstance()
-            ip_in_db = apiclient.find("ips", {"ip": ip_real}, False)
-            if ip_in_db is None:
-                return None
-            self.parent = ip_in_db["_id"]
-            self.update({"parent": self.parent})
-            return ip_in_db["_id"]
-        return None

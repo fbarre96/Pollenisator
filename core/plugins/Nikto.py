@@ -3,9 +3,7 @@
 from core.plugins.plugin import Plugin
 from server.ServerModels.Ip import ServerIp
 from server.ServerModels.Port import ServerPort
-from core.Models.Port import Port
 import re
-import webbrowser
 
 
 def parse_nikto_plain_text(output):

@@ -7,7 +7,6 @@ from core.Models.Ip import Ip
 from core.Models.Interval import Interval
 import core.Components.Utils as Utils
 from core.Models.Scope import Scope
-from core.Components.apiclient import APIClient
 
 
 class Wave(Element):
@@ -47,38 +46,6 @@ class Wave(Element):
         self.infos = infos if infos is not None else {}
         return self
 
-    def delete(self):
-        """
-        Delete the wave represented by this model in database.
-        Also delete the tools, intervals, scopes associated with this wave
-        """
-        apiclient = APIClient.getInstance()
-        apiclient.delete("waves", ObjectId(self._id))
-
-    def addInDb(self):
-        """
-        Add this wave in database.
-        Returns: a tuple with :
-                * bool for success
-                * mongo ObjectId : already existing object if duplicate, create object id otherwise 
-        """
-        apiclient = APIClient.getInstance()
-        res, iid = apiclient.insert(
-            "waves", {"wave": self.wave, "wave_commands": list(self.wave_commands)})
-        self._id = iid
-        return res, iid
-
-    def update(self, pipeline_set=None):
-        """Update this object in database.
-        Args:
-            pipeline_set: (Opt.) A dictionnary with custom values. If None (default) use model attributes.
-        """
-        apiclient = APIClient.getInstance()
-        if pipeline_set is None:
-            apiclient.update("waves", ObjectId(self._id), {"wave_commands": list(self.wave_commands)})
-        else:
-            apiclient.update("waves", ObjectId(self._id), pipeline_set)
-
 
     def __str__(self):
         """
@@ -104,22 +71,7 @@ class Wave(Element):
         """
         return Tool.fetchObjects({"wave": self.wave})
 
-    def getIntervals(self):
-        """Return scope assigned intervals as a list of mongo fetched intervals dict
-        Returns:
-            list of defect raw mongo data dictionnaries
-        """
-        apiclient = APIClient.getInstance()
-        return apiclient.find("intervals",
-                                  {"wave": self.wave})
 
-    def getScopes(self):
-        """Return wave assigned scopes as a list of mongo fetched scopes dict
-        Returns:
-            list of defect raw mongo data dictionnaries
-        """
-        apiclient = APIClient.getInstance()
-        return apiclient.find("scopes", {"wave": self.wave})
 
     def getDbKey(self):
         """Return a dict from model to use as unique composed key.
@@ -142,17 +94,3 @@ class Wave(Element):
 
     
 
-    @classmethod
-    def listWaves(cls):
-        """Return all waves names as a list 
-        Returns:
-            list of all wave names
-        """
-        ret = []
-        apiclient = APIClient.getInstance()
-        waves = apiclient.find("waves", {})
-        for wave in waves:
-            ret.append(wave["wave"])
-        return ret
-
-  

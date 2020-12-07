@@ -1,0 +1,6 @@
+[submodule "PollenisatorGUI"]
+	path = PollenisatorGUI
+	url = https://github.com/fbarre96/PollenisatorGUI
+[submodule "PollenisatorWorker"]
+	path = PollenisatorWorker
+	url = https://github.com/fbarre96/PollenisatorWorker

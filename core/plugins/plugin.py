@@ -95,13 +95,3 @@ class Plugin(metaclass=MetaPlugin):
             string: the path to file created
         """
         return self.getFileOutputPath(commandExecuted)
-
-    def getActions(self, _toolmodel):
-        """
-        Summary: Add buttons to the tool view.
-        Args:
-            * toolmodel : the tool model opened in the pollenisator client.
-        Return:
-            A dictionary with buttons text as key and function callback as value.
-        """
-        return {}

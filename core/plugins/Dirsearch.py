@@ -3,11 +3,9 @@
 from core.plugins.plugin import Plugin
 from server.ServerModels.Ip import ServerIp
 from server.ServerModels.Port import ServerPort
-from core.Models.Port import Port
 from core.Application.Dialogs.ChildDialogQuestion import ChildDialogQuestion
 import re
-import webbrowser
-import tkinter as tk
+
 
 def parse_dirsearch_file(notes):
     """Parse a dirsearch resulting raw text file
@@ -77,40 +75,6 @@ class Dirsearch(Plugin):
         """Constructor"""
         self.port_m = None
 
-    def getActions(self, toolmodel):
-        """
-        Summary: Add buttons to the tool view.
-        Args:
-            toolmodel : the tool model opened in the pollenisator client.
-        Return:
-            A dictionary with buttons text as key and function callback as value.
-        """
-        self.port_m = Port.fetchObject(
-            {"ip": toolmodel.ip, "port": toolmodel.port, "proto": toolmodel.proto})
-        if self.port_m is None:
-            return {}
-        return {"Open 200 in browser": self.openInBrowser}
-
-    def openInBrowser(self, _event=None):
-        """Callback of action  Open 200 in browser
-        Open all 200 status code in browser as tabs. If more that 10 status code 200 are to be opened, shows a warning.
-        Args:
-            _event: not used but mandatory
-        """
-        ssl = self.port_m.infos.get("SSL", "False")
-        paths = self.port_m.infos.get("Dirsearch_200", [])
-        url_base = "https://" if ssl == "True" else "http://"
-        toplevel = tk.Toplevel()
-        if len(paths) > 10:
-            dialog = ChildDialogQuestion(toplevel,
-                                     "OPEN WARNING", "Becareful for you are about to open "+str(len(paths)) + "in your browser. This may a bit too much.", ["Continue", "Cancel"])
-            toplevel.wait_window(dialog.app)
-            if dialog.rvalue != "Continue":
-                return
-        toplevel.destroy()
-        for path in paths:
-            url = url_base + self.port_m.ip+":"+str(self.port_m.port)+path
-            webbrowser.open_new_tab(url)
 
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file

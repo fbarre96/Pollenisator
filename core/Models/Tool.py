@@ -1,7 +1,6 @@
 """Tool Model. A tool is an instanciation of a command against a target"""
 
 from core.Models.Element import Element
-from core.Components.apiclient import APIClient
 from bson.objectid import ObjectId
 from datetime import datetime
 import core.Components.Utils as Utils
@@ -91,51 +90,6 @@ class Tool(Element):
         self.status = status
         return self
 
-    def delete(self):
-        """
-        Delete the tool represented by this model in database.
-        """
-        apiclient = APIClient.getInstance()
-        apiclient.delete("tools", ObjectId(self._id))
-
-    def addInDb(self):
-        """
-        Add this tool in database.
-
-        Returns: a tuple with :
-                * bool for success
-                * mongo ObjectId : already existing object if duplicate, create object id otherwise 
-        """
-        base = self.getDbKey()
-        apiclient = APIClient.getInstance()
-        # Checking unicity
-        existing = apiclient.find("tools", base, False)
-        if existing is not None:
-            return False, existing["_id"]
-        # Those are added to base after tool's unicity verification
-        base["scanner_ip"] = self.scanner_ip
-        base["dated"] = self.dated
-        base["datef"] = self.datef
-        if isinstance(self.status, str):
-            self.status = [self.status]
-        base["status"] = self.status
-        base["tags"] = self.tags
-        base["text"] = self.text
-        base["resultfile"] = self.resultfile
-        base["notes"] = self.notes
-        res, iid = apiclient.insert("tools", base)
-        self._id = iid
-        return True, iid
-      
-
-    def setStatus(self,status):
-        """Set this tool status with given list of status
-        Args:
-            list of string with status inside (accepted values are OOS, OOT, running, done)
-        """
-        self.status = status
-        apiclient = APIClient.getInstance()
-        apiclient.setToolStatus(self, self.status)
 
     def getStatus(self):
         """
@@ -149,17 +103,6 @@ class Tool(Element):
                 running : This tool is being run."""
         return self.status
 
-    def getCommand(self):
-        """
-        Get the tool associated command.
-
-        Return:
-            Returns the Mongo dict command fetched instance associated with this tool's name.
-        """
-        apiclient = APIClient.getInstance()
-        commandTemplate = apiclient.findInDb(apiclient.getCurrentPentest(),
-                                                 "commands", {"name": self.name}, False)
-        return commandTemplate
 
     @classmethod
     def __sanitize(cls, var_to_path):
@@ -196,43 +139,6 @@ class Tool(Element):
                 self.proto)+"/"+str(self.port)
             output_dir += Tool.__sanitize(port_dir)+"/"
         return output_dir
-
-    
-
-    def update(self, pipeline_set=None):
-        """Update this object in database.
-        Args:
-            pipeline_set: (Opt.) A dictionnary with custom values. If None (default) use model attributes.
-        """
-        apiclient = APIClient.getInstance()
-        if pipeline_set is None:
-            apiclient.update("tools", ObjectId(self._id), {"scanner_ip": str(self.scanner_ip), "dated": str(self.dated), "status": self.status,
-                         "datef":  str(self.datef), "notes":  self.notes, "resultfile": self.resultfile, "tags": self.tags})
-        else:
-            apiclient.update(
-                "tools", ObjectId(self._id), pipeline_set)
-
-    def _getParentId(self):
-        """
-        Return the mongo ObjectId _id of the first parent of this object. For a Tool it is either a scope, an ip or a port depending on the tool's level.
-
-        Returns:
-            Returns the parent's ObjectId _id". or None if a type error occurs
-        """
-        apiclient = APIClient.getInstance()
-        try:
-            if self.lvl == "wave":
-                wave = apiclient.find("waves", {"wave": self.wave}, False)
-                return wave["_id"]
-            elif self.lvl == "network" or self.lvl == "domain":
-                return apiclient.find("scopes", {"wave": self.wave, "scope": self.scope}, False)["_id"]
-            elif self.lvl == "ip":
-                return apiclient.find("ips", {"ip": self.ip}, False)["_id"]
-            else:
-                return apiclient.find("ports", {"ip": self.ip, "port": self.port, "proto": self.proto}, False)["_id"]
-        except TypeError:
-            # None type returned:
-            return None
 
     def __str__(self):
         """

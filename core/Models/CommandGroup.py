@@ -1,6 +1,5 @@
 """Command Group Model."""
 from core.Models.Element import Element
-from core.Components.apiclient import APIClient
 from bson.objectid import ObjectId
 
 
@@ -46,89 +45,6 @@ class CommandGroup(Element):
         self.max_thread = int(max_thread)
         self.infos = infos if infos is not None else {}
         return self
-
-    def delete(self):
-        """
-        Delete the command group represented by this model in database.
-        """
-        ret = self._id
-        apiclient = APIClient.getInstance()
-        apiclient.delete("group_commands", ret)
-
-    def addInDb(self):
-        """
-        Add a new command group to pollenisator database.
-
-        Returns: a tuple with :
-                * bool for success
-                * mongo ObjectId : already existing object if duplicate, create object id otherwise 
-        """
-        apiclient = APIClient.getInstance()
-        res, id = apiclient.insert("group_commands", {
-            "name": self.name, "sleep_between": int(self.sleep_between), "commands": self.commands, "max_thread": int(self.max_thread)})
-        if not res:
-            return False, id
-        self._id = id
-        return True, id
-
-
-    @classmethod
-    def fetchObject(cls, pipeline):
-        """Fetch one command from database and return the CommandGroup object 
-        Args:
-            pipeline: a Mongo search pipeline (dict)
-        Returns:
-            Returns a CommandGroup or None if nothing matches the pipeline.
-        """
-        apiclient = APIClient.getInstance()
-        d = apiclient.findInDb(
-            "pollenisator", "group_commands", pipeline, False)
-        if d is None:
-            return None
-        return CommandGroup(d)
-
-    @classmethod
-    def fetchObjects(cls, pipeline):
-        """Fetch many commands from database and return a Cursor to iterate over CommandGroup objects
-        Args:
-            pipeline: a Mongo search pipeline (dict)
-        Returns:
-            Returns a cursor to iterate on CommandGroup objects
-        """
-        apiclient = APIClient.getInstance()
-        ds = apiclient.findInDb(
-            "pollenisator", "group_commands", pipeline, True)
-        if ds is None:
-            return None
-        for d in ds:
-            yield CommandGroup(d)
-
-    def update(self, pipeline_set=None):
-        """Update this object in database.
-        Args:
-            pipeline_set: (Opt.) A dictionnary with custom values. If None (default) use model attributes.
-        """
-        apiclient = APIClient.getInstance()
-        if pipeline_set is None:
-            # Update in database
-            apiclient.update("group_commands", ObjectId(self._id), {"name": self.name, "sleep_between": int(self.sleep_between), "commands": self.commands, "max_thread": int(self.max_thread)})
-        else:
-            apiclient.update("group_commands",  ObjectId(self._id), pipeline_set)
-
-    @classmethod
-    def getList(cls):
-        """
-        Get all group of command's name registered on database
-
-        Returns:
-            Returns the list of command groups name found inside the database. List may be empty.
-        """
-        apiclient = APIClient.getInstance()
-        gcommands = apiclient.findInDb("pollenisator", "group_commands")
-        ret = []
-        for gcommand in gcommands:
-            ret.append(gcommand["name"])
-        return ret
 
     def __str__(self):
         """

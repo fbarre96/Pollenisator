@@ -1,11 +1,7 @@
 """Handle mongo database connection and add shortcut functions to common stuff."""
 import os
 import ssl
-import tkinter.messagebox
-import tkinter.simpledialog
-import tkinter.filedialog
 import datetime
-import uuid, OpenSSL
 from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError, OperationFailure
 import core.Components.Utils as Utils
@@ -583,8 +579,6 @@ class MongoCalendar:
                 self.client.drop_database(calendarName)
                 return True
 
-        tkinter.messagebox.showinfo(
-            "Error", "Deleting "+str(calendarName)+" is not allowed because it is not a database.")
         return False
 
     def validateCalendarName(self, calendarName):
