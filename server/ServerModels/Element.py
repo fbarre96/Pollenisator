@@ -52,3 +52,6 @@ class ServerElement(object):
             del newInfos[""]
         self.infos.update(newInfos)
         mongoInstance.update(self.__class__.coll_name(), {"_id":self.getId()}, {"$set":{"infos":self.infos}})
+    
+    def getId(self):
+        return self._id

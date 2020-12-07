@@ -2,12 +2,13 @@ from bson import ObjectId
 from core.Components.mongo import MongoCalendar
 from core.Models.Interval import Interval
 from server.ServerModels.Tool import ServerTool
+from server.ServerModels.Element import ServerElement
 from core.Components.Utils import JSONEncoder, fitNowTime
 import json
 
 mongoInstance = MongoCalendar.getInstance()
 
-class ServerInterval(Interval):
+class ServerInterval(Interval, ServerElement):
 
     def __init__(self, pentest="", *args, **kwargs):
         super().__init__(*args, **kwargs)

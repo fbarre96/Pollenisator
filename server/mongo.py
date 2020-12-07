@@ -10,12 +10,10 @@ from core.Components.Utils import JSONDecoder, getMainDir
 from core.Controllers.CommandController import CommandController
 from core.Controllers.WaveController import WaveController
 from core.Controllers.IntervalController import IntervalController
-from core.Models.Wave import Wave
-from core.Models.Interval import Interval
 from server.ServerModels.Command import ServerCommand
 from server.ServerModels.Command import insert as insert_command
-from server.ServerModels.Wave import insert as insert_wave
-from server.ServerModels.Interval import insert as insert_interval
+from server.ServerModels.Wave import ServerWave, insert as insert_wave
+from server.ServerModels.Interval import ServerInterval, insert as insert_interval
 from server.ServerModels.Scope import insert as insert_scope
 from server.FileManager import deletePentestFiles
 mongoInstance = MongoCalendar.getInstance()
@@ -185,9 +183,9 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     for command in allcommands:
         command.indb = dbName
         insert_command(command.indb, CommandController(command).getData())
-    wave_o = Wave().initialize(dbName, commands)
+    wave_o = ServerWave().initialize(dbName, commands)
     insert_wave(dbName, WaveController(wave_o).getData())
-    interval_o = Interval().initialize(dbName, start_date, end_date)
+    interval_o = ServerInterval().initialize(dbName, start_date, end_date)
     insert_interval(dbName, IntervalController(interval_o).getData())
     for scope in scope.split("\n"):
         if scope.strip() != "":

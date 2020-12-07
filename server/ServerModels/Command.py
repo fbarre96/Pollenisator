@@ -7,7 +7,7 @@ import json
 
 mongoInstance = MongoCalendar.getInstance()
 
-class ServerCommand(Command):
+class ServerCommand(Command, ServerElement):
 
     def __init__(self, pentest, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -41,6 +41,19 @@ class ServerCommand(Command):
         if result is None:
             return None
         return ServerCommand(targetdb, result)
+
+    @classmethod
+    def getList(cls, pipeline=None, targetdb="pollenisator"):
+        """
+        Get all command's name registered on database
+        Args:
+            pipeline: default to None. Condition for mongo search.
+        Returns:
+            Returns the list of commands name found inside the database. List may be empty.
+        """
+        if pipeline is None:
+            pipeline = {}
+        return [command.name for command in cls.fetchObjects(pipeline, targetdb)]
 
 def delete(pentest, command_iid):
     mongoInstance.connectToDb(pentest)

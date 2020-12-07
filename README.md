@@ -2,6 +2,7 @@
 
 **Pollenisator** is a tool aiming to assist pentesters and auditor automating the use of some tools/scripts and keep track of them.
   * Written in python 3
+  * API available
   * Provides a modelisation of "pentest objects" : Scope, Hosts, Ports, Commands, Tools etc.
   * Tools/scripts are separated into 4 categories : wave, Network/domain, IP, Port
   * Objects are stored in a NoSQL DB (Mongo)
@@ -9,7 +10,7 @@
   * Objects can be created through parsers / manual input
   * Business logic can be implemented (auto vuln referencing, item triggers, etc.)
   * Many tools/scripts launch conditions are availiable to avoid overloading the target or the scanner.
-  * A GUI based on tcl/tk
+  * A GUI client based on tcl/tk
   
 ## Documentation ##
 
@@ -54,9 +55,6 @@ Everything is the [wiki](https://github.com/AlgoSecure/Pollenisator/wiki/_Sideba
     
    
 ## Roadmap ##
-
-  * Change the architecture to an API based one
-  * Get rid of Celery
   * Add flexibity for commands
   * Improve UX
   * Add more plugin and improve existing ones
