@@ -26,8 +26,6 @@ import io
 from server.ServerModels.Ip import ServerIp
 from server.ServerModels.Port import ServerPort
 from server.ServerModels.Defect import ServerDefect
-from core.Application.Dialogs.ChildDialogQuestion import ChildDialogQuestion
-import tkinter as tk
 
 class DummyProgressBar:
     def update(self):
@@ -799,15 +797,6 @@ def populate_services_table(pentest, document, parent):
     ips = ServerIp.fetchObjects(pentest, {"in_scopes": {"$ne":[]}})
     cursorAsList = [c for c in ips] # NOT OPTIMIZED
     nbOfIp = len(cursorAsList)
-    if nbOfIp >= 10:
-        if parent is None:
-            parent = tk.Toplevel()
-        dialog = ChildDialogQuestion(parent,
-            "Warning", "The service table will contain "+str(nbOfIp)+" IPs with their ports. It would add a lot of pages to the document. Do you want to keep or discard the service table for this report?", ["Keep", "Discard"])
-        parent.wait_window(dialog.app)
-        if dialog.rvalue == "Discard":
-            table._element.getparent().remove(table._element) # pylint: disable=protected-access
-            return
     for ip in cursorAsList:
         ligne_deb = len(table.rows)
         ports = ServerPort.fetchObjects(pentest, {"ip":ip.ip})
