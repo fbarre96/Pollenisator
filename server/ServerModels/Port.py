@@ -38,7 +38,7 @@ class ServerPort(Port, ServerElement):
             check: A boolean to bypass checks. Force adding this command tool to this port if False. Default is True
         """
         mongoInstance.connectToDb(self.pentest)
-        if check == False:
+        if not check:
             newTool = ServerTool(self.pentest)
             newTool.initialize(command_name, wave_name, scope,
                                self.ip, self.port, self.proto, "port")
@@ -221,5 +221,7 @@ def addCustomTool(pentest, port_iid, data):
     mongoInstance.connectToDb(pentest)
     if not mongoInstance.isUserConnected():
         return "Not connected", 503
+    if mongoInstance.find("waves", {"wave": 'Custom Tools'}, False) is None:
+        mongoInstance.insert("waves", {"wave": 'Custom Tools', "wave_commands": list()})
     port_o = ServerPort(pentest, mongoInstance.find("ports", {"_id":ObjectId(port_iid)}, False))
-    port_o.addAllTool(data["tool_name"], 'Custom Tools', '')
+    port_o.addAllTool(data["tool_name"], 'Custom Tools', '', check=False)

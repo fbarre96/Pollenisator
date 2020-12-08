@@ -41,7 +41,7 @@ class ServerElement(object):
                         i += 1
             tags.append(newTag)
             self.tags = tags
-            mongoInstance.update(self.__class__.coll_name(), {"_id":self.getId()}, {"$set":{"tags":tags}})
+            mongoInstance.update(self.__class__.coll_name, {"_id":self.getId()}, {"$set":{"tags":tags}})
 
     def updateInfos(self, newInfos):
         """Change all infos stores in self.infos with the given new ones and update database.
@@ -51,7 +51,7 @@ class ServerElement(object):
         if "" in newInfos:
             del newInfos[""]
         self.infos.update(newInfos)
-        mongoInstance.update(self.__class__.coll_name(), {"_id":self.getId()}, {"$set":{"infos":self.infos}})
+        mongoInstance.update(self.__class__.coll_name, {"_id":self.getId()}, {"$set":{"infos":self.infos}})
     
     def getId(self):
         return self._id

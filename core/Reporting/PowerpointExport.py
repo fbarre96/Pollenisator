@@ -274,7 +274,6 @@ def write_each_defect(document, defects_dict):
                 ]
             print("Writing defect "+str(count_defects)+"")
             count_fixes += write_defect_from_input(result, document, table_d, new_slide_i, o_defect, count_defects)
-            progressbar.update()
         if level_count == 0:
             table_d = findTableInSlide(document, slide_copy_i, "var_d_id")
             if table_d is not None:
@@ -314,13 +313,11 @@ def addSerieToChart(presentation, index_chart, serie_name, serie):
 
 def createReport(pentest, defects_dict, template, out_name, **kwargs):
     document = Presentation(template)
-    global progressbar
     global SLD_LAYOUT_TO_COPY
     SLD_LAYOUT_TO_COPY = document.slide_layouts.get_by_name("TO_COPY")
     if SLD_LAYOUT_TO_COPY is None:
         raise Exception("The pptx template does not contain a TO_COPY layout")
     client_name = kwargs.get("client", "").strip()
-    progressbar = kwargs.get("progressbar", DummyProgressBar())
     total_len = 0
     levels = ["Critique", "Majeur", "Important", "Mineur"]
     for level in levels:
@@ -328,7 +325,6 @@ def createReport(pentest, defects_dict, template, out_name, **kwargs):
     nb_steps = total_len # 1 step by defect
     nb_steps += 1 # step for general stuff
     nb_steps += 1 # step for saving
-    progressbar.show(nb_steps)
     if client_name != "":
         replaceTextInDocument(document, "var_client", client_name)
     contract_name = kwargs.get("contract", "").strip()
@@ -347,7 +343,6 @@ def createReport(pentest, defects_dict, template, out_name, **kwargs):
     replaceTextInDocument(document, "var_nb_d_important", str(nb_important))
     replaceTextInDocument(document, "var_nb_d_minor", str(nb_minor))
     addSerieToChart(document, 0, 'Criticity', (nb_critical,nb_major,nb_important,nb_minor))
-    progressbar.update()
     print("Write each defect ...")
     count_defect, count_fixes = write_each_defect(document, defects_dict)
     replaceTextInDocument(document, "var_nb_d_total", str(count_defect))
@@ -363,6 +358,5 @@ def createReport(pentest, defects_dict, template, out_name, **kwargs):
     dir_path = os.path.dirname(os.path.realpath(__file__))
     out_path = os.path.join(dir_path, "../../exports/", out_name+".pptx")
     document.save(out_path)
-    progressbar.update()
     print("Generated report at "+str(out_path))
     return out_path

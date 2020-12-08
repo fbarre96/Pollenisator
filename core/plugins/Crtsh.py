@@ -79,8 +79,10 @@ class Crtsh(Plugin):
                 if not insert_ret["res"]:
                     notes += domain+" exists but already added.\n"
                     ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
-                    infosToAdd = {"hostname": list(set([ip] +
-                                                       ip_m.infos.get("hostname", [])))}
+                    hostname = ip_m.infos.get("hostname", [])
+                    if not isinstance(hostname, list):
+                        hostname = list(hostname)
+                    infosToAdd = {"hostname": list(set([ip] + hostname))}
                     ip_m.updateInfos(infosToAdd)
                 else:
                     countInserted += 1

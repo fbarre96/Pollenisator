@@ -23,7 +23,7 @@ def downloadTemplate(templateName):
     template_to_download_path = os.path.join(template_path, fileName)
     if not os.path.isfile(template_to_download_path):
         return "Template file not found", 404
-    send_file(template_to_download_path, attachment_filename=fileName)
+    return send_file(template_to_download_path, attachment_filename=fileName)
 
 
 def uploadTemplate(upfile):

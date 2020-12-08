@@ -12,9 +12,10 @@ from server.ServerModels.Tool import ServerTool, getNbOfLaunchedCommand, launchT
 from server.ServerModels.Scope import ServerScope
 from server.ServerModels.Ip import ServerIp
 
-mongoInstance = MongoCalendar.getInstance()
 
 def startAutoScan(pentest):
+    mongoInstance = MongoCalendar.getInstance()
+
     mongoInstance.connectToDb(pentest)
     autoscanRunning = mongoInstance.find("autoscan", {"special":True}, False) is not None
     if autoscanRunning:
@@ -54,6 +55,7 @@ def autoScan(pentest):
         mongoInstance.delete("autoscan", {}, True)
 
 def stopAutoScan(pentest):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     toolsRunning = []
     workers = mongoInstance.getWorkers({"excludedDatabases":{"$nin":[pentest]}})
@@ -69,6 +71,7 @@ def stopAutoScan(pentest):
 def getAutoScanStatus(pentest):
     #commandsRunning = mongoInstance.aggregate("tools", [{"$match": {"datef": "None", "dated": {
     #        "$ne": "None"}, "scanner_ip": {"$ne": "None"}}}, {"$group": {"_id": "$name", "count": {"$sum": 1}}}])
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     return mongoInstance.find("autoscan", {"special":True}, False) is not None
 

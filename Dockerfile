@@ -5,4 +5,5 @@ WORKDIR /home/Pollenisator
 COPY requirements.txt /tmp
 RUN python3 -m pip install -r /tmp/requirements.txt
 EXPOSE 5000
+ENV TZ Europe/Paris
 CMD ["/bin/sh", "-c", "mongod --bind_ip_all & python3 api.py"]
