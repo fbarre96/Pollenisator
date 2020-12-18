@@ -194,7 +194,7 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     mongoInstance.insert("settings", {"key":"include_domains_with_ip_in_scope", "value": settings['Add domains whose IP are in scope'] == 1})
     mongoInstance.insert("settings", {"key":"include_domains_with_topdomain_in_scope", "value":settings["Add domains who have a parent domain in scope"] == 1})
     mongoInstance.insert("settings", {"key":"include_all_domains", "value":settings["Add all domains found"] == 1})
-    mongoInstance.insert("settings", {"key":"pentesters", "value":list(map(lambda x: x.strip(), pentesters.split("\n")))})
+    mongoInstance.insert("settings", {"key":"pentesters", "value":list(map(lambda x: x.strip(), pentesters.replace("\n",",").split(",")))})
 
 def getSettings():
     res = mongoInstance.findInDb("pollenisator", "settings", {}, True)

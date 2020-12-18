@@ -597,7 +597,10 @@ class MongoCalendar:
         elif " " in calendarName.strip():
             msg = "The name cannot contain a space."
             return False, msg
-        calendars = [x.lower() for x in self.listCalendars()]
+        calendars = self.listCalendars()
+        if calendars is None:
+            return False, "API has trouble connecting to db. Check api server config."
+        calendars = [x.lower() for x in calendars]
         if calendarName.strip().lower() in calendars:
             msg = "A database with the same name already exists."
             return False, msg
