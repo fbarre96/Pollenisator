@@ -290,6 +290,27 @@ paths:
         200:
           description: "Successful find command"
   
+  /search/{pentest}:
+    get:
+      operationId: "server.mongo.search"
+      tags:
+        - "Mongo"
+      summary: "Search using python like query syntax"
+      description: "Find matching objects in database"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          required: true
+        - name: s
+          in: query
+          type: string
+          required: false
+          default: ''
+      responses:
+        200:
+          description: "Successful search results. A dictionnary with type of objects as keys and matching documents in a list as value"
+  
   /count/{pentest}/{collection}:
     post:
       operationId: "server.mongo.count"

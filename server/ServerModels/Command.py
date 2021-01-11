@@ -57,12 +57,12 @@ class ServerCommand(Command, ServerElement):
 
 def delete(pentest, command_iid):
     mongoInstance.connectToDb(pentest)
-    command = Command(mongoInstance.find("commands", {"_id":command_iid}))
+    command = Command(mongoInstance.find("commands", {"_id":ObjectId(command_iid)}, False))
     mongoInstance.updateInDb(command.indb, "group_commands", {}, {
         "$pull": {"commands": command.name}}, True, True)
     # Remove from all waves this command.
     if command.indb == "pollenisator":
-        calendars = mongoInstance.getPentestList()
+        calendars = mongoInstance.listCalendars()
     else:
         calendars = [command.indb]
     for calendar in calendars:
@@ -76,8 +76,10 @@ def delete(pentest, command_iid):
         # Remove all tools refering to this command's name.
         mongoInstance.deleteFromDb(calendar,
                                 "tools", {"name": command.name}, True, True)
+
+    print(f'deleting from {command.indb} id {str(command_iid)}')
     res = mongoInstance.deleteFromDb(command.indb, "commands", {
-                                   "_id": command_iid}, False, True)
+                                   "_id": ObjectId(command_iid)}, False, True)
     if res is None:
         return 0
     else:

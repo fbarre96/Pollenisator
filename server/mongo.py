@@ -6,7 +6,8 @@ from flask import send_file
 import tempfile
 import shutil
 from core.Components.mongo import MongoCalendar
-from core.Components.Utils import JSONDecoder, getMainDir
+from core.Components.parser import Parser, ParseError, Term
+from core.Components.Utils import JSONDecoder, getMainDir, isIp
 from core.Controllers.CommandController import CommandController
 from core.Controllers.WaveController import WaveController
 from core.Controllers.IntervalController import IntervalController
@@ -18,8 +19,11 @@ from server.ServerModels.Scope import insert as insert_scope
 from server.FileManager import deletePentestFiles
 mongoInstance = MongoCalendar.getInstance()
 
+searchable_collections = ["waves","scopes","ips","ports","tools","defects"]
 validCollections = ["group_commands", "commands", "settings"]
-
+operato_trans = {
+    "||regex||":"$regex", "==":"$eq", "!=": "$ne", ">":"$gt", "<":"$lt", ">=":"$gte", "<=":"$lte", "in":"$in", "not in":"$nin"
+    }
 
 def status():
     mongoInstance.connect()
@@ -79,6 +83,88 @@ def find(pentest, collection, data):
             r["_id"] = str(r["_id"])
             ret.append(r)
         return ret
+
+def search(pentest, s):
+    """Use a parser to convert the search query into mongo queries and returns all matching objects
+    """
+    searchQuery = s
+    if pentest not in mongoInstance.listCalendars():
+        return "Pentest argument is not a valid pollenisator pentest", 403
+    try:
+        parser = Parser(searchQuery)
+        condition_list = parser.getResult()
+        # Searching
+        collections = []
+        builtPipeline = _evaluateCondition(collections, condition_list)
+        print(f"DEBUG : coll={collections} pipeline={builtPipeline}")
+        if len(collections) == 0:
+            collections = searchable_collections
+        list_of_objects = {}
+        for collection in collections:
+            list_of_objects[collection] = []
+            res = mongoInstance.findInDb(pentest, collection, builtPipeline, True)
+            if res is None:
+                continue
+            for elem in res:
+                list_of_objects[collection].append(elem)
+        return list_of_objects
+    except ParseError as e:
+        return str(e).split("\n")[0], 400
+
+def _evaluateCondition(searchable_collections, condition_list):
+    """Recursive function evaluating a given condition.
+    Args:
+        searchable_collections: the starting list of collection to search objects in
+        condition: a list of 2 or 3 elements representing a condition or a boolean value. 
+            If 2 elements:
+                0 is a unary operator and 1 is a bool value a term or a condition (as a list)
+            If 3:
+                0th and 2nd element are either a Term object, a value or a condition to compare the term against
+                1th element is a binary operator
+
+    Example:
+    [[<core.Components.parser.Term object at 0x7f05ba85f910>, '==', '"port"'], 'and', [[<core.Components.parser.Term object at 0x7f05ba85f730>, '==', '"43"'], 'or', [<core.Components.parser.Term object at 0x7f05b9844280>, '==', '"44"']]]
+    becomes
+    searchable_collections = ["ports"], builtPipeline = {"$or":[{"port":"43"}, {"port":44}]}
+    """
+    currentCondition = {}
+    if not isinstance(condition_list, list):
+        raise Exception(f"The evaluation of a condition was not given a condition but {str(type(condition_list))} was given")
+    if len(condition_list) == 2:
+        if condition_list[0] == "not":
+            if isinstance(condition_list[1], list):
+                currentCondition["$not"] = _evaluateCondition(searchable_collections, condition_list[1]) 
+            else:
+                raise Exception(f"Not operator expected a condition not {str(condition_list[1])}")
+        else:
+            raise Exception("Invalid condition with 2 elements and not a unary operator")
+    elif len(condition_list) == 3:
+        operator = condition_list[1]
+        if operator in ["or", "and"]:
+            currentCondition["$"+operator] = [_evaluateCondition(searchable_collections, condition_list[0]), _evaluateCondition(searchable_collections, condition_list[2])]
+        elif operator in operato_trans.keys():
+            if operator == "||regex||":
+                termToSearch = str(condition_list[0])
+                value = str(condition_list[2])
+            else:
+                termToSearch = condition_list[0] if isinstance(condition_list[0], Term) else condition_list[2]
+                termToSearch = str(termToSearch)
+                value = condition_list[2] if isinstance(condition_list[0], Term) else condition_list[0]
+            if isinstance(value, str):
+                if value.startswith("\"") and value.endswith("\""):
+                    value = value[1:-1]
+            if termToSearch == "type":
+                if operator == "==":
+                    searchable_collections.append(value+"s")
+                else:
+                    raise Exception(f"When filtering type, only == is a valid operators")
+            else:
+                currentCondition[str(termToSearch)] = {operato_trans[operator]: str(value)}
+        else:
+            raise Exception(f"Unknown operator {operator}")
+    else:
+        raise Exception(f"Invalid condition with {len(condition_list)} elements")
+    return currentCondition
 
 def count(pentest, collection, data):
     pipeline = data["pipeline"]
@@ -187,9 +273,13 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     insert_wave(dbName, WaveController(wave_o).getData())
     interval_o = ServerInterval().initialize(dbName, start_date, end_date)
     insert_interval(dbName, IntervalController(interval_o).getData())
-    for scope in scope.split("\n"):
-        if scope.strip() != "":
-            insert_scope(dbName, {"wave":dbName, "scope":scope.strip()})
+    scopes = scope.replace("\n", ",").split(",")
+    for scope_item in scopes:
+        if scope_item.strip() != "":
+            if isIp(scope_item.strip()):
+                insert_scope(dbName, {"wave":dbName, "scope":scope_item.strip()+"/32"})
+            else:
+                insert_scope(dbName, {"wave":dbName, "scope":scope_item.strip()})
     mongoInstance.insert("settings", {"key":"pentest_type", "value":pentest_type})
     mongoInstance.insert("settings", {"key":"include_domains_with_ip_in_scope", "value": settings['Add domains whose IP are in scope'] == 1})
     mongoInstance.insert("settings", {"key":"include_domains_with_topdomain_in_scope", "value":settings["Add domains who have a parent domain in scope"] == 1})
