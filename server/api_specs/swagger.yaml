@@ -483,6 +483,8 @@ paths:
         200:
           description: "Successful delete command"
 
+
+
   /pentests:
     get:
       operationId: "server.mongo.listPentests"
@@ -1386,6 +1388,16 @@ paths:
         200:
           description: "Get a delete count"
 
+  /tools/plugins:
+    get:
+      operationId: "server.ServerModels.Tool.listPlugins"
+      tags:
+        - "Tools"
+      summary: "Get a list of existing plugins"
+      responses:
+        200:
+          description: "Successful get"
+
   /tools/{pentest}:
     post:
       operationId: "server.ServerModels.Tool.insert"
@@ -1934,5 +1946,47 @@ paths:
       responses:
         200:
           description: "A template file docx or pptx"
+
+  /report/{pentest}/defects:
+    get:
+      operationId: "server.ServerModels.Defect.getGlobalDefects"
+      tags:
+        - "Report"
+      summary: "Get the ordered list of global defect"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+      responses:
+        200:
+          description: "A list of defect"
+
+  /report/{pentest}/defects/move/{defect_id_to_move}/{target_id}:
+    post:
+      operationId: "server.ServerModels.Defect.moveDefect"
+      tags:
+        - "Report"
+      summary: "Move one defect at the index of the other. Other index are impacted"
+      parameters:
+        - name: pentest
+          in: path
+          type: string
+          description: pentest name
+          required: true
+        - name: defect_id_to_move
+          in: path
+          type: string
+          description: defect_id to move 
+          required: true
+        - name: target_id
+          in: path
+          type: string
+          description: target_id to move to 
+          required: true
+      responses:
+        200:
+          description: "Success"
 
           

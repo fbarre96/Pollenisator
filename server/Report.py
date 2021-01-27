@@ -4,6 +4,8 @@ from flask import send_file
 import core.Reporting.WordExport as WordExport
 import core.Reporting.PowerpointExport as PowerpointExport
 from server.ServerModels.Defect import ServerDefect
+from core.Controllers.DefectController import DefectController
+from bson import ObjectId
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 template_path = os.path.normpath(os.path.join(dir_path, "../Templates/"))

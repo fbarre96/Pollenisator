@@ -11,6 +11,8 @@ import json
 import time
 from datetime import datetime
 import io
+import os
+import sys
 
 mongoInstance = MongoCalendar.getInstance()
 
@@ -269,6 +271,7 @@ def insert(pentest, data):
     base["scanner_ip"] = data.get("scanner_ip", "None")
     base["dated"] = data.get("dated", "None")
     base["datef"] = data.get("datef", "None")
+    base["text"] = data.get("text", "")
     res_insert = mongoInstance.insert("tools", base, parent)
     ret = res_insert.inserted_id
     tool_o._id = ret
@@ -308,12 +311,27 @@ def craftCommandLine(pentest, tool_iid, plugin):
     if comm == "":
         return "An empty command line was crafted", 400
     # Load the plugin
-    mod = toolModel.getPlugin(plugin, tools_infos[toolModel.name])
+    mod = toolModel.getPlugin(plugin, tools_infos.get(toolModel.name, None))
       
     # craft outputfile name
     
     comm = mod.changeCommand(comm, "|outputDir|", mod.getFileOutputExt())
     return {"comm":comm, "ext":mod.getFileOutputExt()}
+
+def listPlugins():
+    """
+    List the plugins.
+    Returns:
+        return the list of plugins file names.
+    """
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    path = os.path.join(dir_path, "../../core/plugins/")
+    # Load plugins
+    sys.path.insert(0, path)
+    plugin_list = os.listdir(path)
+    plugin_list = [x[:-3] for x in plugin_list if x.endswith(
+        ".py") and x != "__pycache__" and x != "__init__.py" and x != "plugin.py"]
+    return plugin_list
     
 def importResult(pentest, tool_iid, upfile, plugin):
     #STORE FILE
@@ -330,7 +348,7 @@ def importResult(pentest, tool_iid, upfile, plugin):
     if plugin.strip() == "":
         if toolModel.name not in list(tools_infos.keys()):
             return "This tool has no plugin configured and no plugin was specified", 400
-    mod = toolModel.getPlugin(plugin, tools_infos[toolModel.name])
+    mod = toolModel.getPlugin(plugin, tools_infos.get(toolModel.name, None))
     if mod is not None:
         try:
             # Check return code by plugin (can be always true if the return code is inconsistent)
@@ -481,3 +499,4 @@ def getNbOfLaunchedCommand(calendarName, worker, commandName):
     if t is not None:
         return t.count()
     return 0
+

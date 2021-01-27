@@ -11,6 +11,7 @@ import os
 mongoInstance = MongoCalendar.getInstance()
 
 class ServerDefect(Defect, ServerElement):
+
     def __init__(self, pentest="", *args, **kwargs):
         super().__init__(*args, **kwargs)
         if pentest != "":
@@ -80,6 +81,12 @@ def delete(pentest, defect_iid):
     defect = ServerDefect(pentest, mongoInstance.find("defects", {"_id": ObjectId(defect_iid)}, False))
     if defect is None:
         return 0
+    if not defect.isAssigned():
+        globalDefects = ServerDefect.fetchObjects(pentest, {"ip":""})
+        for globalDefect in globalDefects:
+            if int(globalDefect.index) > int(defect.index):
+                update(pentest, globalDefect.getId(), {"index":str(int(globalDefect.index) - 1)})
+
     proofs_path = getProofPath(pentest, defect_iid)
     if os.path.isdir(proofs_path):
         files = os.listdir(proofs_path)
@@ -102,9 +109,28 @@ def insert(pentest, data):
     parent = defect_o.getParentId()
     if "_id" in data:
         del data["_id"]
+    if not defect_o.isAssigned():
+        insert_pos = findInsertPosition(pentest, data["risk"])
+        save_insert_pos = insert_pos
+        defects_to_edit = []
+        
+        defect_to_edit_o = ServerDefect.fetchObject(pentest, {"ip":"", "index":str(insert_pos)})
+        if defect_to_edit_o is not None:
+            defects_to_edit.append(defect_to_edit_o)
+        while defect_to_edit_o is not None:
+            insert_pos+=1
+            defect_to_edit_o = ServerDefect.fetchObject(pentest, {"ip":"", "index":str(insert_pos)})
+            if defect_to_edit_o is not None:
+                defects_to_edit.append(defect_to_edit_o)
+            
+        for defect_to_edit in defects_to_edit:
+            print("Update defect index to "+str(int(defect_to_edit.index)+1))
+            update(pentest, defect_to_edit.getId(), {"index":str(int(defect_to_edit.index)+1)})
+        data["index"] = str(save_insert_pos)
     ins_result = mongoInstance.insert("defects", data, parent)
     iid = ins_result.inserted_id
     defect_o._id = iid
+
     if defect_o.isAssigned():
         # Edit to global defect and insert it
         defect_o.ip = ""
@@ -115,7 +141,60 @@ def insert(pentest, data):
         insert(pentest, DefectController(defect_o).getData())
     return {"res":True, "iid":iid}
 
+def findInsertPosition(pentest, risk):
+    riskLevels = ["Critique", "Majeur",  "Important", "Mineur"] # TODO do not hardcode those things
+    riskLevelPos = riskLevels.index(risk)
+    highestInd = 0
+    for risklevel_i, riskLevel in enumerate(riskLevels):
+        if risklevel_i > riskLevelPos:
+            break
+        globalDefects = ServerDefect.fetchObjects(pentest, {"ip":"", "risk":riskLevel})
+        for globalDefect in globalDefects:
+            highestInd = max(int(globalDefect.index)+1, highestInd)
+    return highestInd
+
 def update(pentest, defect_iid, data):
     mongoInstance.connectToDb(pentest)
+    defect_o = ServerDefect.fetchObject(pentest, {"_id":ObjectId(defect_iid)})
+    if defect_o is None:
+        return "This defect does not exist", 404
+    if not defect_o.isAssigned():
+        if data.get("risk", None) is not None:
+            if data["risk"] != defect_o.risk:
+                defectTarget = ServerDefect.fetchObject(pentest, {"ip":"", "index":str(findInsertPosition(pentest, data["risk"]))})
+                moveDefect(pentest, defect_iid, defectTarget.getId())
     return mongoInstance.update("defects", {"_id":ObjectId(defect_iid)}, {"$set":data}, False, True)
 
+
+
+def getGlobalDefects(pentest):
+    defects = ServerDefect.fetchObjects(pentest, {"ip": ""})
+    d_list = {}
+    if defects is None:
+        return []
+    for defect in defects:
+        d_list[int(defect.index)] = defect
+    keys_ordered = sorted(list(d_list.keys()))
+    defects_ordered = []
+    for i in range(len(keys_ordered)):
+        defect_o = d_list[keys_ordered[i]]
+        defects_ordered.append(DefectController(defect_o).getData())
+    return defects_ordered
+
+def moveDefect(pentest, defect_id_to_move, target_id):
+    defect_to_move = ServerDefect.fetchObject(pentest, {"_id":ObjectId(defect_id_to_move), "ip":""})
+    if defect_to_move is None:
+        return "This global defect does not exist", 404
+    defects_ordered = getGlobalDefects(pentest)
+    defect_target = ServerDefect.fetchObject(pentest, {"_id":ObjectId(target_id), "ip":""})
+    if defect_target is None:
+        return "the target global defect does not exist", 404
+    target_ind = int(defect_target.index)
+    defect_to_move_ind = int(defect_to_move.index)
+    del defects_ordered[defect_to_move_ind]
+    defects_ordered.insert(target_ind, DefectController(defect_to_move).getData())
+    for defect_i in range(min(defect_to_move_ind, target_ind), len(defects_ordered)):
+        defect_o = ServerDefect(pentest, defects_ordered[defect_i])
+        update(pentest, defect_o.getId(), {"index":str(defect_i)})
+    update(pentest, defect_to_move.getId(), {"index":str(target_ind)})
+    return target_ind
