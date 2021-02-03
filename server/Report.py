@@ -54,8 +54,7 @@ def generateReport(pentest, templateName, clientName, contractName, mainRedactor
         outfile = WordExport.createReport(pentest, getDefectsAsDict(pentest), template_to_use_path, out_name, mainRedac=mainRedactor,
                                 client=clientName.strip(), contract=contractName.strip())
     elif ext == ".pptx":
-        outfile = PowerpointExport.createReport(pentest, getDefectsAsDict(
-        pentest), template_to_use_path, out_name, client=clientName.strip(), contract=contractName.strip())
+        outfile = PowerpointExport.createReport(pentest, getDefectsAsDict(pentest), template_to_use_path, out_name, client=clientName.strip(), contract=contractName.strip())
     else:
         return "Unknown template file extension", 400
     return send_file(outfile, attachment_filename=out_name+ext) 

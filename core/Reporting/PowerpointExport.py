@@ -311,7 +311,8 @@ def addSerieToChart(presentation, index_chart, serie_name, serie):
                 count_chart += 1
     return False
 
-def createReport(pentest, defects_dict, template, out_name, **kwargs):
+@classmethod
+def createReport(cls, pentest, defects_dict, template, out_name, **kwargs):
     document = Presentation(template)
     global SLD_LAYOUT_TO_COPY
     SLD_LAYOUT_TO_COPY = document.slide_layouts.get_by_name("TO_COPY")
