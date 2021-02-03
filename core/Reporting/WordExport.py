@@ -27,10 +27,6 @@ from server.ServerModels.Ip import ServerIp
 from server.ServerModels.Port import ServerPort
 from server.ServerModels.Defect import ServerDefect
 
-class DummyProgressBar:
-    def update(self):
-        return
-
 def downloadImgData(url):
     data = requests.get(url)
     if data.status_code != 200:
@@ -733,7 +729,6 @@ def write_each_defect(pentest, document, defects_dict):
                         pics.append(ret)
                 o_defect["details"][ids]["pics"] = pics
             write_defect_from_input(result, document, table_d, separator, o_defect, count)
-            progressbar.update()
         # Delete remaining copies
         table_d, table_i = findRowContaining(document, "var_d_id")
         separator = findParagraphContaining(document, 'var_d_separator')
@@ -1063,7 +1058,6 @@ def createReport(pentest, defects_dict, template, out_name, **kwargs):
     document = Document(template)
     global cell_style
     global normal_style
-    global progressbar
     current_step = 0
     cell_style = document.styles["Normal_Cell"]
     normal_style = document.styles["Normal"]
@@ -1079,21 +1073,7 @@ def createReport(pentest, defects_dict, template, out_name, **kwargs):
     replaceTextInDocument(document, "var_year", date.strftime("%Y"))
     replaceTextInDocument(document, "var_annee", date.strftime("%Y"))
     contract_name = kwargs.get("contract", "").strip()
-    progressbar = kwargs.get("progressbar", None)
-    if progressbar is not None:
-        total_len = 0
-        levels = ["Critique", "Majeur", "Important", "Mineur"]
-        for level in levels:
-            total_len += len(defects_dict[level].values())
-        nb_steps = total_len # 1 step by defect 
-        nb_steps += 1 # step for general stuff
-        nb_steps += 1 # step for defect summary
-        nb_steps += 1 # step for service table
-        nb_steps += 1 # step for markdown conversion
-        nb_steps += 1 # step for saving
-        progressbar.show(nb_steps)
-    else:
-        progressbar = DummyProgressBar() # avoid testing for None every time
+    
     if contract_name != "":
         replaceTextInDocument(document, "var_contract", contract_name)
     replaceTextInDocument(document, "var_synthesis", str(kwargs.get("synthesis", "ToDo "+kwargs.get("main_redactor", "synthesis"))))
@@ -1102,18 +1082,15 @@ def createReport(pentest, defects_dict, template, out_name, **kwargs):
     replaceTextInDocument(document, "var_nb_d_major", str(len(defects_dict["Majeur"].keys())))
     replaceTextInDocument(document, "var_nb_d_important", str(len(defects_dict["Important"].keys())))
     replaceTextInDocument(document, "var_nb_d_minor", str(len(defects_dict["Mineur"].keys())))
-    progressbar.update() # general stuff step
     print("Populate defect summary ....")
     try:
         populate_defect_summary_table(document, defects_dict)
     except KeyError as e:
         print("Skipping  defect summary: "+str(e))
-    progressbar.update() # defect summary step
     print("Write each defect ...")
     write_each_defect(pentest, document, defects_dict)
     print("Write services table ...")
     populate_services_table(pentest, document, kwargs.get("root", None))
-    progressbar.update() # service table step
     print("Converting Markdown ...")
     markdownToWordInDocument(document)
     print("Saving ...")
@@ -1123,5 +1100,4 @@ def createReport(pentest, defects_dict, template, out_name, **kwargs):
     out_path = os.path.join(dir_path, "../../exports/", out_name+".docx")
     print("Generated report at "+str(out_path))
     document.save(out_path)
-    progressbar.update() # saving step
     return out_path

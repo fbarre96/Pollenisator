@@ -6,10 +6,6 @@ import core.Components.Utils as Utils
 import copy
 import six
 
-class DummyProgressBar:
-    def update(self):
-        return
-
 def replaceTextInParagraph(paragraph, search, replace):
     """
     Replace at a run level a text that will be searched in the given paragraph.
