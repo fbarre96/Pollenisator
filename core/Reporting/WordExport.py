@@ -1058,8 +1058,7 @@ def markdownToWordInDocument(document):
                     for run in paragraph.runs:
                         markdownToWordInRun(paragraph, run, document.styles)
 
-@classmethod
-def createReport(cls, pentest, defects_dict, template, out_name, **kwargs):
+def createReport(pentest, defects_dict, template, out_name, **kwargs):
     #print("Defect dict: "+str(defects_dict))
     document = Document(template)
     global cell_style
