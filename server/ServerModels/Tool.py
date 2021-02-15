@@ -423,7 +423,6 @@ def stopTask(pentest, tool_iid, data):
     saveScannerip = stopableTool.scanner_ip
     if forceReset:
         stopableTool.markAsNotDone()
-        print("mark as not done")
         update(pentest, tool_iid, ToolController(stopableTool).getData())
     if saveScannerip == "":
         return "Empty worker field", 400

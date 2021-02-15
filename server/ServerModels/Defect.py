@@ -158,14 +158,19 @@ def update(pentest, defect_iid, data):
     defect_o = ServerDefect.fetchObject(pentest, {"_id":ObjectId(defect_iid)})
     if defect_o is None:
         return "This defect does not exist", 404
+    oldRisk = defect_o.risk
     if not defect_o.isAssigned():
         if data.get("risk", None) is not None:
-            if data["risk"] != defect_o.risk:
-                defectTarget = ServerDefect.fetchObject(pentest, {"ip":"", "index":str(findInsertPosition(pentest, data["risk"]))})
+            if data["risk"] != oldRisk:
+                insert_pos = str(findInsertPosition(pentest, data["risk"]))
+                if int(insert_pos) > int(defect_o.index):
+                    insert_pos = str(int(insert_pos)-1)
+                defectTarget = ServerDefect.fetchObject(pentest, {"ip":"", "index":insert_pos})
                 moveDefect(pentest, defect_iid, defectTarget.getId())
-    return mongoInstance.update("defects", {"_id":ObjectId(defect_iid)}, {"$set":data}, False, True)
-
-
+            if "index" in data:
+                del data["index"]
+    res = mongoInstance.update("defects", {"_id":ObjectId(defect_iid)}, {"$set":data}, False, True)
+    return res
 
 def getGlobalDefects(pentest):
     defects = ServerDefect.fetchObjects(pentest, {"ip": ""})
