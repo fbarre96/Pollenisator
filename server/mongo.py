@@ -231,6 +231,8 @@ def delete(pentest, collection, body):
 @permission("user")
 def listPentests(**kwargs):
     username = kwargs["token_info"]["sub"]
+    if "admin" in kwargs["token_info"]["scope"]:
+        username = None
     ret = mongoInstance.listCalendars(username)
     if ret:
         return ret
