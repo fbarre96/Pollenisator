@@ -5,7 +5,7 @@ from server.ServerModels.Tool import ServerTool
 from server.ServerModels.Element import ServerElement
 from core.Components.Utils import JSONEncoder, fitNowTime
 import json
-
+from server.permission import permission
 mongoInstance = MongoCalendar.getInstance()
 
 class ServerInterval(Interval, ServerElement):
@@ -55,7 +55,7 @@ class ServerInterval(Interval, ServerElement):
             # disabling this error as it is an abstract function
             yield cls(pentest, d)  #  pylint: disable=no-value-for-parameter
 
-
+@permission("pentester")
 def delete(pentest, interval_iid):
     mongoInstance.connectToDb(pentest)
     interval_o = ServerInterval(pentest, mongoInstance.find("intervals", {"_id": ObjectId(interval_iid)}, False))
@@ -80,21 +80,21 @@ def delete(pentest, interval_iid):
         return 0
     else:
         return res.deleted_count
-
-def insert(pentest, data):
+@permission("pentester")
+def insert(pentest, body):
     mongoInstance.connectToDb(pentest)
-    if "_id" in data:
-        del data["_id"]
-    interval_o = ServerInterval(pentest, data)
+    if "_id" in body:
+        del body["_id"]
+    interval_o = ServerInterval(pentest, body)
     parent = interval_o.getParentId()
-    ins_result = mongoInstance.insert("intervals", data, parent)
+    ins_result = mongoInstance.insert("intervals", body, parent)
     interval_o.setToolsInTime()
     iid = ins_result.inserted_id
     return {"res":True, "iid":iid}
 
-
-def update(pentest, interval_iid, data):
+@permission("pentester")
+def update(pentest, interval_iid, body):
     mongoInstance.connectToDb(pentest)
     interval_o = ServerInterval(pentest, mongoInstance.find("intervals", {"_id": ObjectId(interval_iid)}, False))
     interval_o.setToolsInTime()
-    return mongoInstance.update("intervals", {"_id":ObjectId(interval_iid)}, {"$set":data}, False, True)
+    return mongoInstance.update("intervals", {"_id":ObjectId(interval_iid)}, {"$set":body}, False, True)

@@ -8,7 +8,7 @@ from datetime import datetime
 from core.Components.Utils import listPlugin, loadPlugin
 from core.Components.mongo import MongoCalendar
 from core.Components.Utils import JSONDecoder
-
+from server.permission import permission
 
 mongoInstance = MongoCalendar.getInstance()
 local_path = "/etc/PollenisatorAPI/files"
@@ -30,11 +30,11 @@ def md5(f):
         hash_md5.update(chunk)
     return hash_md5.hexdigest()
 
-
+@permission("pentester")
 def upload(pentest, defect_iid, upfile):
     msg, status, filepath = _upload(pentest, defect_iid, "proof", upfile)
     return msg, status
-
+@permission("pentester")
 def importExistingFile(pentest, upfile, plugin):
     from server.ServerModels.Tool import ServerTool
     mongoInstance.connectToDb(pentest)
@@ -122,12 +122,13 @@ def _upload(pentest, attached_iid, filetype, upfile):
         mongoInstance.update("defects", {"_id": ObjectId(attached_iid)}, {"$push":{"proofs":name}})
     return name + " was successfully uploaded", 200, filepath
 
-
+@permission("pentester")
 def listFiles(pentest, attached_iid, filetype):
     filepath = os.path.join(local_path, pentest, filetype, attached_iid)
     files = os.listdir(filepath)
     return files
 
+@permission("pentester")
 def download(pentest, attached_iid, filetype, filename):
     if filetype == "result":
         filepath = os.path.join(local_path, pentest, filetype, attached_iid)
@@ -142,6 +143,7 @@ def download(pentest, attached_iid, filetype, filename):
         return "File not found", 404
     return send_file(filepath, attachment_filename=filename.replace("/", "_"))
 
+@permission("pentester")
 def rmProof(pentest, defect_iid, filename):
     mongoInstance.connectToDb(pentest)
     filename = filename.replace("/", "_")

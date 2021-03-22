@@ -11,6 +11,7 @@ from server.ServerModels.Port import delete as port_delete
 from server.ServerModels.Defect import delete as defect_delete
 from server.ServerModels.Element import ServerElement
 from core.Components.Utils import JSONEncoder, performLookUp
+from server.permission import permission
 import json
 
 mongoInstance = MongoCalendar.getInstance()
@@ -185,7 +186,7 @@ class ServerIp(Ip, ServerElement):
     def update(self):
         return update("ips", self._id, IpController(self).getData())
 
-
+@permission("pentester")
 def delete(pentest, ip_iid):
     mongoInstance.connectToDb(pentest)
     ip_dic = mongoInstance.find("ips", {"_id":ObjectId(ip_iid)}, False)
@@ -208,19 +209,19 @@ def delete(pentest, ip_iid):
         return 0
     else:
         return res.deleted_count
-
-def insert(pentest, data):
+@permission("pentester")
+def insert(pentest, body):
     mongoInstance.connectToDb(pentest)
-    ip_o = ServerIp(pentest, data)
+    ip_o = ServerIp(pentest, body)
     base = ip_o.getDbKey()
     existing = mongoInstance.find(
             "ips", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
-    if "_id" in data:
-        del data["_id"]
+    if "_id" in body:
+        del body["_id"]
     parent = ip_o.getParentId()
-    ins_result = mongoInstance.insert("ips", data, parent)
+    ins_result = mongoInstance.insert("ips", body, parent)
     iid = ins_result.inserted_id
     waves = mongoInstance.find("waves", {})
     for wave in waves:
@@ -238,8 +239,8 @@ def insert(pentest, data):
                 tool_o.addInDb()
     return {"res":True, "iid":iid}
 
-
-def update(pentest, ip_iid, data):
+@permission("pentester")
+def update(pentest, ip_iid, body):
     mongoInstance.connectToDb(pentest)
-    return mongoInstance.update("ips", {"_id":ObjectId(ip_iid)}, {"$set":data}, False, True)
+    return mongoInstance.update("ips", {"_id":ObjectId(ip_iid)}, {"$set":body}, False, True)
 

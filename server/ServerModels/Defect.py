@@ -5,6 +5,7 @@ from core.Models.Defect import Defect
 from core.Controllers.DefectController import DefectController
 from server.FileManager import getProofPath
 from server.ServerModels.Element import ServerElement
+from server.permission import permission
 import json
 import os
 
@@ -76,6 +77,7 @@ class ServerDefect(Defect, ServerElement):
             return None
         return cls(pentest, d) 
 
+@permission("pentester")
 def delete(pentest, defect_iid):
     mongoInstance.connectToDb(pentest)
     defect = ServerDefect(pentest, mongoInstance.find("defects", {"_id": ObjectId(defect_iid)}, False))
@@ -98,19 +100,19 @@ def delete(pentest, defect_iid):
         return 0
     else:
         return res.deleted_count
-
-def insert(pentest, data):
+@permission("pentester")
+def insert(pentest, body):
     mongoInstance.connectToDb(pentest)
-    defect_o = ServerDefect(pentest, data)
+    defect_o = ServerDefect(pentest, body)
     base = defect_o.getDbKey()
     existing = mongoInstance.find("defects", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
     parent = defect_o.getParentId()
-    if "_id" in data:
-        del data["_id"]
+    if "_id" in body:
+        del body["_id"]
     if not defect_o.isAssigned():
-        insert_pos = findInsertPosition(pentest, data["risk"])
+        insert_pos = findInsertPosition(pentest, body["risk"])
         save_insert_pos = insert_pos
         defects_to_edit = []
         
@@ -126,8 +128,8 @@ def insert(pentest, data):
         for defect_to_edit in defects_to_edit:
             print("Update defect index to "+str(int(defect_to_edit.index)+1))
             update(pentest, defect_to_edit.getId(), {"index":str(int(defect_to_edit.index)+1)})
-        data["index"] = str(save_insert_pos)
-    ins_result = mongoInstance.insert("defects", data, parent)
+        body["index"] = str(save_insert_pos)
+    ins_result = mongoInstance.insert("defects", body, parent)
     iid = ins_result.inserted_id
     defect_o._id = iid
 
@@ -140,7 +142,7 @@ def insert(pentest, data):
         defect_o.notes = ""
         insert(pentest, DefectController(defect_o).getData())
     return {"res":True, "iid":iid}
-
+@permission("pentester")
 def findInsertPosition(pentest, risk):
     riskLevels = ["Critique", "Majeur",  "Important", "Mineur"] # TODO do not hardcode those things
     riskLevelPos = riskLevels.index(risk)
@@ -152,26 +154,26 @@ def findInsertPosition(pentest, risk):
         for globalDefect in globalDefects:
             highestInd = max(int(globalDefect.index)+1, highestInd)
     return highestInd
-
-def update(pentest, defect_iid, data):
+@permission("pentester")
+def update(pentest, defect_iid, body):
     mongoInstance.connectToDb(pentest)
     defect_o = ServerDefect.fetchObject(pentest, {"_id":ObjectId(defect_iid)})
     if defect_o is None:
         return "This defect does not exist", 404
     oldRisk = defect_o.risk
     if not defect_o.isAssigned():
-        if data.get("risk", None) is not None:
-            if data["risk"] != oldRisk:
-                insert_pos = str(findInsertPosition(pentest, data["risk"]))
+        if body.get("risk", None) is not None:
+            if body["risk"] != oldRisk:
+                insert_pos = str(findInsertPosition(pentest, body["risk"]))
                 if int(insert_pos) > int(defect_o.index):
                     insert_pos = str(int(insert_pos)-1)
                 defectTarget = ServerDefect.fetchObject(pentest, {"ip":"", "index":insert_pos})
                 moveDefect(pentest, defect_iid, defectTarget.getId())
-            if "index" in data:
-                del data["index"]
-    res = mongoInstance.update("defects", {"_id":ObjectId(defect_iid)}, {"$set":data}, False, True)
+            if "index" in body:
+                del body["index"]
+    res = mongoInstance.update("defects", {"_id":ObjectId(defect_iid)}, {"$set":body}, False, True)
     return res
-
+@permission("pentester")
 def getGlobalDefects(pentest):
     defects = ServerDefect.fetchObjects(pentest, {"ip": ""})
     d_list = {}
@@ -185,7 +187,7 @@ def getGlobalDefects(pentest):
         defect_o = d_list[keys_ordered[i]]
         defects_ordered.append(DefectController(defect_o).getData())
     return defects_ordered
-
+@permission("pentester")
 def moveDefect(pentest, defect_id_to_move, target_id):
     defect_to_move = ServerDefect.fetchObject(pentest, {"_id":ObjectId(defect_id_to_move), "ip":""})
     if defect_to_move is None:

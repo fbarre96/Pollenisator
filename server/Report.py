@@ -6,17 +6,17 @@ import core.Reporting.PowerpointExport as PowerpointExport
 from server.ServerModels.Defect import ServerDefect
 from core.Controllers.DefectController import DefectController
 from bson import ObjectId
-
+from server.permission import permission
 dir_path = os.path.dirname(os.path.realpath(__file__))
 template_path = os.path.normpath(os.path.join(dir_path, "../Templates/"))
 
-
+@permission("user")
 def getTemplateList():
     onlyfiles = [f for f in os.listdir(template_path) if os.path.isfile(
         os.path.join(template_path, f))]
     return onlyfiles
 
-
+@permission("user")
 def downloadTemplate(templateName):
     global template_path
     fileName = os.path.basename(templateName)
@@ -27,7 +27,7 @@ def downloadTemplate(templateName):
         return "Template file not found", 404
     return send_file(template_to_download_path, attachment_filename=fileName)
 
-
+@permission("user")
 def uploadTemplate(upfile):
     global template_path
     fileName = upfile.filename.replace("/", "_")
@@ -39,7 +39,7 @@ def uploadTemplate(upfile):
         return "Success"
     return "Failure"
 
-
+@permission("pentester")
 def generateReport(pentest, templateName, clientName, contractName, mainRedactor):
     if not templateName.endswith(".pptx") and not templateName.endswith(".docx"):
         return "Invalid extension for template, must be pptx or docx", 400

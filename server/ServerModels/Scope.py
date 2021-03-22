@@ -7,6 +7,7 @@ from server.ServerModels.Ip import ServerIp
 from server.ServerModels.Element import ServerElement
 from core.Components.Utils import JSONEncoder, isNetworkIp, performLookUp, isIp
 import json
+from server.permission import permission
 
 mongoInstance = MongoCalendar.getInstance()
 
@@ -87,7 +88,7 @@ class ServerScope(Scope, ServerElement):
                 if ServerIp.checkIpScope(self.scope, ip["ip"]):
                     ips_fitting.append(ip)
         return ips_fitting
-
+@permission("pentester")
 def delete(pentest, scope_iid):
     mongoInstance.connectToDb(pentest)
     # deleting tool with scope lvl
@@ -111,17 +112,17 @@ def delete(pentest, scope_iid):
         return 0
     else:
         return res.deleted_count
-
-def insert(pentest, data):
+@permission("pentester")
+def insert(pentest, body):
     mongoInstance.connectToDb(pentest)
-    scope_o = ServerScope(pentest, data)
+    scope_o = ServerScope(pentest, body)
     # Checking unicity
     base = scope_o.getDbKey()
     existing = mongoInstance.find("scopes", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
-    if "_id" in data:
-        del data["_id"]
+    if "_id" in body:
+        del body["_id"]
     # Inserting scope
     parent = scope_o.getParentId()
     res_insert = mongoInstance.insert("scopes", base, parent)
@@ -142,7 +143,7 @@ def insert(pentest, data):
                 ip_o.addScopeFitting(pentest, scope_o.getId())
     return {"res":True, "iid":ret}
 
-
-def update(pentest, scope_iid, data):
+@permission("pentester")
+def update(pentest, scope_iid, body):
     mongoInstance.connectToDb(pentest)
-    return mongoInstance.update("scopes", {"_id":ObjectId(scope_iid)}, {"$set":data}, False, True)
+    return mongoInstance.update("scopes", {"_id":ObjectId(scope_iid)}, {"$set":body}, False, True)

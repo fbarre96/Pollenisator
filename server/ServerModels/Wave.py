@@ -6,6 +6,7 @@ from server.ServerModels.Scope import ServerScope
 from server.ServerModels.Element import ServerElement
 from core.Components.Utils import JSONEncoder
 import json
+from server.permission import permission
 
 mongoInstance = MongoCalendar.getInstance()
 
@@ -56,6 +57,7 @@ class ServerWave(Wave, ServerElement):
             if "done" not in tool.getStatus():
                 tool.delete()
 
+@permission("pentester")
 def delete(pentest, wave_iid):
     mongoInstance.connectToDb(pentest)
     wave_o = ServerWave(pentest, mongoInstance.find("waves", {"_id": ObjectId(wave_iid)}, False))
@@ -66,16 +68,16 @@ def delete(pentest, wave_iid):
         return 0
     else:
         return res.deleted_count
-
-def insert(pentest, data):
+@permission("pentester")
+def insert(pentest, body):
     mongoInstance.connectToDb(pentest)
-    wave_o = ServerWave(pentest, data)
+    wave_o = ServerWave(pentest, body)
     # Checking unicity
     existing = mongoInstance.find("waves", {"wave": wave_o.wave}, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
-    if "_id" in data:
-        del data["_id"]
+    if "_id" in body:
+        del body["_id"]
     # Inserting scope
     res_insert = mongoInstance.insert("waves", {"wave": wave_o.wave, "wave_commands": list(wave_o.wave_commands)})
     ret = res_insert.inserted_id
@@ -84,13 +86,13 @@ def insert(pentest, data):
         wave_o.addAllTool(commName)
     return {"res":True, "iid":ret}
 
-
-def update(pentest, wave_iid, data):
+@permission("pentester")
+def update(pentest, wave_iid, body):
     mongoInstance.connectToDb(pentest)
     oldWave_o = ServerWave(pentest, mongoInstance.find("waves", {"_id":ObjectId(wave_iid)}, False))
     oldCommands = oldWave_o.wave_commands
-    wave_commands = data["wave_commands"]
-    mongoInstance.update("waves", {"_id":ObjectId(wave_iid)}, {"$set":data}, False, True)
+    wave_commands = body["wave_commands"]
+    mongoInstance.update("waves", {"_id":ObjectId(wave_iid)}, {"$set":body}, False, True)
     # If the wave_commands are changed, we have to add and delete corresponding tools.
     for command_name in oldCommands:
         # The previously present command name is not authorized anymore.

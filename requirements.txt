@@ -9,3 +9,5 @@ requests>=2.18.4
 connexion
 flask
 lark-parser
+bcrypt
+python-jose

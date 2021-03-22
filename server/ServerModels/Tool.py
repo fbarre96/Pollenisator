@@ -13,6 +13,8 @@ from datetime import datetime
 import io
 import os
 import sys
+from server.permission import permission
+from server.token import encode_token
 
 mongoInstance = MongoCalendar.getInstance()
 
@@ -222,9 +224,10 @@ class ServerTool(Tool, ServerElement):
         self.scanner_ip = workerName
         mongoInstance.updateInDb("pollenisator", "workers", {"name":workerName}, {"$push":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
     
-def setStatus(pentest, tool_iid, data):
-    newStatus = data["newStatus"]
-    arg = data.get("arg", "")
+@permission("pentester")
+def setStatus(pentest, tool_iid, body):
+    newStatus = body["newStatus"]
+    arg = body.get("arg", "")
     tool_o = ServerTool.fetchObject(pentest, {"_id":ObjectId(tool_iid)})
     if tool_o is None:
         return "Tool not found", 404
@@ -244,6 +247,7 @@ def setStatus(pentest, tool_iid, data):
         tool_o.markAsNotDone()
     return update(pentest, tool_o.getId(), ToolController(tool_o).getData())
 
+@permission("pentester")
 def delete(pentest, tool_iid):
     mongoInstance.connectToDb(pentest)
     if not mongoInstance.isUserConnected():
@@ -254,36 +258,37 @@ def delete(pentest, tool_iid):
     else:
         return res.deleted_count
 
-def insert(pentest, data):
+@permission("pentester")
+def insert(pentest, body):
     mongoInstance.connectToDb(pentest)
     if not mongoInstance.isUserConnected():
         return "Not connected", 503
-    tool_o = ServerTool(pentest, data)
+    tool_o = ServerTool(pentest, body)
     # Checking unicity
     base = tool_o.getDbKey()
     existing = mongoInstance.find("tools", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
-    if "_id" in data:
-        del data["_id"]
+    if "_id" in body:
+        del body["_id"]
     # Inserting scope
     parent = tool_o.getParentId()
-    base["scanner_ip"] = data.get("scanner_ip", "None")
-    base["dated"] = data.get("dated", "None")
-    base["datef"] = data.get("datef", "None")
-    base["text"] = data.get("text", "")
+    base["scanner_ip"] = body.get("scanner_ip", "None")
+    base["dated"] = body.get("dated", "None")
+    base["datef"] = body.get("datef", "None")
+    base["text"] = body.get("text", "")
     res_insert = mongoInstance.insert("tools", base, parent)
     ret = res_insert.inserted_id
     tool_o._id = ret
     # adding the appropriate tools for this scope.
     return {"res":True, "iid":ret}
 
-
-def update(pentest, tool_iid, data):
+@permission("pentester")
+def update(pentest, tool_iid, body):
     mongoInstance.connectToDb(pentest)
-    res = mongoInstance.update("tools", {"_id":ObjectId(tool_iid)}, {"$set":data}, False, True)
+    res = mongoInstance.update("tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
     return res
-
+@permission("pentester")
 def craftCommandLine(pentest, tool_iid, plugin):
     # CHECK TOOL EXISTS
     toolModel = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
@@ -318,6 +323,7 @@ def craftCommandLine(pentest, tool_iid, plugin):
     comm = mod.changeCommand(comm, "|outputDir|", mod.getFileOutputExt())
     return {"comm":comm, "ext":mod.getFileOutputExt()}
 
+@permission("user")
 def listPlugins():
     """
     List the plugins.
@@ -333,8 +339,10 @@ def listPlugins():
         ".py") and x != "__pycache__" and x != "__init__.py" and x != "plugin.py"]
     return plugin_list
     
-def importResult(pentest, tool_iid, upfile, plugin):
+@permission("pentester")
+def importResult(pentest, tool_iid, upfile, body):
     #STORE FILE
+    plugin = body.get("plugin", "")
     res, status, filepath = _upload(pentest, tool_iid, "result", upfile)
     if status != 200:
         return res, status
@@ -380,15 +388,17 @@ def importResult(pentest, tool_iid, upfile, plugin):
         raise Exception(msg)
     return "Success"
 
-def launchTask(pentest, tool_iid, data):
+@permission("pentester")
+def launchTask(pentest, tool_iid, body, **kwargs):
+    workerToken = encode_token(kwargs["token_info"])
     mongoInstance.connectToDb(pentest)
     launchableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     if launchableTool is None:
         return "Tool not found", 404
-    checks = data["checks"]
-    plugin = data["plugin"]
+    checks = body["checks"]
+    plugin = body["plugin"]
     # Find a worker that can launch the tool without breaking limitations
-    workers = mongoInstance.getWorkers({"excludedDatabases":{"$nin":[pentest]}})
+    workers = mongoInstance.getWorkers({"pentests":pentest})
     choosenWorker = ""
     for worker in workers:
         workerName = worker["name"]
@@ -407,10 +417,10 @@ def launchTask(pentest, tool_iid, data):
     # Mark the tool as running (scanner_ip is set and dated is set, datef is "None")
     # Add a queue to the selected worker for this tool, So that only this worker will receive this task
     instructions = mongoInstance.insertInDb("pollenisator", "instructions", {"worker":workerName, "date":datetime.now(), "function":"executeCommand",
-                                                                             "args":[pentest, str(launchableToolId), plugin]})
+                                                                             "args":[workerToken, pentest, str(launchableToolId), plugin]})
     return instructions.inserted_id, 200
-
-def stopTask(pentest, tool_iid, data):
+@permission("pentester")
+def stopTask(pentest, tool_iid, body):
     mongoInstance.connectToDb(pentest)
     stopableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     print("Trying to stop task "+str(stopableTool))
@@ -419,7 +429,7 @@ def stopTask(pentest, tool_iid, data):
         return "Tool not found", 404
     workers = mongoInstance.getWorkers({})
     workerNames = [worker["name"] for worker in workers]
-    forceReset = data["forceReset"]
+    forceReset = body["forceReset"]
     saveScannerip = stopableTool.scanner_ip
     if forceReset:
         stopableTool.markAsNotDone()

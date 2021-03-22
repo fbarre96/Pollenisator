@@ -95,8 +95,10 @@ class dnsrecon(Plugin):
             if not insert_ret["res"]:
                 notes += name+" exists but already added.\n"
                 ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
-                infosToAdd = {"ip": list(set([ip] +
-                                                    ip_m.infos.get("ip", [])))}
+                existing_ips = ip_m.infos.get("ip", [])
+                if not isinstance(existing_ips, list):
+                    existing_ips = [existing_ips]
+                infosToAdd = {"ip": list(set([ip] +existing_ips))}
                 ip_m.updateInfos(infosToAdd)
             else:
                 countInserted += 1

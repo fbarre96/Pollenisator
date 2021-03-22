@@ -3,6 +3,7 @@ from core.Components.mongo import MongoCalendar
 from core.Models.Command import Command
 from server.ServerModels.Element import ServerElement
 from core.Components.Utils import JSONEncoder
+from server.permission import permission
 import json
 
 mongoInstance = MongoCalendar.getInstance()
@@ -55,6 +56,7 @@ class ServerCommand(Command, ServerElement):
             pipeline = {}
         return [command.name for command in cls.fetchObjects(pipeline, targetdb)]
 
+@permission("pentester")
 def delete(pentest, command_iid):
     mongoInstance.connectToDb(pentest)
     command = Command(mongoInstance.find("commands", {"_id":ObjectId(command_iid)}, False))
@@ -85,16 +87,18 @@ def delete(pentest, command_iid):
     else:
         return res.deleted_count
 
-def insert(pentest, data):
+@permission("pentester")
+def insert(pentest, body):
     existing = mongoInstance.findInDb(
-            data["indb"], "commands", {"name": data["name"]}, False)
+            body["indb"], "commands", {"name": body["name"]}, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
-    if "_id" in data:
-        del data["_id"]
-    ins_result = mongoInstance.insertInDb(data["indb"], "commands", data, '', True)
+    if "_id" in body:
+        del body["_id"]
+    ins_result = mongoInstance.insertInDb(body["indb"], "commands", body, '', True)
     iid = ins_result.inserted_id
     return {"res":True, "iid":iid}
-
-def update(pentest, command_iid, data):
-    return mongoInstance.updateInDb(data["indb"], "commands", {"_id":ObjectId(command_iid)}, {"$set":data}, False, True)
+    
+@permission("pentester")
+def update(pentest, command_iid, body):
+    return mongoInstance.updateInDb(body["indb"], "commands", {"_id":ObjectId(command_iid)}, {"$set":body}, False, True)

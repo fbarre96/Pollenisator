@@ -173,7 +173,14 @@ definitions:
         type: array
         items:
           type: string
-        
+
+securityDefinitions:
+  jwt:
+    type: http
+    scheme: bearer
+    bearerFormat: JWT
+security: 
+  - jwt: []
 # Paths supported by the server application
 paths:
   /:
@@ -186,6 +193,32 @@ paths:
         200:
           description: "Successful read status operation"
   
+  /login:
+    post:
+      operationId: "server.auth.login"
+      tags:
+        - "Security"
+      summary: "Login to access the app"
+      security: 
+        - bearerAuth: []
+      parameters:
+        - name: data
+          in: body
+          schema:
+            type: object
+            required:
+              - username
+              - pwd
+            properties:
+              username:
+                type: string
+              pwd:
+                type: string
+              
+      responses:
+        200:
+          description: "successfully logged in, returns an  token"
+        
   /update/{pentest}/{collection}:
     post:
       operationId: "server.mongo.update"

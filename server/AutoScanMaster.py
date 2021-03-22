@@ -11,26 +11,30 @@ from server.ServerModels.CommandGroup import ServerCommandGroup
 from server.ServerModels.Tool import ServerTool, getNbOfLaunchedCommand, launchTask, stopTask
 from server.ServerModels.Scope import ServerScope
 from server.ServerModels.Ip import ServerIp
+from server.permission import permission
+from server.token import encode_token
 
-
-def startAutoScan(pentest):
+@permission("pentester")
+def startAutoScan(pentest, **kwargs):
+    token = encode_token(kwargs["token_info"])
     mongoInstance = MongoCalendar.getInstance()
-
     mongoInstance.connectToDb(pentest)
     autoscanRunning = mongoInstance.find("autoscan", {"special":True}, False) is not None
     if autoscanRunning:
         return "An auto scan is already running", 403
-    workers = mongoInstance.getWorkers({"excludedDatabases":{"$nin":[pentest]}})
+    workers = mongoInstance.getWorkers({"pentests":pentest})
     if workers is None:
         return "No worker registered for this pentest", 404
     mongoInstance.insert("autoscan", {"start":datetime.now(), "special":True})
-    autoscan = Process(target=autoScan, args=(pentest,))
+    keywords = kwargs
+    autoscan = Process(target=autoScan, args=(pentest,), kwargs=keywords)
     try:
         autoscan.start()
     except(KeyboardInterrupt, SystemExit):
         mongoInstance.delete("autoscan", {}, True)
 
-def autoScan(pentest):
+@permission("pentester")
+def autoScan(pentest, **kwargs):
     """
     Search tools to launch within defined conditions and attempts to launch them this  worker.
     Gives a visual feedback on stdout
@@ -41,24 +45,27 @@ def autoScan(pentest):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     check = True
+    if "body" in kwargs:
+        del kwargs["body"]
     try:
         while check:
             launchableTools, waiting = findLaunchableTools(pentest)
             launchableTools.sort(key=lambda tup: (tup["errored"], int(tup["priority"])))
             #TODO CHECK SPACE 
             for launchableTool in launchableTools:
-                res, statuscode = launchTask(pentest, launchableTool["tool"].getId(), {"checks":True, "plugin":""})
+                res, statuscode = launchTask(pentest, launchableTool["tool"].getId(), {"checks":True, "plugin":""}, **kwargs)
             check = getAutoScanStatus(pentest)
             time.sleep(3)
     except(KeyboardInterrupt, SystemExit):
         print("stop autoscan : Kill received...")
         mongoInstance.delete("autoscan", {}, True)
 
+@permission("pentester")
 def stopAutoScan(pentest):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     toolsRunning = []
-    workers = mongoInstance.getWorkers({"excludedDatabases":{"$nin":[pentest]}})
+    workers = mongoInstance.getWorkers({"pentests":pentest})
     for worker in workers:
         tools = mongoInstance.find("tools", {"scanner_ip": worker["name"]}, True)
         for tool in tools:
@@ -68,6 +75,7 @@ def stopAutoScan(pentest):
         res, msg = stopTask(pentest, toolId, {"forceReset":True})
         print("STOPTASK : "+str(msg))
 
+@permission("pentester")
 def getAutoScanStatus(pentest):
     #commandsRunning = mongoInstance.aggregate("tools", [{"$match": {"datef": "None", "dated": {
     #        "$ne": "None"}, "scanner_ip": {"$ne": "None"}}}, {"$group": {"_id": "$name", "count": {"$sum": 1}}}])

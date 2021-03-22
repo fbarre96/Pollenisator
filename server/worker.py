@@ -4,9 +4,10 @@ from core.Controllers.ToolController import ToolController
 from server.ServerModels.Tool import ServerTool, update as tool_update
 from bson import ObjectId
 from datetime import datetime
+from server.permission import permission
 mongoInstance = MongoCalendar.getInstance()
 
-
+@permission("user")
 def listWorkers(pipeline=None):
     """Return workers documents from database
     Returns:
@@ -21,10 +22,12 @@ def listWorkers(pipeline=None):
         ret.append(w)
     return ret
 
-def setExclusion(name, worker):
-    "Set a worker exclusion from database"
-    return mongoInstance.setWorkerExclusion(name, worker["db"], worker["setExcluded"])
+@permission("pentester", "body.db")
+def setInclusion(name, body):
+    "Set a worker inclusion in a pentest"
+    return mongoInstance.setWorkerInclusion(name, body["db"], body["setInclusion"])
 
+@permission("user")
 def deleteWorker(name):
     res = mongoInstance.deleteWorker(name)
     if res is None:
@@ -46,26 +49,30 @@ def removeInactiveWorkers():
         count += 1
     return {"n":int(count)}
 
-def registerCommands(name, command_names):
+def registerCommands(name, body):
+    command_names = body
     res = mongoInstance.registerCommands(name, command_names)
     return res
 
+@permission("user")
 def getRegisteredCommands(name):
     return mongoInstance.getRegisteredCommands(name)
 
-def setCommandConfig(name, data):
-    plugin = data["plugin"]
-    command_name = data["command_name"]
-    remote_bin = data["remote_bin"]
+@permission("user")
+def setCommandConfig(name, body):
+    plugin = body["plugin"]
+    command_name = body["command_name"]
+    remote_bin = body["remote_bin"]
     worker = mongoInstance.getWorker(name)
     if worker is None:
         return "Worker not found", 404
     mongoInstance.insertInDb("pollenisator", "instructions", {"worker":name, "date":datetime.now(), "function":"editToolConfig", "args":[command_name, remote_bin, plugin]}, False)
     return True
 
-def registerWorker(data):
-    name = data["name"]
-    command_names = data["command_names"]
+@permission("worker")
+def registerWorker(body):
+    name = body["name"]
+    command_names = body["command_names"]
     res = mongoInstance.registerCommands(name, command_names)
     return res
 
@@ -91,7 +98,8 @@ def getInstructions(name):
     data = list(instructions)
     mongoInstance.deleteFromDb("pollenisator", "instructions", {"worker":name}, True, False)
     return data
-
+    
+@permission("worker")
 def deleteInstruction(name, instruction_iid):
     worker = mongoInstance.getWorker(name)
     if worker is None:

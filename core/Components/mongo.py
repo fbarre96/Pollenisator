@@ -74,13 +74,13 @@ class MongoCalendar:
             Mongo result of workers. Cursor of dictionnary."""
         return self.findInDb("pollenisator", "workers", {"name":name}, False)
 
-    def setWorkerExclusion(self, name, db, setExcluded):
-        if setExcluded:
+    def setWorkerInclusion(self, name, db, setInclusion):
+        if setInclusion:
             return self.updateInDb("pollenisator", "workers", {"name": name}, {
-                            "$push": {"excludedDatabases": db}}, False, True)
+                            "$push": {"pentests": db}}, False, True)
         else:
             return self.updateInDb("pollenisator", "workers", {"name": name}, {
-                            "$pull": {"excludedDatabases": db}}, False, True)
+                            "$pull": {"pentests": db}}, False, True)
 
     def deleteWorker(self, worker_hostname):
         """Remove given worker.
@@ -211,7 +211,7 @@ class MongoCalendar:
                                 {"name": worker_name}, {"$set": {"registeredCommands": command_names}}, False, True)
             else:
                 self.insertInDb("pollenisator", "workers", {
-                    "name": worker_name, "shortname": worker_shortname, "registeredCommands": command_names, "last_heartbeat":datetime.datetime.now(), "excludedDatabases":[]}, '', True)
+                    "name": worker_name, "shortname": worker_shortname, "registeredCommands": command_names, "last_heartbeat":datetime.datetime.now(), "pentests":[]}, '', True)
             print("Registered commands "+str(command_names) +
                   " for  "+str(worker_name))
             return True
@@ -528,7 +528,7 @@ class MongoCalendar:
                 res = db[collection].delete_one(pipeline)
         return res
 
-    def listCalendars(self):
+    def listCalendars(self, username=None):
         """Return the list of pollenisator databases.
         Raises:
             Raise Exception if client is not connected to database
@@ -544,7 +544,12 @@ class MongoCalendar:
             calendars = self.findInDb("pollenisator", "calendars")
             try:
                 for calendar in calendars:
-                    ret.append(calendar["nom"])
+                    if username is not None:
+                        res = self.findInDb(calendar["nom"], "settings", {"key":"pentesters", "value":username}, False)
+                        if res is not None or username == calendar.get("owner"):
+                            ret.append(calendar["nom"])
+                    else:
+                        ret.append(calendar["nom"])
             except OperationFailure:
                 print("The connected user has no rights")
                 return None
@@ -606,11 +611,12 @@ class MongoCalendar:
             return False, msg
         return True, ""
 
-    def registerCalendar(self, saveAsName, askDeleteIfExists=True, autoconnect=True):
+    def registerCalendar(self, owner, saveAsName, askDeleteIfExists=True, autoconnect=True):
         """
         Register a new calendar into database.
 
         Args:
+            owner: the owner's username
             saveAsName: the calendar name to register
             askDeleteIfExists: boolean to ask the user for a deletion in case of an already existing calendar with the same name.
                                 If false, and the case appends, calendar will not be registered. Default is True.
@@ -632,13 +638,25 @@ class MongoCalendar:
             return False, msg
         # insert in database  calendars
         self.connectToDb("pollenisator")
-        self.db.calendars.insert({"nom": saveAsName.strip()})
+        self.db.calendars.insert({"nom": saveAsName.strip(), "owner":owner})
         self.connectToDb(saveAsName.strip())
         if autoconnect:
             self.connectToDb(saveAsName.strip())
         else:
             self.connectToDb(oldConnection)
         return True, "Success"
+
+    def getPentestUsers(self, pentest):
+        pentesters = self.findInDb(pentest, "settings", {"key":"pentesters"}, False)
+        if pentesters is None:
+            return []
+        return pentesters["value"]
+
+    def getPentestOwner(self, pentest):
+        pentest_data = self.findInDb("pollenisator", "calendars", {"nom":pentest}, False)
+        if pentest_data is None:
+            return "admin"
+        return pentest_data.get("owner", "admin")
 
     def copyDb(self, fromCopyName, toCopyName):
         """
@@ -654,9 +672,10 @@ class MongoCalendar:
             return "database destination name is empty", 400
         if fromCopyName not in self.listCalendars():
             return "database to copy : not found", 404
+        
         major_version = ".".join(self.client.server_info()["version"].split(".")[:2])
         if float(major_version) < 4.2:
-            succeed, msg = self.registerCalendar(
+            succeed, msg = self.registerCalendar(self.getPentestOwner(fromCopyName),
                 toCopyName, True, True)
             if succeed:
                 self.client.admin.command('copydb',
@@ -667,7 +686,7 @@ class MongoCalendar:
             return "Success", 200
         else:
             outpath = self.dumpDb(fromCopyName)
-            return self.importDatabase(outpath, nsFrom=fromCopyName, nsTo=toCopyName)
+            return self.importDatabase(self.getPentestOwner(fromCopyName), outpath, nsFrom=fromCopyName, nsTo=toCopyName)
 
     def dumpDb(self, dbName, collection=""):
         """
@@ -694,7 +713,7 @@ class MongoCalendar:
         execute(cmd)
         return out_path+".gz"
 
-    def importDatabase(self, filename, **kwargs):
+    def importDatabase(self, owner, filename, **kwargs):
         """
         Import a database dump into a calendar database.
             It uses the mongorestore utily installed with mongodb-org-tools
@@ -710,7 +729,7 @@ class MongoCalendar:
             toDbName = kwargs.get("nsTo")
         else:
             toDbName = os.path.splitext(os.path.basename(filename))[0]
-        success, msg = self.registerCalendar(toDbName, True, False)
+        success, msg = self.registerCalendar(owner, toDbName, True, False)
         if success:
             connectionString = '' if self.user == '' else "-u "+self.user + \
                 " -p "+self.password + " --authenticationDatabase admin "

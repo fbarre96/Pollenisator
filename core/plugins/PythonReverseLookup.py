@@ -75,7 +75,10 @@ class PythonReverseLookup(Plugin):
         insert_res = ip_m.addInDb()
         if not insert_res["res"]:
             ip_m = ServerIp.fetchObject(pentest, {"_id": insert_res["iid"]})
-        hostnames = list(set(ip_m.infos.get("hostname", []) + [domain]))
+        existing_hostnames = ip_m.infos.get("hostname", [])
+        if not isinstance(existing_hostnames, list):
+            existing_hostnames = [existing_hostnames]
+        hostnames = list(set(existing_hostnames + [domain]))
         ip_m.updateInfos({"hostname": hostnames})
         targets["ip"] = {"ip": ip}
         notes += "Domain found :"+domain+"\n"

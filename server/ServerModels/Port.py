@@ -7,7 +7,7 @@ from server.ServerModels.Defect import delete as defect_delete
 from server.ServerModels.Element import ServerElement
 from core.Components.Utils import JSONEncoder
 import json
-
+from server.permission import permission
 mongoInstance = MongoCalendar.getInstance()
 
 class ServerPort(Port, ServerElement):
@@ -120,6 +120,7 @@ class ServerPort(Port, ServerElement):
     def update(self):
         return update("ports", ObjectId(self._id), PortController(self).getData())
 
+@permission("pentester")
 def delete(pentest, port_iid):
     mongoInstance.connectToDb(pentest)
 
@@ -137,19 +138,19 @@ def delete(pentest, port_iid):
         return 0
     else:
         return res.deleted_count
-
-def insert(pentest, data):
+@permission("pentester")
+def insert(pentest, body):
     mongoInstance.connectToDb(pentest)
-    port_o = ServerPort(pentest, data)
+    port_o = ServerPort(pentest, body)
     base = port_o.getDbKey()
     existing = mongoInstance.find(
             "ports", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
-    if "_id" in data:
-        del data["_id"]
+    if "_id" in body:
+        del body["_id"]
     parent = port_o.getParentId()
-    ins_result = mongoInstance.insert("ports", data, parent)
+    ins_result = mongoInstance.insert("ports", body, parent)
     iid = ins_result.inserted_id
     # adding the appropriate tools for this port.
     # 1. fetching the wave's commands
@@ -189,14 +190,14 @@ def insert(pentest, data):
                         newTool.addInDb()
     return {"res":True, "iid":iid}
 
-
-def update(pentest, port_iid, data):
+@permission("pentester")
+def update(pentest, port_iid, body):
     mongoInstance.connectToDb(pentest)
     
     oldPort = ServerPort(pentest, mongoInstance.find("ports", {"_id": ObjectId(port_iid)}, False))
     if oldPort is None:
         return
-    port_o = ServerPort(pentest, data)
+    port_o = ServerPort(pentest, body)
     oldService = oldPort.service
     if oldService != port_o.service:
         mongoInstance.delete("tools", {
@@ -215,13 +216,14 @@ def update(pentest, port_iid, data):
                     tool_m = ServerTool(pentest).initialize(port_command["name"], wave["wave"], "",
                                                 port_o.ip, port_o.port, port_o.proto, "port")
                     tool_m.addInDb()
-    return mongoInstance.update("ports", {"_id":ObjectId(port_iid)}, {"$set":data}, False, True)
-
-def addCustomTool(pentest, port_iid, data):
+    return mongoInstance.update("ports", {"_id":ObjectId(port_iid)}, {"$set":body}, False, True)
+    
+@permission("pentester")
+def addCustomTool(pentest, port_iid, body):
     mongoInstance.connectToDb(pentest)
     if not mongoInstance.isUserConnected():
         return "Not connected", 503
     if mongoInstance.find("waves", {"wave": 'Custom Tools'}, False) is None:
         mongoInstance.insert("waves", {"wave": 'Custom Tools', "wave_commands": list()})
     port_o = ServerPort(pentest, mongoInstance.find("ports", {"_id":ObjectId(port_iid)}, False))
-    port_o.addAllTool(data["tool_name"], 'Custom Tools', '', check=False)
+    port_o.addAllTool(body["tool_name"], 'Custom Tools', '', check=False)
