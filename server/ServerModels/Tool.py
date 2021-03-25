@@ -234,6 +234,8 @@ class ServerTool(Tool, ServerElement):
             newStatus.append("OOS")
         if "OOT" in self.status:
             newStatus.append("OOT")
+        if "timedout" in self.status:
+            newStatus.append("timedout")
         self.status = newStatus
         self.scanner_ip = workerName
         mongoInstance.updateInDb("pollenisator", "workers", {"name":workerName}, {"$push":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
