@@ -192,6 +192,20 @@ class ServerTool(Tool, ServerElement):
         if "running" in self.status:
             self.status.remove("running")
         self.status.append("error")
+
+    def markAsTimedout(self):
+        """Set this tool status as not done by removing "done" or "running" and adding an error status.
+        Also resets starting and ending date as well as worker name
+        """
+        self.dated = "None"
+        self.datef = "None"
+        mongoInstance.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
+        self.scanner_ip = "None"
+        if "done" in self.status:
+            self.status.remove("done")
+        if "running" in self.status:
+            self.status.remove("running")
+        self.status.append("timedout")
         
     def markAsNotDone(self):
         """Set this tool status as not done by removing "done" or "running" status.
@@ -243,6 +257,8 @@ def setStatus(pentest, tool_iid, body):
         tool_o.markAsNotDone()
     elif "error" in newStatus:
         tool_o.markAsError()
+    elif "timedout" in newStatus:
+        tool_o.markAsTimedout()
     elif len(newStatus) == 0:
         tool_o.markAsNotDone()
     return update(pentest, tool_o.getId(), ToolController(tool_o).getData())
