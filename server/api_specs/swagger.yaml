@@ -1844,7 +1844,7 @@ paths:
                 type: array
                 items:
                   type: string
-                  enum: ["OOS","OOT","not_done","running","error","done", "ready"]
+                  enum: ["OOS","OOT","not_done","running","error","timedout","done", "ready"]
               arg:
                 type: string
                 default: ""

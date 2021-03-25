@@ -50,7 +50,7 @@ def autoScan(pentest, **kwargs):
     try:
         while check:
             launchableTools, waiting = findLaunchableTools(pentest)
-            launchableTools.sort(key=lambda tup: (tup["errored"], int(tup["priority"])))
+            launchableTools.sort(key=lambda tup: (tup["timedout"], int(tup["priority"])))
             #TODO CHECK SPACE 
             for launchableTool in launchableTools:
                 res, statuscode = launchTask(pentest, launchableTool["tool"].getId(), {"checks":True, "plugin":""}, **kwargs)
@@ -105,13 +105,15 @@ def findLaunchableTools(pentest):
                 waiting[str(toolModel)] += 1
             except KeyError:
                 waiting[str(toolModel)] = 1
+            if "error" in toolModel.status:
+                continue
             command = toolModel.getCommand()
             if command is None:
                 prio = 0
             else:
                 prio = int(command.get("priority", 0))
             toolsLaunchable.append(
-                {"tool": toolModel, "name": str(toolModel), "priority": prio, "errored": "error" in toolModel.status})
+                {"tool": toolModel, "name": str(toolModel), "priority": prio, "timedout":"timedout" in toolModel.status})
 
     return toolsLaunchable, waiting
 

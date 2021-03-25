@@ -6,7 +6,7 @@ from datetime import datetime
 from flask import jsonify
 from bson import ObjectId
 import threading
-from core.Components.Utils import JSONEncoder
+from core.Components.Utils import JSONEncoder, loadServerConfig
 from server.worker import removeInactiveWorkers
 from server.token import generateNewToken
 from getpass import getpass
@@ -58,5 +58,12 @@ if __name__ == '__main__':
     removeInactiveWorkersTimer.start()
     #import logging
     #logging.basicConfig(filename='error.log',level=logging.DEBUG)
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    conf = loadServerConfig()
+    port = int(conf.get("api_port", 5000))
+    https = conf.get("https", "true").lower() == "true"
+    if https:
+        ssl_context = "adhoc"
+    else:
+        ssl_context = None
+    app.run(host='0.0.0.0', port=port, debug=True, ssl_context=ssl_context)
     removeInactiveWorkersTimer.cancel()
