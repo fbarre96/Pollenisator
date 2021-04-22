@@ -3,20 +3,24 @@ from core.Components.mongo import MongoCalendar
 import json
 import bcrypt
 from datetime import datetime
-from flask import jsonify
+from flask import jsonify, session
+from flask_socketio import SocketIO
 from bson import ObjectId
 import threading
 from core.Components.Utils import JSONEncoder, loadServerConfig
 from server.worker import removeInactiveWorkers
 from server.token import generateNewToken
 from getpass import getpass
+#from server.NotificationService import NotificationService
 # Create the application instance
 app = connexion.App(__name__, specification_dir='./server/api_specs/')
 
 # Read the openapi.yaml file to configure the endpoints
 app.add_api('openapi.yaml')
+flask_app = app.app
 # Tell your app object which encoder to use to create JSON from objects. 
-app.app.json_encoder = JSONEncoder
+flask_app.json_encoder = JSONEncoder
+socketio = SocketIO(flask_app, logger=True)
 # Create a URL route in our application for "/"
 @app.route('/')
 def home():
@@ -46,6 +50,7 @@ def createAdmin():
     mongoInstance.insertInDb("pollenisator", "users", {"username":username, "hash":bcrypt.hashpw(password.encode(), salt), "scope":["admin","user"]})
     print("Administrator created")
 
+
 # If we're running in stand alone mode, run the application
 if __name__ == '__main__':
     mongoInstance = MongoCalendar.getInstance()
@@ -60,10 +65,15 @@ if __name__ == '__main__':
     #logging.basicConfig(filename='error.log',level=logging.DEBUG)
     conf = loadServerConfig()
     port = int(conf.get("api_port", 5000))
-    https = conf.get("https", "true").lower() == "true"
+    https = conf.get("https", "false").lower() == "true"
     if https:
         ssl_context = "adhoc"
     else:
         ssl_context = None
-    app.run(host='0.0.0.0', port=port, debug=True, ssl_context=ssl_context)
+    #notif_service = NotificationService()
+    #notif_service.start()
+    with flask_app.app_context():
+        flask_app.config['socketio'] = socketio
+        app.run(host='0.0.0.0', port=port, debug=True, ssl_context=ssl_context)
+
     removeInactiveWorkersTimer.cancel()

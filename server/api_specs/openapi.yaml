@@ -304,7 +304,27 @@ paths:
       responses:
         "200":
           description: Successful read status operation
-
+  /issue:
+    post:
+      operationId: server.logger.report
+      tags:
+        - Logger
+      summary: report an issue from client
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - error
+              properties:
+                error:
+                  type: string
+      security: []
+      responses:
+        "200":
+          description: Reported a client issue successfully
+ 
   /user/register:
     post:
       operationId: server.auth.createUser
