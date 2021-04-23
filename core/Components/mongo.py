@@ -780,7 +780,5 @@ class MongoCalendar:
             action: the type of modification performed on this document ("insert", "update" or "delete")
             parentId: (not used) default to "", a node parent id as str
         """
-        from api import socketio
-        socketio.emit("notification", json.dumps({"db":db, "collection":collection, "iid":str(iid), "parent":parentId, "action":action}), broadcast=True)
-        #self.client["pollenisator"]["notifications"].insert_one(
-        #    {"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now()})
+        self.client["pollenisator"]["notifications"].insert_one(
+            {"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now()})
