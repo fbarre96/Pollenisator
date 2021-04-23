@@ -4,7 +4,6 @@ import json
 import bcrypt
 from datetime import datetime
 from flask import jsonify, session
-from flask_socketio import SocketIO
 from bson import ObjectId
 import threading
 from core.Components.Utils import JSONEncoder, loadServerConfig
@@ -20,7 +19,6 @@ app.add_api('openapi.yaml')
 flask_app = app.app
 # Tell your app object which encoder to use to create JSON from objects. 
 flask_app.json_encoder = JSONEncoder
-socketio = SocketIO(flask_app, logger=True)
 # Create a URL route in our application for "/"
 @app.route('/')
 def home():
@@ -73,7 +71,6 @@ if __name__ == '__main__':
     #notif_service = NotificationService()
     #notif_service.start()
     with flask_app.app_context():
-        flask_app.config['socketio'] = socketio
         app.run(host='0.0.0.0', port=port, debug=True, ssl_context=ssl_context)
 
     removeInactiveWorkersTimer.cancel()
