@@ -678,7 +678,6 @@ def write_each_defect(pentest, document, defects_dict):
             replaceTextInTable(table_d, "var_d_title", o_defect["title"])
             replaceTextInTable(table_d, "var_d_ease", o_defect["ease"])
             replaceTextInTable(table_d, "var_d_impact", o_defect["impact"])
-            table_d = copy_table
             result = [
                     {
                         "id":"0",
@@ -731,6 +730,7 @@ def write_each_defect(pentest, document, defects_dict):
                         pics.append(ret)
                 o_defect["details"][ids]["pics"] = pics
             write_defect_from_input(result, document, table_d, separator, o_defect, count)
+            table_d = copy_table
         # Delete remaining copies
         table_d, table_i = findRowContaining(document, "var_d_id")
         separator = findParagraphContaining(document, 'var_d_separator')
