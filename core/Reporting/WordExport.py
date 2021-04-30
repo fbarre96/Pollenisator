@@ -570,9 +570,9 @@ def write_every_defect_fix(fixes, document, last_defect_paragraph, count):
         if table_c is None:
             raise Exception("Error, fixe table was deleted too soon. RIP")
         # Add notes paragraph after it
-        _, added_paragraph = copy_table_after(table_c, last_defect_paragraph, "var_c_notes\n")
+        copied_table_c, added_paragraph = copy_table_after(table_c, last_defect_paragraph, "var_c_notes\n")
 
-        copied_table_c, _ = findRowContaining(document, "var_c_id")
+        #copied_table_c, _ = findRowContaining(document, "var_c_id")
         replaceTextInTable(copied_table_c, "var_c_id", id_correctif)
         replaceTextInTable(copied_table_c, "var_c_title", fixe["title"])
         replaceTextInTable(copied_table_c, "var_c_ease", fixe["execution"])
@@ -666,17 +666,19 @@ def write_each_defect(pentest, document, defects_dict):
     total_len = 0
     for level in levels:
         total_len += len(defects_dict[level].values())
+        table_d, table_i = findRowContaining(document, "var_d_id")
+    
     for level in levels:
         for defect_dict in defects_dict[level].values():
             count += 1
             o_defect = defect_dict["description"]
-            table_d, table_i = findRowContaining(document, "var_d_id")
             separator = findParagraphContaining(document, 'var_d_separator')
-            copy_table_after(table_d, separator, "var_d_separator")
+            copy_table, copy_para = copy_table_after(table_d, separator, "var_d_separator")
             replaceTextInTable(table_d, "var_d_id", "D"+str(count))
             replaceTextInTable(table_d, "var_d_title", o_defect["title"])
             replaceTextInTable(table_d, "var_d_ease", o_defect["ease"])
             replaceTextInTable(table_d, "var_d_impact", o_defect["impact"])
+            table_d = copy_table
             result = [
                     {
                         "id":"0",
