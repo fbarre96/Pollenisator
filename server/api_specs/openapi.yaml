@@ -410,6 +410,24 @@ paths:
         "200":
           description: successfully changed another user password
 
+  /user/searchUsers/{searchreq}:
+    get:
+      operationId: server.auth.searchUsers
+      tags:
+        - Users
+      parameters:
+        - name: searchreq
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 3
+      summary: get a list of users filtered with search request (3 carac. min.)
+      description: get a list of users 
+      responses:
+        "200":
+          description: Get a list of users
+
   /admin/listUsers:
     get:
       operationId: server.auth.listUsers

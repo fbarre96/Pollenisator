@@ -76,6 +76,12 @@ def listUsers():
     user_records = mongoInstance.aggregateFromDb("pollenisator", "users", [{"$project":{"hash":0, "token":0}}])
     return [user_record for user_record in user_records]
     
+@permission("user")
+def searchUsers(searchreq):
+    mongoInstance = MongoCalendar.getInstance()
+    user_records = mongoInstance.findInDb("pollenisator", "users", {"username":{"$regex":f".*{searchreq}.*"}})
+    return [user_record["username"] for user_record in user_records]
+
 def login(body):
     username = body.get("username", "")
     pwd = body.get("pwd", "")
