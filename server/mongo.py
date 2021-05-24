@@ -299,6 +299,7 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     insert_wave(dbName, WaveController(wave_o).getData(), **kwargs)
     interval_o = ServerInterval().initialize(dbName, start_date, end_date)
     insert_interval(dbName, IntervalController(interval_o).getData(), **kwargs)
+    scopes = scopes.replace("https://", "").replace("http://","")
     scopes = scope.replace("\n", ",").split(",")
     for scope_item in scopes:
         if scope_item.strip() != "":
