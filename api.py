@@ -1,6 +1,7 @@
 import connexion
 from core.Components.mongo import MongoCalendar
 import json
+import os
 import bcrypt
 from datetime import datetime
 from flask import jsonify, session
@@ -12,7 +13,8 @@ from server.token import generateNewToken
 from getpass import getpass
 #from server.NotificationService import NotificationService
 # Create the application instance
-app = connexion.App(__name__, specification_dir='./server/api_specs/')
+server_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "./server/api_specs/")
+app = connexion.App(__name__, specification_dir=server_folder)
 
 # Read the openapi.yaml file to configure the endpoints
 app.add_api('openapi.yaml')
