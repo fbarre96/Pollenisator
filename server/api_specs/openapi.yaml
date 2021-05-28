@@ -777,6 +777,28 @@ paths:
       responses:
         "200":
           description: Successful delete command
+  "/delete/{pentest}/bulk":
+    post:
+      operationId: server.mongo.bulk_delete
+      tags:
+        - Mongo
+      summary: Delete many things in db
+      description: Delete many things in db
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              
+      responses:
+        "200":
+          description: Successful delete command
   /pentests:
     get:
       operationId: server.mongo.listPentests

@@ -228,6 +228,25 @@ def delete(pentest, collection, body):
     else:
         return res.deleted_count
 
+@permission("pentester")
+def bulk_delete(pentest, body):
+    data = body
+    if isinstance(data, str):
+        data = json.loads(data, cls=JSONDecoder)
+    if not isinstance(data, dict):
+        return "body was not a valid dictionnary", 400
+    if pentest == "pollenisator":
+        return "Impossible to bulk delete in this database", 403
+    elif pentest not in mongoInstance.listCalendars():
+        return "Pentest argument is not a valid pollenisator pentest", 403
+    deleted = 0
+    for obj_type in body:
+        for obj_id in body[obj_type]:
+            res = mongoInstance.deleteFromDb(pentest, obj_type, {"_id": ObjectId(obj_id)}, False, True)
+            if res is not None:
+                deleted += res.deleted_count
+    return deleted
+
 @permission("user")
 def listPentests(**kwargs):
     username = kwargs["token_info"]["sub"]
