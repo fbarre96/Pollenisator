@@ -240,8 +240,8 @@ def bulk_delete(pentest, body):
     elif pentest not in mongoInstance.listCalendars():
         return "Pentest argument is not a valid pollenisator pentest", 403
     deleted = 0
-    for obj_type in body:
-        for obj_id in body[obj_type]:
+    for obj_type in data:
+        for obj_id in data[obj_type]:
             res = mongoInstance.deleteFromDb(pentest, obj_type, {"_id": ObjectId(obj_id)}, False, True)
             if res is not None:
                 deleted += res.deleted_count
