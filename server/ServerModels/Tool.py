@@ -339,7 +339,7 @@ def craftCommandLine(pentest, tool_iid, plugin):
     # craft outputfile name
     
     comm = mod.changeCommand(comm, "|outputDir|", mod.getFileOutputExt())
-    return {"comm":comm, "ext":mod.getFileOutputExt()}
+    return {"comm":comm, "ext":mod.getFileOutputExt(), "bin":bin_path.strip()}
 
 @permission("user")
 def listPlugins():
