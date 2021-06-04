@@ -2334,3 +2334,28 @@ paths:
       responses:
         "200":
           description: Success
+
+  "/report/search":
+    get:
+      operationId: server.Report.search
+      tags:
+        - Report
+      summary: search a defect/remark on an external app
+      parameters:
+        - name: type
+          in: query
+          description: defect or remark
+          required: true
+          schema:
+            type: string
+            enum:
+              - defect
+              - remark
+        - name: q
+          in: query
+          description: terms for the saerch
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success

@@ -1,11 +1,15 @@
 import os
+import json
 from datetime import datetime
 from flask import send_file
 import core.Reporting.WordExport as WordExport
+from core.Components.Utils import loadServerConfig
 import core.Reporting.PowerpointExport as PowerpointExport
 from server.ServerModels.Defect import ServerDefect
 from core.Controllers.DefectController import DefectController
 from bson import ObjectId
+import requests
+from core.Components.mongo import MongoCalendar
 from server.permission import permission
 dir_path = os.path.dirname(os.path.realpath(__file__))
 template_path = os.path.normpath(os.path.join(dir_path, "../Templates/"))
@@ -39,7 +43,7 @@ def uploadTemplate(upfile):
         return "Success"
     return "Failure"
 
-@permission("pentester")
+@permission("user")
 def generateReport(pentest, templateName, clientName, contractName, mainRedactor):
     if not templateName.endswith(".pptx") and not templateName.endswith(".docx"):
         return "Invalid extension for template, must be pptx or docx", 400
@@ -51,13 +55,31 @@ def generateReport(pentest, templateName, clientName, contractName, mainRedactor
     template_to_use_path = os.path.join(template_path, templateName)
     outfile = None
     if ext == ".docx":
-        outfile = WordExport.createReport(pentest, getDefectsAsDict(pentest), template_to_use_path, out_name, mainRedac=mainRedactor,
+        outfile = WordExport.createReport(pentest, getDefectsAsDict(pentest), getRemarksAsDict(pentest), template_to_use_path, out_name, mainRedac=mainRedactor,
                                 client=clientName.strip(), contract=contractName.strip())
     elif ext == ".pptx":
-        outfile = PowerpointExport.createReport(pentest, getDefectsAsDict(pentest), template_to_use_path, out_name, client=clientName.strip(), contract=contractName.strip())
+        outfile = PowerpointExport.createReport(pentest, getDefectsAsDict(
+        pentest), getRemarksAsDict(pentest), template_to_use_path, out_name, client=clientName.strip(), contract=contractName.strip())
     else:
-        return "Unknown template file extension", 400
+        return "Unknown template file extension", 400     
     return send_file(outfile, attachment_filename=out_name+ext) 
+    
+
+@permission("user")
+def search(type, q):
+    config = loadServerConfig()
+    api_url = config.get('knowledge_api_url', '')
+    if api_url == "":
+        return "There is no knowledge database implemented.", 204
+    try:
+        resp = requests.get(api_url, params={"type":type, "terms": q})
+    except Exception as e:
+        return "The knowledge database is unreachable", 503
+    if resp.status_code != 200:
+        return "The knowledge dabatase encountered an issue : "+resp.txt, 503
+    answer = json.loads(resp.text)
+    return answer
+    
 
 def getDefectsAsDict(pentest):
     """
@@ -119,3 +141,17 @@ def getDefectsAsDict(pentest):
             defects_dict[defect_recap["risk"]
                             ][title]["defects_ids"].append(defect.getId())
     return defects_dict
+    
+
+def getRemarksAsDict(pentest):
+    remarks = {}
+    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance.connectToDb(pentest)
+    ds = mongoInstance.find("remarks", {}, True)
+    if ds is None:
+        return None
+    for d in ds:
+        if d["type"] not in remarks:
+            remarks[d["type"]] = []
+        remarks[d["type"]].append(d["title"])
+    return remarks

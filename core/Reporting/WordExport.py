@@ -22,10 +22,10 @@ from bson.objectid import ObjectId
 from datetime import datetime
 import requests
 import re
-import io
-from server.ServerModels.Ip import ServerIp
-from server.ServerModels.Port import ServerPort
+import server.Report as Report
+from server.ServerModels.Port import ServerPort	
 from server.ServerModels.Defect import ServerDefect
+
 
 def downloadImgData(url):
     data = requests.get(url)
@@ -269,8 +269,8 @@ def findRowContaining(document, search):
         for row in table.rows:
             for cell in row.cells:
                 for paragraph in cell.paragraphs:
-                    if search in paragraph.text:
-                        return table, table_i
+                   if search in paragraph.text:
+                       return document.tables[table_i], table_i
     return None, None
 
 def findParagraphContaining(document, search):
@@ -418,7 +418,7 @@ def format_block_res_table(table_res, start_defect_line_on_res_table, nb_line_re
         bottom={"sz": 0, "val": "none", "color": "#000000", "space": "0"},
     )
 
-def populate_defect_summary_table(document, defects_dict):
+def populate_defect_summary_table(document, defects_dict, pentest_type):
     """
     Fill a table found with a decorator var_dsum_colId in a line.
     This table will contains a summary of the defects given the excel.
@@ -497,16 +497,51 @@ def populate_defect_summary_table(document, defects_dict):
             fill_cell(new_row_cells[cell_impact], o_defect["impact"], risks_font_colors[level], risks_bg_colors[level])
             fill_cell(new_row_cells[cell_type], type_first_letters, risks_font_colors[level], risks_bg_colors[level])
             count_correctif = 1
-            id_correctif = "A"+str(count)
-            new_row_c_cells = table_c.add_row().cells
-            if table_res_i is not None:
-                write_res_table_fix_line(table_res, risks_bg_colors[level], id_correctif, {"title":"A definir", "execution":"A def", "gain":"A def"})
-                nb_line_res_table += 1
-                format_block_res_table(table_res, start_defect_line_on_res_table, nb_line_res_table)
-            fill_cell(new_row_c_cells[cell_c_id], id_correctif, None, None, True)
-            fill_cell(new_row_c_cells[cell_c_tit], "A definir")
-            fill_cell(new_row_c_cells[cell_c_ease], "A def", risks_font_colors["Critique"], fixes_bg_colors["Quick Win"])
-            fill_cell(new_row_c_cells[cell_c_gain], "A def", risks_font_colors["Critique"], fixes_bg_colors["Quick Win"])
+            result = Report.search("defect", o_defect["title"])
+            impossible_to_connect = False
+            if result == None:
+                impossible_to_connect = True
+            if impossible_to_connect == True:
+                print("ERROR : knowledge database is not accessible")
+            NoResult = False
+            if isinstance(result, bool):
+                if result == False:
+                    NoResult = True
+            elif result is None:
+                NoResult = True
+            elif len(result) == 0:
+                NoResult = True
+            
+            if NoResult:
+                id_correctif = "A"+str(count)
+                new_row_c_cells = table_c.add_row().cells
+                if table_res_i is not None:
+                    write_res_table_fix_line(table_res, risks_bg_colors[level], id_correctif, {"title":"A definir", "execution":"A def", "gain":"A def"})
+                    nb_line_res_table += 1
+                    format_block_res_table(table_res, start_defect_line_on_res_table, nb_line_res_table)
+                fill_cell(new_row_c_cells[cell_c_id], id_correctif, None, None, True)
+                fill_cell(new_row_c_cells[cell_c_tit], "A definir")
+                fill_cell(new_row_c_cells[cell_c_ease], "A def", risks_font_colors["Critique"], fixes_bg_colors["Quick Win"])
+                fill_cell(new_row_c_cells[cell_c_gain], "A def", risks_font_colors["Critique"], fixes_bg_colors["Quick Win"])
+                continue
+            resultMatch = result[0]
+            if len(result) > 1:
+                for result_defect_match in result:
+                    if result_defect_match["perimeter"].lower() == pentest_type.lower():
+                        resultMatch = result_defect_match
+            for fixe in resultMatch["fixes"]:
+                id_correctif = "A"+str(count)
+                if len(resultMatch["fixes"]) > 1:
+                    id_correctif += "."+str(count_correctif)
+                    count_correctif+=1
+                new_row_c_cells = table_c.add_row().cells
+                if table_res_i is not None:
+                    write_res_table_fix_line(table_res, risks_bg_colors[level], id_correctif, fixe)
+                    nb_line_res_table += 1
+                fill_cell(new_row_c_cells[cell_c_id], id_correctif, None, None, True)
+                fill_cell(new_row_c_cells[cell_c_tit], fixe["title"])
+                fill_cell(new_row_c_cells[cell_c_ease], fixe["execution"], risks_font_colors["Critique"], fixes_bg_colors[fixe["execution"]])
+                fill_cell(new_row_c_cells[cell_c_gain], fixe["gain"], risks_font_colors["Critique"], fixes_bg_colors[fixe["gain"]])
             if table_res_i is not None:
                 format_block_res_table(table_res, start_defect_line_on_res_table, nb_line_res_table)
     # Ajustement de la taille des lignes pour combler la page
@@ -613,11 +648,11 @@ def insert_images_after(paragraph, pics):
         r.add_picture(pic, width=Cm(17.19))
     return new_p
 
-def write_defect_from_input(result, document, table_d, separator, o_defect, count):
-    desc = result[0]["description"].replace("\r", "")
+def write_defect_from_input(resultMatch, document, table_d, separator, o_defect, count):
+    desc = resultMatch["description"].replace("\r", "")
     desc_paras = desc.split("\n")
-    synthesis = result[0].get("synthesis", None)
-    if synthesis is not None:
+    synthesis = resultMatch.get("synthesis", None)
+    if synthesis is not None and synthesis.strip() != '':
         desc_paras.insert(0, synthesis.replace("\r", "").strip())
     desc_paras.insert(1, "ToDo "+str(o_defect["redactor"]))
     desc_paras.insert(2, "\n")
@@ -643,11 +678,11 @@ def write_defect_from_input(result, document, table_d, separator, o_defect, coun
         first_separator.text = "\n"
     else:
         delete_paragraph(first_separator)
-    write_every_defect_fix(result[0]["fixes"], document, separator, count)
+    write_every_defect_fix(resultMatch["fixes"], document, separator, count)
 
 
 
-def write_each_defect(pentest, document, defects_dict):
+def write_each_defect(pentest, document, defects_dict, pentest_type):
     """
     for each default
        Copy a table and a paragraph form the template marked with var_d_id and var_d_separator.
@@ -677,27 +712,45 @@ def write_each_defect(pentest, document, defects_dict):
             replaceTextInTable(table_d, "var_d_title", o_defect["title"])
             replaceTextInTable(table_d, "var_d_ease", o_defect["ease"])
             replaceTextInTable(table_d, "var_d_impact", o_defect["impact"])
-            result = [
-                    {
-                        "id":"0",
-                        "title": o_defect["title"],
-                        "ease": o_defect["ease"],
-                        "impact": o_defect["impact"],
-                        "risk": o_defect["risk"],
-                        "type": o_defect["type"],
-                        "description": "Description",
-                        "details": {},
-                        "notes": o_defect.get("notes", ""),
-                        "fixes": [
-                            {
-                                "title": "A def",
-                                "execution": "Modérée",
-                                "gain": "Moyen",
-                                "description": "A definir"
-                            }
-                        ]
-                    }
-                ]
+            result = Report.search("defect", o_defect["title"])
+            impossible_to_connect = False
+            if result is None:
+                impossible_to_connect = True
+            elif isinstance(result, bool):
+                if result == False:
+                    impossible_to_connect = True
+            elif len(result) == 0:
+                impossible_to_connect = True
+            if impossible_to_connect:
+                result = [
+                        {
+                            "id":"0",
+                            "title": o_defect["title"],
+                            "ease": o_defect["ease"],
+                            "impact": o_defect["impact"],
+                            "risk": o_defect["risk"],
+                            "type": o_defect["type"],
+                            "description": "Description",
+                            "details": {},
+                            "notes": o_defect.get("notes", ""),
+                            "fixes": [
+                                {
+                                    "title": "A def",
+                                    "execution": "Modérée",
+                                    "gain": "Moyen",
+                                    "description": "A definir"
+                                }
+                            ]
+                        }
+                    ]
+                print("Write each defect (not found "+str(count)+")")
+            else:
+                print("Write each defect (found "+str(count)+")")
+            resultMatch = result[0]
+            if len(result) > 1:
+                for result_defect_match in result:
+                    if result_defect_match["perimeter"].lower() == pentest_type.lower():
+                        resultMatch = result_defect_match
             o_defect["details"] = {}
             for ids in defect_dict.get("defects_ids", []):
                 o_defect["details"][ids] = o_defect["details"].get(ids, {})
@@ -728,7 +781,7 @@ def write_each_defect(pentest, document, defects_dict):
                     if ret is not None:
                         pics.append(ret)
                 o_defect["details"][ids]["pics"] = pics
-            write_defect_from_input(result, document, table_d, separator, o_defect, count)
+            write_defect_from_input(resultMatch, document, table_d, separator, o_defect, count)
         # Delete remaining copies
         table_d, table_i = findRowContaining(document, "var_d_id")
         separator = findParagraphContaining(document, 'var_d_separator')
@@ -742,6 +795,45 @@ def write_each_defect(pentest, document, defects_dict):
     for _ in range(len(table_c.rows)):
         remove_row(table_c, table_c.rows[0])
     del document.tables[table_c_i]
+
+def write_each_remark(document, remarks_dict):
+    for key in remarks_dict.keys():
+        paragraph = findParagraphContaining(document, "var_remarks_"+key.lower())
+        if paragraph is None:
+            continue
+        i = 0
+        for value in remarks_dict[key]:
+            result = Report.search("remark", value)
+            impossible_to_connect = False
+            if result is None:
+                impossible_to_connect = True
+            elif isinstance(result, bool):
+                if result == False:
+                    impossible_to_connect = True
+            elif len(result) == 0:
+                impossible_to_connect = True
+            if impossible_to_connect:
+                result = [
+                        {
+                            "id": None,
+                            "title": value,
+                            "description": value,
+                            "type": key,
+                            "language": "fr",
+                            "translation": 0
+                        }
+                    ]
+                print("Write each "+key+" remark (not found "+str(i+1)+")")
+            else:
+                #print(str(result))
+                print("Write each "+key+" remark ( found "+str(i+1)+")")
+            result = result[0]
+            if i != 0:
+                paragraph = insert_paragraph_after(paragraph, result["description"])
+            else:
+                paragraph.text = result["description"]
+            paragraph.style = "remarks_"+key.lower()
+            i+=1
 
 def remove_row(table, row):
     """
@@ -791,7 +883,7 @@ def populate_services_table(pentest, document, parent):
     replaceTextInTable(table, "var_ssum_comment", "Commentaires")
     ips = ServerIp.fetchObjects(pentest, {"in_scopes": {"$ne":[]}})
     cursorAsList = [c for c in ips] # NOT OPTIMIZED
-    nbOfIp = len(cursorAsList)
+    
     for ip in cursorAsList:
         ligne_deb = len(table.rows)
         ports = ServerPort.fetchObjects(pentest, {"ip":ip.ip})
@@ -877,13 +969,13 @@ def markdownStrongEmphasisToBold(paragraph, initialRun):
     runs = [initialRun]
     i = 0
     while i < len(runs):
-        splitted_runs = splitRunOnMarker(paragraph, runs[i], r"(?!\w)\*\*([^\*\*\n]]+)\*\*(?!\w)", "**")
+        splitted_runs = splitRunOnMarker(paragraph, runs[i], r"(?<!\w)\*\*([^\*\n]+)\*\*(?!\w)", "**")
         if len(splitted_runs) == 3:
             splitted_runs[1].bold = True
             runs.append(splitted_runs[1])
             runs.append(splitted_runs[2])
         else:
-            splitted_runs = splitRunOnMarker(paragraph, runs[i], r"(?!\w)\_\_([^\_\n]]+)\_\_(?!\w)", "__")
+            splitted_runs = splitRunOnMarker(paragraph, runs[i], r"(?<!\w)\_\_([^\_\n]+)\_\_(?!\w)", "__")
             if len(splitted_runs) == 3:
                 splitted_runs[1].bold = True
                 runs.append(splitted_runs[1])
@@ -960,6 +1052,7 @@ def splitRunOnMarker(paragraph, run, regexToSearch, markerToRemove):
     regex = re.compile(regexToSearch, re.MULTILINE)
     matched = re.findall(regex, run.text)
     for match in matched:
+        #print("Found pattern in "+str(run.text)+ " pattern is |"+regexToSearch+"|")
         start = run.text.index(markerToRemove+match+markerToRemove)
         end = start+len(markerToRemove+match+markerToRemove)
         split_runs = split_run_in_three(paragraph, run, start, end)
@@ -1001,7 +1094,7 @@ def markdownUnorderedListToWordList(paragraph, style, state):
             r = new_p.add_run()
             r.add_text(match)
         if text_end.strip() != "":
-            insert_paragraph_after(new_p.strip(), text_end)
+            insert_paragraph_after(new_p, text_end)
         if paragraph.text.strip() == "":
             delete_paragraph(paragraph)
     return state
@@ -1053,7 +1146,7 @@ def markdownToWordInDocument(document):
                     for run in paragraph.runs:
                         markdownToWordInRun(paragraph, run, document.styles)
 
-def createReport(pentest, defects_dict, template, out_name, **kwargs):
+def createReport(pentest, defects_dict, remarks_list, template, out_name, **kwargs):
     #print("Defect dict: "+str(defects_dict))
     document = Document(template)
     global cell_style
@@ -1073,7 +1166,6 @@ def createReport(pentest, defects_dict, template, out_name, **kwargs):
     replaceTextInDocument(document, "var_year", date.strftime("%Y"))
     replaceTextInDocument(document, "var_annee", date.strftime("%Y"))
     contract_name = kwargs.get("contract", "").strip()
-    
     if contract_name != "":
         replaceTextInDocument(document, "var_contract", contract_name)
     replaceTextInDocument(document, "var_synthesis", str(kwargs.get("synthesis", "ToDo "+kwargs.get("main_redactor", "synthesis"))))
@@ -1084,11 +1176,13 @@ def createReport(pentest, defects_dict, template, out_name, **kwargs):
     replaceTextInDocument(document, "var_nb_d_minor", str(len(defects_dict["Mineur"].keys())))
     print("Populate defect summary ....")
     try:
-        populate_defect_summary_table(document, defects_dict)
+        populate_defect_summary_table(document, defects_dict, kwargs.get("pentest_type","undefined"))
     except KeyError as e:
         print("Skipping  defect summary: "+str(e))
     print("Write each defect ...")
-    write_each_defect(pentest, document, defects_dict)
+    write_each_defect(pentest, document, defects_dict, kwargs.get("pentest_type","undefined"))
+    print("Write each remark ...")
+    write_each_remark(document, remarks_list)
     print("Write services table ...")
     populate_services_table(pentest, document, kwargs.get("root", None))
     print("Converting Markdown ...")
