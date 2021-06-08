@@ -498,7 +498,9 @@ def populate_defect_summary_table(document, defects_dict, pentest_type):
             fill_cell(new_row_cells[cell_impact], o_defect["impact"], risks_font_colors[level], risks_bg_colors[level])
             fill_cell(new_row_cells[cell_type], type_first_letters, risks_font_colors[level], risks_bg_colors[level])
             count_correctif = 1
-            result = Report.search("defect", o_defect["title"])
+            result, status = Report.search("defect", o_defect["title"])
+            if status != 200:
+                result = None
             impossible_to_connect = False
             if result == None:
                 impossible_to_connect = True
@@ -526,6 +528,7 @@ def populate_defect_summary_table(document, defects_dict, pentest_type):
                 fill_cell(new_row_c_cells[cell_c_gain], "A def", risks_font_colors["Critique"], fixes_bg_colors["Quick Win"])
                 continue
             resultMatch = result[0]
+            print(result)
             if len(result) > 1:
                 for result_defect_match in result:
                     if result_defect_match["perimeter"].lower() == pentest_type.lower():
@@ -713,7 +716,9 @@ def write_each_defect(pentest, document, defects_dict, pentest_type):
             replaceTextInTable(table_d, "var_d_title", o_defect["title"])
             replaceTextInTable(table_d, "var_d_ease", o_defect["ease"])
             replaceTextInTable(table_d, "var_d_impact", o_defect["impact"])
-            result = Report.search("defect", o_defect["title"])
+            result, status = Report.search("defect", o_defect["title"])
+            if status != 200:
+                result = None
             impossible_to_connect = False
             if result is None:
                 impossible_to_connect = True
@@ -804,7 +809,9 @@ def write_each_remark(document, remarks_dict):
             continue
         i = 0
         for value in remarks_dict[key]:
-            result = Report.search("remark", value)
+            result, status = Report.search("remark", value)
+            if status != 200:
+                result = None
             impossible_to_connect = False
             if result is None:
                 impossible_to_connect = True

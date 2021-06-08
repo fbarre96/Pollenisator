@@ -249,7 +249,9 @@ def write_each_defect(document, defects_dict):
             replaceTextInTable(table_d, "var_d_title", o_defect["title"])
             replaceTextInTable(table_d, "var_d_ease", o_defect["ease"])
             replaceTextInTable(table_d, "var_d_impact", o_defect["impact"])
-            result = Report.search( "defect", o_defect["title"])
+            result, status = Report.search( "defect", o_defect["title"])
+            if status != 200:
+                result = None
             impossible_to_connect = False
             if result is None:
                 impossible_to_connect = True
@@ -308,7 +310,9 @@ def write_each_remark(document, remarks_dict):
                         tf.paragraphs[0]._p.addnext(paragraph_copy)
                     i = 0
                     for value in remarks_dict[key]:
-                        result = Report.search("remark", value)
+                        result,status = Report.search("remark", value)
+                        if status != 200:
+                            result = None
                         impossible_to_connect = False
                         if result is None:
                             impossible_to_connect = True
