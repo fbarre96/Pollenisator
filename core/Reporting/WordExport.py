@@ -25,6 +25,7 @@ import re
 import server.Report as Report
 from server.ServerModels.Port import ServerPort	
 from server.ServerModels.Defect import ServerDefect
+from server.ServerModels.Ip import ServerIp
 
 
 def downloadImgData(url):
