@@ -78,7 +78,7 @@ def search(type, q):
     if resp.status_code != 200:
         return "The knowledge dabatase encountered an issue : "+resp.txt, 503
     answer = json.loads(resp.text)
-    return answer
+    return answer, 200
     
 
 def getDefectsAsDict(pentest):
