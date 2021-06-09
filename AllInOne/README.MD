@@ -8,11 +8,11 @@ docker build --no-cache -t allinone-pollenisator .
 
 # Run worker (if it's for local to local add --net=host)
 
-```docker run -p 127.0.0.1:2222:22 -p 127.0.0.1:27017:27017 -v `pwd`/../:/home/Pollenisator/ -d allinone-pollenisator```
+```docker run -p 127.0.0.1:5000:5000 -d allinone-pollenisator```
 
 or enter docker
 
-```docker run -p 127.0.0.1:2222:22 -p 127.0.0.1:27017:27017 -v `pwd`/../:/home/Pollenisator/ -ti allinone-pollenisator /bin/bash```
+```docker run -p127.0.0.1:5000:5000 -ti allinone-pollenisator /bin/bash```
 
 and run ./start.sh
 

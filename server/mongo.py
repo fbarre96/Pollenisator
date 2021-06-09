@@ -319,7 +319,7 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     interval_o = ServerInterval().initialize(dbName, start_date, end_date)
     insert_interval(dbName, IntervalController(interval_o).getData(), **kwargs)
     scopes = scopes.replace("https://", "").replace("http://","")
-    scopes = scope.replace("\n", ",").split(",")
+    scopes = scopes.replace("\n", ",").split(",")
     for scope_item in scopes:
         if scope_item.strip() != "":
             if isIp(scope_item.strip()):

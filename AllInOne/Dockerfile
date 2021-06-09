@@ -1,6 +1,5 @@
 FROM ubuntu:18.04
 ARG DEBIAN_FRONTEND=noninteractive
-ARG SSHPASSWORD=pollenisator123
 RUN apt-get update
 RUN apt-get install -y gnupg2
 RUN apt-get install -y apt-transport-https wget
@@ -48,16 +47,6 @@ RUN pip3 install --upgrade setuptools
 RUN git clone https://github.com/maurosoria/dirsearch.git /home/dirsearch/ && \
 	chmod +x /home/dirsearch/dirsearch.py && \
 	ln -s /home/dirsearch/dirsearch.py /usr/bin/dirsearch.py
-# Knockpy as knockpy.py
-RUN apt-get install -y python-dnspython python-pip
-RUN python2 -m pip install setuptools
-RUN git clone https://github.com/guelfoweb/knock.git /home/knock && \
-	cd /home/knock && \
-	chmod +x /home/knock/knockpy/knockpy.py && \
-	python2 /home/knock/setup.py install && \
-	ln -s /home/knock/knockpy/knockpy.py /usr/bin/knockpy.py && \
-	cp -r /home/knock/knockpy/wordlist /usr/bin/wordlist
-
 # Sublist3r as sublist3r.py
 RUN git clone https://github.com/aboul3la/Sublist3r.git /home/sublist3r/ && \
 	pip3 install -r /home/sublist3r/requirements.txt && \
@@ -124,19 +113,21 @@ RUN python3.7 -m pip install --upgrade cryptography
 RUN python3.7 -m pip install --upgrade asn1crypto
 RUN pip install .
 RUN cme smb
-## SERVER 
-RUN apt-get install -y openssh-server libcurl3 mongodb-org-shell mongodb-org-server mongodb-org
+## Knockpy as knockpy.py
+RUN apt-get install -y python-dnspython
+RUN python3.7 -m pip install setuptools
+RUN git clone https://github.com/guelfoweb/knock.git /home/knock && \
+	cd /home/knock && \
+	chmod +x /home/knock/knockpy/knockpy.py && \
+	python3.7 /home/knock/setup.py install && \
+	ln -s /home/knock/knockpy/knockpy.py /usr/bin/knockpy.py
+# SERVER 
+RUN apt-get install -y libcurl3 mongodb-org-shell mongodb-org-server mongodb-org
 RUN mkdir -p /data/db
-RUN adduser pollenisator && usermod -s /bin/false pollenisator && usermod -d / pollenisator && mkdir -p /etc/Pollenisator/files/ && chown root.root /etc/Pollenisator && chown pollenisator.pollenisator /etc/Pollenisator/files
-RUN echo "pollenisator:$SSHPASSWORD" | chpasswd
-RUN sed -i 's/Subsystem\tsftp\t\/usr\/lib\/openssh\/sftp-server/Subsystem sftp internal-sftp/g' /etc/ssh/sshd_config
-RUN echo "Match User pollenisator\n\tChrootDirectory /etc/Pollenisator/\n\tPermitTunnel no\n\tX11Forwarding no\n\tAllowTcpForwarding no\n\tForceCommand internal-sftp\n\tPasswordAuthentication yes\n" >> /etc/ssh/sshd_config
-RUN service ssh stop
-RUN service ssh start
 ## CLIENT
-COPY start.sh /home/Pollenisator/start.sh
 # Pollenisator
 WORKDIR /home/Pollenisator
-COPY requirements.txt /tmp
-RUN python3 -m pip install -r /tmp/requirements.txt
-CMD ["/bin/sh", "-c", "./start.sh"]
+COPY requirements.txt /tmp/requirements.txt
+COPY start.sh /usr/bin/start.sh
+RUN python3.7 -m pip install -r /tmp/requirements.txt
+CMD ["/bin/sh", "-c", "/usr/bin/start.sh"]
