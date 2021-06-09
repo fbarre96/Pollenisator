@@ -320,7 +320,7 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     insert_interval(dbName, IntervalController(interval_o).getData(), **kwargs)
     scope = scope.replace("https://", "").replace("http://","")
     scope = scope.replace("\n", ",").split(",")
-    for scope_item in scopes:
+    for scope_item in scope:
         if scope_item.strip() != "":
             if isIp(scope_item.strip()):
                 insert_scope(dbName, {"wave":dbName, "scope":scope_item.strip()+"/32"}, **kwargs)
