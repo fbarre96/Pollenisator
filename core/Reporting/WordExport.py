@@ -21,6 +21,7 @@ import json
 from bson.objectid import ObjectId
 from datetime import datetime
 import requests
+import io
 import re
 import server.Report as Report
 from server.ServerModels.Port import ServerPort	
