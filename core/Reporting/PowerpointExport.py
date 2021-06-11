@@ -238,8 +238,15 @@ def write_each_defect(document, defects_dict):
             duplicate_slide(document, slide_copy_i)
             new_slide_i = slide_copy_i+i
             move_slide(document, -1, new_slide_i)
-        # FILL COPIED SLIDES
-        for defect_dict in defects_dict[level].values():
+        sorted_defects = {}
+        keys = []
+        for d in defects_dict[level].values():
+            keys.append(int(d["description"]["index"]))
+            sorted_defects[d["description"]["index"]] = d
+        keys.sort()
+        for key in keys:
+            defect_dict = sorted_defects[str(key)]
+            # FILL COPIED SLIDES
             new_slide_i = slide_copy_i + level_count
             level_count += 1
             count_defects += 1

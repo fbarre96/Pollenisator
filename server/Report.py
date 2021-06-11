@@ -54,12 +54,12 @@ def generateReport(pentest, templateName, clientName, contractName, mainRedactor
     templateName = os.path.basename(templateName)
     template_to_use_path = os.path.join(template_path, templateName)
     outfile = None
+    defectDict = getDefectsAsDict(pentest)
     if ext == ".docx":
-        outfile = WordExport.createReport(pentest, getDefectsAsDict(pentest), getRemarksAsDict(pentest), template_to_use_path, out_name, mainRedac=mainRedactor,
+        outfile = WordExport.createReport(pentest, defectDict, getRemarksAsDict(pentest), template_to_use_path, out_name, mainRedac=mainRedactor,
                                 client=clientName.strip(), contract=contractName.strip())
     elif ext == ".pptx":
-        outfile = PowerpointExport.createReport(pentest, getDefectsAsDict(
-        pentest), getRemarksAsDict(pentest), template_to_use_path, out_name, client=clientName.strip(), contract=contractName.strip())
+        outfile = PowerpointExport.createReport(pentest, defectDict, getRemarksAsDict(pentest), template_to_use_path, out_name, client=clientName.strip(), contract=contractName.strip())
     else:
         return "Unknown template file extension", 400     
     return send_file(outfile, attachment_filename=out_name+ext) 
@@ -127,6 +127,7 @@ def getDefectsAsDict(pentest):
         defect_recap["ease"] = defect_obj.ease
         defect_recap["impact"] = defect_obj.impact
         defect_recap["redactor"] = defect_obj.redactor
+        defect_recap["index"] = defect_obj.index
         types = defect_obj.mtype
         d_types = []
         for d_type in types:

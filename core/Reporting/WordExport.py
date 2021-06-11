@@ -473,7 +473,14 @@ def populate_defect_summary_table(document, defects_dict, pentest_type):
     obj_font.size = Pt(11)
     obj_font.name = 'Calibri'
     for level in levels:
-        for defect_dict in defects_dict[level].values():
+        sorted_defects = {}
+        keys = []
+        for d in defects_dict[level].values():
+            keys.append(int(d["description"]["index"]))
+            sorted_defects[d["description"]["index"]] = d
+        keys.sort()
+        for key in keys:
+            defect_dict = sorted_defects[str(key)]
             o_defect = defect_dict["description"]
             new_row_cells = table.add_row().cells
             count += 1
@@ -707,7 +714,14 @@ def write_each_defect(pentest, document, defects_dict, pentest_type):
     for level in levels:
         total_len += len(defects_dict[level].values())
     for level in levels:
-        for defect_dict in defects_dict[level].values():
+        sorted_defects = {}
+        keys = []
+        for d in defects_dict[level].values():
+            keys.append(int(d["description"]["index"]))
+            sorted_defects[d["description"]["index"]] = d
+        keys.sort()
+        for key in keys:
+            defect_dict = sorted_defects[str(key)]
             count += 1
             o_defect = defect_dict["description"]
             table_d, table_i = findRowContaining(document, "var_d_id")
