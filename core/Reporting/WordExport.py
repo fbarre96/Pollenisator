@@ -629,6 +629,8 @@ def write_every_defect_fix(fixes, document, last_defect_paragraph, count):
         fixe_synthesis = fixe.get("synthesis", None)
         if fixe_synthesis is not None:
             desc_paras.insert(0, fixe_synthesis)
+        if desc_paras[0].strip() == "":
+            del desc_paras[0]
         replaceTextInTable(copied_table_c, "var_c_description", desc_paras[0].strip())
         # added_paragraph: premier paragraphe dessous le tableau
         # c_separator: paragraphes supplémentaires éventuelles
