@@ -324,9 +324,12 @@ def loadServerConfig():
     Returns:
         Json converted data inside config/server.cfg
     """
-    config = os.path.join(os.path.dirname(
-        os.path.realpath(__file__)), "../../config/server.cfg")
-    return loadCfg(config)
+    config_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../config/")
+    config_file = os.path.join(config_folder, "server.cfg")
+    if not os.path.isfile(config_file):
+        print(f"Config file not found inside {os.path.normpath(config_file)}, please create one based on the provided serverSample.cfg inside the same directory.")
+        sys.exit(0)
+    return loadCfg(config_file)
 
 
 def saveServerConfig(configDict):
