@@ -2022,4 +2022,12 @@ paths:
         200:
           description: "Success"
 
-          
+  /tools/plugins:
+    get:
+      operationId: "server.ServerModels.Tool.listPlugins"
+      tags:
+        - "Tool"
+      summary: "Get the list of plugins"
+      responses:
+        200:
+          description: "A list of defect"

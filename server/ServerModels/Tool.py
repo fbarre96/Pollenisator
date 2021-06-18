@@ -6,7 +6,7 @@ from server.ServerModels.Command import ServerCommand
 from server.ServerModels.CommandGroup import ServerCommandGroup
 from server.ServerModels.Element import ServerElement
 from server.FileManager import _upload
-from core.Components.Utils import JSONEncoder, fitNowTime, loadToolsConfig, isNetworkIp, loadPlugin, loadPluginByBin
+from core.Components.Utils import JSONEncoder, fitNowTime, loadToolsConfig, isNetworkIp, loadPlugin, loadPluginByBin, listPlugin
 import json
 import time
 from datetime import datetime
@@ -527,3 +527,12 @@ def getNbOfLaunchedCommand(calendarName, worker, commandName):
         return t.count()
     return 0
 
+
+@permission("user")
+def listPlugins():
+    """
+    Get the declared list of plugin
+    Returns:
+        A list of python plugins
+    """
+    return listPlugin()
