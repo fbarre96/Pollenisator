@@ -34,9 +34,11 @@ def md5(f):
 def upload(pentest, defect_iid, upfile):
     msg, status, filepath = _upload(pentest, defect_iid, "proof", upfile)
     return msg, status
+    
 @permission("pentester")
-def importExistingFile(pentest, upfile, plugin):
+def importExistingFile(pentest, upfile, body):
     from server.ServerModels.Tool import ServerTool
+    plugin = body.get("plugin", "auto-detect")
     mongoInstance.connectToDb(pentest)
     md5File = md5(upfile.stream)
     upfile.stream.seek(0)
