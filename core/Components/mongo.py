@@ -129,8 +129,7 @@ class MongoCalendar:
         if self.client is not None:
             return
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        cfg = config if config is not None else Utils.loadCfg(
-            os.path.join(dir_path, "../../config/server.cfg"))
+        cfg = config if config is not None else Utils.loadServerConfig()
         try:
             self.host = str(cfg["host"])
             self.port = str(cfg.get("mongo_port", 27017))
