@@ -455,10 +455,10 @@ def populate_defect_summary_table(document, defects_dict, pentest_type):
     quick_win_color = '00B0F0'
     white_rgb = RGBColor(0xff, 0xfb, 0xfa)
     black_rgb = RGBColor(0x26, 0x32, 0x32)
-    risks_font_colors = {"Critique":white_rgb, "Majeur":white_rgb, "Important":white_rgb, "Mineur":black_rgb}
-    risks_bg_colors = {"Critique":"263232", "Majeur":"F8453C", "Important":"EE8200", "Mineur":"FFFF00"}
-    fixes_bg_colors = {"Quick Win":quick_win_color, "Faible":quick_win_color, "Modérée":medium_color, "Moyen":medium_color, "Fort":strong_color, "Envergure":strong_color}
-    levels = ["Critique", "Majeur", "Important", "Mineur"]
+    risks_font_colors = {"Critical":white_rgb, "Major":white_rgb, "Important":white_rgb, "Minor":black_rgb}
+    risks_bg_colors = {"Critical":"263232", "Major":"F8453C", "Important":"EE8200", "Minor":"FFFF00"}
+    fixes_bg_colors = {"Quick Win":quick_win_color, "Weak":quick_win_color, "Moderate":medium_color, "Moderate":medium_color, "Strong":strong_color, "Hard":strong_color}
+    levels = ["Critical", "Major", "Important", "Minor"]
     count = 0
     start_defect_line_on_res_table = 0
     nb_line_res_table = 0
@@ -527,13 +527,13 @@ def populate_defect_summary_table(document, defects_dict, pentest_type):
                 id_correctif = "A"+str(count)
                 new_row_c_cells = table_c.add_row().cells
                 if table_res_i is not None:
-                    write_res_table_fix_line(table_res, risks_bg_colors[level], id_correctif, {"title":"A definir", "execution":"A def", "gain":"A def"})
+                    write_res_table_fix_line(table_res, risks_bg_colors[level], id_correctif, {"title":"ToDo", "execution":"ToDo", "gain":"ToDo"})
                     nb_line_res_table += 1
                     format_block_res_table(table_res, start_defect_line_on_res_table, nb_line_res_table)
                 fill_cell(new_row_c_cells[cell_c_id], id_correctif, None, None, True)
-                fill_cell(new_row_c_cells[cell_c_tit], "A definir")
-                fill_cell(new_row_c_cells[cell_c_ease], "A def", risks_font_colors["Critique"], fixes_bg_colors["Quick Win"])
-                fill_cell(new_row_c_cells[cell_c_gain], "A def", risks_font_colors["Critique"], fixes_bg_colors["Quick Win"])
+                fill_cell(new_row_c_cells[cell_c_tit], "ToDo")
+                fill_cell(new_row_c_cells[cell_c_ease], "ToDo", risks_font_colors["Critical"], fixes_bg_colors["Quick Win"])
+                fill_cell(new_row_c_cells[cell_c_gain], "ToDo", risks_font_colors["Critical"], fixes_bg_colors["Quick Win"])
                 continue
             resultMatch = result[0]
             print(result)
@@ -552,8 +552,8 @@ def populate_defect_summary_table(document, defects_dict, pentest_type):
                     nb_line_res_table += 1
                 fill_cell(new_row_c_cells[cell_c_id], id_correctif, None, None, True)
                 fill_cell(new_row_c_cells[cell_c_tit], fixe["title"])
-                fill_cell(new_row_c_cells[cell_c_ease], fixe["execution"], risks_font_colors["Critique"], fixes_bg_colors[fixe["execution"]])
-                fill_cell(new_row_c_cells[cell_c_gain], fixe["gain"], risks_font_colors["Critique"], fixes_bg_colors[fixe["gain"]])
+                fill_cell(new_row_c_cells[cell_c_ease], fixe["execution"], risks_font_colors["Critical"], fixes_bg_colors[fixe["execution"]])
+                fill_cell(new_row_c_cells[cell_c_gain], fixe["gain"], risks_font_colors["Critical"], fixes_bg_colors[fixe["gain"]])
             if table_res_i is not None:
                 format_block_res_table(table_res, start_defect_line_on_res_table, nb_line_res_table)
     # Ajustement de la taille des lignes pour combler la page
@@ -710,7 +710,7 @@ def write_each_defect(pentest, document, defects_dict, pentest_type):
             defects_dict: the dictionary of defect gotten with the dedicated function getDefectDictFromExcel
 
     """
-    levels = ["Critique", "Majeur", "Important", "Mineur"]
+    levels = ["Critical", "Major", "Important", "Minor"]
     count = 0
     total_len = 0
     for level in levels:
@@ -758,10 +758,10 @@ def write_each_defect(pentest, document, defects_dict, pentest_type):
                             "notes": o_defect.get("notes", ""),
                             "fixes": [
                                 {
-                                    "title": "A def",
-                                    "execution": "Modérée",
-                                    "gain": "Moyen",
-                                    "description": "A definir"
+                                    "title": "ToDo",
+                                    "execution": "Moderate",
+                                    "gain": "Moderate",
+                                    "description": "ToDo"
                                 }
                             ]
                         }
@@ -1194,11 +1194,11 @@ def createReport(pentest, defects_dict, remarks_list, template, out_name, **kwar
     if contract_name != "":
         replaceTextInDocument(document, "var_contract", contract_name)
     replaceTextInDocument(document, "var_synthesis", str(kwargs.get("synthesis", "ToDo "+kwargs.get("main_redactor", "synthesis"))))
-    replaceTextInDocument(document, "var_nb_d_total", str(len(defects_dict["Critique"].keys())+len(defects_dict["Majeur"].keys())+len(defects_dict["Important"].keys())+len(defects_dict["Mineur"].keys())))
-    replaceTextInDocument(document, "var_nb_d_critical", str(len(defects_dict["Critique"].keys())))
-    replaceTextInDocument(document, "var_nb_d_major", str(len(defects_dict["Majeur"].keys())))
+    replaceTextInDocument(document, "var_nb_d_total", str(len(defects_dict["Critical"].keys())+len(defects_dict["Major"].keys())+len(defects_dict["Important"].keys())+len(defects_dict["Minor"].keys())))
+    replaceTextInDocument(document, "var_nb_d_critical", str(len(defects_dict["Critical"].keys())))
+    replaceTextInDocument(document, "var_nb_d_major", str(len(defects_dict["Major"].keys())))
     replaceTextInDocument(document, "var_nb_d_important", str(len(defects_dict["Important"].keys())))
-    replaceTextInDocument(document, "var_nb_d_minor", str(len(defects_dict["Mineur"].keys())))
+    replaceTextInDocument(document, "var_nb_d_minor", str(len(defects_dict["Minor"].keys())))
     print("Populate defect summary ....")
     try:
         populate_defect_summary_table(document, defects_dict, kwargs.get("pentest_type","undefined"))

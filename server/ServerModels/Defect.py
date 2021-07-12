@@ -144,7 +144,7 @@ def insert(pentest, body):
     return {"res":True, "iid":iid}
 @permission("pentester")
 def findInsertPosition(pentest, risk):
-    riskLevels = ["Critique", "Majeur",  "Important", "Mineur"] # TODO do not hardcode those things
+    riskLevels = ["Critical", "Major",  "Important", "Minor"] # TODO do not hardcode those things
     riskLevelPos = riskLevels.index(risk)
     highestInd = 0
     for risklevel_i, riskLevel in enumerate(riskLevels):

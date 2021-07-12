@@ -74,8 +74,8 @@ class BlueKeep(Plugin):
                 targets[str(p_o.getId())] = {"ip": ip, "port": kwargs.get(
                     "port", None), "proto": kwargs.get("proto", None)}
             if "VULNERABLE" in line:
-                ServerDefect().initialize(ip, kwargs.get("port", None), kwargs.get("proto", None), "Serveur vulnérable à BlueKeep",
-                                    "Difficile", "Critique", "Critique", "N/A", ["Socle"], notes=notes, proofs=[]).addInDb()
+                ServerDefect().initialize(ip, kwargs.get("port", None), kwargs.get("proto", None), "BlueKeep",
+                                    "Difficult", "Critical", "Critical", "N/A", ["Base"], notes=notes, proofs=[]).addInDb()
                 tags=["P0wned!"]
                 if p_o is not None:
                     p_o.addTag("P0wned!")

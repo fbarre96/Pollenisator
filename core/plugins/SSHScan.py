@@ -81,8 +81,8 @@ class SSHScan(Plugin):
                     if str(is_ok) == "False":
                         port_o.updateInfos({"compliant": "False"})
                         port_o.updateInfos({"auth_methods": scan["auth_methods"]})
-                        ServerDefect().initialize(ip, port, "tcp", "Défauts d’implémentation de la configuration SSH",
-                                            "Très difficile", "Majeur", "Important",  "N/A", ["Socle"], notes=notes, proofs=[]).addInDb()
+                        ServerDefect().initialize(ip, port, "tcp", "SSH configuration implementation flaws",
+                                            "Arduous", "Major", "Important",  "N/A", ["Base"], notes=notes, proofs=[]).addInDb()
             except KeyError:
                 continue
         if not oneScanIsValid:

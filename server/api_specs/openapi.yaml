@@ -161,26 +161,26 @@ components:
         ease:
           type: string
           enum:
-            - Facile
-            - Modérée
-            - Difficile
-            - Très difficile
+            - Easy
+            - Moderate
+            - Difficult
+            - Arduous
             - N/A
         impact:
           type: string
           enum:
-            - Mineur
+            - Minor
             - Important
-            - Majeur
-            - Critique
+            - Major
+            - Critical
             - N/A
         risk:
           type: string
           enum:
-            - Mineur
+            - Minor
             - Important
-            - Majeur
-            - Critique
+            - Major
+            - Critical
             - N/A
         redactor:
           type: string

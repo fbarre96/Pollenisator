@@ -73,8 +73,8 @@ class EternalBlue(Plugin):
                 "ip": ip, "port": port, "proto": proto}
         if "VULNERABLE" in notes:
             d_o = ServerDefect()
-            d_o.initialize(ip, port, proto, "Serveur vulnérable à EternalBlue",
-                           "Difficile", "Critique", "Critique", "N/A", ["Socle"], notes=notes, proofs=[])
+            d_o.initialize(ip, port, proto, "EternalBlue",
+                           "Difficult", "Critical", "Critical", "N/A", ["Base"], notes=notes, proofs=[])
             d_o.addInDb()
             tags=["P0wned!"]
             if res_insert is not None:

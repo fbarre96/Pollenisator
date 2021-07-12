@@ -224,7 +224,7 @@ def write_each_defect(document, defects_dict):
             defects_dict: the dictionary of defect gotten with the dedicated function getDefectDictFromExcel
 
     """
-    levels = ["Critique", "Majeur", "Important", "Mineur"]
+    levels = ["Critical", "Major", "Important", "Minor"]
     count_defects = 0
     count_fixes = 0
     total_len = 0
@@ -280,10 +280,10 @@ def write_each_defect(document, defects_dict):
                             "notes": o_defect.get("notes", ""),
                             "fixes": [
                                 {
-                                    "title": "A def",
-                                    "execution": "Modérée",
-                                    "gain": "Moyen",
-                                    "description": "A definir"
+                                    "title": "ToDo",
+                                    "execution": "Moderate",
+                                    "gain": "Moderate",
+                                    "description": "ToDo"
                                 }
                             ]
                         }
@@ -366,7 +366,7 @@ def addSerieToChart(presentation, index_chart, serie_name, serie):
             if shape.has_chart:
                 if count_chart == index_chart:
                     chart_data = CategoryChartData()
-                    chart_data.categories = ("Critique", "Majeur", "Important", "Mineur")
+                    chart_data.categories = ("Critical", "Major", "Important", "Minor")
                     chart_data.add_series(serie_name, serie)
                     shape.chart.replace_data(chart_data)
                     shape.chart.value_axis.maximum_scale = max(serie)+1
@@ -382,7 +382,7 @@ def createReport(pentest, defects_dict, remarks_list, template, out_name, **kwar
         raise Exception("The pptx template does not contain a TO_COPY layout")
     client_name = kwargs.get("client", "").strip()
     total_len = 0
-    levels = ["Critique", "Majeur", "Important", "Mineur"]
+    levels = ["Critical", "Major", "Important", "Minor"]
     for level in levels:
         total_len += len(defects_dict[level].values())
     nb_steps = total_len # 1 step by defect
@@ -397,10 +397,10 @@ def createReport(pentest, defects_dict, remarks_list, template, out_name, **kwar
         elif contract_name.lower().startswith("audit "):
             contract_name = "de l'a"+contract_name[1:]
         replaceTextInDocument(document, "var_contract", contract_name)
-    nb_critical = len(defects_dict["Critique"].keys())
-    nb_major = len(defects_dict["Majeur"].keys())
+    nb_critical = len(defects_dict["Critical"].keys())
+    nb_major = len(defects_dict["Major"].keys())
     nb_important = len(defects_dict["Important"].keys())
-    nb_minor = len(defects_dict["Mineur"].keys())
+    nb_minor = len(defects_dict["Minor"].keys())
     replaceTextInDocument(document, "var_nb_d_critical", str(nb_critical))
     replaceTextInDocument(document, "var_nb_d_major", str(nb_major))
     replaceTextInDocument(document, "var_nb_d_important", str(nb_important))

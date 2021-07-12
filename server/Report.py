@@ -114,10 +114,10 @@ def getDefectsAsDict(pentest):
         }
     """
     defects_dict = dict()
-    defects_dict["Critique"] = dict()
-    defects_dict["Majeur"] = dict()
+    defects_dict["Critical"] = dict()
+    defects_dict["Major"] = dict()
     defects_dict["Important"] = dict()
-    defects_dict["Mineur"] = dict()
+    defects_dict["Minor"] = dict()
     defects_obj = ServerDefect.fetchObjects(pentest, {"ip": ""})
     for defect_obj in defects_obj:
         title = defect_obj.title
