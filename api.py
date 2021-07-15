@@ -3,6 +3,7 @@ from core.Components.mongo import MongoCalendar
 import json
 import os
 import bcrypt
+import sys
 from datetime import datetime
 from flask import jsonify, session
 from bson import ObjectId
@@ -36,16 +37,18 @@ def removeInactiveWorkersTimerSet():
             30, removeInactiveWorkersTimerSet)
     removeInactiveWorkersTimer.start()
 
-def createAdmin():
+def createAdmin(username="", password=""):
     print("The user database is empty, create an admin now")
-    username = input("username: ")
-    while username.strip() == "":
-        print("username cannot be empty")
+    if username.strip() == "":
         username = input("username: ")
-    password = getpass("password: ")
-    while password.strip() == "":
-        print("Password cannot be empty")
+        while username.strip() == "":
+            print("username cannot be empty")
+            username = input("username: ")
+    if password.strip() == "":
         password = getpass("password: ")
+        while password.strip() == "":
+            print("Password cannot be empty")
+            password = getpass("password: ")
     salt = bcrypt.gensalt()
     mongoInstance.insertInDb("pollenisator", "users", {"username":username, "hash":bcrypt.hashpw(password.encode(), salt), "scope":["admin","user"]})
     print("Administrator created")
@@ -55,8 +58,22 @@ def createAdmin():
 if __name__ == '__main__':
     mongoInstance = MongoCalendar.getInstance()
     any_user = mongoInstance.findInDb("pollenisator", "users", {}, False)
+    noninteractive = False
     if any_user is None:
-        createAdmin()
+        for arg in sys.argv:
+            if arg == "-h" or "--help":
+                print("""Usage : python api.py [-h|--help] [--non-interactive]
+                Python3.7+ is required
+                Options:
+                    -h | --help : print this help
+                    --non-interactive : does not prompt for anything (WARNING : a default user will be created with admin:admin credentials if no user previously exist)
+                """)
+            if arg == "--non-interactive":
+                noninteractive = True
+        if noninteractive:
+            createAdmin("admin", "admin")
+        else:
+            createAdmin()
         
     removeInactiveWorkersTimer = threading.Timer(
             30, removeInactiveWorkersTimerSet)
