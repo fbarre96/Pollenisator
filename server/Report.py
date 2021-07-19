@@ -13,38 +13,59 @@ from core.Components.mongo import MongoCalendar
 from server.permission import permission
 dir_path = os.path.dirname(os.path.realpath(__file__))
 template_path = os.path.normpath(os.path.join(dir_path, "../Templates/"))
+lang_translation = dict()
+
+def validate_lang(lang):
+    langs = [existing_lang for existing_lang in os.listdir(template_path) if os.path.isdir(os.path.join(template_path, existing_lang))]
+    return lang in langs
 
 @permission("user")
-def getTemplateList():
-    onlyfiles = [f for f in os.listdir(template_path) if os.path.isfile(
+def getLangList():
+    onlyfolders = [f for f in os.listdir(template_path) if not os.path.isfile(
         os.path.join(template_path, f))]
+    return onlyfolders
+
+@permission("user")
+def getTemplateList(lang):
+    if not validate_lang(lang):
+        return "There is no existing templates for this lang", 400
+    lang = os.path.basename(lang)
+    langs_path = os.path.join(template_path, lang)
+    onlyfiles = [f for f in os.listdir(langs_path) if os.path.isfile(
+        os.path.join(langs_path, f))]
     return onlyfiles
 
 @permission("user")
-def downloadTemplate(templateName):
+def downloadTemplate(lang, templateName):
     global template_path
     fileName = os.path.basename(templateName)
     if not fileName.endswith(".pptx") and not fileName.endswith(".docx"):
         return "A template is either a pptx or a docx document", 400
-    template_to_download_path = os.path.join(template_path, fileName)
+    lang = os.path.basename(lang)
+    if not validate_lang(lang):
+        return "There is no existing templates for this lang", 400
+    template_to_download_path = os.path.join(template_path, lang+"/"+fileName)
     if not os.path.isfile(template_to_download_path):
         return "Template file not found", 404
     return send_file(template_to_download_path, attachment_filename=fileName)
 
 @permission("user")
-def uploadTemplate(upfile):
+def uploadTemplate(upfile, lang):
     global template_path
     fileName = upfile.filename.replace("/", "_")
     if not fileName.endswith(".pptx") and not fileName.endswith(".docx"):
         return "Invalid extension for template, must be pptx or docx", 400
-    template_to_upload_path = os.path.join(template_path, fileName)
+    lang = os.path.basename(lang)
+    folder_to_upload_path = os.path.join(template_path, lang+"/")
+    os.makedirs(folder_to_upload_path)
+    template_to_upload_path = os.path.join(folder_to_upload_path, fileName)
     with open(template_to_upload_path, "wb") as f:
         f.write(upfile.steam.read())
         return "Success"
     return "Failure"
 
 @permission("user")
-def generateReport(pentest, templateName, clientName, contractName, mainRedactor):
+def generateReport(pentest, templateName, clientName, contractName, mainRedactor, lang):
     if not templateName.endswith(".pptx") and not templateName.endswith(".docx"):
         return "Invalid extension for template, must be pptx or docx", 400
     timestr = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -52,14 +73,23 @@ def generateReport(pentest, templateName, clientName, contractName, mainRedactor
     basename = clientName.strip() + "_"+contractName.strip()
     out_name = str(timestr)+"_"+basename
     templateName = os.path.basename(templateName)
-    template_to_use_path = os.path.join(template_path, templateName)
+    lang = os.path.basename(lang)
+    if not validate_lang(lang):
+        return "There is no existing templates for this lang", 400
+    template_to_use_path = os.path.join(template_path, lang+"/",templateName)
+    if not os.path.isfile(template_to_use_path):
+        return "Template file not found", 404
     outfile = None
+    lang_file = os.path.join(template_path,lang+"/lang.json")
+    global lang_translation
+    with open(lang_file) as f:
+        lang_translation = json.loads(f.read())
     defectDict = getDefectsAsDict(pentest)
     if ext == ".docx":
         outfile = WordExport.createReport(pentest, defectDict, getRemarksAsDict(pentest), template_to_use_path, out_name, mainRedac=mainRedactor,
-                                client=clientName.strip(), contract=contractName.strip())
+                                client=clientName.strip(), contract=contractName.strip(), translation=lang_translation)
     elif ext == ".pptx":
-        outfile = PowerpointExport.createReport(pentest, defectDict, getRemarksAsDict(pentest), template_to_use_path, out_name, client=clientName.strip(), contract=contractName.strip())
+        outfile = PowerpointExport.createReport(pentest, defectDict, getRemarksAsDict(pentest), template_to_use_path, out_name, client=clientName.strip(), contract=contractName.strip(), translation=lang_translation)
     else:
         return "Unknown template file extension", 400     
     return send_file(outfile, attachment_filename=out_name+ext) 
@@ -113,11 +143,10 @@ def getDefectsAsDict(pentest):
             ...
         }
     """
+    
     defects_dict = dict()
-    defects_dict["Critical"] = dict()
-    defects_dict["Major"] = dict()
-    defects_dict["Important"] = dict()
-    defects_dict["Minor"] = dict()
+    for level in ["Critical", "Major", "Important", "Minor"]:
+        defects_dict[level] = dict()
     defects_obj = ServerDefect.fetchObjects(pentest, {"ip": ""})
     for defect_obj in defects_obj:
         title = defect_obj.title

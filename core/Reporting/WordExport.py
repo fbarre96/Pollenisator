@@ -28,6 +28,15 @@ from server.ServerModels.Port import ServerPort
 from server.ServerModels.Defect import ServerDefect
 from server.ServerModels.Ip import ServerIp
 
+translation = None
+
+def translate(w):
+    if translation is None:
+        return w
+    return translation.get(w, w)
+
+def getDefaultLevels():
+    return ["Critical", "Major", "Important", "Minor"]
 
 def downloadImgData(url):
     data = requests.get(url)
@@ -313,7 +322,7 @@ def delete_paragraph(paragraph):
 def write_res_table_defect_line(table_res, risks_font_colors, risks_bg_colors, count, o_defect):
     new_row_cells = table_res.add_row().cells
     level = o_defect["risk"]
-    fill_cell(new_row_cells[0], "D"+str(count), risks_font_colors[level], risks_bg_colors[level], True)
+    fill_cell(new_row_cells[0], translate("DEFECT_SMALLER")+str(count), risks_font_colors[level], risks_bg_colors[level], True)
     run = new_row_cells[0].paragraphs[0].runs[0]
     font = run.font
     run.bold = True
@@ -322,8 +331,8 @@ def write_res_table_defect_line(table_res, risks_font_colors, risks_bg_colors, c
     run = new_row_cells[1].paragraphs[0].runs[0]
     font = run.font
     font.size = Pt(11)
-    fill_cell(new_row_cells[3], "Risque\n", risks_font_colors[level], risks_bg_colors[level])
-    new_row_cells[3].paragraphs[0].add_run(o_defect["risk"], style="contentStyle")
+    fill_cell(new_row_cells[3], translate("Risk")+"\n", risks_font_colors[level], risks_bg_colors[level])
+    new_row_cells[3].paragraphs[0].add_run(translate(o_defect["risk"]), style="contentStyle")
     new_row_cells[3].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
     header_run = new_row_cells[3].paragraphs[0].runs[0]
     font = header_run.font
@@ -333,8 +342,8 @@ def write_res_table_defect_line(table_res, risks_font_colors, risks_bg_colors, c
     font = value_run.font
     font.size = Pt(11)
     font.color.rgb = risks_font_colors[o_defect["risk"]]
-    fill_cell(new_row_cells[4], "Exploitation\n", risks_font_colors[level], risks_bg_colors[level])
-    new_row_cells[4].paragraphs[0].add_run(o_defect["risk"], style="contentStyle")
+    fill_cell(new_row_cells[4], translate("Exploitation")+"\n", risks_font_colors[level], risks_bg_colors[level])
+    new_row_cells[4].paragraphs[0].add_run(translate(o_defect["risk"]), style="contentStyle")
     new_row_cells[4].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.LEFT
     header_run = new_row_cells[4].paragraphs[0].runs[0]
     font = header_run.font
@@ -344,8 +353,8 @@ def write_res_table_defect_line(table_res, risks_font_colors, risks_bg_colors, c
     font = value_run.font
     font.size = Pt(11)
     font.color.rgb = risks_font_colors[o_defect["risk"]]
-    fill_cell(new_row_cells[5], "Impact\n", risks_font_colors[level], risks_bg_colors[level])
-    new_row_cells[5].paragraphs[0].add_run(o_defect["impact"], style="contentStyle")
+    fill_cell(new_row_cells[5], translate("Impact")+"\n", risks_font_colors[level], risks_bg_colors[level])
+    new_row_cells[5].paragraphs[0].add_run(translate(o_defect["impact"]), style="contentStyle")
     new_row_cells[5].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.LEFT
     header_run = new_row_cells[5].paragraphs[0].runs[0]
     font = header_run.font
@@ -368,16 +377,16 @@ def write_res_table_fix_line(table_res, risk_bg_color, id_correctif, fixe):
     run.bold = True
     font.size = Pt(11)
     fill_cell(new_row_cells[2], fixe["title"], black, gray)
-    fill_cell(new_row_cells[4], "Mise en œuvre\n", black, gray)
-    new_row_cells[4].paragraphs[0].add_run(fixe["execution"], style='contentStyleFix')
+    fill_cell(new_row_cells[4], translate("Fix_Ease")+"\n", black, gray)
+    new_row_cells[4].paragraphs[0].add_run(translate(fixe["execution"]), style='contentStyleFix')
     new_row_cells[4].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.LEFT
     header_run = new_row_cells[4].paragraphs[0].runs[0]
     font = header_run.font
     font.size = Pt(9)
     font.color.rgb = lightgray
     header_run.italic = True
-    fill_cell(new_row_cells[5], "Gain\n", black, gray)
-    new_row_cells[5].paragraphs[0].add_run(fixe["gain"], style='contentStyleFix')
+    fill_cell(new_row_cells[5], translate("Gain")+"\n", black, gray)
+    new_row_cells[5].paragraphs[0].add_run(translate(fixe["gain"]), style='contentStyleFix')
     new_row_cells[5].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.LEFT
     header_run = new_row_cells[5].paragraphs[0].runs[0]
     font = header_run.font
@@ -440,16 +449,16 @@ def populate_defect_summary_table(document, defects_dict, pentest_type):
     if table_res_i is not None:
         remove_row(table_res, table_res.rows[0])
 
-    _replaceTextInTable, cell_id = replaceTextInTable(table, "var_dsum_colId", "ID")
-    _replaceTextInTable, cell_tit = replaceTextInTable(table, "var_dsum_colTit", "Libellé")
-    _, cell_ease = replaceTextInTable(table, "var_dsum_colEase", "Exploitation")
-    _, cell_impact = replaceTextInTable(table, "var_dsum_colImpact", "Impact")
-    _replaceTextInParagraphes, cell_type = replaceTextInTable(table, "var_dsum_colType", "Type")
+    _replaceTextInTable, cell_id = replaceTextInTable(table, "var_dsum_colId", translate("ID"))
+    _replaceTextInTable, cell_tit = replaceTextInTable(table, "var_dsum_colTit", translate("Title"))
+    _, cell_ease = replaceTextInTable(table, "var_dsum_colEase", translate("Ease"))
+    _, cell_impact = replaceTextInTable(table, "var_dsum_colImpact", translate("Impact"))
+    _replaceTextInParagraphes, cell_type = replaceTextInTable(table, "var_dsum_colType", translate("Type"))
 
-    _, cell_c_id = replaceTextInTable(table_c, "var_csum_colId", "ID")
-    _, cell_c_tit = replaceTextInTable(table_c, "var_csum_colTit", "Libellé")
-    _, cell_c_ease = replaceTextInTable(table_c, "var_csum_colEase", "Mise en\nœuvre")
-    _, cell_c_gain = replaceTextInTable(table_c, "var_csum_colGain", "Gain en sécurité")
+    _, cell_c_id = replaceTextInTable(table_c, "var_csum_colId", translate("ID"))
+    _, cell_c_tit = replaceTextInTable(table_c, "var_csum_colTit", translate("Title"))
+    _, cell_c_ease = replaceTextInTable(table_c, "var_csum_colEase", translate("Fix_Ease"))
+    _, cell_c_gain = replaceTextInTable(table_c, "var_csum_colGain", translate("Gain"))
     strong_color = '002060'
     medium_color = '0070C0'
     quick_win_color = '00B0F0'
@@ -458,7 +467,7 @@ def populate_defect_summary_table(document, defects_dict, pentest_type):
     risks_font_colors = {"Critical":white_rgb, "Major":white_rgb, "Important":white_rgb, "Minor":black_rgb}
     risks_bg_colors = {"Critical":"263232", "Major":"F8453C", "Important":"EE8200", "Minor":"FFFF00"}
     fixes_bg_colors = {"Quick Win":quick_win_color, "Weak":quick_win_color, "Moderate":medium_color, "Moderate":medium_color, "Strong":strong_color, "Hard":strong_color}
-    levels = ["Critical", "Major", "Important", "Minor"]
+    levels = getDefaultLevels()
     count = 0
     start_defect_line_on_res_table = 0
     nb_line_res_table = 0
@@ -491,7 +500,7 @@ def populate_defect_summary_table(document, defects_dict, pentest_type):
             d_types = o_defect["type"]
             defect_types = []
             for types in d_types:
-                words_in_type = types.strip().split(" ")
+                words_in_type = translate(types.strip()).split(" ")
                 type_acro = ""
                 for word in words_in_type:
                     if word != "":
@@ -500,10 +509,10 @@ def populate_defect_summary_table(document, defects_dict, pentest_type):
             type_first_letters = ", ".join(defect_types)
             if type_first_letters == "":
                 type_first_letters = "N/A"
-            fill_cell(new_row_cells[cell_id], "D"+str(count), risks_font_colors[level], risks_bg_colors[level], True)
+            fill_cell(new_row_cells[cell_id], translate("DEFECT_SMALLER")+str(count), risks_font_colors[level], risks_bg_colors[level], True)
             fill_cell(new_row_cells[cell_tit], o_defect["title"], risks_font_colors[level], risks_bg_colors[level])
-            fill_cell(new_row_cells[cell_ease], o_defect["ease"], risks_font_colors[level], risks_bg_colors[level])
-            fill_cell(new_row_cells[cell_impact], o_defect["impact"], risks_font_colors[level], risks_bg_colors[level])
+            fill_cell(new_row_cells[cell_ease], translate(o_defect["ease"]), risks_font_colors[level], risks_bg_colors[level])
+            fill_cell(new_row_cells[cell_impact], translate(o_defect["impact"]), risks_font_colors[level], risks_bg_colors[level])
             fill_cell(new_row_cells[cell_type], type_first_letters, risks_font_colors[level], risks_bg_colors[level])
             count_correctif = 1
             result, status = Report.search("defect", o_defect["title"])
@@ -524,7 +533,7 @@ def populate_defect_summary_table(document, defects_dict, pentest_type):
                 NoResult = True
             
             if NoResult:
-                id_correctif = "A"+str(count)
+                id_correctif = translate("FIX_SMALLER")+str(count)
                 new_row_c_cells = table_c.add_row().cells
                 if table_res_i is not None:
                     write_res_table_fix_line(table_res, risks_bg_colors[level], id_correctif, {"title":"ToDo", "execution":"ToDo", "gain":"ToDo"})
@@ -542,7 +551,7 @@ def populate_defect_summary_table(document, defects_dict, pentest_type):
                     if result_defect_match["perimeter"].lower() == pentest_type.lower():
                         resultMatch = result_defect_match
             for fixe in resultMatch["fixes"]:
-                id_correctif = "A"+str(count)
+                id_correctif = translate("FIX_SMALLER")+str(count)
                 if len(resultMatch["fixes"]) > 1:
                     id_correctif += "."+str(count_correctif)
                     count_correctif+=1
@@ -552,8 +561,8 @@ def populate_defect_summary_table(document, defects_dict, pentest_type):
                     nb_line_res_table += 1
                 fill_cell(new_row_c_cells[cell_c_id], id_correctif, None, None, True)
                 fill_cell(new_row_c_cells[cell_c_tit], fixe["title"])
-                fill_cell(new_row_c_cells[cell_c_ease], fixe["execution"], risks_font_colors["Critical"], fixes_bg_colors[fixe["execution"]])
-                fill_cell(new_row_c_cells[cell_c_gain], fixe["gain"], risks_font_colors["Critical"], fixes_bg_colors[fixe["gain"]])
+                fill_cell(new_row_c_cells[cell_c_ease], translate(fixe["execution"]), risks_font_colors["Critical"], fixes_bg_colors[fixe["execution"]])
+                fill_cell(new_row_c_cells[cell_c_gain], translate(fixe["gain"]), risks_font_colors["Critical"], fixes_bg_colors[fixe["gain"]])
             if table_res_i is not None:
                 format_block_res_table(table_res, start_defect_line_on_res_table, nb_line_res_table)
     # Ajustement de la taille des lignes pour combler la page
@@ -608,7 +617,7 @@ def insertPageBreak(paragraph):
 def write_every_defect_fix(fixes, document, last_defect_paragraph, count):
     # print("write fixes for "+str(count)+ " after "+str(last_defect_paragraph.text))
     for fixe_i in range(len(fixes)-1, -1, -1):
-        id_correctif = "A"+str(count)
+        id_correctif = translate("FIX_SMALLER")+str(count)
         fixe = fixes[fixe_i]
         if len(fixes) > 1:
             id_correctif += "."+str(fixe_i+1)
@@ -622,8 +631,10 @@ def write_every_defect_fix(fixes, document, last_defect_paragraph, count):
         copied_table_c, _ = findRowContaining(document, "var_c_id")
         replaceTextInTable(copied_table_c, "var_c_id", id_correctif)
         replaceTextInTable(copied_table_c, "var_c_title", fixe["title"])
-        replaceTextInTable(copied_table_c, "var_c_ease", fixe["execution"])
-        replaceTextInTable(copied_table_c, "var_c_gain", fixe["gain"])
+        replaceTextInTable(copied_table_c, "var_h_ease", translate("Ease"))
+        replaceTextInTable(copied_table_c, "var_h_gain", translate("Gain"))
+        replaceTextInTable(copied_table_c, "var_c_ease", translate(fixe["execution"]))
+        replaceTextInTable(copied_table_c, "var_c_gain", translate(fixe["gain"]))
         desc = fixe["description"].replace("\r", "")
         desc_paras = desc.split("\n")
         fixe_synthesis = fixe.get("synthesis", None)
@@ -710,7 +721,7 @@ def write_each_defect(pentest, document, defects_dict, pentest_type):
             defects_dict: the dictionary of defect gotten with the dedicated function getDefectDictFromExcel
 
     """
-    levels = ["Critical", "Major", "Important", "Minor"]
+    levels = getDefaultLevels()
     count = 0
     total_len = 0
     for level in levels:
@@ -729,10 +740,12 @@ def write_each_defect(pentest, document, defects_dict, pentest_type):
             table_d, table_i = findRowContaining(document, "var_d_id")
             separator = findParagraphContaining(document, 'var_d_separator')
             copy_table_after(table_d, separator, "var_d_separator")
-            replaceTextInTable(table_d, "var_d_id", "D"+str(count))
+            replaceTextInTable(table_d, "var_d_id", translate("DEFECT_SMALLER")+str(count))
+            replaceTextInTable(table_d, "var_h_exploitation", translate("Exploitation"))
+            replaceTextInTable(table_d, "var_h_impact", translate("Impact"))
             replaceTextInTable(table_d, "var_d_title", o_defect["title"])
-            replaceTextInTable(table_d, "var_d_ease", o_defect["ease"])
-            replaceTextInTable(table_d, "var_d_impact", o_defect["impact"])
+            replaceTextInTable(table_d, "var_d_ease", translate(o_defect["ease"]))
+            replaceTextInTable(table_d, "var_d_impact", translate(o_defect["impact"]))
             result, status = Report.search("defect", o_defect["title"])
             if status != 200:
                 result = None
@@ -749,18 +762,18 @@ def write_each_defect(pentest, document, defects_dict, pentest_type):
                         {
                             "id":"0",
                             "title": o_defect["title"],
-                            "ease": o_defect["ease"],
-                            "impact": o_defect["impact"],
-                            "risk": o_defect["risk"],
+                            "ease": translate(o_defect["ease"]),
+                            "impact": translate(o_defect["impact"]),
+                            "risk": translate(o_defect["risk"]),
                             "type": o_defect["type"],
-                            "description": "Description",
+                            "description": translate("Description"),
                             "details": {},
                             "notes": o_defect.get("notes", ""),
                             "fixes": [
                                 {
                                     "title": "ToDo",
-                                    "execution": "Moderate",
-                                    "gain": "Moderate",
+                                    "execution": translate("Moderate"),
+                                    "gain": translate("Moderate"),
                                     "description": "ToDo"
                                 }
                             ]
@@ -791,12 +804,12 @@ def write_each_defect(pentest, document, defects_dict, pentest_type):
                     defect_m.notes = "ToDo : Too much notes to paste it there."
                 if target != "":
                     if defect_m.notes.strip() == "":
-                        notes = target+": Vulnerable."
+                        notes = target+": "+translate("Vulnerable")+"."
                     else:
                         notes = target+":\n"+defect_m.notes
                 else:
                     if defect_m.notes.strip() != "":
-                        notes = "Notes: "+defect_m.notes
+                        notes = translate("Notes")+": "+defect_m.notes
                 o_defect["details"][ids]["notes"] = notes
                 pics = []
                 for i_proof, _proof in enumerate(defect_m.proofs):
@@ -902,10 +915,10 @@ def populate_services_table(pentest, document, parent):
     table, _ = findRowContaining(document, "var_ssum_ip")
     if table is None:
         return
-    replaceTextInTable(table, "var_ssum_ip", "IP")
-    replaceTextInTable(table, "var_ssum_port", "Port")
-    replaceTextInTable(table, "var_ssum_proto", "Protocole")
-    replaceTextInTable(table, "var_ssum_comment", "Commentaires")
+    replaceTextInTable(table, "var_ssum_ip", translate("IP"))
+    replaceTextInTable(table, "var_ssum_port", translate("Port"))
+    replaceTextInTable(table, "var_ssum_proto", translate("Protocol"))
+    replaceTextInTable(table, "var_ssum_comment", translate("Comments"))
     ips = ServerIp.fetchObjects(pentest, {"in_scopes": {"$ne":[]}})
     cursorAsList = [c for c in ips] # NOT OPTIMIZED
     
@@ -1176,6 +1189,8 @@ def createReport(pentest, defects_dict, remarks_list, template, out_name, **kwar
     document = Document(template)
     global cell_style
     global normal_style
+    global translation
+    translation = kwargs.get("translation")
     current_step = 0
     cell_style = document.styles["Normal_Cell"]
     normal_style = document.styles["Normal"]
@@ -1184,21 +1199,19 @@ def createReport(pentest, defects_dict, remarks_list, template, out_name, **kwar
         replaceTextInDocument(document, "var_client", client_name)
     date = datetime.now()
     month = date.strftime("%B").lower()
-    replaceTextInDocument(document, "var_month", month)
-    month_fr = {"january":"janvier", "february":"février", "march":"mars", "april":"avril", "may":"mai", "june":"juin",
-                "july":"juillet", "august":"août", "september":"septembre", "october":"octobre", "november":"novembre", "december":"décembre"}
-    replaceTextInDocument(document, "var_mois", month_fr.get(month, month))
+    replaceTextInDocument(document, "var_month", translate(month))
     replaceTextInDocument(document, "var_year", date.strftime("%Y"))
-    replaceTextInDocument(document, "var_annee", date.strftime("%Y"))
     contract_name = kwargs.get("contract", "").strip()
     if contract_name != "":
         replaceTextInDocument(document, "var_contract", contract_name)
     replaceTextInDocument(document, "var_synthesis", str(kwargs.get("synthesis", "ToDo "+kwargs.get("main_redactor", "synthesis"))))
-    replaceTextInDocument(document, "var_nb_d_total", str(len(defects_dict["Critical"].keys())+len(defects_dict["Major"].keys())+len(defects_dict["Important"].keys())+len(defects_dict["Minor"].keys())))
-    replaceTextInDocument(document, "var_nb_d_critical", str(len(defects_dict["Critical"].keys())))
-    replaceTextInDocument(document, "var_nb_d_major", str(len(defects_dict["Major"].keys())))
-    replaceTextInDocument(document, "var_nb_d_important", str(len(defects_dict["Important"].keys())))
-    replaceTextInDocument(document, "var_nb_d_minor", str(len(defects_dict["Minor"].keys())))
+    levels = getDefaultLevels()
+    count = 0
+    for level in levels:
+        replaceTextInDocument(document, "var_nb_d_"+level.lower(), str(len(defects_dict[level].keys())))
+        count += len(defects_dict[level].keys())
+    replaceTextInDocument(document, "var_nb_d_total", str(count))
+    
     print("Populate defect summary ....")
     try:
         populate_defect_summary_table(document, defects_dict, kwargs.get("pentest_type","undefined"))

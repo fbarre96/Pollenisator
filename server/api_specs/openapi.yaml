@@ -2213,16 +2213,32 @@ paths:
       responses:
         "200":
           description: Successfully stoped auto scan
-  /report/templates:
+  /report/langs:
+    get:
+      operationId: server.Report.getLangList
+      tags:
+        - Report
+      summary: Get a list of existings langs templates
+      responses:
+        "200":
+          description: A list of langs as stringpython
+  /report/{lang}/templates:
     get:
       operationId: server.Report.getTemplateList
       tags:
         - Report
       summary: Get a lsit of report template
+      parameters:
+        - name: lang
+          in: path
+          description: template language
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: A list of avalaible templates names
-  /report/templates/download:
+  /report/{lang}/templates/download:
     get:
       operationId: server.Report.downloadTemplate
       tags:
@@ -2235,15 +2251,28 @@ paths:
           required: true
           schema:
             type: string
+        - name: lang
+          in: path
+          description: template language
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: A template file docx or pptx
-  /report/templates/upload:
+  /report/{lang}/templates/upload:
     post:
       operationId: server.Report.uploadTemplate
       tags:
         - Report
       summary: Upload a report template
+      parameters:
+        - name: lang
+          in: path
+          description: template language
+          required: true
+          schema:
+            type: string
       requestBody:
         $ref: "#/components/requestBodies/server.mongo.importDb"
       responses:
@@ -2287,6 +2316,12 @@ paths:
           schema:
             type: string
             default: N/A
+        - name: lang
+          in: query
+          description: lang of the template
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: A template file docx or pptx
