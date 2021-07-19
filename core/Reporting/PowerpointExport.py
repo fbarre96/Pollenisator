@@ -7,6 +7,15 @@ import copy
 import six
 import server.Report as Report
 
+translation = None
+
+def translate(w):
+    if translation is None:
+        return w
+    return translation.get(w, w)
+
+def getDefaultLevels():
+    return ["Critical", "Major", "Important", "Minor"]
 
 def replaceTextInParagraph(paragraph, search, replace):
     """
@@ -181,7 +190,7 @@ def write_every_defect_fix(fixes, document, slide_i, count):
     # print("write fixes for "+str(count)+ " after "+str(last_defect_paragraph.text))
     shape_fix = None
     for fixe_i in range(len(fixes)):
-        id_correctif = "A"+str(count)
+        id_correctif = translate("FIX_SMALLER")+str(count)
         fixe = fixes[fixe_i]
         if len(fixes) > 1:
             id_correctif += "."+str(fixe_i+1)
@@ -224,7 +233,7 @@ def write_each_defect(document, defects_dict):
             defects_dict: the dictionary of defect gotten with the dedicated function getDefectDictFromExcel
 
     """
-    levels = ["Critical", "Major", "Important", "Minor"]
+    levels = getDefaultLevels()
     count_defects = 0
     count_fixes = 0
     total_len = 0
@@ -252,10 +261,12 @@ def write_each_defect(document, defects_dict):
             count_defects += 1
             o_defect = defect_dict["description"]
             table_d = findTableInSlide(document, new_slide_i, "var_d_id")
-            replaceTextInTable(table_d, "var_d_id", "D"+str(count_defects))
+            replaceTextInTable(table_d, "var_d_id", translate("DEFECT_SMALLER")+str(count_defects))
             replaceTextInTable(table_d, "var_d_title", o_defect["title"])
-            replaceTextInTable(table_d, "var_d_ease", o_defect["ease"])
-            replaceTextInTable(table_d, "var_d_impact", o_defect["impact"])
+            replaceTextInTable(table_d, "var_h_exploitation", translate("Exploitation"))
+            replaceTextInTable(table_d, "var_h_impact", translate("Impact"))
+            replaceTextInTable(table_d, "var_d_ease", translate(o_defect["ease"]))
+            replaceTextInTable(table_d, "var_d_impact", translate(o_defect["impact"]))
             result, status = Report.search( "defect", o_defect["title"])
             if status != 200:
                 result = None
@@ -377,12 +388,14 @@ def addSerieToChart(presentation, index_chart, serie_name, serie):
 def createReport(pentest, defects_dict, remarks_list, template, out_name, **kwargs):
     document = Presentation(template)
     global SLD_LAYOUT_TO_COPY
+    global translation
+    translation = kwargs.get("translation")
     SLD_LAYOUT_TO_COPY = document.slide_layouts.get_by_name("TO_COPY")
     if SLD_LAYOUT_TO_COPY is None:
         raise Exception("The pptx template does not contain a TO_COPY layout")
     client_name = kwargs.get("client", "").strip()
     total_len = 0
-    levels = ["Critical", "Major", "Important", "Minor"]
+    levels = getDefaultLevels()
     for level in levels:
         total_len += len(defects_dict[level].values())
     nb_steps = total_len # 1 step by defect
@@ -392,10 +405,6 @@ def createReport(pentest, defects_dict, remarks_list, template, out_name, **kwar
         replaceTextInDocument(document, "var_client", client_name)
     contract_name = kwargs.get("contract", "").strip()
     if contract_name != "":
-        if contract_name.lower().startswith("test "):
-            contract_name = "du t"+contract_name[1:]
-        elif contract_name.lower().startswith("audit "):
-            contract_name = "de l'a"+contract_name[1:]
         replaceTextInDocument(document, "var_contract", contract_name)
     nb_critical = len(defects_dict["Critical"].keys())
     nb_major = len(defects_dict["Major"].keys())
