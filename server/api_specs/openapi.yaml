@@ -161,26 +161,26 @@ components:
         ease:
           type: string
           enum:
-            - Easy
-            - Moderate
-            - Difficult
-            - Arduous
+            - Facile
+            - Modérée
+            - Difficile
+            - Très difficile
             - N/A
         impact:
           type: string
           enum:
-            - Minor
+            - Mineur
             - Important
-            - Major
-            - Critical
+            - Majeur
+            - Critique
             - N/A
         risk:
           type: string
           enum:
-            - Minor
+            - Mineur
             - Important
-            - Major
-            - Critical
+            - Majeur
+            - Critique
             - N/A
         redactor:
           type: string
@@ -302,8 +302,13 @@ paths:
       summary: Test connection
       security: []
       responses:
-        "200":
+        '200':
           description: Successful read status operation
+          content:
+            application/json:
+              examples:
+                Status:
+                  value: 'true'
   /issue:
     post:
       operationId: server.logger.report
@@ -322,9 +327,13 @@ paths:
                   type: string
       security: []
       responses:
-        "200":
+        '200':
           description: Reported a client issue successfully
- 
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'True'
   /user/register:
     post:
       operationId: server.auth.createUser
@@ -345,10 +354,29 @@ paths:
                 pwd:
                   type: string
       responses:
-        "200":
+        '200':
           description: successfully created a new user
-
-  /user/delete/{username}:
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Successully created user'
+        '400':
+          description: Incorrect parameters
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{parameter name} is required'
+        '403':
+          description: User already exists
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'A user with this username already exists'
+                  
+  '/user/delete/{username}':
     delete:
       operationId: server.auth.deleteUser
       tags:
@@ -361,8 +389,20 @@ paths:
           schema:
             type: string
       responses:
-        "200":
+        '200':
           description: successfully deleted a user
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'User successfully deleted'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'User to delete not found'
 
   /user/changePassword:
     post:
@@ -386,6 +426,32 @@ paths:
       responses:
         "200":
           description: successfully changed user password
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+        '400':
+          description: Missing parameters
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{parameter name} is required.'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'The old password is incorrect'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'This user does not exist'
   
   /admin/resetPassword:
     post:
@@ -409,6 +475,25 @@ paths:
       responses:
         "200":
           description: successfully changed another user password
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+        '400':
+          description: Missing parameters
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{parameter name} is required'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'This user does not exist'
 
   /user/searchUsers/{searchreq}:
     get:
@@ -427,6 +512,11 @@ paths:
       responses:
         "200":
           description: Get a list of users
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '["pierre", "pietro"]'
 
   /admin/listUsers:
     get:
@@ -438,6 +528,27 @@ paths:
       responses:
         "200":
           description: Get a list of users
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '[
+  {
+    "_id": "ObjectId|60350f6e690427c8c35074b3",
+    "scope": [
+      "admin",
+      "user"
+    ],
+    "username": "admin"
+  },
+  {
+    "_id": "ObjectId|60464db6065a28e50e9e9ae6",
+    "scope": [
+      "user"
+    ],
+    "username": "Fabien"
+  }
+]'
 
 
   /login:
@@ -463,6 +574,25 @@ paths:
       responses:
         "200":
           description: successfully logged in, returns an  token
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjY3MDE0MjcsImV4cCI6MTYyNjcwNTAyNywic3ViIjoiYWRtaW4iLCJzY29wZSI6WyJhZG1pbiIsInVzZXIiXX0.Tmv96VqKyqBa_xYjnfOqM7deKn6-UKmTB-rY9IrKX1M"'
+        '400':
+          description: Missing parameters
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{parameter name} is required'
+        '401':
+          description: Authentication failure
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Authentication failure'
   /login/{pentest}:
     post:
       operationId: server.auth.connectToPentest
@@ -477,7 +607,27 @@ paths:
           type: string
       responses:
         "200":
-          description: successfully logged in to a database, returns an  token
+          description: successfully logged in, returns a token with extended scope
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjY3MDI2NzQsImV4cCI6MTYyNjcwNjI3NCwic3ViIjoiYWRtaW4iLCJzY29wZSI6WyJhZG1pbiIsInVzZXIiLCJUZXN0aW5hIiwib3duZXIiLCJwZW50ZXN0ZXIiXX0.PxLT9qfHAsoebokDIU34cmUWWmzSxkTXWV2nBJayzq8"'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Forbidden'
+        '404':
+          description: Pentest not found
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pentest not found'
+          
   "/update/{pentest}/{collection}":
     post:
       operationId: server.mongo.update
@@ -517,7 +667,26 @@ paths:
                   default: false
       responses:
         "200":
-          description: Successful update command
+          description: successfully updated an item
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+        '400':
+          description: Pipeline argument invalid
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pipeline|Update pipeline argument was not valid'
+        '403':
+          description: Unknown param value
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pentest|Collection argument is not a valid pollenisator collection'
   "/insert/{pentest}/{collection}":
     post:
       operationId: server.mongo.insert
@@ -554,7 +723,26 @@ paths:
                   default: false
       responses:
         "200":
-          description: Successful insert command
+          description: successfully inserted an item in db, return its ObjectId (bson.ObjectId type)
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"60f58598d8357e0f40e7fa66"'
+        '400':
+          description: Pipeline argument invalid
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pipeline argument was not valid'
+        '403':
+          description: Unknown param value
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pentest|Collection argument is not a valid pollenisator collection'
   "/find/{pentest}/{collection}":
     post:
       operationId: server.mongo.find
@@ -587,7 +775,37 @@ paths:
                   default: false
       responses:
         "200":
-          description: Successful find command
+          description: successful find command with parameters
+          content:
+            application/json:
+              examples:
+                Many = false:
+                  value: '{"_id": "ObjectId|60a3aaa129926f9ad7197919",  "parent": "ObjectId|60a3aaa129926f9ad7197915",  "scope": "test",  "wave": "Testina"}'
+                Many = true:
+                  value: '[{"_id": "60a3aaa129926f9ad7197919", "parent": "ObjectId|60a3aaa129926f9ad7197915",  "scope": "test",   "wave": "Testina" },  { "_id": "60f58598d8357e0f40e7fa66","scope": "test.fr" }]'
+                many = true but empty result:
+                  value: '[]'
+        '400':
+          description: Pipeline argument invalid
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pipeline argument was not valid'
+        '403':
+          description: Unknown param value
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pentest|Collection argument is not a valid pollenisator collection'
+        '404':
+          description: Empty result on specific search
+          content:
+            application/json:
+              examples:
+                Empty result with many=false:
+                  value: "Not found"
   "/search/{pentest}":
     get:
       operationId: server.mongo.search
@@ -611,6 +829,25 @@ paths:
         "200":
           description: Successful search results. A dictionnary with type of objects as
             keys and matching documents in a list as value
+          content:
+            application/json:
+              examples:
+                'search type == "defect"':
+                  value: '{  "defects": [    {      "_id": "ObjectId|60f190815955e6cf385a405d",      "ease": "Moderate",      "impact": "Major",      "index": "1",      "ip": "",      "notes": "",      "parent": "",      "port": "",      "proofs": [],      "proto": "",      "redactor": "N/A",      "risk": "Major",      "title": "sql",      "type": [        "Application"      ]    },    {      "_id": "ObjectId|60f194db1255fd087c769756",      "ease": "Moderate",      "impact": "Critical",      "index": "0",      "ip": "",      "notes": "",      "parent": "",      "port": "",      "proofs": [],      "proto": "",      "redactor": "N/A",      "risk": "Critical",      "title": "XSS",      "type": [        "Application"      ]    }  ]}'
+        '400':
+          description: Parse error
+          content:
+            application/json:
+              examples:
+                toto tata:
+                  value: '"Unexpected token Token(''STRING'', ''toto'') at line 1, column 4."'
+        '403':
+          description: Unknown pentest value given
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pentest argument is not a valid pollenisator pentest'
   "/count/{pentest}/{collection}":
     post:
       operationId: server.mongo.count
@@ -642,6 +879,25 @@ paths:
       responses:
         "200":
           description: Successful count command
+          content:
+              application/json:
+                examples:
+                  Success:
+                    value: '3' 
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                pipeline is not a dict:
+                  value: '"Pipeline argument was not valid"'
+        '403':
+          description: Unknown pentest value given
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pentest argument is not a valid pollenisator pentest'
   "/dumpDb/{dbName}":
     get:
       operationId: server.mongo.dumpDb
@@ -663,6 +919,25 @@ paths:
       responses:
         "200":
           description: archive content
+          content:
+              application/octet-stream:
+                schema:
+                  type: string
+                  format: binary
+        '404':
+          description: Not found parameters
+          content:
+            application/json:
+              examples:
+                Not found:
+                  value: '"Collection|Database not found"'
+        '503':
+          description: Failed to create a dump
+          content:
+            application/json:
+              examples:
+                Server issue:
+                  value: 'Failed to export database'
   /importDb:
     post:
       operationId: server.mongo.importDb
@@ -685,6 +960,11 @@ paths:
       responses:
         "200":
           description: Successfully imported the file
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
   /copyDb:
     post:
       operationId: server.mongo.copyDb
@@ -706,7 +986,12 @@ paths:
                   type: string
       responses:
         "200":
-          description: Successfully imported the file
+          description: Successfully copied db
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
   "/aggregate/{pentest}/{collection}":
     post:
       operationId: server.mongo.aggregate
@@ -740,6 +1025,18 @@ paths:
       responses:
         "200":
           description: Successful aggregate command
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '[{*mongo_object*}, {*mongo_object2*}...]'
+        '403':
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                Not found:
+                  value: '"Collection|Pentest argument is not a valid pollenisator collection|pentest"'
   "/delete/{pentest}/{collection}":
     post:
       operationId: server.mongo.delete
@@ -777,6 +1074,25 @@ paths:
       responses:
         "200":
           description: Successful delete command
+          content:
+            application/json:
+              examples:
+                Deleted count:
+                  value: '1'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                pipeline is not a dict:
+                  value: '"Pipeline argument was not a valid dictionnary"'
+        '403':
+          description: Invalid parameters values
+          content:
+            application/json:
+              examples:
+                Not found:
+                  value: '"Collection|Pentest argument is not a valid pollenisator collection|pentest"'
   "/delete/{pentest}/bulk":
     post:
       operationId: server.mongo.bulk_delete
@@ -798,7 +1114,28 @@ paths:
               
       responses:
         "200":
-          description: Successful delete command
+          description: Successful bulk delete command
+          content:
+            application/json:
+              examples:
+                Deleted count:
+                  value: '4'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                body is not a dict:
+                  value: '"body was not a valid dictionnary"'
+        '403':
+          description: Invalid parameters values
+          content:
+            application/json:
+              examples:
+                Not found:
+                  value: '"Collection|Pentest argument is not a valid pollenisator collection|pentest"'
+                Pollenisator db:
+                  value: 'Impossible to bulk delete in this database'
   /pentests:
     get:
       operationId: server.mongo.listPentests
@@ -814,6 +1151,9 @@ paths:
                 type: array
                 items:
                   type: string
+              examples:
+                Success:
+                  value: '["pentest1", "pentest2"]'
   "/pentest/{pentest}/delete":
     delete:
       operationId: server.mongo.deletePentest
@@ -829,6 +1169,25 @@ paths:
       responses:
         "200":
           description: Successful deletion
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Successful deletion'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              examples:
+                Pentest not found:
+                  value: '"Unknown pentest"'
+        '403':
+          description: Forbidden, not enough rights
+          content:
+            application/json:
+              examples:
+                Not owner of the db:
+                  value: '"Forbidden"'
   "/pentest/{pentest}":
     post:
       operationId: server.mongo.registerCalendar
@@ -888,6 +1247,19 @@ paths:
       responses:
         "200":
           description: Successful creation
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"Success"'
+        
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              examples:
+                Reason:
+                  value: '"*{Reason of failure, invalid name, or database already exist..}*"'
   "/notification/{pentest}":
     get:
       operationId: server.mongo.fetchNotifications
@@ -909,6 +1281,11 @@ paths:
       responses:
         "200":
           description: Successful read notifications operation
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '[{ "_id" : "ObjectId|5f9150fbed75193ef71ba47f", "iid" : "ObjectId|5f903112ed7519bbc6405980", "db" : "TEST", "collection" : "ips", "action" : "update", "parent" : "", "time" : "2020-10-22T11:29:31.162Z" }, ...]'
   /settings/add:
     post:
       operationId: server.mongo.createSetting
@@ -920,6 +1297,11 @@ paths:
       responses:
         "200":
           description: Created global pollenisator settings
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
   /settings/update:
     put:
       operationId: server.mongo.updateSetting
@@ -931,12 +1313,17 @@ paths:
       responses:
         "200":
           description: Created global pollenisator settings
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   /settings/search:
     get:
       operationId: server.mongo.getSetting
       tags:
         - Settings
-      summary: Get global pollenisator settings filtered
+      summary: Get a global pollenisator setting from search
       parameters:
         - name: pipeline
           in: query
@@ -944,10 +1331,19 @@ paths:
           schema:
             type: string
             default: "{}"
-            example: "{}"
+            example: '{"key":"pentest_types"}'
       responses:
         "200":
-          description: Get global pollenisator settings
+          description: Get a global pollenisator setting from search
+          content:
+            application/json:
+              examples:
+                Success for search {"key":"tags"}:
+                  value: '{
+    "_id": "ObjectId|5fa5819aed75191f22168a40",
+    "key": "tags",
+    "value": "{\"todo\": \"orange\", \"unscanned\": \"yellow\", \"P0wned!\": \"red\", \"Interesting\": \"dark green\", \"Uninteresting\": \"sky blue\", \"Neutral\": \"white\"}"
+  }'
   /settings:
     get:
       operationId: server.mongo.getSettings
@@ -957,6 +1353,22 @@ paths:
       responses:
         "200":
           description: Get global pollenisator settings
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '[
+  {
+    "_id": "ObjectId|5fa5819aed75191f22168a40",
+    "key": "tags",
+    "value": "{\"todo\": \"orange\", \"unscanned\": \"yellow\", \"P0wned!\": \"red\", \"Interesting\": \"dark green\", \"Uninteresting\": \"sky blue\", \"Neutral\": \"white\"}"
+  },
+  {
+    "_id": "ObjectId|5fbb793bed75195fe4274412",
+    "key": "pentest_types",
+    "value": "{\"Web\": [\"Base\", \"Application\", \"Data\", \"Policy\"], \"LAN\": [\"Infrastructure\", \"Active Directory\", \"Data\", \"Policy\"]}"
+  }
+]'
   /workers:
     get:
       operationId: server.worker.listWorkers
@@ -989,12 +1401,81 @@ paths:
                       type: string
                     name:
                       type: string
+                    pentests:
+                      type: array
+                      items:
+                        type: string
                     shortname:
                       type: string
                     registeredCommands:
                       type: array
                       items:
                         type: string
+              examples:
+                list returned:
+                  value : '[
+                    {
+                      "_id": "60f686d8e15510a2957cb263",
+                      "last_heartbeat": "2021-07-20 10:18:35.269000",
+                      "name": "078cbd54-6c26-4ba9-b84d-fdb12f239af3@barre",
+                      "pentests": [],
+                      "registeredCommands": [
+                        "Nmap.tcp",
+                        "Nmap.top_udp",
+                        "Nmap.bdd",
+                        "Nmap.vpn",
+                        "Nmap.supervision",
+                        "Nmap.services",
+                        "Nmap.services.udp",
+                        "Nmap.services_scripts",
+                        "Nmap.all.tcp",
+                        "Nmap.ip.allTcp",
+                        "Nmap.ip.udp",
+                        "WhatWeb.http",
+                        "WhatWeb.https",
+                        "TestSSL",
+                        "Nikto",
+                        "digReverseLookUp",
+                        "pythonReverseLookUp",
+                        "Sublist3r",
+                        "Dirsearch.http",
+                        "Dirsearch.https",
+                        "Knockpy",
+                        "crtsh",
+                        "ssh_scan",
+                        "amap",
+                        "amap.udp",
+                        "http-methods",
+                        "smbmap",
+                        "smbmap_anon",
+                        "smbmap_greybox",
+                        "smb-enum-users",
+                        "nmap-script-vuln",
+                        "enum4linux",
+                        "ftp-anon",
+                        "Nmap.quick",
+                        "ike-scan",
+                        "Nmap.verify.tcp",
+                        "Nmap.verify.udp",
+                        "CME.recon",
+                        "CME.usecreds",
+                        "eternalblue",
+                        "bluekeep",
+                        "openrelay",
+                        "searchsploit",
+                        "dnsrecon",
+                        "CME_greybox"
+                      ],
+                      "shortname": "078cbd54-6c26-4ba9-b84d-fdb12f239af3"
+                    }
+                  ]'
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                pipeline invalid:
+                  value: 'Pipeline argument was not valid'
   "/workers/{name}":
     delete:
       operationId: server.worker.deleteWorker
@@ -1018,8 +1499,17 @@ paths:
                 properties:
                   n:
                     type: integer
+              examples:
+                deleted 2:
+                  value: '{"n":2}'
+                
         "404":
           description: Worker name not found
+          content:
+            application/json:
+              examples:
+                worker not found:
+                  value: '"Worker not found"'
   "/workers/{name}/setInclusion":
     put:
       operationId: server.worker.setInclusion
@@ -1062,6 +1552,9 @@ paths:
                     type: integer
                   updatedExisting:
                     type: boolean
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   /workers/register/:
     post:
       operationId: server.worker.registerWorker
@@ -1086,6 +1579,11 @@ paths:
       responses:
         "200":
           description: Successful registered a worker
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
   "/workers/{name}/registerCommands":
     put:
       operationId: server.worker.registerCommands
@@ -1109,7 +1607,13 @@ paths:
                 type: string
       responses:
         "200":
-          description: Successful update of worker registed commands
+          description: Successful update of worker registered commands
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
+  
   "/workers/{name}/setCommandConfig":
     put:
       operationId: server.worker.setCommandConfig
@@ -1140,7 +1644,19 @@ paths:
                   type: string
       responses:
         "200":
-          description: Successful update of worker registed commands
+          description: Successful update of worker registed command configuration
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
+        "404":
+          description: Worker not found
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Worker not found'
   "/workers/{name}/unregister":
     post:
       operationId: server.worker.unregister
@@ -1157,7 +1673,19 @@ paths:
             type: string
       responses:
         "200":
-          description: Successful update of worker registed commands
+          description: Successful worker unregister
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
+        "404":
+          description: Worker not found
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Worker not found'
   "/workers/{name}/getRegisteredCommands":
     get:
       operationId: server.worker.getRegisteredCommands
@@ -1180,6 +1708,54 @@ paths:
                 type: array
                 items:
                   type: string
+              examples:
+                list of registered commands:
+                  value: '[
+  "Nmap.tcp",
+  "Nmap.top_udp",
+  "Nmap.bdd",
+  "Nmap.vpn",
+  "Nmap.supervision",
+  "Nmap.services",
+  "Nmap.services.udp",
+  "Nmap.services_scripts",
+  "Nmap.all.tcp",
+  "Nmap.ip.allTcp",
+  "Nmap.ip.udp",
+  "WhatWeb.http",
+  "WhatWeb.https",
+  "TestSSL",
+  "Nikto",
+  "digReverseLookUp",
+  "pythonReverseLookUp",
+  "Sublist3r",
+  "Dirsearch.http",
+  "Dirsearch.https",
+  "Knockpy",
+  "crtsh",
+  "ssh_scan",
+  "amap",
+  "amap.udp",
+  "http-methods",
+  "smbmap",
+  "smbmap_anon",
+  "smbmap_greybox",
+  "smb-enum-users",
+  "nmap-script-vuln",
+  "enum4linux",
+  "ftp-anon",
+  "Nmap.quick",
+  "ike-scan",
+  "Nmap.verify.tcp",
+  "Nmap.verify.udp",
+  "CME.recon",
+  "CME.usecreds",
+  "eternalblue",
+  "bluekeep",
+  "openrelay",
+  "searchsploit",
+  "dnsrecon"
+]'
 
   "/workers/{name}/instructions":
     get:
@@ -1223,6 +1799,18 @@ paths:
       responses:
         "200":
           description: Successful deletion of instruction
+          content:
+            application/json:
+              schema:
+                type: integer
+        "404":
+          description: Worker or instruction not found
+          content:
+            application/json:
+              examples:
+                Instruction not found:
+                  value: '"Instruction not found"'
+
   "/commands/{pentest}":
     post:
       operationId: server.ServerModels.Command.insert
@@ -1239,8 +1827,14 @@ paths:
         $ref: "#/components/requestBodies/Commands"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: command insertion success or already existing object
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/commands/update/{pentest}/{command_iid}":
     put:
       operationId: server.ServerModels.Command.update
@@ -1263,8 +1857,12 @@ paths:
         $ref: "#/components/requestBodies/Commands"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: command update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/commands/{pentest}/{command_iid}":
     delete:
       operationId: server.ServerModels.Command.delete
@@ -1287,6 +1885,10 @@ paths:
       responses:
         "200":
           description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
   "/group_commands/{pentest}/{command_group_iid}":
     delete:
       operationId: server.ServerModels.CommandGroup.delete
@@ -1309,6 +1911,10 @@ paths:
       responses:
         "200":
           description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
   "/group_commands/{pentest}":
     post:
       operationId: server.ServerModels.CommandGroup.insert
@@ -1325,8 +1931,14 @@ paths:
         $ref: "#/components/requestBodies/CommandGroups"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: command group insertion success or already existing object
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/group_commands/update/{pentest}/{command_group_iid}":
     put:
       operationId: server.ServerModels.CommandGroup.update
@@ -1349,8 +1961,12 @@ paths:
         $ref: "#/components/requestBodies/CommandGroups"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: command group update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/defects/{pentest}":
     post:
       operationId: server.ServerModels.Defect.insert
@@ -1367,8 +1983,14 @@ paths:
         $ref: "#/components/requestBodies/Defects"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: Defect insertion success or already existing object
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/defects/update/{pentest}/{defect_iid}":
     put:
       operationId: server.ServerModels.Defect.update
@@ -1391,8 +2013,12 @@ paths:
         $ref: "#/components/requestBodies/Defects"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: defect update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/defects/{pentest}/{defect_iid}":
     delete:
       operationId: server.ServerModels.Defect.delete
@@ -1415,6 +2041,10 @@ paths:
       responses:
         "200":
           description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
   "/intervals/{pentest}":
     post:
       operationId: server.ServerModels.Interval.insert
@@ -1431,8 +2061,14 @@ paths:
         $ref: "#/components/requestBodies/Intervals"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: interval successfully inserted
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/intervals/update/{pentest}/{interval_iid}":
     put:
       operationId: server.ServerModels.Interval.update
@@ -1455,8 +2091,12 @@ paths:
         $ref: "#/components/requestBodies/Intervals"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: interval update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/intervals/{pentest}/{interval_iid}":
     delete:
       operationId: server.ServerModels.Interval.delete
@@ -1479,6 +2119,10 @@ paths:
       responses:
         "200":
           description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
   "/ips/{pentest}":
     post:
       operationId: server.ServerModels.Ip.insert
@@ -1495,8 +2139,14 @@ paths:
         $ref: "#/components/requestBodies/Ips"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: Successful ip insertion
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/ips/update/{pentest}/{ip_iid}":
     put:
       operationId: server.ServerModels.Ip.update
@@ -1519,8 +2169,12 @@ paths:
         $ref: "#/components/requestBodies/Ips"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: ip update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/ips/{pentest}/{ip_iid}":
     delete:
       operationId: server.ServerModels.Ip.delete
@@ -1543,6 +2197,10 @@ paths:
       responses:
         "200":
           description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
   "/ports/{pentest}":
     post:
       operationId: server.ServerModels.Port.insert
@@ -1559,8 +2217,14 @@ paths:
         $ref: "#/components/requestBodies/Ports"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: Successful port insertion
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/ports/update/{pentest}/{port_iid}":
     put:
       operationId: server.ServerModels.Port.update
@@ -1583,8 +2247,12 @@ paths:
         $ref: "#/components/requestBodies/Ports"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: port update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/ports/{pentest}/{port_iid}":
     delete:
       operationId: server.ServerModels.Port.delete
@@ -1607,6 +2275,10 @@ paths:
       responses:
         "200":
           description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
   "/ports/{pentest}/{port_iid}/addCustomTool/":
     post:
       operationId: server.ServerModels.Port.addCustomTool
@@ -1636,8 +2308,15 @@ paths:
                   type: string
         required: true
       responses:
-        "200":
-          description: return boolean
+        "504":
+          description: Empty response is good
+        "503":
+          description: Not connected
+          content:
+            application/json:
+              examples:
+                Not connected:
+                  value: '"Not connected"'
   "/scopes/{pentest}":
     post:
       operationId: server.ServerModels.Scope.insert
@@ -1654,8 +2333,14 @@ paths:
         $ref: "#/components/requestBodies/Scopes"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: Successful scope insertion
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/scopes/update/{pentest}/{scope_iid}":
     put:
       operationId: server.ServerModels.Scope.update
@@ -1678,8 +2363,12 @@ paths:
         $ref: "#/components/requestBodies/Scopes"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: scope update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/scopes/{pentest}/{scope_iid}":
     delete:
       operationId: server.ServerModels.Scope.delete
@@ -1702,6 +2391,10 @@ paths:
       responses:
         "200":
           description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
   /tools/plugins:
     get:
       operationId: server.ServerModels.Tool.listPlugins
@@ -1711,6 +2404,11 @@ paths:
       responses:
         "200":
           description: Successful get
+          content:
+            application/json:
+              examples:
+                List of plugins available:
+                  value: '["Nmap.py", "WhatWeb.py", ...]'
   "/tools/{pentest}":
     post:
       operationId: server.ServerModels.Tool.insert
@@ -1727,8 +2425,14 @@ paths:
         $ref: "#/components/requestBodies/Tools"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: Successful tool insertion
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/tools/update/{pentest}/{tool_iid}":
     put:
       operationId: server.ServerModels.Tool.update
@@ -1751,8 +2455,12 @@ paths:
         $ref: "#/components/requestBodies/Tools"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: tool update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/tools/{pentest}/{tool_iid}":
     delete:
       operationId: server.ServerModels.Tool.delete
@@ -1775,6 +2483,10 @@ paths:
       responses:
         "200":
           description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
   "/waves/{pentest}":
     post:
       operationId: server.ServerModels.Wave.insert
@@ -1791,8 +2503,14 @@ paths:
         $ref: "#/components/requestBodies/Waves"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: Successful wave insertion
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/waves/update/{pentest}/{wave_iid}":
     put:
       operationId: server.ServerModels.Wave.update
@@ -1815,8 +2533,12 @@ paths:
         $ref: "#/components/requestBodies/Waves"
       responses:
         "200":
-          description: Get a boolean for success and insert idof either new or conflicting
-            object
+          description: wave update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/waves/{pentest}/{wave_iid}":
     delete:
       operationId: server.ServerModels.Wave.delete
@@ -1839,6 +2561,10 @@ paths:
       responses:
         "200":
           description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
   "/files/{pentest}/upload/proof/{defect_iid}":
     post:
       operationId: server.FileManager.upload
@@ -1863,6 +2589,18 @@ paths:
       responses:
         "200":
           description: Successfully uploaded file
+          content:
+            application/json:
+              examples:
+                Successful:
+                  value: '"{filename} was successfully uploaded"'
+        "404":
+          description: defect not found
+          content:
+            application/json:
+              examples:
+                Unknown defect:
+                  value: '"The given iid does not match an existing defect"'
   "/files/{pentest}/download/{filetype}/{attached_iid}":
     get:
       operationId: server.FileManager.listFiles
@@ -1893,6 +2631,12 @@ paths:
       responses:
         "200":
           description: Successfully listed files
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
   "/files/{pentest}/download/{filetype}/{attached_iid}/{filename}":
     get:
       operationId: server.FileManager.download
@@ -1928,6 +2672,19 @@ paths:
       responses:
         "200":
           description: Successfully downloaded file
+          content:
+            application/octet-steam:
+              schema:
+                type: string
+                format: binary
+                
+        "404":
+          description: File not found
+          content:
+            application/json:
+              examples:
+                file not found:
+                  value: '"File not found"'
   "/files/{pentest}/{defect_iid}/{filename}":
     delete:
       operationId: server.FileManager.rmProof
@@ -1955,6 +2712,19 @@ paths:
       responses:
         "200":
           description: Successfully deleted the file
+          content:
+            application/json:
+              examples:
+                Successful:
+                  value: '"Successfully deleted {filename}"'
+        "404":
+          description: File not found
+          content:
+            application/json:
+              examples:
+                file not found:
+                  value: '"File not found"'
+
   "/files/{pentest}/import":
     post:
       operationId: server.FileManager.importExistingFile
@@ -1986,7 +2756,14 @@ paths:
                 - plugin
       responses:
         "200":
-          description: Successfully imported the file
+          description: Successfully imported file
+          content:
+            application/json:
+              examples:
+                successful import of nmap file:
+                  value: '{
+  "Nmap.py": 1
+}'
   "/tools/{pentest}/craftCommandLine/{tool_iid}":
     get:
       operationId: server.ServerModels.Tool.craftCommandLine
@@ -2017,6 +2794,24 @@ paths:
         "200":
           description: The command line to execute with a marker for |outputDir| to be
             replaced
+          content:
+            application/json:
+              examples:
+                Successful nmap craft:
+                  value: '{
+  "bin": "nmap",
+  "comm": "nmap -n -v -p443 www.algosecure.fr -oN |outputDir|.nmap",
+  "ext": ".nmap"
+}'
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                no plugin:
+                  value: '"This tool has no plugin configured and no plugin was specified"'
+                empty command line result:
+                  value: '"An empty command line was crafted"'
   "/tools/{pentest}/importResult/{tool_iid}":
     post:
       operationId: server.ServerModels.Tool.importResult
@@ -2054,6 +2849,25 @@ paths:
       responses:
         "200":
           description: Successfully uploaded file
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"Success"'
+        "400":
+          description: Invalid plugin
+          content:
+            application/json:
+              examples:
+                invalid plugin:
+                  value: '"This tool has no plugin configured and no plugin was specified"'
+        "404":
+          description: tool not found
+          content:
+            application/json:
+              examples:
+                Unknown tool:
+                  value: '"The given iid does not match an existing tool"'
   "/tools/{pentest}/launchTask/{tool_iid}":
     post:
       operationId: server.ServerModels.Tool.launchTask
@@ -2088,6 +2902,20 @@ paths:
       responses:
         "200":
           description: Successfully launched task
+          content:
+            application/json:
+              examples:
+                Success returns instruction iid:
+                  value: '"ObjectId|60f69c67fca98c4bbbe5348a"'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              examples:
+                Tool not found:
+                  value: '"Tool not found"'
+                Worker not found:
+                  value: '"No worker available"'
   "/tools/{pentest}/stopTask/{tool_iid}":
     post:
       operationId: server.ServerModels.Tool.stopTask
@@ -2119,6 +2947,35 @@ paths:
       responses:
         "200":
           description: Successfully stopped task
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"Success"'
+        "400":
+          description: Invalid parameter
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"Empty worker field"'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              examples:
+                Tool not found:
+                  value: '"Tool not found"'
+                Worker not running anymore:
+                  value: '"The worker running this tool is not running anymore"'
+        "405":
+          description: Method not allowed 
+          content:
+            application/json:
+              examples:
+                localhost tool:
+                  value: '"Tools running in localhost cannot be stopped through API"'
+
   "/tools/{pentest}/{tool_iid}/changeStatus":
     post:
       operationId: server.ServerModels.Tool.setStatus
@@ -2165,6 +3022,11 @@ paths:
       responses:
         "200":
           description: Successfully updated tool status
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/autoscan/{pentest}/start":
     post:
       operationId: server.AutoScanMaster.startAutoScan
@@ -2181,6 +3043,26 @@ paths:
       responses:
         "200":
           description: Successfully started auto scan
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"Success"'
+        "403":
+          description: Autoscan already running
+          content:
+            application/json:
+              examples:
+               Already running:
+                  value: '"An autoscan is already running"'
+        "404":
+          description: No worker available/found
+          content:
+            application/json:
+              examples:
+                No worker available:
+                  value: '"No worker registered for this pentest"'
+            
   "/autoscan/{pentest}/status":
     get:
       operationId: server.AutoScanMaster.getAutoScanStatus
@@ -2197,6 +3079,11 @@ paths:
       responses:
         "200":
           description: Successfully returned status of auto scan
+          content:
+            application/json:
+              schema:
+                type: boolean
+
   "/autoscan/{pentest}/stop":
     post:
       operationId: server.AutoScanMaster.stopAutoScan
@@ -2213,6 +3100,11 @@ paths:
       responses:
         "200":
           description: Successfully stoped auto scan
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"Success"'
   /report/langs:
     get:
       operationId: server.Report.getLangList
@@ -2221,7 +3113,12 @@ paths:
       summary: Get a list of existings langs templates
       responses:
         "200":
-          description: A list of langs as stringpython
+          description: A list of langs as string
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '["en", "fr", ...]'
   /report/{lang}/templates:
     get:
       operationId: server.Report.getTemplateList
@@ -2237,7 +3134,19 @@ paths:
             type: string
       responses:
         "200":
-          description: A list of avalaible templates names
+          description: A list of templates as string
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '["Mddel.docx", "Model2.pptx", ...]'
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                Lang invalid:
+                  value: '"There is no existing templates for this lang"'
   /report/{lang}/templates/download:
     get:
       operationId: server.Report.downloadTemplate
@@ -2260,6 +3169,33 @@ paths:
       responses:
         "200":
           description: A template file docx or pptx
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.presentationml.document:
+              schema:
+                type: string
+                format: binary
+              
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                docx or pptx expected:
+                  value: '"A template is either a pptx or a docx document"'
+                no template:
+                  value: '"There is no existing templates for this lang"'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              examples:
+                template not found:
+                  value: '"Template file not found"'
+
   /report/{lang}/templates/upload:
     post:
       operationId: server.Report.uploadTemplate
@@ -2277,7 +3213,22 @@ paths:
         $ref: "#/components/requestBodies/server.mongo.importDb"
       responses:
         "200":
-          description: An indication of success for uploadfin template file docx or pptx
+          description: An indication of success or failure for upload
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"Success"'
+                Failure when writing:
+                  value: '"Failure"'
+        "400":
+          description: Invalid parameter
+          content:
+            application/json:
+              examples:
+                unexpected extension:
+                  value: '"Invalid extension for template, must be pptx or docx"'
+              
   "/report/{pentest}/generate":
     get:
       operationId: server.Report.generateReport
@@ -2324,7 +3275,32 @@ paths:
             type: string
       responses:
         "200":
-          description: A template file docx or pptx
+          description: Return a generated report file
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.presentationml.document:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid parameter
+          content:
+            application/json:
+              examples:
+                Invalid extension:
+                  value: '"Invalid extension for template, must be pptx or docx"'
+                No template for lang:
+                  value: '"There is no existing templates for this lang"'
+        "404":
+          description: not found
+          content:
+            application/json:
+              examples:
+                Template not found:
+                  value: '"Template file not found"'
   "/report/{pentest}/defects":
     get:
       operationId: server.ServerModels.Defect.getGlobalDefects
@@ -2340,7 +3316,51 @@ paths:
             type: string
       responses:
         "200":
-          description: A list of defect
+          description: A list of defect ordered by index
+          content:
+            application/json:
+              examples:
+                Ordered defect list:
+                  value: '[
+  {
+    "_id": "ObjectId|60f194db1255fd087c769756",
+    "ease": "Moderate",
+    "impact": "Critical",
+    "index": "0",
+    "infos": {},
+    "ip": "",
+    "notes": "",
+    "port": "",
+    "proofs": [],
+    "proto": "",
+    "redactor": "N/A",
+    "risk": "Critical",
+    "tags": [],
+    "title": "XSS",
+    "type": [
+      "Application"
+    ]
+  },
+  {
+    "_id": "ObjectId|60f190815955e6cf385a405d",
+    "ease": "Moderate",
+    "impact": "Major",
+    "index": "1",
+    "infos": {},
+    "ip": "",
+    "notes": "",
+    "port": "",
+    "proofs": [],
+    "proto": "",
+    "redactor": "N/A",
+    "risk": "Major",
+    "tags": [],
+    "title": "sql",
+    "type": [
+      "Application"
+    ]
+  }
+]'
   "/report/{pentest}/defects/move/{defect_id_to_move}/{target_id}":
     post:
       operationId: server.ServerModels.Defect.moveDefect
@@ -2369,28 +3389,18 @@ paths:
       responses:
         "200":
           description: Success
-
-  "/report/search":
-    get:
-      operationId: server.Report.search
-      tags:
-        - Report
-      summary: search a defect/remark on an external app
-      parameters:
-        - name: type
-          in: query
-          description: defect or remark
-          required: true
-          schema:
-            type: string
-            enum:
-              - defect
-              - remark
-        - name: q
-          in: query
-          description: terms for the saerch
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
+          content:
+            application/json:
+              examples:
+                Success destination index:
+                  value: '2'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              examples:
+                not found moving defect:
+                  value: '"This global defect does not exist"'
+                not found destination defect:
+                  value: '"the target global defect does not exist"'
+              

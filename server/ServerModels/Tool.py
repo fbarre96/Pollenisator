@@ -457,7 +457,7 @@ def stopTask(pentest, tool_iid, body):
     if saveScannerip == "localhost":
         return "Tools running in localhost cannot be stopped through API", 405
     if saveScannerip not in workerNames:
-        return "The worker running this tool is no more running", 404
+        return "The worker running this tool is not running anymore", 404
     instructions = mongoInstance.insertInDb("pollenisator", "instructions", {"worker":saveScannerip, "date":datetime.now(), "function":"stopCommand",
                                                                              "args":[pentest, str(tool_iid)]})
     if not forceReset:

@@ -32,6 +32,7 @@ def startAutoScan(pentest, **kwargs):
         autoscan.start()
     except(KeyboardInterrupt, SystemExit):
         mongoInstance.delete("autoscan", {}, True)
+    return "Success"
 
 @permission("pentester")
 def autoScan(pentest, **kwargs):
@@ -74,6 +75,7 @@ def stopAutoScan(pentest):
     for toolId in toolsRunning:
         res, msg = stopTask(pentest, toolId, {"forceReset":True})
         print("STOPTASK : "+str(msg))
+    return "Success"
 
 @permission("pentester")
 def getAutoScanStatus(pentest):

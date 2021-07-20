@@ -94,12 +94,12 @@ def login(body):
     hashed = bcrypt.hashpw(pwd.encode(), salt)
     user_record = mongoInstance.findInDb("pollenisator", "users", {"username":username}, False)
     if user_record is None:
-        return "Authentication failure", 404
+        return "Authentication failure", 401
     if user_record["username"] == username:
         if bcrypt.checkpw(pwd.encode(), user_record["hash"]):
             
             return getTokenFor(username)
-    return "Authentication failure", 404
+    return "Authentication failure", 401
 
 def connectToPentest(pentest, **kwargs):
     username = kwargs["token_info"]["sub"]

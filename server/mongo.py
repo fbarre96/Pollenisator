@@ -45,7 +45,7 @@ def update(pentest, collection, body):
     if isinstance(updatePipeline, str):
         updatePipeline = json.loads(updatePipeline, cls=JSONDecoder)
     if not isinstance(updatePipeline, dict):
-        return "Pipeline argument was not valid", 400
+        return "Update pipeline argument was not valid", 400
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
@@ -98,7 +98,7 @@ def search(pentest, s):
     """
     searchQuery = s
     if pentest not in mongoInstance.listCalendars():
-        return "Pentest argument is not a valid pollenisator pentest", 403
+        return "Pentest argument is not a valid pollenisator pentest", 400
     try:
         parser = Parser(searchQuery)
         condition_list = parser.getResult()

@@ -187,6 +187,7 @@ def getGlobalDefects(pentest):
         defect_o = d_list[keys_ordered[i]]
         defects_ordered.append(DefectController(defect_o).getData())
     return defects_ordered
+    
 @permission("pentester")
 def moveDefect(pentest, defect_id_to_move, target_id):
     defect_to_move = ServerDefect.fetchObject(pentest, {"_id":ObjectId(defect_id_to_move), "ip":""})

@@ -32,7 +32,7 @@ def getTemplateList(lang):
     lang = os.path.basename(lang)
     langs_path = os.path.join(template_path, lang)
     onlyfiles = [f for f in os.listdir(langs_path) if os.path.isfile(
-        os.path.join(langs_path, f))]
+        os.path.join(langs_path, f)) and f != "lang.json"]
     return onlyfiles
 
 @permission("user")
