@@ -39,8 +39,9 @@ def permission(*dec_args, **dec_kwargs):
                         arg_value_i = args_spec.args.index(arg_name)
                         arg_value = args[arg_value_i]
                 if arg_value not in token_info.get("scope", []):
-                    print(f"{arg_value} is not in the token scope {token_info}")
-                    return f"Forbidden : you do not have access to {arg_value}", 403
+                    if "admin" not in token_info.get("scope", []):
+                        print(f"{arg_value} is not in the token scope {token_info}")
+                        return f"Forbidden : you do not have access to {arg_value}", 403
             if scope == "worker":
                 if arg_name == "pentest":
                     arg_name = "name"

@@ -276,9 +276,9 @@ def registerCalendar(pentest, body, **kwargs):
     ret, msg = mongoInstance.registerCalendar(username, pentest, False, False)
     
     if ret:
-        token = connectToPentest(pentest, **kwargs)
-        kwargs["token_info"] = decode_token(token[0])
-        prepareCalendar(pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], **kwargs)
+        #token = connectToPentest(pentest, **kwargs)
+        #kwargs["token_info"] = decode_token(token[0])
+        prepareCalendar(pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"])
         return msg
     else:
         return msg, 403
