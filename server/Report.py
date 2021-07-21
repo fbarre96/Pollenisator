@@ -106,7 +106,7 @@ def search(type, q):
     except Exception as e:
         return "The knowledge database is unreachable", 503
     if resp.status_code != 200:
-        return "The knowledge dabatase encountered an issue : "+resp.txt, 503
+        return "The knowledge dabatase encountered an issue : "+resp.text, 503
     answer = json.loads(resp.text)
     return answer, 200
     
