@@ -161,26 +161,26 @@ components:
         ease:
           type: string
           enum:
-            - Facile
-            - Modérée
-            - Difficile
-            - Très difficile
+            - Easy
+            - Moderate
+            - Difficult
+            - Arduous
             - N/A
         impact:
           type: string
           enum:
-            - Mineur
+            - Minor
             - Important
-            - Majeur
-            - Critique
+            - Major
+            - Critical
             - N/A
         risk:
           type: string
           enum:
-            - Mineur
+            - Minor
             - Important
-            - Majeur
-            - Critique
+            - Major
+            - Critical
             - N/A
         redactor:
           type: string
@@ -3403,4 +3403,101 @@ paths:
                   value: '"This global defect does not exist"'
                 not found destination defect:
                   value: '"the target global defect does not exist"'
-              
+  
+  "/report/search":
+    get:
+      operationId: server.Report.search
+      tags:
+        - Report
+      summary: search a defect/remark on an external app
+      parameters:
+        - name: type
+          in: query
+          description: defect or remark
+          required: true
+          schema:
+            type: string
+            enum:
+              - defect
+              - remark
+        - name: q
+          in: query
+          description: terms for the saerch
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    description:
+                      type: string
+                    ease:
+                      type: string
+                      enum: 
+                        - Easy
+                        - Moderate
+                        - Difficult
+                        - Arduous
+                    impact:
+                      type: string
+                      enum:
+                        - Minor
+                        - Important
+                        - Major
+                        - Critical
+                    perimeter:
+                      type: string
+                    risk:
+                      type: string
+                      enum:
+                        - Minor
+                        - Important
+                        - Major
+                        - Critical
+                    synthesis:
+                      type: string
+                    title:
+                      type: string
+                    type:
+                      type: string
+                    fixes:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          description:
+                            type: string
+                          execution:
+                            type: string
+                            enum:
+                              - Quick Win
+                              - Moderate
+                              - Hard
+                          gain:
+                            type: string
+                            enum:
+                              - Weak
+                              - Moderate
+                              - Strong
+                          synthesis:
+                            type: string
+                          title:
+                            type: string
+
+        "503":
+          description: Error knowledge database
+          content:
+            application/json:
+              examples:
+                No knowledge database:
+                  value: '"There is no knowledge database implemented."'
+                Unreachable:
+                  value: '"The knowledge database is unreachable"'
+                Error from knowledge db:
+                  value: '"The knowledge dabatase encountered an issue : "{response_text}'

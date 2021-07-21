@@ -100,7 +100,7 @@ def search(type, q):
     config = loadServerConfig()
     api_url = config.get('knowledge_api_url', '')
     if api_url == "":
-        return "There is no knowledge database implemented.", 204
+        return "There is no knowledge database implemented.", 503
     try:
         resp = requests.get(api_url, params={"type":type, "terms": q})
     except Exception as e:
