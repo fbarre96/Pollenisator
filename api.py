@@ -12,7 +12,7 @@ from core.Components.Utils import JSONEncoder, loadServerConfig
 from server.worker import removeInactiveWorkers
 from server.token import generateNewToken
 from getpass import getpass
-#from server.NotificationService import NotificationService
+from flask_socketio import SocketIO
 # Create the application instance
 server_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "./server/api_specs/")
 app = connexion.App(__name__, specification_dir=server_folder)
@@ -20,9 +20,12 @@ app = connexion.App(__name__, specification_dir=server_folder)
 # Read the openapi.yaml file to configure the endpoints
 app.add_api('openapi.yaml')
 flask_app = app.app
+socketio = SocketIO(flask_app)
+
 # Tell your app object which encoder to use to create JSON from objects. 
 flask_app.json_encoder = JSONEncoder
 # Create a URL route in our application for "/"
+
 @app.route('/')
 def home():
     """
@@ -53,6 +56,30 @@ def createAdmin(username="", password=""):
     mongoInstance.insertInDb("pollenisator", "users", {"username":username, "hash":bcrypt.hashpw(password.encode(), salt), "scope":["admin","user"]})
     print("Administrator created")
 
+def notify_clients(notif):
+    """Notify clients websockets
+    """
+    #HACK: connexion has a known issue with flask_socketio https://github.com/zalando/connexion/issues/832
+    # it opens and close the server manytime resulting in losing the connection clients 
+    # This loads the memory address of the socketio object from a file with ctypes !!!
+    import _ctypes, json
+    with open('socket-io.json') as json_file:
+        data = json.load(json_file)
+    socketio = _ctypes.PyObj_FromPtr(int(data['id']))
+    socketio.emit("notif", json.dumps(notif, cls=JSONEncoder))
+
+@socketio.event
+def connect():
+    """Called when a websocket client connects to the server
+    """
+    #HACK: connexion has a known issue with flask_socketio https://github.com/zalando/connexion/issues/832
+    # it opens and close the server manytime resulting in losing the connection clients 
+    # This saves the memory address of the socketio object to a file !!!
+    # Another solution would be to store it in a global flask config current_app.config['socketio'] = socketio 
+    # this does not seem to be stored across those modules
+    with open('socket-io.json', "w") as json_file:
+        json_file.write(json.dumps({"id":id(socketio)}))
+
 
 # If we're running in stand alone mode, run the application
 if __name__ == '__main__':
@@ -78,8 +105,6 @@ if __name__ == '__main__':
     removeInactiveWorkersTimer = threading.Timer(
             30, removeInactiveWorkersTimerSet)
     removeInactiveWorkersTimer.start()
-    #import logging
-    #logging.basicConfig(filename='error.log',level=logging.DEBUG)
     conf = loadServerConfig()
     port = int(conf.get("api_port", 5000))
     https = conf.get("https", "false").lower() == "true"
@@ -87,9 +112,6 @@ if __name__ == '__main__':
         ssl_context = "adhoc"
     else:
         ssl_context = None
-    #notif_service = NotificationService()
-    #notif_service.start()
-    with flask_app.app_context():
-        app.run(host='0.0.0.0', port=port, debug=True, ssl_context=ssl_context)
-
+    socketio.run(flask_app, host='0.0.0.0', port=port, debug=True)
     removeInactiveWorkersTimer.cancel()
+

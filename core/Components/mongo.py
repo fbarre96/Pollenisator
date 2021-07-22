@@ -7,7 +7,6 @@ from pymongo.errors import ServerSelectionTimeoutError, OperationFailure
 import core.Components.Utils as Utils
 import json
 
-
 class MongoCalendar:
     # pylint: disable=unsubscriptable-object
     """
@@ -779,5 +778,7 @@ class MongoCalendar:
             action: the type of modification performed on this document ("insert", "update" or "delete")
             parentId: (not used) default to "", a node parent id as str
         """
-        self.client["pollenisator"]["notifications"].insert_one(
-            {"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now()})
+        from api import notify_clients
+        notify_clients({"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now()})
+        # self.client["pollenisator"]["notifications"].insert_one(
+        #     {"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now()})
