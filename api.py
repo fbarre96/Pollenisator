@@ -13,9 +13,10 @@ from server.worker import removeInactiveWorkers
 from server.token import generateNewToken
 from getpass import getpass
 from flask_socketio import SocketIO
+import logging
 # Create the application instance
 server_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "./server/api_specs/")
-app = connexion.App(__name__, specification_dir=server_folder)
+app = connexion.App(__name__, specification_dir=server_folder, debug=True)
 
 # Read the openapi.yaml file to configure the endpoints
 app.add_api('openapi.yaml')

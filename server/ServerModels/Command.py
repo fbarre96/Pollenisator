@@ -6,7 +6,6 @@ from core.Components.Utils import JSONEncoder
 from server.permission import permission
 import json
 
-mongoInstance = MongoCalendar.getInstance()
 
 class ServerCommand(Command, ServerElement):
 
@@ -22,6 +21,8 @@ class ServerCommand(Command, ServerElement):
         Returns:
             Returns a cursor to iterate on Command objects
         """
+        mongoInstance = MongoCalendar.getInstance()
+
         mongoInstance.connectToDb(targetdb)
         results = mongoInstance.findInDb(targetdb, "commands", pipeline, True)
         if results is None:
@@ -37,6 +38,7 @@ class ServerCommand(Command, ServerElement):
         Returns:
             Returns a Server Command
         """
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(targetdb)
         result = mongoInstance.findInDb(targetdb, "commands", pipeline, False)
         if result is None:
@@ -58,6 +60,7 @@ class ServerCommand(Command, ServerElement):
 
 @permission("pentester")
 def delete(pentest, command_iid):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     command = Command(mongoInstance.find("commands", {"_id":ObjectId(command_iid)}, False))
     mongoInstance.updateInDb(command.indb, "group_commands", {}, {
@@ -89,6 +92,7 @@ def delete(pentest, command_iid):
 
 @permission("pentester")
 def insert(pentest, body):
+    mongoInstance = MongoCalendar.getInstance()
     existing = mongoInstance.findInDb(
             body["indb"], "commands", {"name": body["name"]}, False)
     if existing is not None:
@@ -101,4 +105,5 @@ def insert(pentest, body):
     
 @permission("pentester")
 def update(pentest, command_iid, body):
+    mongoInstance = MongoCalendar.getInstance()
     return mongoInstance.updateInDb(body["indb"], "commands", {"_id":ObjectId(command_iid)}, {"$set":body}, False, True)

@@ -16,12 +16,11 @@ import sys
 from server.permission import permission
 from server.token import encode_token
 
-mongoInstance = MongoCalendar.getInstance()
-
 class ServerTool(Tool, ServerElement):
 
     def __init__(self, pentest="", *args, **kwargs):
         super().__init__(*args, **kwargs)
+        mongoInstance = MongoCalendar.getInstance()
         if pentest != "":
             self.pentest = pentest
         elif mongoInstance.calendarName != "":
@@ -51,6 +50,7 @@ class ServerTool(Tool, ServerElement):
 
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(pentest)
         results = mongoInstance.find("tools", pipeline)
         for result in results:
@@ -58,6 +58,7 @@ class ServerTool(Tool, ServerElement):
 
     @classmethod
     def fetchObject(cls, pentest, pipeline):
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(pentest)
         result = mongoInstance.find("tools", pipeline, False)
         return cls(pentest, result)
@@ -69,7 +70,7 @@ class ServerTool(Tool, ServerElement):
         Return:
             Returns the Mongo dict command fetched instance associated with this tool's name.
         """
-        
+        mongoInstance = MongoCalendar.getInstance()
         commandTemplate = mongoInstance.findInDb(self.pentest,
                                                  "commands", {"name": self.name}, False)
         return commandTemplate
@@ -97,6 +98,7 @@ class ServerTool(Tool, ServerElement):
         delete(self.pentest, self._id)
 
     def getParentId(self):
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(self.pentest)
         try:
             if self.lvl == "wave":
@@ -119,6 +121,7 @@ class ServerTool(Tool, ServerElement):
         Return:
             Returns the bash command of this tool instance, a marker |outputDir| is still to be replaced.
         """
+        mongoInstance = MongoCalendar.getInstance()
         toolHasCommand = self.text
         if toolHasCommand is not None and toolHasCommand.strip() != "":
             command = self.text
@@ -177,6 +180,7 @@ class ServerTool(Tool, ServerElement):
             newStatus.append("OOT")
         self.status = newStatus
         self.resultfile = file_name
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
 
     def markAsError(self):
@@ -185,6 +189,7 @@ class ServerTool(Tool, ServerElement):
         """
         self.dated = "None"
         self.datef = "None"
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
         self.scanner_ip = "None"
         if "done" in self.status:
@@ -199,6 +204,7 @@ class ServerTool(Tool, ServerElement):
         """
         self.dated = "None"
         self.datef = "None"
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
         self.scanner_ip = "None"
         if "done" in self.status:
@@ -213,6 +219,7 @@ class ServerTool(Tool, ServerElement):
         """
         self.dated = "None"
         self.datef = "None"
+        mongoInstance = MongoCalendar.getInstance()
         if self.scanner_ip != "None":
             mongoInstance.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
         self.scanner_ip = "None"
@@ -238,6 +245,7 @@ class ServerTool(Tool, ServerElement):
             newStatus.append("timedout")
         self.status = newStatus
         self.scanner_ip = workerName
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.updateInDb("pollenisator", "workers", {"name":workerName}, {"$push":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
     
 @permission("pentester")
@@ -267,6 +275,7 @@ def setStatus(pentest, tool_iid, body):
 
 @permission("pentester")
 def delete(pentest, tool_iid):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     if not mongoInstance.isUserConnected():
         return "Not connected", 503
@@ -278,6 +287,7 @@ def delete(pentest, tool_iid):
 
 @permission("pentester")
 def insert(pentest, body):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     if not mongoInstance.isUserConnected():
         return "Not connected", 503
@@ -303,6 +313,7 @@ def insert(pentest, body):
 
 @permission("pentester")
 def update(pentest, tool_iid, body):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     res = mongoInstance.update("tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
     return res
@@ -366,6 +377,7 @@ def importResult(pentest, tool_iid, upfile, body):
         return res, status
     # Analyze
     upfile.stream.seek(0)
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     toolModel = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     if toolModel is None:
@@ -408,7 +420,8 @@ def importResult(pentest, tool_iid, upfile, body):
 
 @permission("pentester")
 def launchTask(pentest, tool_iid, body, **kwargs):
-    workerToken = encode_token(kwargs["token_info"])
+    worker_token = kwargs.get("worker_token", encode_token(kwargs["token_info"]))
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     launchableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     if launchableTool is None:
@@ -437,8 +450,11 @@ def launchTask(pentest, tool_iid, body, **kwargs):
     instructions = mongoInstance.insertInDb("pollenisator", "instructions", {"worker":workerName, "date":datetime.now(), "function":"executeCommand",
                                                                              "args":[workerToken, pentest, str(launchableToolId), plugin]})
     return instructions.inserted_id, 200
+
+    
 @permission("pentester")
 def stopTask(pentest, tool_iid, body):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     stopableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     print("Trying to stop task "+str(stopableTool))
@@ -473,6 +489,7 @@ def hasRegistered(worker, launchableTool):
     Returns:
         Return bool.
     """
+    mongoInstance = MongoCalendar.getInstance()
     list_registered_command = mongoInstance.getRegisteredCommands(worker)
     if list_registered_command is None:
         return False
@@ -521,18 +538,9 @@ def getNbOfLaunchedCommand(calendarName, worker, commandName):
     Returns:
         Return the total of running tools with this command's name as an integer.
     """
+    mongoInstance = MongoCalendar.getInstance()
     t = mongoInstance.findInDb(calendarName, "tools", {"name": commandName, "scanner_ip": worker, "dated": {
                             "$ne": "None"}, "datef": "None"})
     if t is not None:
         return t.count()
     return 0
-
-
-@permission("user")
-def listPlugins():
-    """
-    Get the declared list of plugin
-    Returns:
-        A list of python plugins
-    """
-    return listPlugin()

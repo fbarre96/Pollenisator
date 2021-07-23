@@ -9,11 +9,10 @@ from core.Components.Utils import JSONEncoder, isNetworkIp, performLookUp, isIp
 import json
 from server.permission import permission
 
-mongoInstance = MongoCalendar.getInstance()
-
 class ServerScope(Scope, ServerElement):
     
     def __init__(self, pentest="", *args, **kwargs):
+        mongoInstance = MongoCalendar.getInstance()
         super().__init__(*args, **kwargs)
         if pentest != "":
             self.pentest = pentest
@@ -25,12 +24,14 @@ class ServerScope(Scope, ServerElement):
 
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(pentest)
         results = mongoInstance.find("scopes", pipeline)
         for result in results:
             yield(cls(pentest, result))
 
     def getParentId(self):
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(self.pentest)
         res = mongoInstance.find("waves", {"wave": self.wave}, False)
         return res["_id"]
@@ -41,6 +42,7 @@ class ServerScope(Scope, ServerElement):
         Args:
             command_name: The command that we want to create all the tools for.
         """
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(self.pentest)
         command = mongoInstance.findInDb(self.pentest, "commands", {
                                          "name": command_name}, False)
@@ -67,6 +69,7 @@ class ServerScope(Scope, ServerElement):
         Returns:
             A list ip IP dictionnary from mongo db
         """
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(self.pentest)
         ips = mongoInstance.find("ips", )
         ips_fitting = []
@@ -90,6 +93,7 @@ class ServerScope(Scope, ServerElement):
         return ips_fitting
 @permission("pentester")
 def delete(pentest, scope_iid):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     # deleting tool with scope lvl
     scope_o = ServerScope(pentest, mongoInstance.find("scopes", {"_id": ObjectId(scope_iid)}, False))
@@ -112,8 +116,10 @@ def delete(pentest, scope_iid):
         return 0
     else:
         return res.deleted_count
+        
 @permission("pentester")
 def insert(pentest, body):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     scope_o = ServerScope(pentest, body)
     # Checking unicity
@@ -145,5 +151,6 @@ def insert(pentest, body):
 
 @permission("pentester")
 def update(pentest, scope_iid, body):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     return mongoInstance.update("scopes", {"_id":ObjectId(scope_iid)}, {"$set":body}, False, True)

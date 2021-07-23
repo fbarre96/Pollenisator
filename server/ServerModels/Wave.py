@@ -8,12 +8,12 @@ from core.Components.Utils import JSONEncoder
 import json
 from server.permission import permission
 
-mongoInstance = MongoCalendar.getInstance()
 
 class ServerWave(Wave, ServerElement):
 
     def __init__(self, pentest="", *args, **kwargs):
         super().__init__(*args, **kwargs)
+        mongoInstance = MongoCalendar.getInstance()
         if pentest != "":
             self.pentest = pentest
         elif mongoInstance.calendarName != "":
@@ -30,6 +30,7 @@ class ServerWave(Wave, ServerElement):
         Args:
             command_name: The command that we want to create all the tools for.
         """
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(self.pentest)
         command = mongoInstance.findInDb(self.pentest, "commands", {
                                          "name": command_name}, False)
@@ -51,6 +52,7 @@ class ServerWave(Wave, ServerElement):
         Args:
             command_name: The command that we want to remove all the tools.
         """
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(self.pentest)
         tools = ServerTool.fetchObjects(self.pentest, {"name": command_name, "wave": self.wave})
         for tool in tools:
@@ -59,6 +61,7 @@ class ServerWave(Wave, ServerElement):
 
 @permission("pentester")
 def delete(pentest, wave_iid):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     wave_o = ServerWave(pentest, mongoInstance.find("waves", {"_id": ObjectId(wave_iid)}, False))
     mongoInstance.delete("tools", {"wave": wave_o.wave}, True)
@@ -70,6 +73,7 @@ def delete(pentest, wave_iid):
         return res.deleted_count
 @permission("pentester")
 def insert(pentest, body):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     wave_o = ServerWave(pentest, body)
     # Checking unicity
@@ -88,6 +92,7 @@ def insert(pentest, body):
 
 @permission("pentester")
 def update(pentest, wave_iid, body):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     oldWave_o = ServerWave(pentest, mongoInstance.find("waves", {"_id":ObjectId(wave_iid)}, False))
     oldCommands = oldWave_o.wave_commands

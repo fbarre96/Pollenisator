@@ -1,9 +1,8 @@
 from core.Components.mongo import MongoCalendar
 
-mongoInstance = MongoCalendar.getInstance()
-
 class ServerElement(object):
     def getTags(self):
+        mongoInstance = MongoCalendar.getInstance()
         tags = mongoInstance.findInDb("pollenisator", "settings", {"key": "tags"}, False)
         if tags is not None:
             if isinstance(tags["value"], dict):
@@ -41,6 +40,7 @@ class ServerElement(object):
                         i += 1
             tags.append(newTag)
             self.tags = tags
+            mongoInstance = MongoCalendar.getInstance()
             mongoInstance.update(self.__class__.coll_name, {"_id":self.getId()}, {"$set":{"tags":tags}})
 
     def updateInfos(self, newInfos):
@@ -51,6 +51,7 @@ class ServerElement(object):
         if "" in newInfos:
             del newInfos[""]
         self.infos.update(newInfos)
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.update(self.__class__.coll_name, {"_id":self.getId()}, {"$set":{"infos":self.infos}})
     
     def getId(self):

@@ -9,11 +9,9 @@ from server.permission import permission
 import json
 import os
 
-mongoInstance = MongoCalendar.getInstance()
-
 class ServerDefect(Defect, ServerElement):
-
     def __init__(self, pentest="", *args, **kwargs):
+        mongoInstance = MongoCalendar.getInstance()
         super().__init__(*args, **kwargs)
         if pentest != "":
             self.pentest = pentest
@@ -37,6 +35,7 @@ class ServerDefect(Defect, ServerElement):
             port = None
         if port is None:
             port = ""
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(self.pentest)
         if port == "":
             obj = mongoInstance.find("ips", {"ip": self.ip}, False)
@@ -55,6 +54,7 @@ class ServerDefect(Defect, ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(pentest)
         ds = mongoInstance.find(cls.coll_name, pipeline, True)
         if ds is None:
@@ -71,6 +71,7 @@ class ServerDefect(Defect, ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(pentest)
         d = mongoInstance.find(cls.coll_name, pipeline, False)
         if d is None:
@@ -79,6 +80,7 @@ class ServerDefect(Defect, ServerElement):
 
 @permission("pentester")
 def delete(pentest, defect_iid):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     defect = ServerDefect(pentest, mongoInstance.find("defects", {"_id": ObjectId(defect_iid)}, False))
     if defect is None:
@@ -102,6 +104,7 @@ def delete(pentest, defect_iid):
         return res.deleted_count
 @permission("pentester")
 def insert(pentest, body):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     defect_o = ServerDefect(pentest, body)
     base = defect_o.getDbKey()
@@ -142,6 +145,7 @@ def insert(pentest, body):
         defect_o.notes = ""
         insert(pentest, DefectController(defect_o).getData())
     return {"res":True, "iid":iid}
+
 @permission("pentester")
 def findInsertPosition(pentest, risk):
     riskLevels = ["Critical", "Major",  "Important", "Minor"] # TODO do not hardcode those things
@@ -154,8 +158,10 @@ def findInsertPosition(pentest, risk):
         for globalDefect in globalDefects:
             highestInd = max(int(globalDefect.index)+1, highestInd)
     return highestInd
+
 @permission("pentester")
 def update(pentest, defect_iid, body):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     defect_o = ServerDefect.fetchObject(pentest, {"_id":ObjectId(defect_iid)})
     if defect_o is None:

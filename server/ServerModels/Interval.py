@@ -6,12 +6,12 @@ from server.ServerModels.Element import ServerElement
 from core.Components.Utils import JSONEncoder, fitNowTime
 import json
 from server.permission import permission
-mongoInstance = MongoCalendar.getInstance()
 
 class ServerInterval(Interval, ServerElement):
 
     def __init__(self, pentest="", *args, **kwargs):
         super().__init__(*args, **kwargs)
+        mongoInstance = MongoCalendar.getInstance()
         if pentest != "":
             self.pentest = pentest
         elif mongoInstance.calendarName != "":
@@ -36,6 +36,7 @@ class ServerInterval(Interval, ServerElement):
         Returns:
             Returns the parent wave's ObjectId _id".
         """
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(self.pentest)
         return mongoInstance.find("waves", {"wave": self.wave}, False)["_id"]
 
@@ -47,6 +48,8 @@ class ServerInterval(Interval, ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
+        mongoInstance = MongoCalendar.getInstance()
+
         mongoInstance.connectToDb(pentest)
         ds = mongoInstance.find(cls.coll_name, pipeline, True)
         if ds is None:
@@ -57,6 +60,7 @@ class ServerInterval(Interval, ServerElement):
 
 @permission("pentester")
 def delete(pentest, interval_iid):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     interval_o = ServerInterval(pentest, mongoInstance.find("intervals", {"_id": ObjectId(interval_iid)}, False))
     res = mongoInstance.delete("intervals", {"_id": ObjectId(interval_iid)}, False)
@@ -68,7 +72,7 @@ def delete(pentest, interval_iid):
         no_interval_in_time = True
         for other_interval in other_intervals:
             other_interval = ServerInterval(pentest, other_interval)
-            if Utils.fitNowTime(other_interval.dated, other_interval.datef):
+            if fitNowTime(other_interval.dated, other_interval.datef):
                 no_interval_in_time = False
                 break
         if no_interval_in_time:
@@ -82,6 +86,7 @@ def delete(pentest, interval_iid):
         return res.deleted_count
 @permission("pentester")
 def insert(pentest, body):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     if "_id" in body:
         del body["_id"]
@@ -94,6 +99,7 @@ def insert(pentest, body):
 
 @permission("pentester")
 def update(pentest, interval_iid, body):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     interval_o = ServerInterval(pentest, mongoInstance.find("intervals", {"_id": ObjectId(interval_iid)}, False))
     interval_o.setToolsInTime()

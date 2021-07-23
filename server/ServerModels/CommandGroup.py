@@ -5,8 +5,6 @@ from core.Components.Utils import JSONEncoder
 from server.permission import permission
 import json
 
-mongoInstance = MongoCalendar.getInstance()
-
 class ServerCommandGroup(CommandGroup):
 
     def __init__(self, pentest, *args, **kwargs):
@@ -21,6 +19,7 @@ class ServerCommandGroup(CommandGroup):
         Returns:
             Returns a cursor to iterate on Command Group objects
         """
+        mongoInstance = MongoCalendar.getInstance()
         results = mongoInstance.findInDb("pollenisator", "group_commands", pipeline, True)
         if results is None:
             return None
@@ -29,6 +28,7 @@ class ServerCommandGroup(CommandGroup):
 
 @permission   
 def delete(pentest, command_group_iid):
+    mongoInstance = MongoCalendar.getInstance()
     res = mongoInstance.deleteFromDb("pollenisator", "group_commands", {
                                    "_id": ObjectId(command_group_iid)}, False, True)
     if res is None:
@@ -38,6 +38,7 @@ def delete(pentest, command_group_iid):
         
 @permission("pentester")
 def insert(pentest, body):
+    mongoInstance = MongoCalendar.getInstance()
     if "_id" in body:
         del body["_id"]
     existing = mongoInstance.findInDb(
@@ -50,4 +51,5 @@ def insert(pentest, body):
 
 @permission("pentester")
 def update(pentest, command_group_iid, body):
+    mongoInstance = MongoCalendar.getInstance()
     return mongoInstance.updateInDb("pollenisator", "group_commands", {"_id":ObjectId(command_group_iid)}, {"$set":body}, False, True)

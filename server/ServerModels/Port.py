@@ -8,11 +8,11 @@ from server.ServerModels.Element import ServerElement
 from core.Components.Utils import JSONEncoder
 import json
 from server.permission import permission
-mongoInstance = MongoCalendar.getInstance()
 
 class ServerPort(Port, ServerElement):
     
     def __init__(self, pentest="", *args, **kwargs):
+        mongoInstance = MongoCalendar.getInstance()
         if pentest != "":
             self.pentest = pentest
         elif mongoInstance.calendarName != "":
@@ -24,6 +24,7 @@ class ServerPort(Port, ServerElement):
 
 
     def getParentId(self):
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(self.pentest)
         return mongoInstance.find("ips", {"ip": self.ip}, False)["_id"]
 
@@ -37,6 +38,7 @@ class ServerPort(Port, ServerElement):
             scope: a scope matching this tool (should only be used by network level tools)
             check: A boolean to bypass checks. Force adding this command tool to this port if False. Default is True
         """
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(self.pentest)
         if not check:
             newTool = ServerTool(self.pentest)
@@ -92,6 +94,7 @@ class ServerPort(Port, ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(pentest)
         ds = mongoInstance.find(cls.coll_name, pipeline, True)
         if ds is None:
@@ -108,6 +111,7 @@ class ServerPort(Port, ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
+        mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(pentest)
         d = mongoInstance.find(cls.coll_name, pipeline, False)
         if d is None:
@@ -122,6 +126,7 @@ class ServerPort(Port, ServerElement):
 
 @permission("pentester")
 def delete(pentest, port_iid):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
 
     port_o = ServerPort(pentest, mongoInstance.find("ports", {"_id":ObjectId(port_iid)}, False))
@@ -138,8 +143,10 @@ def delete(pentest, port_iid):
         return 0
     else:
         return res.deleted_count
+
 @permission("pentester")
 def insert(pentest, body):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     port_o = ServerPort(pentest, body)
     base = port_o.getDbKey()
@@ -192,6 +199,7 @@ def insert(pentest, body):
 
 @permission("pentester")
 def update(pentest, port_iid, body):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     
     oldPort = ServerPort(pentest, mongoInstance.find("ports", {"_id": ObjectId(port_iid)}, False))
@@ -220,6 +228,7 @@ def update(pentest, port_iid, body):
     
 @permission("pentester")
 def addCustomTool(pentest, port_iid, body):
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     if not mongoInstance.isUserConnected():
         return "Not connected", 503
