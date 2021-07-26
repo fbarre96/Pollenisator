@@ -4,7 +4,7 @@ RUN apt-get install -y python3.7 python3-pip python3-setuptools git wget build-e
 RUN python3.7 -m pip install -U pip
 RUN git clone https://github.com/fbarre96/Pollenisator /home/Pollenisator
 WORKDIR /home/Pollenisator
-RUN python3.7 -m pip install --upgrade -r /home/Pollenisator/requirements.txt
+RUN python3.7 -m pip install --upgrade .
 EXPOSE 5000
 ENV TZ Europe/Paris
-CMD ["/bin/sh", "-c", "mongod & python3.7 api.py --noninteractive"]
+CMD ["/bin/sh", "-c", "mongod & pollenisator"]
