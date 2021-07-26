@@ -323,14 +323,21 @@ def saveToolsConfig(dic):
     with open(default_tools_config, "w") as f:
         f.write(json.dumps(dic))
 
+def getServerConfigFolder():
+    c = os.path.join(os.path.expanduser("~"), ".config/pollenisator/")
+    try:
+        os.makedirs(c)
+    except:
+        pass
+    return c
+
 def loadServerConfig():
     """Return data converted from json inside config/server.cfg
     Returns:
         Json converted data inside config/server.cfg
     """
-    config_folder = getMainDir()+"config/"
-    config_file = os.path.join(config_folder, "server.cfg")
-    sample_config_file = os.path.join(config_folder, "serverSample.cfg")
+    config_file = os.path.join(getServerConfigFolder(), "server.cfg")
+    sample_config_file = os.path.join(getMainDir(),"config/", "serverSample.cfg")
     if not os.path.isfile(config_file):
         if os.path.isfile(sample_config_file):
             try:
@@ -349,7 +356,7 @@ def saveServerConfig(configDict):
     Args:
         configDict: data to be stored in config/server.cfg
     """
-    configFile = getMainDir()+"config/server.cfg"
+    configFile = os.path.join(getServerConfigFolder(),"server.cfg")
     with open(configFile, "w") as f:
         f.write(json.dumps(configDict))
 

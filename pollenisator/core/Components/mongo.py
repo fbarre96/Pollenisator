@@ -6,6 +6,7 @@ from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError, OperationFailure
 import pollenisator.core.Components.Utils as Utils
 import json
+import sys
 
 class MongoCalendar:
     # pylint: disable=unsubscriptable-object
@@ -151,7 +152,8 @@ class MongoCalendar:
                 server_info = self.client.server_info()
                 return True and self.client is not None and server_info is not None
             except ServerSelectionTimeoutError as e:  # Unable to connect
-                raise e
+                print(f"Unable to connect to the database:\nPlease check the mongo db is up and reachable and your configuration file is correct: \n{os.path.normpath(Utils.getServerConfigFolder())}/server.cfg")
+                sys.exit(0)
             except OperationFailure as e:  #  Authentication failed
                 raise e
         except KeyError as e:
