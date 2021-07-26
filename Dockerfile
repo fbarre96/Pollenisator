@@ -7,4 +7,4 @@ WORKDIR /home/Pollenisator
 RUN python3.7 -m pip install --upgrade .
 EXPOSE 5000
 ENV TZ Europe/Paris
-CMD ["/bin/sh", "-c", "mongod & pollenisator"]
+CMD ["/bin/sh", "-c", "mongod & pollenisator --non-interactive"]
