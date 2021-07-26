@@ -1,0 +1,3503 @@
+openapi: 3.0.0
+info:
+  description: Pollenisator index api file
+  version: 1.0.0
+  title: Swagger REST Article
+
+
+servers:
+- url: /api/v1
+components:
+  securitySchemes:
+    jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      x-bearerInfoFunc: pollenisator.server.token.decode_token
+      
+  requestBodies:
+    Tools:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Tools"
+      required: true
+    Ips:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Ips"
+      required: true
+    Ports:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Ports"
+      required: true
+    Defects:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Defects"
+      required: true
+    pollenisator.server.mongo.importDb:
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              upfile:
+                description: The file to upload
+                type: string
+                format: binary
+            required:
+              - upfile
+    pollenisator.server.mongo.createSettingData:
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - key
+              - value
+            properties:
+              key:
+                type: string
+              value:
+                type: string
+    Commands:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Commands"
+      required: true
+    CommandGroups:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/CommandGroups"
+      required: true
+    Intervals:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Intervals"
+      required: true
+    Scopes:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Scopes"
+      required: true
+    Waves:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Waves"
+      required: true
+  schemas:
+    Commands:
+      properties:
+        name:
+          type: string
+        lvl:
+          type: string
+          enum:
+            - port
+            - ip
+            - wave
+            - domain
+            - network
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 99
+        sleep_between:
+          type: integer
+        max_thread:
+          type: integer
+        text:
+          type: string
+        ports:
+          type: string
+        safe:
+          type: boolean
+        types:
+          type: array
+          items:
+            type: string
+        indb:
+          type: string
+        timeout:
+          type: integer
+    CommandGroups:
+      properties:
+        name:
+          type: string
+        sleep_between:
+          type: integer
+        max_thread:
+          type: integer
+        commands:
+          type: array
+          items:
+            type: string
+    Defects:
+      properties:
+        ip:
+          type: string
+        title:
+          type: string
+        port:
+          type: string
+        proto:
+          type: string
+          enum:
+            - tcp
+            - udp
+            - ""
+        notes:
+          type: string
+        ease:
+          type: string
+          enum:
+            - Easy
+            - Moderate
+            - Difficult
+            - Arduous
+            - N/A
+        impact:
+          type: string
+          enum:
+            - Minor
+            - Important
+            - Major
+            - Critical
+            - N/A
+        risk:
+          type: string
+          enum:
+            - Minor
+            - Important
+            - Major
+            - Critical
+            - N/A
+        redactor:
+          type: string
+        type:
+          type: array
+          items:
+            type: string
+        proofs:
+          type: array
+          items:
+            type: string
+        index:
+          type: string
+          default: end
+    Intervals:
+      properties:
+        wave:
+          type: string
+        dated:
+          type: string
+        datef:
+          type: string
+    Ips:
+      properties:
+        ip:
+          type: string
+        notes:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        in_scopes:
+          type: array
+          items:
+            type: string
+    Ports:
+      properties:
+        ip:
+          type: string
+        port:
+          type: string
+        proto:
+          type: string
+          enum:
+            - tcp
+            - udp
+            - ""
+        service:
+          type: string
+        product:
+          type: string
+        notes:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+    Scopes:
+      properties:
+        wave:
+          type: string
+        scope:
+          type: string
+        notes:
+          type: string
+    Tools:
+      properties:
+        wave:
+          type: string
+        scope:
+          type: string
+        ip:
+          type: string
+        port:
+          type: string
+        proto:
+          type: string
+          enum:
+            - tcp
+            - udp
+            - ""
+        name:
+          type: string
+        lvl:
+          type: string
+          enum:
+            - port
+            - ip
+            - wave
+            - domain
+            - network
+    Waves:
+      properties:
+        wave:
+          type: string
+        wave_commands:
+          type: array
+          items:
+            type: string
+    Instructions:
+      properties:
+        function:
+          type: string
+        args:
+          type: array
+          items:
+            type: string
+
+security:
+  - jwt: []
+
+paths:
+  /:
+    get:
+      operationId: pollenisator.server.mongo.status
+      tags:
+        - Mongo
+      summary: Test connection
+      security: []
+      responses:
+        '200':
+          description: Successful read status operation
+          content:
+            application/json:
+              examples:
+                Status:
+                  value: 'true'
+  /issue:
+    post:
+      operationId: pollenisator.server.logger.report
+      tags:
+        - Logger
+      summary: report an issue from client
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - error
+              properties:
+                error:
+                  type: string
+      security: []
+      responses:
+        '200':
+          description: Reported a client issue successfully
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'True'
+  /user/register:
+    post:
+      operationId: pollenisator.server.auth.createUser
+      tags:
+        - Admin
+      summary: Create a new user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - pwd
+              properties:
+                username:
+                  type: string
+                pwd:
+                  type: string
+      responses:
+        '200':
+          description: successfully created a new user
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Successully created user'
+        '400':
+          description: Incorrect parameters
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{parameter name} is required'
+        '403':
+          description: User already exists
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'A user with this username already exists'
+                  
+  '/user/delete/{username}':
+    delete:
+      operationId: pollenisator.server.auth.deleteUser
+      tags:
+        - Admin
+      summary: Delete a user
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: successfully deleted a user
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'User successfully deleted'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'User to delete not found'
+
+  /user/changePassword:
+    post:
+      operationId: pollenisator.server.auth.changePassword
+      tags:
+        - Security
+      summary: Change a user password
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - oldPwd
+                - newPwd
+              properties:
+                oldPwd:
+                  type: string
+                newPwd:
+                  type: string
+      responses:
+        "200":
+          description: successfully changed user password
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+        '400':
+          description: Missing parameters
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{parameter name} is required.'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'The old password is incorrect'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'This user does not exist'
+  
+  /admin/resetPassword:
+    post:
+      operationId: pollenisator.server.auth.resetPassword
+      tags:
+        - Admin
+      summary: reset a user password
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - newPwd
+              properties:
+                username:
+                  type: string
+                newPwd:
+                  type: string
+      responses:
+        "200":
+          description: successfully changed another user password
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+        '400':
+          description: Missing parameters
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{parameter name} is required'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'This user does not exist'
+
+  /user/searchUsers/{searchreq}:
+    get:
+      operationId: pollenisator.server.auth.searchUsers
+      tags:
+        - Users
+      parameters:
+        - name: searchreq
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 3
+      summary: get a list of users filtered with search request (3 carac. min.)
+      description: get a list of users 
+      responses:
+        "200":
+          description: Get a list of users
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '["pierre", "pietro"]'
+
+  /admin/listUsers:
+    get:
+      operationId: pollenisator.server.auth.listUsers
+      tags:
+        - Admin
+      summary: get a list of users 
+      description: get a list of users 
+      responses:
+        "200":
+          description: Get a list of users
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '[
+  {
+    "_id": "ObjectId|60350f6e690427c8c35074b3",
+    "scope": [
+      "admin",
+      "user"
+    ],
+    "username": "admin"
+  },
+  {
+    "_id": "ObjectId|60464db6065a28e50e9e9ae6",
+    "scope": [
+      "user"
+    ],
+    "username": "Fabien"
+  }
+]'
+
+
+  /login:
+    post:
+      operationId: pollenisator.server.auth.login
+      tags:
+        - Security
+      summary: Login to access the app
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - pwd
+              properties:
+                username:
+                  type: string
+                pwd:
+                  type: string
+      responses:
+        "200":
+          description: successfully logged in, returns an  token
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjY3MDE0MjcsImV4cCI6MTYyNjcwNTAyNywic3ViIjoiYWRtaW4iLCJzY29wZSI6WyJhZG1pbiIsInVzZXIiXX0.Tmv96VqKyqBa_xYjnfOqM7deKn6-UKmTB-rY9IrKX1M"'
+        '400':
+          description: Missing parameters
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{parameter name} is required'
+        '401':
+          description: Authentication failure
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Authentication failure'
+  /login/{pentest}:
+    post:
+      operationId: pollenisator.server.auth.connectToPentest
+      tags:
+        - Security
+      summary: Login to access a pentest
+      parameters:
+      - name: pentest
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: successfully logged in, returns a token with extended scope
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjY3MDI2NzQsImV4cCI6MTYyNjcwNjI3NCwic3ViIjoiYWRtaW4iLCJzY29wZSI6WyJhZG1pbiIsInVzZXIiLCJUZXN0aW5hIiwib3duZXIiLCJwZW50ZXN0ZXIiXX0.PxLT9qfHAsoebokDIU34cmUWWmzSxkTXWV2nBJayzq8"'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Forbidden'
+        '404':
+          description: Pentest not found
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pentest not found'
+          
+  "/update/{pentest}/{collection}":
+    post:
+      operationId: pollenisator.server.mongo.update
+      tags:
+        - Mongo
+      summary: Update something in db
+      description: Update something in db
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - pipeline
+                - updatePipeline
+              properties:
+                pipeline:
+                  type: string
+                updatePipeline:
+                  type: string
+                many:
+                  type: boolean
+                  default: false
+                notify:
+                  type: boolean
+                  default: false
+      responses:
+        "200":
+          description: successfully updated an item
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+        '400':
+          description: Pipeline argument invalid
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pipeline|Update pipeline argument was not valid'
+        '403':
+          description: Unknown param value
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pentest|Collection argument is not a valid pollenisator collection'
+  "/insert/{pentest}/{collection}":
+    post:
+      operationId: pollenisator.server.mongo.insert
+      tags:
+        - Mongo
+      summary: Insert something in db
+      description: Insert something in db
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - pipeline
+              properties:
+                pipeline:
+                  type: string
+                parent:
+                  type: string
+                  default: ""
+                notify:
+                  type: boolean
+                  default: false
+      responses:
+        "200":
+          description: successfully inserted an item in db, return its ObjectId (bson.ObjectId type)
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"60f58598d8357e0f40e7fa66"'
+        '400':
+          description: Pipeline argument invalid
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pipeline argument was not valid'
+        '403':
+          description: Unknown param value
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pentest|Collection argument is not a valid pollenisator collection'
+  "/find/{pentest}/{collection}":
+    post:
+      operationId: pollenisator.server.mongo.find
+      tags:
+        - Mongo
+      summary: Find something in db
+      description: Find something in db
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pipeline:
+                  type: string
+                  example: "{}"
+                many:
+                  type: boolean
+                  default: false
+      responses:
+        "200":
+          description: successful find command with parameters
+          content:
+            application/json:
+              examples:
+                Many = false:
+                  value: '{"_id": "ObjectId|60a3aaa129926f9ad7197919",  "parent": "ObjectId|60a3aaa129926f9ad7197915",  "scope": "test",  "wave": "Testina"}'
+                Many = true:
+                  value: '[{"_id": "60a3aaa129926f9ad7197919", "parent": "ObjectId|60a3aaa129926f9ad7197915",  "scope": "test",   "wave": "Testina" },  { "_id": "60f58598d8357e0f40e7fa66","scope": "test.fr" }]'
+                many = true but empty result:
+                  value: '[]'
+        '400':
+          description: Pipeline argument invalid
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pipeline argument was not valid'
+        '403':
+          description: Unknown param value
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pentest|Collection argument is not a valid pollenisator collection'
+        '404':
+          description: Empty result on specific search
+          content:
+            application/json:
+              examples:
+                Empty result with many=false:
+                  value: "Not found"
+  "/search/{pentest}":
+    get:
+      operationId: pollenisator.server.mongo.search
+      tags:
+        - Mongo
+      summary: Search using python like query syntax
+      description: Find matching objects in database
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: s
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ""
+      responses:
+        "200":
+          description: Successful search results. A dictionnary with type of objects as
+            keys and matching documents in a list as value
+          content:
+            application/json:
+              examples:
+                'search type == "defect"':
+                  value: '{  "defects": [    {      "_id": "ObjectId|60f190815955e6cf385a405d",      "ease": "Moderate",      "impact": "Major",      "index": "1",      "ip": "",      "notes": "",      "parent": "",      "port": "",      "proofs": [],      "proto": "",      "redactor": "N/A",      "risk": "Major",      "title": "sql",      "type": [        "Application"      ]    },    {      "_id": "ObjectId|60f194db1255fd087c769756",      "ease": "Moderate",      "impact": "Critical",      "index": "0",      "ip": "",      "notes": "",      "parent": "",      "port": "",      "proofs": [],      "proto": "",      "redactor": "N/A",      "risk": "Critical",      "title": "XSS",      "type": [        "Application"      ]    }  ]}'
+        '400':
+          description: Parse error
+          content:
+            application/json:
+              examples:
+                toto tata:
+                  value: '"Unexpected token Token(''STRING'', ''toto'') at line 1, column 4."'
+        '403':
+          description: Unknown pentest value given
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pentest argument is not a valid pollenisator pentest'
+  "/count/{pentest}/{collection}":
+    post:
+      operationId: pollenisator.server.mongo.count
+      tags:
+        - Mongo
+      summary: Cout something in db
+      description: Cout something in db
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pipeline:
+                  type: string
+                  default: "{}"
+                  example: "{}"
+      responses:
+        "200":
+          description: Successful count command
+          content:
+              application/json:
+                examples:
+                  Success:
+                    value: '3' 
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                pipeline is not a dict:
+                  value: '"Pipeline argument was not valid"'
+        '403':
+          description: Unknown pentest value given
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pentest argument is not a valid pollenisator pentest'
+  "/dumpDb/{dbName}":
+    get:
+      operationId: pollenisator.server.mongo.dumpDb
+      tags:
+        - Mongo
+      summary: Dump a database as an archive
+      parameters:
+        - name: dbName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ""
+      responses:
+        "200":
+          description: archive content
+          content:
+              application/octet-stream:
+                schema:
+                  type: string
+                  format: binary
+        '404':
+          description: Not found parameters
+          content:
+            application/json:
+              examples:
+                Not found:
+                  value: '"Collection|Database not found"'
+        '503':
+          description: Failed to create a dump
+          content:
+            application/json:
+              examples:
+                Server issue:
+                  value: 'Failed to export database'
+  /importDb:
+    post:
+      operationId: pollenisator.server.mongo.importDb
+      tags:
+        - Mongo
+      summary: Import an existing database file
+      requestBody:
+        $ref: "#/components/requestBodies/pollenisator.server.mongo.importDb"
+      responses:
+        "200":
+          description: Successfully imported the file
+  /importCommands:
+    post:
+      operationId: pollenisator.server.mongo.importCommands
+      tags:
+        - Admin
+      summary: Import an existing command database file
+      requestBody:
+        $ref: "#/components/requestBodies/pollenisator.server.mongo.importDb"
+      responses:
+        "200":
+          description: Successfully imported the file
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
+  /copyDb:
+    post:
+      operationId: pollenisator.server.mongo.copyDb
+      tags:
+        - Mongo
+      summary: Duplicate a database
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fromDb
+                - toDb
+              properties:
+                fromDb:
+                  type: string
+                toDb:
+                  type: string
+      responses:
+        "200":
+          description: Successfully copied db
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
+  "/aggregate/{pentest}/{collection}":
+    post:
+      operationId: pollenisator.server.mongo.aggregate
+      tags:
+        - Mongo
+      summary: aggregate something in db
+      description: aggregate something in db
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                properties:
+                  pipeline:
+                    type: string
+                    default: "{}"
+                    example: "{}"
+      responses:
+        "200":
+          description: Successful aggregate command
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '[{*mongo_object*}, {*mongo_object2*}...]'
+        '403':
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                Not found:
+                  value: '"Collection|Pentest argument is not a valid pollenisator collection|pentest"'
+  "/delete/{pentest}/{collection}":
+    post:
+      operationId: pollenisator.server.mongo.delete
+      tags:
+        - Mongo
+      summary: Delete something in db
+      description: Delete something in db
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - pipeline
+              properties:
+                pipeline:
+                  type: string
+                many:
+                  type: boolean
+                  default: false
+                notify:
+                  type: boolean
+                  default: false
+      responses:
+        "200":
+          description: Successful delete command
+          content:
+            application/json:
+              examples:
+                Deleted count:
+                  value: '1'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                pipeline is not a dict:
+                  value: '"Pipeline argument was not a valid dictionnary"'
+        '403':
+          description: Invalid parameters values
+          content:
+            application/json:
+              examples:
+                Not found:
+                  value: '"Collection|Pentest argument is not a valid pollenisator collection|pentest"'
+  "/delete/{pentest}/bulk":
+    post:
+      operationId: pollenisator.server.mongo.bulk_delete
+      tags:
+        - Mongo
+      summary: Delete many things in db
+      description: Delete many things in db
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              
+      responses:
+        "200":
+          description: Successful bulk delete command
+          content:
+            application/json:
+              examples:
+                Deleted count:
+                  value: '4'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                body is not a dict:
+                  value: '"body was not a valid dictionnary"'
+        '403':
+          description: Invalid parameters values
+          content:
+            application/json:
+              examples:
+                Not found:
+                  value: '"Collection|Pentest argument is not a valid pollenisator collection|pentest"'
+                Pollenisator db:
+                  value: 'Impossible to bulk delete in this database'
+  /pentests:
+    get:
+      operationId: pollenisator.server.mongo.listPentests
+      tags:
+        - pentest
+      summary: Get a list of pentests
+      responses:
+        "200":
+          description: Successful get
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+              examples:
+                Success:
+                  value: '["pentest1", "pentest2"]'
+  "/pentest/{pentest}/delete":
+    delete:
+      operationId: pollenisator.server.mongo.deletePentest
+      tags:
+        - pentest
+      summary: Remove a pentest
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful deletion
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Successful deletion'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              examples:
+                Pentest not found:
+                  value: '"Unknown pentest"'
+        '403':
+          description: Forbidden, not enough rights
+          content:
+            application/json:
+              examples:
+                Not owner of the db:
+                  value: '"Forbidden"'
+  "/pentest/{pentest}":
+    post:
+      operationId: pollenisator.server.mongo.registerCalendar
+      tags:
+        - pentest
+      summary: Create a pentest
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - pentest_type
+                - start_date
+                - end_date
+                - scope
+                - settings
+                - pentesters
+              properties:
+                pentest_type:
+                  type: string
+                start_date:
+                  type: string
+                  format: date-time
+                end_date:
+                  type: string
+                  format: date-time
+                scope:
+                  type: string
+                pentesters:
+                  type: string
+                settings:
+                  type: object
+                  properties:
+                    Add domains whose IP are in scope:
+                      type: integer
+                      minimum: 0
+                      maximum: 1
+                    Add domains who have a parent domain in scope:
+                      type: integer
+                      minimum: 0
+                      maximum: 1
+                    Add all domains found:
+                      type: integer
+                      minimum: 0
+                      maximum: 1
+                  required:
+                    - Add domains whose IP are in scope
+                    - Add domains who have a parent domain in scope
+                    - Add all domains found
+      responses:
+        "200":
+          description: Successful creation
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"Success"'
+        
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              examples:
+                Reason:
+                  value: '"*{Reason of failure, invalid name, or database already exist..}*"'
+  "/notification/{pentest}":
+    get:
+      operationId: pollenisator.server.mongo.fetchNotifications
+      tags:
+        - Notification
+      summary: Return notifications documents from database, also used as keep alive
+        method
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: fromTime
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Successful read notifications operation
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '[{ "_id" : "ObjectId|5f9150fbed75193ef71ba47f", "iid" : "ObjectId|5f903112ed7519bbc6405980", "db" : "TEST", "collection" : "ips", "action" : "update", "parent" : "", "time" : "2020-10-22T11:29:31.162Z" }, ...]'
+  /settings/add:
+    post:
+      operationId: pollenisator.server.mongo.createSetting
+      tags:
+        - Admin
+      summary: Create global pollenisator settings
+      requestBody:
+        $ref: "#/components/requestBodies/pollenisator.server.mongo.createSettingData"
+      responses:
+        "200":
+          description: Created global pollenisator settings
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
+  /settings/update:
+    put:
+      operationId: pollenisator.server.mongo.updateSetting
+      tags:
+        - Settings
+      summary: Update global pollenisator settings
+      requestBody:
+        $ref: "#/components/requestBodies/pollenisator.server.mongo.createSettingData"
+      responses:
+        "200":
+          description: Created global pollenisator settings
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+  /settings/search:
+    get:
+      operationId: pollenisator.server.mongo.getSetting
+      tags:
+        - Settings
+      summary: Get a global pollenisator setting from search
+      parameters:
+        - name: pipeline
+          in: query
+          required: false
+          schema:
+            type: string
+            default: "{}"
+            example: '{"key":"pentest_types"}'
+      responses:
+        "200":
+          description: Get a global pollenisator setting from search
+          content:
+            application/json:
+              examples:
+                Success for search {"key":"tags"}:
+                  value: '{
+    "_id": "ObjectId|5fa5819aed75191f22168a40",
+    "key": "tags",
+    "value": "{\"todo\": \"orange\", \"unscanned\": \"yellow\", \"P0wned!\": \"red\", \"Interesting\": \"dark green\", \"Uninteresting\": \"sky blue\", \"Neutral\": \"white\"}"
+  }'
+  /settings:
+    get:
+      operationId: pollenisator.server.mongo.getSettings
+      tags:
+        - Settings
+      summary: Get global pollenisator settings
+      responses:
+        "200":
+          description: Get global pollenisator settings
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '[
+  {
+    "_id": "ObjectId|5fa5819aed75191f22168a40",
+    "key": "tags",
+    "value": "{\"todo\": \"orange\", \"unscanned\": \"yellow\", \"P0wned!\": \"red\", \"Interesting\": \"dark green\", \"Uninteresting\": \"sky blue\", \"Neutral\": \"white\"}"
+  },
+  {
+    "_id": "ObjectId|5fbb793bed75195fe4274412",
+    "key": "pentest_types",
+    "value": "{\"Web\": [\"Base\", \"Application\", \"Data\", \"Policy\"], \"LAN\": [\"Infrastructure\", \"Active Directory\", \"Data\", \"Policy\"]}"
+  }
+]'
+  /workers:
+    get:
+      operationId: pollenisator.server.worker.listWorkers
+      tags:
+        - Worker
+      summary: Return workers documents from database
+      description: "Return workers documents from database Returns: Mongo result of
+        workers. Cursor of dictionnary"
+      parameters:
+        - name: pipeline
+          in: query
+          description: query workers with filters
+          required: false
+          schema:
+            type: string
+            default: "{}"
+            example: "{}"
+      responses:
+        "200":
+          description: Successful read worker list operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties:
+                    _id:
+                      type: string
+                    last_heartbeat:
+                      type: string
+                    name:
+                      type: string
+                    pentests:
+                      type: array
+                      items:
+                        type: string
+                    shortname:
+                      type: string
+                    registeredCommands:
+                      type: array
+                      items:
+                        type: string
+              examples:
+                list returned:
+                  value : '[
+                    {
+                      "_id": "60f686d8e15510a2957cb263",
+                      "last_heartbeat": "2021-07-20 10:18:35.269000",
+                      "name": "078cbd54-6c26-4ba9-b84d-fdb12f239af3@barre",
+                      "pentests": [],
+                      "registeredCommands": [
+                        "Nmap.tcp",
+                        "Nmap.top_udp",
+                        "Nmap.bdd",
+                        "Nmap.vpn",
+                        "Nmap.supervision",
+                        "Nmap.services",
+                        "Nmap.services.udp",
+                        "Nmap.services_scripts",
+                        "Nmap.all.tcp",
+                        "Nmap.ip.allTcp",
+                        "Nmap.ip.udp",
+                        "WhatWeb.http",
+                        "WhatWeb.https",
+                        "TestSSL",
+                        "Nikto",
+                        "digReverseLookUp",
+                        "pythonReverseLookUp",
+                        "Sublist3r",
+                        "Dirsearch.http",
+                        "Dirsearch.https",
+                        "Knockpy",
+                        "crtsh",
+                        "ssh_scan",
+                        "amap",
+                        "amap.udp",
+                        "http-methods",
+                        "smbmap",
+                        "smbmap_anon",
+                        "smbmap_greybox",
+                        "smb-enum-users",
+                        "nmap-script-vuln",
+                        "enum4linux",
+                        "ftp-anon",
+                        "Nmap.quick",
+                        "ike-scan",
+                        "Nmap.verify.tcp",
+                        "Nmap.verify.udp",
+                        "CME.recon",
+                        "CME.usecreds",
+                        "eternalblue",
+                        "bluekeep",
+                        "openrelay",
+                        "searchsploit",
+                        "dnsrecon",
+                        "CME_greybox"
+                      ],
+                      "shortname": "078cbd54-6c26-4ba9-b84d-fdb12f239af3"
+                    }
+                  ]'
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                pipeline invalid:
+                  value: 'Pipeline argument was not valid'
+  "/workers/{name}":
+    delete:
+      operationId: pollenisator.server.worker.deleteWorker
+      tags:
+        - Worker
+      summary: delete workers from database
+      parameters:
+        - name: name
+          in: path
+          description: query workers with filters
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful delete worker operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  n:
+                    type: integer
+              examples:
+                deleted 2:
+                  value: '{"n":2}'
+                
+        "404":
+          description: Worker name not found
+          content:
+            application/json:
+              examples:
+                worker not found:
+                  value: '"Worker not found"'
+  "/workers/{name}/setInclusion":
+    put:
+      operationId: pollenisator.server.worker.setInclusion
+      tags:
+        - Worker
+      summary: Set a worker exclusion from database
+      description: Set a worker exclusion from database
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - db
+                - setInclusion
+              properties:
+                db:
+                  type: string
+                setInclusion:
+                  type: boolean
+      responses:
+        "200":
+          description: Successful update of worker inclusion in a pentest
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  n:
+                    type: integer
+                  nModifider:
+                    type: integer
+                  ok:
+                    type: integer
+                  updatedExisting:
+                    type: boolean
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+  /workers/register/:
+    post:
+      operationId: pollenisator.server.worker.registerWorker
+      tags:
+        - Worker
+      summary: register the caller as worker
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - command_names
+              properties:
+                name:
+                  type: string
+                command_names:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Successful registered a worker
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
+  "/workers/{name}/registerCommands":
+    put:
+      operationId: pollenisator.server.worker.registerCommands
+      tags:
+        - Worker
+      summary: Set a worker registered commands
+      description: Set a worker registered commands
+      security: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+      responses:
+        "200":
+          description: Successful update of worker registered commands
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
+  
+  "/workers/{name}/setCommandConfig":
+    put:
+      operationId: pollenisator.server.worker.setCommandConfig
+      tags:
+        - Worker
+      summary: Set a worker registered command plugin and bin path
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - command_name
+                - remote_bin
+                - plugin
+              properties:
+                command_name:
+                  type: string
+                remote_bin:
+                  type: string
+                plugin:
+                  type: string
+      responses:
+        "200":
+          description: Successful update of worker registed command configuration
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
+        "404":
+          description: Worker not found
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Worker not found'
+  "/workers/{name}/unregister":
+    post:
+      operationId: pollenisator.server.worker.unregister
+      tags:
+        - Worker
+      summary: Remvoe a worker from the lsit of workers
+      description: Set a worker unregistered
+      security: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful worker unregister
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
+        "404":
+          description: Worker not found
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Worker not found'
+  "/workers/{name}/getRegisteredCommands":
+    get:
+      operationId: pollenisator.server.worker.getRegisteredCommands
+      tags:
+        - Worker
+      summary: Get a worker registered commands
+      description: Get a worker registered commands
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful get
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+              examples:
+                list of registered commands:
+                  value: '[
+  "Nmap.tcp",
+  "Nmap.top_udp",
+  "Nmap.bdd",
+  "Nmap.vpn",
+  "Nmap.supervision",
+  "Nmap.services",
+  "Nmap.services.udp",
+  "Nmap.services_scripts",
+  "Nmap.all.tcp",
+  "Nmap.ip.allTcp",
+  "Nmap.ip.udp",
+  "WhatWeb.http",
+  "WhatWeb.https",
+  "TestSSL",
+  "Nikto",
+  "digReverseLookUp",
+  "pythonReverseLookUp",
+  "Sublist3r",
+  "Dirsearch.http",
+  "Dirsearch.https",
+  "Knockpy",
+  "crtsh",
+  "ssh_scan",
+  "amap",
+  "amap.udp",
+  "http-methods",
+  "smbmap",
+  "smbmap_anon",
+  "smbmap_greybox",
+  "smb-enum-users",
+  "nmap-script-vuln",
+  "enum4linux",
+  "ftp-anon",
+  "Nmap.quick",
+  "ike-scan",
+  "Nmap.verify.tcp",
+  "Nmap.verify.udp",
+  "CME.recon",
+  "CME.usecreds",
+  "eternalblue",
+  "bluekeep",
+  "openrelay",
+  "searchsploit",
+  "dnsrecon"
+]'
+
+  "/workers/{name}/instructions":
+    get:
+      operationId: pollenisator.server.worker.getInstructions
+      tags:
+        - Worker
+      summary: Pull worker instructions
+      security: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful get
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Instructions"
+  "/workers/{name}/instructions/{instruction_iid}":
+    delete:
+      operationId: pollenisator.server.worker.deleteInstruction
+      tags:
+        - Worker
+      summary: delete a worker instruction
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: instruction_iid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful deletion of instruction
+          content:
+            application/json:
+              schema:
+                type: integer
+        "404":
+          description: Worker or instruction not found
+          content:
+            application/json:
+              examples:
+                Instruction not found:
+                  value: '"Instruction not found"'
+
+  "/commands/{pentest}":
+    post:
+      operationId: pollenisator.server.ServerModels.Command.insert
+      tags:
+        - Commands
+      summary: Insert a command or return the conflicting existing one
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/Commands"
+      responses:
+        "200":
+          description: command insertion success or already existing object
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+  "/commands/update/{pentest}/{command_iid}":
+    put:
+      operationId: pollenisator.server.ServerModels.Command.update
+      tags:
+        - Commands
+      summary: "Update a command "
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: command_iid
+          in: path
+          description: command iid to delete
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/Commands"
+      responses:
+        "200":
+          description: command update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+  "/commands/{pentest}/{command_iid}":
+    delete:
+      operationId: pollenisator.server.ServerModels.Command.delete
+      tags:
+        - Commands
+      summary: Delete a command and dependencies
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: command_iid
+          in: path
+          description: command iid to delete
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
+  "/group_commands/{pentest}/{command_group_iid}":
+    delete:
+      operationId: pollenisator.server.ServerModels.CommandGroup.delete
+      tags:
+        - CommandGroup
+      summary: Delete a group of command
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: command_group_iid
+          in: path
+          description: group of command iid to delete
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
+  "/group_commands/{pentest}":
+    post:
+      operationId: pollenisator.server.ServerModels.CommandGroup.insert
+      tags:
+        - CommandGroup
+      summary: Insert a group of command or return the conflicting existing one
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/CommandGroups"
+      responses:
+        "200":
+          description: command group insertion success or already existing object
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+  "/group_commands/update/{pentest}/{command_group_iid}":
+    put:
+      operationId: pollenisator.server.ServerModels.CommandGroup.update
+      tags:
+        - CommandGroup
+      summary: "Update a group of command "
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: command_group_iid
+          in: path
+          description: group of command iid to delete
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/CommandGroups"
+      responses:
+        "200":
+          description: command group update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+  "/defects/{pentest}":
+    post:
+      operationId: pollenisator.server.ServerModels.Defect.insert
+      tags:
+        - Defects
+      summary: Insert a defect or return the conflicting existing one
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/Defects"
+      responses:
+        "200":
+          description: Defect insertion success or already existing object
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+  "/defects/update/{pentest}/{defect_iid}":
+    put:
+      operationId: pollenisator.server.ServerModels.Defect.update
+      tags:
+        - Defects
+      summary: "Update a defect "
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: defect_iid
+          in: path
+          description: defect iid to delete
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/Defects"
+      responses:
+        "200":
+          description: defect update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+  "/defects/{pentest}/{defect_iid}":
+    delete:
+      operationId: pollenisator.server.ServerModels.Defect.delete
+      tags:
+        - Defects
+      summary: Delete a defect and dependencies
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: defect_iid
+          in: path
+          description: defect iid to delete
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
+  "/intervals/{pentest}":
+    post:
+      operationId: pollenisator.server.ServerModels.Interval.insert
+      tags:
+        - Intervals
+      summary: Insert an interval or return the conflicting existing one
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/Intervals"
+      responses:
+        "200":
+          description: interval successfully inserted
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+  "/intervals/update/{pentest}/{interval_iid}":
+    put:
+      operationId: pollenisator.server.ServerModels.Interval.update
+      tags:
+        - Intervals
+      summary: "Update an interval "
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: interval_iid
+          in: path
+          description: interval iid to delete
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/Intervals"
+      responses:
+        "200":
+          description: interval update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+  "/intervals/{pentest}/{interval_iid}":
+    delete:
+      operationId: pollenisator.server.ServerModels.Interval.delete
+      tags:
+        - Intervals
+      summary: Delete an interval and dependencies
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: interval_iid
+          in: path
+          description: defect iid to delete
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
+  "/ips/{pentest}":
+    post:
+      operationId: pollenisator.server.ServerModels.Ip.insert
+      tags:
+        - Ips
+      summary: Insert an ip or return the conflicting existing one
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/Ips"
+      responses:
+        "200":
+          description: Successful ip insertion
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+  "/ips/update/{pentest}/{ip_iid}":
+    put:
+      operationId: pollenisator.server.ServerModels.Ip.update
+      tags:
+        - Ips
+      summary: "Update an ip "
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: ip_iid
+          in: path
+          description: ip iid to delete
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/Ips"
+      responses:
+        "200":
+          description: ip update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+  "/ips/{pentest}/{ip_iid}":
+    delete:
+      operationId: pollenisator.server.ServerModels.Ip.delete
+      tags:
+        - Ips
+      summary: Delete an ip and dependencies
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: ip_iid
+          in: path
+          description: ip iid to delete
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
+  "/ports/{pentest}":
+    post:
+      operationId: pollenisator.server.ServerModels.Port.insert
+      tags:
+        - Ports
+      summary: Insert an port or return the conflicting existing one
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/Ports"
+      responses:
+        "200":
+          description: Successful port insertion
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+  "/ports/update/{pentest}/{port_iid}":
+    put:
+      operationId: pollenisator.server.ServerModels.Port.update
+      tags:
+        - Ports
+      summary: Update a port
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: port_iid
+          in: path
+          description: port iid to delete
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/Ports"
+      responses:
+        "200":
+          description: port update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+  "/ports/{pentest}/{port_iid}":
+    delete:
+      operationId: pollenisator.server.ServerModels.Port.delete
+      tags:
+        - Ports
+      summary: Delete a port and dependencies
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: port_iid
+          in: path
+          description: port iid to delete
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
+  "/ports/{pentest}/{port_iid}/addCustomTool/":
+    post:
+      operationId: pollenisator.server.ServerModels.Port.addCustomTool
+      tags:
+        - Ports
+      summary: Add a tool manually to a port in the 'Custom Tools' wave
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: port_iid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tool_name
+              properties:
+                tool_name:
+                  type: string
+        required: true
+      responses:
+        "504":
+          description: Empty response is good
+        "503":
+          description: Not connected
+          content:
+            application/json:
+              examples:
+                Not connected:
+                  value: '"Not connected"'
+  "/scopes/{pentest}":
+    post:
+      operationId: pollenisator.server.ServerModels.Scope.insert
+      tags:
+        - Scopes
+      summary: Insert a scope or return the conflicting existing one
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/Scopes"
+      responses:
+        "200":
+          description: Successful scope insertion
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+  "/scopes/update/{pentest}/{scope_iid}":
+    put:
+      operationId: pollenisator.server.ServerModels.Scope.update
+      tags:
+        - Scopes
+      summary: Update a scope
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: scope_iid
+          in: path
+          description: scope iid to delete
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/Scopes"
+      responses:
+        "200":
+          description: scope update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+  "/scopes/{pentest}/{scope_iid}":
+    delete:
+      operationId: pollenisator.server.ServerModels.Scope.delete
+      tags:
+        - Scopes
+      summary: Delete a scope and dependencies
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: scope_iid
+          in: path
+          description: scope iid to delete
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
+  /tools/plugins:
+    get:
+      operationId: pollenisator.server.ServerModels.Tool.listPlugins
+      tags:
+        - Tools
+      summary: Get a list of existing plugins
+      responses:
+        "200":
+          description: Successful get
+          content:
+            application/json:
+              examples:
+                List of plugins available:
+                  value: '["Nmap.py", "WhatWeb.py", ...]'
+  "/tools/{pentest}":
+    post:
+      operationId: pollenisator.server.ServerModels.Tool.insert
+      tags:
+        - Tools
+      summary: Insert a tool or return the conflicting existing one
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/Tools"
+      responses:
+        "200":
+          description: Successful tool insertion
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+  "/tools/update/{pentest}/{tool_iid}":
+    put:
+      operationId: pollenisator.server.ServerModels.Tool.update
+      tags:
+        - Tools
+      summary: Update a tool
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tool_iid
+          in: path
+          description: tool iid to delete
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/Tools"
+      responses:
+        "200":
+          description: tool update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+  "/tools/{pentest}/{tool_iid}":
+    delete:
+      operationId: pollenisator.server.ServerModels.Tool.delete
+      tags:
+        - Tools
+      summary: Delete a tool and dependencies
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: tool_iid
+          in: path
+          description: tool iid to delete
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
+  "/waves/{pentest}":
+    post:
+      operationId: pollenisator.server.ServerModels.Wave.insert
+      tags:
+        - Waves
+      summary: Insert a wave or return the conflicting existing one
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/Waves"
+      responses:
+        "200":
+          description: Successful wave insertion
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+                Already exist:
+                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+  "/waves/update/{pentest}/{wave_iid}":
+    put:
+      operationId: pollenisator.server.ServerModels.Wave.update
+      tags:
+        - Waves
+      summary: Update a wave
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: wave_iid
+          in: path
+          description: wave iid to delete
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/Waves"
+      responses:
+        "200":
+          description: wave update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+  "/waves/{pentest}/{wave_iid}":
+    delete:
+      operationId: pollenisator.server.ServerModels.Wave.delete
+      tags:
+        - Waves
+      summary: Delete a wave and dependencies
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: wave_iid
+          in: path
+          description: wave wave_iid to delete
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get a delete count
+          content:
+            application/json:
+              schema:
+                type: integer
+  "/files/{pentest}/upload/proof/{defect_iid}":
+    post:
+      operationId: pollenisator.server.FileManager.upload
+      tags:
+        - FileManager
+      summary: Upload a file
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: defect_iid
+          in: path
+          description: file will be tied to given iid
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/pollenisator.server.mongo.importDb"
+      responses:
+        "200":
+          description: Successfully uploaded file
+          content:
+            application/json:
+              examples:
+                Successful:
+                  value: '"{filename} was successfully uploaded"'
+        "404":
+          description: defect not found
+          content:
+            application/json:
+              examples:
+                Unknown defect:
+                  value: '"The given iid does not match an existing defect"'
+  "/files/{pentest}/download/{filetype}/{attached_iid}":
+    get:
+      operationId: pollenisator.server.FileManager.listFiles
+      tags:
+        - FileManager
+      summary: Lists attached to given iid
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: attached_iid
+          in: path
+          description: file will be tied to given iid
+          required: true
+          schema:
+            type: string
+        - name: filetype
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - result
+              - proof
+      responses:
+        "200":
+          description: Successfully listed files
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+  "/files/{pentest}/download/{filetype}/{attached_iid}/{filename}":
+    get:
+      operationId: pollenisator.server.FileManager.download
+      tags:
+        - FileManager
+      summary: Download a file
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: attached_iid
+          in: path
+          description: file will be tied to given iid
+          required: true
+          schema:
+            type: string
+        - name: filetype
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - result
+              - proof
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successfully downloaded file
+          content:
+            application/octet-steam:
+              schema:
+                type: string
+                format: binary
+                
+        "404":
+          description: File not found
+          content:
+            application/json:
+              examples:
+                file not found:
+                  value: '"File not found"'
+  "/files/{pentest}/{defect_iid}/{filename}":
+    delete:
+      operationId: pollenisator.server.FileManager.rmProof
+      tags:
+        - FileManager
+      summary: Remove a proof file
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: defect_iid
+          in: path
+          description: object iid which have the file to delete
+          required: true
+          schema:
+            type: string
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successfully deleted the file
+          content:
+            application/json:
+              examples:
+                Successful:
+                  value: '"Successfully deleted {filename}"'
+        "404":
+          description: File not found
+          content:
+            application/json:
+              examples:
+                file not found:
+                  value: '"File not found"'
+
+  "/files/{pentest}/import":
+    post:
+      operationId: pollenisator.server.FileManager.importExistingFile
+      tags:
+        - FileManager
+      summary: Import an existing tool file
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                upfile:
+                  description: The file to upload
+                  type: string
+                  format: binary
+                plugin:
+                  description: plugin name to use or "auto-detect"
+                  type: string
+              required:
+                - upfile
+                - plugin
+      responses:
+        "200":
+          description: Successfully imported file
+          content:
+            application/json:
+              examples:
+                successful import of nmap file:
+                  value: '{
+  "Nmap.py": 1
+}'
+  "/tools/{pentest}/craftCommandLine/{tool_iid}":
+    get:
+      operationId: pollenisator.server.ServerModels.Tool.craftCommandLine
+      tags:
+        - Tools
+      summary: Get the command line to execute the tool (using plugin + parameters) a
+        marker for |outputDir| is to be replaced
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: tool_iid
+          in: path
+          description: tool iid for which we want a command line
+          required: true
+          schema:
+            type: string
+        - name: plugin
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ""
+      responses:
+        "200":
+          description: The command line to execute with a marker for |outputDir| to be
+            replaced
+          content:
+            application/json:
+              examples:
+                Successful nmap craft:
+                  value: '{
+  "bin": "nmap",
+  "comm": "nmap -n -v -p443 www.algosecure.fr -oN |outputDir|.nmap",
+  "ext": ".nmap"
+}'
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                no plugin:
+                  value: '"This tool has no plugin configured and no plugin was specified"'
+                empty command line result:
+                  value: '"An empty command line was crafted"'
+  "/tools/{pentest}/importResult/{tool_iid}":
+    post:
+      operationId: pollenisator.server.ServerModels.Tool.importResult
+      tags:
+        - Tools
+      summary: Upload a tool result file
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: tool_iid
+          in: path
+          description: tool iid to launch
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                upfile:
+                  description: The file to upload
+                  type: string
+                  format: binary
+                plugin:
+                  type: string
+                  default: ""
+              required:
+                - upfile
+      responses:
+        "200":
+          description: Successfully uploaded file
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"Success"'
+        "400":
+          description: Invalid plugin
+          content:
+            application/json:
+              examples:
+                invalid plugin:
+                  value: '"This tool has no plugin configured and no plugin was specified"'
+        "404":
+          description: tool not found
+          content:
+            application/json:
+              examples:
+                Unknown tool:
+                  value: '"The given iid does not match an existing tool"'
+  "/tools/{pentest}/launchTask/{tool_iid}":
+    post:
+      operationId: pollenisator.server.ServerModels.Tool.launchTask
+      tags:
+        - Tools
+      summary: Try to launch a tool on any worker
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: tool_iid
+          in: path
+          description: tool id to launch
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                plugin:
+                  type: string
+                  default: ""
+                checks:
+                  type: boolean
+                  default: true
+      responses:
+        "200":
+          description: Successfully launched task
+          content:
+            application/json:
+              examples:
+                Success returns instruction iid:
+                  value: '"ObjectId|60f69c67fca98c4bbbe5348a"'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              examples:
+                Tool not found:
+                  value: '"Tool not found"'
+                Worker not found:
+                  value: '"No worker available"'
+  "/tools/{pentest}/stopTask/{tool_iid}":
+    post:
+      operationId: pollenisator.server.ServerModels.Tool.stopTask
+      tags:
+        - Tools
+      summary: Try to stop a tool
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: tool_iid
+          in: path
+          description: tool id to stop
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                forceReset:
+                  type: boolean
+                  default: false
+      responses:
+        "200":
+          description: Successfully stopped task
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"Success"'
+        "400":
+          description: Invalid parameter
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"Empty worker field"'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              examples:
+                Tool not found:
+                  value: '"Tool not found"'
+                Worker not running anymore:
+                  value: '"The worker running this tool is not running anymore"'
+        "405":
+          description: Method not allowed 
+          content:
+            application/json:
+              examples:
+                localhost tool:
+                  value: '"Tools running in localhost cannot be stopped through API"'
+
+  "/tools/{pentest}/{tool_iid}/changeStatus":
+    post:
+      operationId: pollenisator.server.ServerModels.Tool.setStatus
+      tags:
+        - Tools
+      summary: Update a tool staus
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: tool_iid
+          in: path
+          description: tool id to stop
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - newStatus
+              properties:
+                newStatus:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - OOS
+                      - OOT
+                      - not_done
+                      - running
+                      - error
+                      - done
+                      - ready
+                      - timedout
+                arg:
+                  type: string
+                  default: ""
+      responses:
+        "200":
+          description: Successfully updated tool status
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+  "/autoscan/{pentest}/start":
+    post:
+      operationId: pollenisator.server.AutoScanMaster.startAutoScan
+      tags:
+        - Auto scan
+      summary: Start an automatic scan
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successfully started auto scan
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"Success"'
+        "403":
+          description: Autoscan already running
+          content:
+            application/json:
+              examples:
+               Already running:
+                  value: '"An autoscan is already running"'
+        "404":
+          description: No worker available/found
+          content:
+            application/json:
+              examples:
+                No worker available:
+                  value: '"No worker registered for this pentest"'
+            
+  "/autoscan/{pentest}/status":
+    get:
+      operationId: pollenisator.server.AutoScanMaster.getAutoScanStatus
+      tags:
+        - Auto scan
+      summary: Returns status of automatic scan
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successfully returned status of auto scan
+          content:
+            application/json:
+              schema:
+                type: boolean
+
+  "/autoscan/{pentest}/stop":
+    post:
+      operationId: pollenisator.server.AutoScanMaster.stopAutoScan
+      tags:
+        - Auto scan
+      summary: Stop an automatic scan
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successfully stoped auto scan
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"Success"'
+  /report/langs:
+    get:
+      operationId: pollenisator.server.Report.getLangList
+      tags:
+        - Report
+      summary: Get a list of existings langs templates
+      responses:
+        "200":
+          description: A list of langs as string
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '["en", "fr", ...]'
+  /report/{lang}/templates:
+    get:
+      operationId: pollenisator.server.Report.getTemplateList
+      tags:
+        - Report
+      summary: Get a lsit of report template
+      parameters:
+        - name: lang
+          in: path
+          description: template language
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A list of templates as string
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '["Mddel.docx", "Model2.pptx", ...]'
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                Lang invalid:
+                  value: '"There is no existing templates for this lang"'
+  /report/{lang}/templates/download:
+    get:
+      operationId: pollenisator.server.Report.downloadTemplate
+      tags:
+        - Report
+      summary: Download a report template
+      parameters:
+        - name: templateName
+          in: query
+          description: template name to download
+          required: true
+          schema:
+            type: string
+        - name: lang
+          in: path
+          description: template language
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A template file docx or pptx
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.presentationml.document:
+              schema:
+                type: string
+                format: binary
+              
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                docx or pptx expected:
+                  value: '"A template is either a pptx or a docx document"'
+                no template:
+                  value: '"There is no existing templates for this lang"'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              examples:
+                template not found:
+                  value: '"Template file not found"'
+
+  /report/{lang}/templates/upload:
+    post:
+      operationId: pollenisator.server.Report.uploadTemplate
+      tags:
+        - Report
+      summary: Upload a report template
+      parameters:
+        - name: lang
+          in: path
+          description: template language
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/pollenisator.server.mongo.importDb"
+      responses:
+        "200":
+          description: An indication of success or failure for upload
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"Success"'
+                Failure when writing:
+                  value: '"Failure"'
+        "400":
+          description: Invalid parameter
+          content:
+            application/json:
+              examples:
+                unexpected extension:
+                  value: '"Invalid extension for template, must be pptx or docx"'
+              
+  "/report/{pentest}/generate":
+    get:
+      operationId: pollenisator.server.Report.generateReport
+      tags:
+        - Report
+      summary: Generate a report and returns it
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: templateName
+          in: query
+          description: template name to generate from
+          required: true
+          schema:
+            type: string
+        - name: contractName
+          in: query
+          description: template name to generate from
+          required: true
+          schema:
+            type: string
+        - name: clientName
+          in: query
+          description: template name to generate from
+          required: true
+          schema:
+            type: string
+        - name: mainRedactor
+          in: query
+          description: template name to generate from
+          required: false
+          schema:
+            type: string
+            default: N/A
+        - name: lang
+          in: query
+          description: lang of the template
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Return a generated report file
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.presentationml.document:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid parameter
+          content:
+            application/json:
+              examples:
+                Invalid extension:
+                  value: '"Invalid extension for template, must be pptx or docx"'
+                No template for lang:
+                  value: '"There is no existing templates for this lang"'
+        "404":
+          description: not found
+          content:
+            application/json:
+              examples:
+                Template not found:
+                  value: '"Template file not found"'
+  "/report/{pentest}/defects":
+    get:
+      operationId: pollenisator.server.ServerModels.Defect.getGlobalDefects
+      tags:
+        - Report
+      summary: Get the ordered list of global defect
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A list of defect ordered by index
+          content:
+            application/json:
+              examples:
+                Ordered defect list:
+                  value: '[
+  {
+    "_id": "ObjectId|60f194db1255fd087c769756",
+    "ease": "Moderate",
+    "impact": "Critical",
+    "index": "0",
+    "infos": {},
+    "ip": "",
+    "notes": "",
+    "port": "",
+    "proofs": [],
+    "proto": "",
+    "redactor": "N/A",
+    "risk": "Critical",
+    "tags": [],
+    "title": "XSS",
+    "type": [
+      "Application"
+    ]
+  },
+  {
+    "_id": "ObjectId|60f190815955e6cf385a405d",
+    "ease": "Moderate",
+    "impact": "Major",
+    "index": "1",
+    "infos": {},
+    "ip": "",
+    "notes": "",
+    "port": "",
+    "proofs": [],
+    "proto": "",
+    "redactor": "N/A",
+    "risk": "Major",
+    "tags": [],
+    "title": "sql",
+    "type": [
+      "Application"
+    ]
+  }
+]'
+  "/report/{pentest}/defects/move/{defect_id_to_move}/{target_id}":
+    post:
+      operationId: pollenisator.server.ServerModels.Defect.moveDefect
+      tags:
+        - Report
+      summary: Move one defect at the index of the other. Other index are impacted
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: defect_id_to_move
+          in: path
+          description: defect_id to move
+          required: true
+          schema:
+            type: string
+        - name: target_id
+          in: path
+          description: target_id to move to
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              examples:
+                Success destination index:
+                  value: '2'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              examples:
+                not found moving defect:
+                  value: '"This global defect does not exist"'
+                not found destination defect:
+                  value: '"the target global defect does not exist"'
+  
+  "/report/search":
+    get:
+      operationId: pollenisator.server.Report.search
+      tags:
+        - Report
+      summary: search a defect/remark on an external app
+      parameters:
+        - name: type
+          in: query
+          description: defect or remark
+          required: true
+          schema:
+            type: string
+            enum:
+              - defect
+              - remark
+        - name: q
+          in: query
+          description: terms for the saerch
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    description:
+                      type: string
+                    ease:
+                      type: string
+                      enum: 
+                        - Easy
+                        - Moderate
+                        - Difficult
+                        - Arduous
+                    impact:
+                      type: string
+                      enum:
+                        - Minor
+                        - Important
+                        - Major
+                        - Critical
+                    perimeter:
+                      type: string
+                    risk:
+                      type: string
+                      enum:
+                        - Minor
+                        - Important
+                        - Major
+                        - Critical
+                    synthesis:
+                      type: string
+                    title:
+                      type: string
+                    type:
+                      type: string
+                    fixes:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          description:
+                            type: string
+                          execution:
+                            type: string
+                            enum:
+                              - Quick Win
+                              - Moderate
+                              - Hard
+                          gain:
+                            type: string
+                            enum:
+                              - Weak
+                              - Moderate
+                              - Strong
+                          synthesis:
+                            type: string
+                          title:
+                            type: string
+
+        "503":
+          description: Error knowledge database
+          content:
+            application/json:
+              examples:
+                No knowledge database:
+                  value: '"There is no knowledge database implemented."'
+                Unreachable:
+                  value: '"The knowledge database is unreachable"'
+                Error from knowledge db:
+                  value: '"The knowledge dabatase encountered an issue : "{response_text}'
