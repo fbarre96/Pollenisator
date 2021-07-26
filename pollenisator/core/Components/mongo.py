@@ -33,7 +33,7 @@ class MongoCalendar:
             host: the host where the database is running
             user: a user login to the database
             password: a password corresponding with the user to connect to the database
-            ssl: A boolean string "True" or "False" indicating if ssl should be used to connect with the database.
+            ssl: Absolute path to the folder containing client.pem and ca.pem or empty if ssl is disabled
             calendarName: the calendar name the db has connected to. Or None if not connected to any calendar.
             ssldir: The string path to a folder where all the ssl certificates are to be found.
             db: The database to the client last connected.
@@ -141,9 +141,8 @@ class MongoCalendar:
                 connectionString = self.user+':'+self.password+'@'
             self.calendarName = None
             try:
-                if cfg["ssl"] == "True":
-                    self.ssldir = os.path.abspath(
-                        os.path.join(dir_path, "../../ssl/"))
+                if cfg["ssl"].strip() != "":
+                    self.ssldir = cfg["ssl"].strip()
                     self.client = MongoClient('mongodb://'+connectionString+self.host+":"+self.port, ssl=True, ssl_certfile=os.path.join(
                         self.ssldir, "client.pem"), ssl_cert_reqs=ssl.CERT_REQUIRED, ssl_ca_certs=os.path.join(self.ssldir, "ca.pem"), serverSelectionTimeoutMS=timeoutInMS, socketTimeoutMS=2000, connectTimeoutMS=2000)
                 else:
@@ -708,7 +707,7 @@ class MongoCalendar:
             self.host+"  --db "+dbName+" --archive="+out_path+".gz --gzip"
         if collection.strip() != "":
             cmd += " -c "+str(collection).strip()
-        if self.ssl == "True":
+        if self.ssl.strip() != "":
             cmd += " --ssl --sslPEMKeyFile "+self.ssldir+"/client.pem --sslCAFile " + \
                 self.ssldir+"/ca.pem --sslAllowInvalidHostnames"
         execute(cmd)
@@ -736,7 +735,7 @@ class MongoCalendar:
                 " -p "+self.password + " --authenticationDatabase admin "
             cmd = "mongorestore "+connectionString+"--host " + \
                 self.host+" --archive="+filename+" --gzip"
-            if self.ssl == "True":
+            if self.ssl.strip() != "":
                 cmd += " --ssl --sslPEMKeyFile "+self.ssldir+"/client.pem --sslCAFile " + \
                     self.ssldir+"/ca.pem --sslAllowInvalidHostnames"
             if kwargs.get("nsFrom", None) is not None and kwargs.get("nsTo", None) is not None:
@@ -762,7 +761,7 @@ class MongoCalendar:
             " -p "+self.password + " --authenticationDatabase admin "
         cmd = "mongorestore "+connectionString+"--host " + \
             self.host+" --archive="+filename+" --gzip"
-        if self.ssl == "True":
+        if self.ssl.strip() != "":
             cmd += " --ssl --sslPEMKeyFile "+self.ssldir+"/client.pem --sslCAFile " + \
                 self.ssldir+"/ca.pem --sslAllowInvalidHostnames"
         
