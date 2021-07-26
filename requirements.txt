@@ -13,3 +13,4 @@ flask
 lark-parser
 bcrypt
 python-jose
+flask_socketio

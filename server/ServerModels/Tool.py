@@ -448,7 +448,7 @@ def launchTask(pentest, tool_iid, body, **kwargs):
     # Mark the tool as running (scanner_ip is set and dated is set, datef is "None")
     # Add a queue to the selected worker for this tool, So that only this worker will receive this task
     instructions = mongoInstance.insertInDb("pollenisator", "instructions", {"worker":workerName, "date":datetime.now(), "function":"executeCommand",
-                                                                             "args":[workerToken, pentest, str(launchableToolId), plugin]})
+                                                                             "args":[worker_token, pentest, str(launchableToolId), plugin]})
     return instructions.inserted_id, 200
 
     
