@@ -1,5 +1,9 @@
 """Module for orchestrating an automatic scan. Must be run in a separate thread/process."""
 import time
+import cProfile
+import pstats
+import io
+
 from multiprocessing import Process
 from datetime import datetime
 from bson.objectid import ObjectId
@@ -25,7 +29,8 @@ def startAutoScan(pentest, **kwargs):
     if workers is None:
         return "No worker registered for this pentest", 404
     mongoInstance.insert("autoscan", {"start":datetime.now(), "special":True})
-    autoscan = Process(target=autoScan, args=(pentest, encode_token(kwargs["token_info"])))
+    encoded = encode_token(kwargs["token_info"])
+    autoscan = Process(target=autoScan, args=(pentest, encoded))
     try:
         autoscan.start()
     except(KeyboardInterrupt, SystemExit):
@@ -40,23 +45,26 @@ def autoScan(pentest, endoded_token):
     Args:
         pentest: The database to search tools in
     """
-    print("Starting real auto scan")
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     check = True
     try:
         while check:
-            print("Checking for tools")
+            pr = cProfile.Profile()
+            pr.enable()
             launchableTools, waiting = findLaunchableTools(pentest)
-            print("Found launchable tools "+str(launchableTools))
             launchableTools.sort(key=lambda tup: (tup["timedout"], int(tup["priority"])))
             #TODO CHECK SPACE 
             for launchableTool in launchableTools:
-                print("Launching a tool "+str(launchableTool))
                 res, statuscode = launchTask(pentest, launchableTool["tool"].getId(), {"checks":True, "plugin":""}, worker_token=endoded_token)
             check = getAutoScanStatus(pentest)
-            print("AutoScan status "+str(check))
             time.sleep(3)
+            pr.disable()
+            s = io.StringIO()
+            ps = pstats.Stats(pr, stream=s).sort_stats('tottime')
+            ps.print_stats()
+            with open('/tmp/stats.txt', 'w+') as f:
+                f.write(s.getvalue())
     except(KeyboardInterrupt, SystemExit):
         print("stop autoscan : Kill received...")
         mongoInstance.delete("autoscan", {}, True)
@@ -76,14 +84,12 @@ def stopAutoScan(pentest):
     mongoInstance.delete("autoscan", {}, True)
     for toolId in toolsRunning:
         res, msg = stopTask(pentest, toolId, {"forceReset":True})
-        print("STOPTASK : "+str(msg))
     return "Success"
 
 @permission("pentester")
 def getAutoScanStatus(pentest):
     #commandsRunning = mongoInstance.aggregate("tools", [{"$match": {"datef": "None", "dated": {
     #        "$ne": "None"}, "scanner_ip": {"$ne": "None"}}}, {"$group": {"_id": "$name", "count": {"$sum": 1}}}])
-    print("In auto scan status")
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     return mongoInstance.find("autoscan", {"special":True}, False) is not None

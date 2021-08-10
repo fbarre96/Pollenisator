@@ -129,7 +129,6 @@ def insert(pentest, body):
                 defects_to_edit.append(defect_to_edit_o)
             
         for defect_to_edit in defects_to_edit:
-            print("Update defect index to "+str(int(defect_to_edit.index)+1))
             update(pentest, defect_to_edit.getId(), {"index":str(int(defect_to_edit.index)+1)})
         body["index"] = str(save_insert_pos)
     ins_result = mongoInstance.insert("defects", body, parent)

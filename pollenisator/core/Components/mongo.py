@@ -8,6 +8,7 @@ import pollenisator.core.Components.Utils as Utils
 import json
 import sys
 
+
 class MongoCalendar:
     # pylint: disable=unsubscriptable-object
     """

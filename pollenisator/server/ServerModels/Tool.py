@@ -246,7 +246,7 @@ class ServerTool(Tool, ServerElement):
         self.status = newStatus
         self.scanner_ip = workerName
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.updateInDb("pollenisator", "workers", {"name":workerName}, {"$push":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
+        mongoInstance.updateInDb("pollenisator", "workers", {"name":workerName}, {"$push":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=True)
     
 @permission("pentester")
 def setStatus(pentest, tool_iid, body):
@@ -316,7 +316,9 @@ def update(pentest, tool_iid, body):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     res = mongoInstance.update("tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
+    print("sent notification")
     return res
+    
 @permission("pentester")
 def craftCommandLine(pentest, tool_iid, plugin):
     # CHECK TOOL EXISTS
@@ -420,7 +422,7 @@ def importResult(pentest, tool_iid, upfile, body):
 
 @permission("pentester")
 def launchTask(pentest, tool_iid, body, **kwargs):
-    worker_token = kwargs.get("worker_token", encode_token(kwargs["token_info"]))
+    worker_token = kwargs.get("worker_token") if kwargs.get("worker_token") else kwargs.get("token_info")
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     launchableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
