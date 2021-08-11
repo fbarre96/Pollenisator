@@ -232,20 +232,21 @@ def insert(pentest, body):
     parent = ip_o.getParentId()
     ins_result = mongoInstance.insert("ips", body, parent)
     iid = ins_result.inserted_id
-    waves = mongoInstance.find("waves", {})
-    for wave in waves:
-        waveName = wave["wave"]
-        commands = wave["wave_commands"]
-        for commName in commands:
-            # 2. finding the command only if lvl is port
-            comm = mongoInstance.findInDb(pentest, "commands",
-                                            {"name": commName, "lvl": "ip"}, False)
-            if comm is not None:
-                # 3. checking if the added port fit into the command's allowed service
-                # 3.1 first, default the selected port as tcp if no protocole is defined.
-                tool_o = ServerTool(pentest)
-                tool_o.initialize(comm["name"], waveName, "", ip_o.ip, "", "", "ip")
-                tool_o.addInDb()
+    if ip_o.in_scopes:
+        waves = mongoInstance.find("waves", {})
+        for wave in waves:
+            waveName = wave["wave"]
+            commands = wave["wave_commands"]
+            for commName in commands:
+                # 2. finding the command only if lvl is port
+                comm = mongoInstance.findInDb(pentest, "commands",
+                                                {"name": commName, "lvl": "ip"}, False)
+                if comm is not None:
+                    # 3. checking if the added port fit into the command's allowed service
+                    # 3.1 first, default the selected port as tcp if no protocole is defined.
+                    tool_o = ServerTool(pentest)
+                    tool_o.initialize(comm["name"], waveName, "", ip_o.ip, "", "", "ip")
+                    tool_o.addInDb()
     return {"res":True, "iid":iid}
 
 @permission("pentester")

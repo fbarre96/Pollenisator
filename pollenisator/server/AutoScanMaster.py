@@ -1,10 +1,9 @@
 """Module for orchestrating an automatic scan. Must be run in a separate thread/process."""
 import time
-import cProfile
 import pstats
 import io
 
-from multiprocessing import Process
+from threading import Thread
 from datetime import datetime
 from bson.objectid import ObjectId
 import pollenisator.core.Components.Utils as Utils
@@ -30,7 +29,7 @@ def startAutoScan(pentest, **kwargs):
         return "No worker registered for this pentest", 404
     mongoInstance.insert("autoscan", {"start":datetime.now(), "special":True})
     encoded = encode_token(kwargs["token_info"])
-    autoscan = Process(target=autoScan, args=(pentest, encoded))
+    autoscan = Thread(target=autoScan, args=(pentest, encoded))
     try:
         autoscan.start()
     except(KeyboardInterrupt, SystemExit):
@@ -50,8 +49,6 @@ def autoScan(pentest, endoded_token):
     check = True
     try:
         while check:
-            pr = cProfile.Profile()
-            pr.enable()
             launchableTools, waiting = findLaunchableTools(pentest)
             launchableTools.sort(key=lambda tup: (tup["timedout"], int(tup["priority"])))
             #TODO CHECK SPACE 
@@ -59,12 +56,6 @@ def autoScan(pentest, endoded_token):
                 res, statuscode = launchTask(pentest, launchableTool["tool"].getId(), {"checks":True, "plugin":""}, worker_token=endoded_token)
             check = getAutoScanStatus(pentest)
             time.sleep(3)
-            pr.disable()
-            s = io.StringIO()
-            ps = pstats.Stats(pr, stream=s).sort_stats('tottime')
-            ps.print_stats()
-            with open('/tmp/stats.txt', 'w+') as f:
-                f.write(s.getvalue())
     except(KeyboardInterrupt, SystemExit):
         print("stop autoscan : Kill received...")
         mongoInstance.delete("autoscan", {}, True)

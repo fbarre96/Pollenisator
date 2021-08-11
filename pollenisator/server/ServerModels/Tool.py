@@ -316,7 +316,6 @@ def update(pentest, tool_iid, body):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     res = mongoInstance.update("tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
-    print("sent notification")
     return res
     
 @permission("pentester")

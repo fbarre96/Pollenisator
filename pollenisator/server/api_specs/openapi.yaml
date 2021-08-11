@@ -3403,7 +3403,7 @@ paths:
                   value: '"This global defect does not exist"'
                 not found destination defect:
                   value: '"the target global defect does not exist"'
-  
+
   "/report/search":
     get:
       operationId: pollenisator.server.Report.search
