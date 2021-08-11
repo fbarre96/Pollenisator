@@ -24,7 +24,7 @@ app = connexion.App(__name__, specification_dir=server_folder, debug=True)
 # Read the openapi.yaml file to configure the endpoints
 app.add_api('openapi.yaml')
 flask_app = app.app
-socketio = SocketIO(logger=logger, engineio_logger=logger, async_mode="gevent") 
+socketio = SocketIO(logger=logger, engineio_logger=logger) 
 socketio.init_app(flask_app, log_output=False, logger=False, engineio_logger=False)
 # Tell your app object which encoder to use to create JSON from objects. 
 flask_app.json_encoder = JSONEncoder
@@ -99,7 +99,10 @@ def main():
     else:
         ssl_context = None
     flask_app.config["DEBUG"] = True
-    socketio.run(flask_app, host='0.0.0.0', port=port, debug=True, use_reloader=False)
+    try:
+        socketio.run(flask_app, host='0.0.0.0', port=port, debug=True, use_reloader=False)
+    except KeyboardInterrupt:
+        pass
     removeInactiveWorkersTimer.cancel()
 
 
