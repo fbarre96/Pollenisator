@@ -5,6 +5,8 @@ from pollenisator.server.ServerModels.Tool import ServerTool, update as tool_upd
 from bson import ObjectId
 from datetime import datetime
 from pollenisator.server.permission import permission
+
+
 mongoInstance = MongoCalendar.getInstance()
 
 @permission("user")
@@ -35,8 +37,8 @@ def deleteWorker(name):
     
     return {"n":int(res.deleted_count)}
 
-def removeInactiveWorkers():
-    workers = mongoInstance.getInactiveWorkers()
+def removeWorkers():
+    workers = mongoInstance.getWorkers()
     count = 0
     for worker in workers:
         running_tools = worker.get("running_tools", [])
@@ -49,10 +51,9 @@ def removeInactiveWorkers():
         count += 1
     return {"n":int(count)}
 
-def registerCommands(name, body):
-    command_names = body
-    res = mongoInstance.registerCommands(name, command_names)
-    return res
+
+
+
 
 @permission("user")
 def getRegisteredCommands(name):
@@ -66,7 +67,8 @@ def setCommandConfig(name, body):
     worker = mongoInstance.getWorker(name)
     if worker is None:
         return "Worker not found", 404
-    mongoInstance.insertInDb("pollenisator", "instructions", {"worker":name, "date":datetime.now(), "function":"editToolConfig", "args":[command_name, remote_bin, plugin]}, False)
+    from pollenisator.api import socketio, sockets
+    socketio.emit('editToolConfig', {'command_name': command_name, "remote_bin":remote_bin,"plugin": plugin}, room=sockets[name])
     return True
 
 @permission("worker")
@@ -88,23 +90,3 @@ def unregister(name):
         mongoInstance.deleteFromDb("pollenisator", "workers", {"name": name}, False, True)
         return True
     return "Worker not Found", 404
-
-def getInstructions(name):
-    worker = mongoInstance.getWorker(name)
-    if worker is None:
-        return "Worker not Found", 404
-    mongoInstance.updateWorkerLastHeartbeat(name)
-    instructions = mongoInstance.findInDb("pollenisator", "instructions", {"worker":name}, True)
-    data = list(instructions)
-    mongoInstance.deleteFromDb("pollenisator", "instructions", {"worker":name}, True, False)
-    return data
-    
-@permission("worker")
-def deleteInstruction(name, instruction_iid):
-    worker = mongoInstance.getWorker(name)
-    if worker is None:
-        return "Worker not Found", 404
-    res = mongoInstance.deleteFromDb("pollenisator", "instructions", {"_id":ObjectId(instruction_iid)})
-    if res is None:
-        return "Instruction not found", 404
-    return res.deleted_count

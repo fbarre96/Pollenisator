@@ -92,16 +92,6 @@ class MongoCalendar:
             "name": worker_hostname}, False, True)
         return res
 
-    
-
-    def getInactiveWorkers(self):
-        """Remove workers that did not sent a heart beat in 30 sec."""
-        nowTime = datetime.datetime.now()
-        deltaTime = nowTime - datetime.timedelta(seconds=30)
-        res = self.findInDb("pollenisator", "workers", {"last_heartbeat": {"$lt": deltaTime}}, True)
-        if res is None:
-            return []
-        return res
 
     def updateWorkerLastHeartbeat(self, worker_hostname):
         """Update a worker last heart beat sent

@@ -5,16 +5,19 @@ import os
 import bcrypt
 import sys
 from datetime import datetime
-from flask import jsonify, session
+from flask import jsonify, session, request
 from bson import ObjectId
 import threading
 from pollenisator.core.Components.Utils import JSONEncoder, loadServerConfig
-from pollenisator.server.worker import removeInactiveWorkers
+from pollenisator.server.worker import removeWorkers, unregister
 from pollenisator.server.token import generateNewToken
 from getpass import getpass
 from flask_socketio import SocketIO
 import logging
+import uuid
 
+
+sockets = {}
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s][%(levelname)s] - %(funcName)s: %(message)s')
 logger = logging.getLogger(__name__)
 # Create the application instance
@@ -38,11 +41,6 @@ def home():
     """
     return "Api working"
 
-def removeInactiveWorkersTimerSet():
-    removeInactiveWorkers()
-    removeInactiveWorkersTimer = threading.Timer(
-            30, removeInactiveWorkersTimerSet)
-    removeInactiveWorkersTimer.start()
 
 def createAdmin(username="", password=""):
     print("The user database is empty, create an admin now")
@@ -66,7 +64,28 @@ def notify_clients(notif):
     """
     global socketio
     socketio.emit("notif", json.dumps(notif, cls=JSONEncoder))
+    
+@socketio.event
+def registerCommands(data):
+    mongoInstance = MongoCalendar.getInstance()
+    workerName = data.get("workerName")
+    tools = data.get("tools")
+    global sockets
+    sockets[workerName] = request.sid
+    command_names = tools
+    mongoInstance.registerCommands(workerName, command_names)
 
+@socketio.event
+def disconnect():
+    sid = request.sid
+    todel = None
+    global sockets
+    for key, val in sockets.items():
+        if val == sid:
+            todel = key
+    if todel:
+        unregister(todel)
+        del sockets[todel]
 
 def main():
     mongoInstance = MongoCalendar.getInstance()
@@ -88,9 +107,8 @@ def main():
         else:
             createAdmin()
         
-    removeInactiveWorkersTimer = threading.Timer(
-            30, removeInactiveWorkersTimerSet)
-    removeInactiveWorkersTimer.start()
+
+    removeWorkers()
     conf = loadServerConfig()
     port = int(conf.get("api_port", 5000))
     https = conf.get("https", "false").lower() == "true"
@@ -103,7 +121,6 @@ def main():
         socketio.run(flask_app, host='0.0.0.0', port=port, debug=True, use_reloader=False)
     except KeyboardInterrupt:
         pass
-    removeInactiveWorkersTimer.cancel()
 
 
 

@@ -281,14 +281,6 @@ components:
           type: array
           items:
             type: string
-    Instructions:
-      properties:
-        function:
-          type: string
-        args:
-          type: array
-          items:
-            type: string
 
 security:
   - jwt: []
@@ -1584,35 +1576,35 @@ paths:
               examples:
                 Success:
                   value: 'true'
-  "/workers/{name}/registerCommands":
-    put:
-      operationId: pollenisator.server.worker.registerCommands
-      tags:
-        - Worker
-      summary: Set a worker registered commands
-      description: Set a worker registered commands
-      security: []
-      parameters:
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: array
-              items:
-                type: string
-      responses:
-        "200":
-          description: Successful update of worker registered commands
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: 'true'
+  # "/workers/{name}/registerCommands":
+  #   put:
+  #     operationId: pollenisator.server.worker.registerCommands
+  #     tags:
+  #       - Worker
+  #     summary: Set a worker registered commands
+  #     description: Set a worker registered commands
+  #     security: []
+  #     parameters:
+  #       - name: name
+  #         in: path
+  #         required: true
+  #         schema:
+  #           type: string
+  #     requestBody:
+  #       content:
+  #         application/json:
+  #           schema:
+  #             type: array
+  #             items:
+  #               type: string
+  #     responses:
+  #       "200":
+  #         description: Successful update of worker registered commands
+  #         content:
+  #           application/json:
+  #             examples:
+  #               Success:
+  #                 value: 'true'
   
   "/workers/{name}/setCommandConfig":
     put:
@@ -1756,60 +1748,6 @@ paths:
   "searchsploit",
   "dnsrecon"
 ]'
-
-  "/workers/{name}/instructions":
-    get:
-      operationId: pollenisator.server.worker.getInstructions
-      tags:
-        - Worker
-      summary: Pull worker instructions
-      security: []
-      parameters:
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successful get
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Instructions"
-  "/workers/{name}/instructions/{instruction_iid}":
-    delete:
-      operationId: pollenisator.server.worker.deleteInstruction
-      tags:
-        - Worker
-      summary: delete a worker instruction
-      parameters:
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: instruction_iid
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successful deletion of instruction
-          content:
-            application/json:
-              schema:
-                type: integer
-        "404":
-          description: Worker or instruction not found
-          content:
-            application/json:
-              examples:
-                Instruction not found:
-                  value: '"Instruction not found"'
 
   "/commands/{pentest}":
     post:
@@ -2905,8 +2843,8 @@ paths:
           content:
             application/json:
               examples:
-                Success returns instruction iid:
-                  value: '"ObjectId|60f69c67fca98c4bbbe5348a"'
+                Success :
+                  value: '"Success"'
         "404":
           description: Not found
           content:

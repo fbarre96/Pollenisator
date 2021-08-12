@@ -421,7 +421,7 @@ def importResult(pentest, tool_iid, upfile, body):
 
 @permission("pentester")
 def launchTask(pentest, tool_iid, body, **kwargs):
-    worker_token = kwargs.get("worker_token") if kwargs.get("worker_token") else kwargs.get("token_info")
+    worker_token = kwargs.get("worker_token") if kwargs.get("worker_token") else encode_token(kwargs.get("token_info"))
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     launchableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
@@ -447,10 +447,10 @@ def launchTask(pentest, tool_iid, body, **kwargs):
     launchableTool.markAsRunning(workerName)
     update(pentest, tool_iid, ToolController(launchableTool).getData())
     # Mark the tool as running (scanner_ip is set and dated is set, datef is "None")
-    # Add a queue to the selected worker for this tool, So that only this worker will receive this task
-    instructions = mongoInstance.insertInDb("pollenisator", "instructions", {"worker":workerName, "date":datetime.now(), "function":"executeCommand",
-                                                                             "args":[worker_token, pentest, str(launchableToolId), plugin]})
-    return instructions.inserted_id, 200
+    # Use socket sid as room so that only this worker will receive this task
+    from pollenisator.api import socketio, sockets
+    socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(launchableToolId), "parser": plugin}, room=sockets[workerName])
+    return "Success ", 200
 
     
 @permission("pentester")
@@ -475,8 +475,8 @@ def stopTask(pentest, tool_iid, body):
         return "Tools running in localhost cannot be stopped through API", 405
     if saveScannerip not in workerNames:
         return "The worker running this tool is not running anymore", 404
-    instructions = mongoInstance.insertInDb("pollenisator", "instructions", {"worker":saveScannerip, "date":datetime.now(), "function":"stopCommand",
-                                                                             "args":[pentest, str(tool_iid)]})
+    from pollenisator.api import socketio, sockets
+    socketio.emit('stopCommand', {'pentest': pentest, "tool_iid":str(tool_iid)}, room=sockets[saveScannerip])
     if not forceReset:
         stopableTool.markAsNotDone()
         update(pentest, tool_iid, ToolController(stopableTool).getData())
