@@ -54,6 +54,9 @@ def autoScan(pentest, endoded_token):
             launchableTools.sort(key=lambda tup: (tup["timedout"], int(tup["priority"])))
             #TODO CHECK SPACE 
             for launchableTool in launchableTools:
+                check = getAutoScanStatus(pentest)
+                if not check:
+                    break
                 res, statuscode = launchTask(pentest, launchableTool["tool"].getId(), {"checks":True, "plugin":""}, worker_token=endoded_token)
             check = getAutoScanStatus(pentest)
             time.sleep(3)
@@ -70,7 +73,7 @@ def stopAutoScan(pentest):
     toolsRunning = []
     workers = mongoInstance.getWorkers({"pentests":pentest})
     for worker in workers:
-        tools = mongoInstance.find("tools", {"scanner_ip": worker["name"]}, True)
+        tools = mongoInstance.find("tools", {"scanner_ip": worker["name"], "status":"running"}, True)
         for tool in tools:
             toolsRunning.append(tool["_id"])
     mongoInstance.delete("autoscan", {}, True)
