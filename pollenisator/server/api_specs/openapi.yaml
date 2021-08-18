@@ -1380,6 +1380,9 @@ paths:
                   type: string
                 color:
                   type: string
+                global:
+                  type: boolean
+                  default: false
       responses:
         "200":
           description: Success

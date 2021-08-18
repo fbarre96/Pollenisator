@@ -367,9 +367,18 @@ def updateSetting(body):
 def registerTag(body):
     name = body["name"]
     color = body["color"]
-    tags = json.loads(mongoInstance.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=JSONDecoder)
-    tags[name] = color
-    mongoInstance.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=JSONEncoder)}}, many=False, notify=True)
+    isGlobal = body.get("global", False)
+    if isGlobal:
+        tags = json.loads(mongoInstance.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=JSONDecoder)
+        mongoInstance.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=JSONEncoder)}}, many=False, notify=True)
+    else:
+        tags = mongoInstance.find("settings", {"key":"tags"}, False)
+        if tags is None:
+            mongoInstance.insert("settings", {"key":"tags", "value":{name:color}})
+        else:
+            tags = tags.get("value", {})
+            tags[name] = color
+            mongoInstance.update("settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
     return True
 
 @permission("pentester", "dbName")
