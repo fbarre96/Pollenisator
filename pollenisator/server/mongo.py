@@ -7,7 +7,7 @@ import tempfile
 import shutil
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Components.parser import Parser, ParseError, Term
-from pollenisator.core.Components.Utils import JSONDecoder, getMainDir, isIp
+from pollenisator.core.Components.Utils import JSONDecoder, getMainDir, isIp, JSONEncoder
 from pollenisator.core.Controllers.CommandController import CommandController
 from pollenisator.core.Controllers.WaveController import WaveController
 from pollenisator.core.Controllers.IntervalController import IntervalController
@@ -362,6 +362,15 @@ def updateSetting(body):
     value = body["value"]
     return mongoInstance.updateInDb("pollenisator", "settings", {
                     "key": key}, {"$set": {"value": value}})
+
+@permission("user")
+def registerTag(body):
+    name = body["name"]
+    color = body["color"]
+    tags = json.loads(mongoInstance.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=JSONDecoder)
+    tags[name] = color
+    mongoInstance.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=JSONEncoder)}}, many=False, notify=True)
+    return True
 
 @permission("pentester", "dbName")
 def dumpDb(dbName, collection=""):
