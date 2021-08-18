@@ -12,5 +12,5 @@ connexion
 flask>=2.0.0
 lark-parser
 bcrypt
-python-jose
+python-jose>=3.3.0
 flask_socketio
