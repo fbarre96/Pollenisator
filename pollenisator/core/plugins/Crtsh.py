@@ -81,7 +81,7 @@ class Crtsh(Plugin):
                     ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
                     hostname = ip_m.infos.get("hostname", [])
                     if not isinstance(hostname, list):
-                        hostname = list(hostname)
+                        hostname = [hostname]
                     infosToAdd = {"hostname": list(set([ip] + hostname))}
                     ip_m.updateInfos(infosToAdd)
                 else:

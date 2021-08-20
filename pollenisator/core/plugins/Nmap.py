@@ -73,8 +73,10 @@ def getIpPortsNmap(pentest, nmapFile):
                         insert_res = ipDom_m.addInDb()
                         if not insert_res["res"]:
                             ipDom_m = ServerIp.fetchObject(pentest, {"_id": insert_res["iid"]})
-                        ipDom_m.updateInfos({"hostname": list(set(list(ipDom_m.infos.get(
-                            "hostname", []))+[str(ipCIDR_m.ip)]))})
+                        hostnames = ipDom_m.infos.get("hostname", [])
+                        if isinstance(hostnames, str):
+                            hostnames = [hostnames]
+                        ipDom_m.updateInfos({"hostname": list(set(list(hostnames)+[str(ipCIDR_m.ip)]))})
                         validIps.append(ipDom_m.ip)
                 for ipFound in validIps:
                     if ip == "":
