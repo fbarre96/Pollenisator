@@ -75,6 +75,7 @@ class TreeToCondition(Transformer):
         """
         (s,) = s
         return str(s)
+        
     def number(self, n):
         """Applied on parse-tree number objects.
         Args:

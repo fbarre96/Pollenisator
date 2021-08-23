@@ -60,10 +60,10 @@ class DefectController(ControllerElement):
         notes = values["Notes"]
         proof = values["Proof"]
         proofs = []
-        tableau_from_ease = {"Facile": {"Mineur": "Majeur", "Important": "Majeur", "Majeur": "Critique", "Critique": "Critique"},
-                             "Modérée": {"Mineur": "Important", "Important": "Important", "Majeur": "Majeur", "Critique": "Critique"},
-                             "Difficile": {"Mineur": "Mineur", "Important": "Important", "Majeur": "Majeur", "Critique": "Majeur"},
-                             "Très difficile": {"Mineur": "Mineur", "Important": "Mineur", "Majeur": "Important", "Critique": "Important"}}
+        tableau_from_ease = {"Easy": {"Minor": "Major", "Important": "Major", "Major": "Critical", "Critical": "Critical"},
+                             "Moderate": {"Minor": "Important", "Important": "Important", "Major": "Major", "Critical": "Critical"},
+                             "Difficult": {"Minor": "Minor", "Important": "Important", "Major": "Major", "Critical": "Major"},
+                             "Arduous": {"Minor": "Minor", "Important": "Minor", "Major": "Important", "Critical": "Important"}}
         risk = tableau_from_ease.get(ease,{}).get(impact,"N/A")
         self.model.initialize(ip, port, proto, title, ease,
                               impact, risk, redactor, mtype, notes, proofs)

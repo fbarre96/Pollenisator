@@ -242,7 +242,7 @@ def addDefectsReport(workbook):
         'fg_color': 'yellow',
         'font_color': 'black'
     })
-    risk_formats = {"Critique":critical_risk_format, "Majeur":major_risk_format, "Important":important_risk_format, "Mineur":minor_risk_format}
+    risk_formats = {"Critical":critical_risk_format, "Major":major_risk_format, "Important":important_risk_format, "Minor":minor_risk_format}
     apiclient = APIClient.getInstance()
     titles = apiclient.aggregate("defects", [{"$group":{"_id": "$title"}}])
     ligne = 1
@@ -357,20 +357,20 @@ def addDefectsRecap(workbook, defectDicts):
         'fg_color': 'white',
         'font_color': 'black'
     })
-    risk_formats = {"Critique":critical_risk_format, "Majeur":major_risk_format, "Important":important_risk_format, "Mineur":minor_risk_format}
-    fixes_formats = {"Quick Win":QuickWin_format, "Faible":QuickWin_format, "Modérée":medium_format, "Moyen":medium_format, "Fort":strong_format, "Envergure":strong_format}
+    risk_formats = {"Critical":critical_risk_format, "Major":major_risk_format, "Important":important_risk_format, "Minor":minor_risk_format}
+    fixes_formats = {"Quick Win":QuickWin_format, "Faible":QuickWin_format, "Moderate":medium_format, "Moyen":medium_format, "Fort":strong_format, "Envergure":strong_format}
     defects_dict = defectDicts
     impossible_to_connect = False
-    worksheet1.write(0, 0, "Critique", risk_formats["Critique"])
-    worksheet1.write(1, 0, str(len(defects_dict["Critique"].keys())), border_format)
-    worksheet1.write(0, 1, "Majeur", risk_formats["Majeur"])
-    worksheet1.write(1, 1, str(len(defects_dict["Majeur"].keys())), border_format)
+    worksheet1.write(0, 0, "Critical", risk_formats["Critical"])
+    worksheet1.write(1, 0, str(len(defects_dict["Critical"].keys())), border_format)
+    worksheet1.write(0, 1, "Major", risk_formats["Major"])
+    worksheet1.write(1, 1, str(len(defects_dict["Major"].keys())), border_format)
     worksheet1.write(0, 2, "Important", risk_formats["Important"])
     worksheet1.write(1, 2, str(len(defects_dict["Important"].keys())), border_format)
-    worksheet1.write(0, 3, "Mineur", risk_formats["Mineur"])
-    worksheet1.write(1, 3, str(len(defects_dict["Mineur"].keys())), border_format)
+    worksheet1.write(0, 3, "Minor", risk_formats["Minor"])
+    worksheet1.write(1, 3, str(len(defects_dict["Minor"].keys())), border_format)
     worksheet1.write(0, 4, "Total", border_format)
-    worksheet1.write(1, 4, str(len(defects_dict["Mineur"].keys())+len(defects_dict["Important"].keys())+len(defects_dict["Majeur"].keys())+len(defects_dict["Critique"].keys())), border_format)
+    worksheet1.write(1, 4, str(len(defects_dict["Minor"].keys())+len(defects_dict["Important"].keys())+len(defects_dict["Major"].keys())+len(defects_dict["Critical"].keys())), border_format)
 
     ligne=3
     ligne_correctif = 3
@@ -393,7 +393,7 @@ def addDefectsRecap(workbook, defectDicts):
     worksheet1.write(ligne_correctif, colMOE, "Mise en oeuvre", border_format)
     worksheet1.write(ligne_correctif, colGain, "Gain en sécurité", border_format)
     ligne_correctif+=1
-    criticity_list = ["Critique", "Majeur", "Important", "Mineur"]
+    criticity_list = ["Critical", "Major", "Important", "Minor"]
     count_defect = 0
     for criticity in criticity_list:
         for title, defect_values in defects_dict[criticity].items():

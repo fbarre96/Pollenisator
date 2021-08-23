@@ -85,11 +85,11 @@ def importExistingFile(pentest, upfile, body):
             mongoInstance.insert("waves", {"wave":"Imported", "wave_commands":[]})
             tool_m = ServerTool().initialize(toolName, "Imported", scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
                                         dated=date, datef=date, scanner_ip="Imported", status="done", notes=notes, tags=tags)
-            tool_m.addInDb()
+            ret = tool_m.addInDb()
             upfile.stream.seek(0)
-            msg, status, filepath = _upload(pentest, tool_m.getId(), "result", upfile)
+            msg, status, filepath = _upload(pentest, str(ret["iid"]), "result", upfile)
             if status == 200:
-                mongoInstance.update("tools", {"_id":ObjectId(tool_m.getId())}, {"resultfile":  filepath})
+                mongoInstance.update("tools", {"_id":ObjectId(ret["iid"])}, {"resultfile":  filepath})
     return results
 
 

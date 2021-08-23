@@ -164,7 +164,9 @@ def _evaluateCondition(searchable_collections, condition_list):
                     value = value[1:-1]
             if termToSearch == "type":
                 if operator == "==":
-                    searchable_collections.append(value+"s")
+                    if not value.endswith("s"):
+                        value += "s"
+                    searchable_collections.append(value)
                 else:
                     raise Exception(f"When filtering type, only == is a valid operators")
             else:
