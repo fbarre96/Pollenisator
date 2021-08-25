@@ -244,6 +244,9 @@ def bulk_delete(pentest, body):
     deleted = 0
     for obj_type in data:
         for obj_id in data[obj_type]:
+            if not isinstance(obj_id, ObjectId):
+                if obj_id.startswith("ObjectId|"):
+                    obj_id = ObjectId(obj_id.split("ObjectId|")[1])
             res = mongoInstance.deleteFromDb(pentest, obj_type, {"_id": ObjectId(obj_id)}, False, True)
             if res is not None:
                 deleted += res.deleted_count
