@@ -1086,6 +1086,22 @@ def markdownLinkToHyperlink(paragraph, initialRun, styles):
         i+=1
     return runs
 
+def linkToHyperlinkStyle(paragraph, initialRun, styles):
+    runs = [initialRun]
+    regex_hyperlink = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*[-a-zA-Z0-9@:%_\+.~#?&//=])"
+    regex = re.compile(regex_hyperlink)
+    i = 0
+    while i < len(runs):
+        matched = re.search(regex, runs[i].text)
+        if matched is not None:
+            start = runs[i].text.index(matched.group(0))
+            end = start+len(matched.group(0))
+            split_runs = split_run_in_three(paragraph, runs[i], start, end)
+            style = styles["Hyperlink"]
+            set_hyperlink(paragraph, split_runs[1], matched.group(0), matched.group(0), style)
+        i+=1
+    return runs
+
 def splitRunOnMarker(paragraph, run, regexToSearch, markerToRemove):
     regex = re.compile(regexToSearch, re.MULTILINE)
     matched = re.findall(regex, run.text)
@@ -1167,6 +1183,8 @@ def markdownToWordInRun(paragraph, initialRun, styles):
         new_runs |= set(markdownImgToInsertedImage(paragraph, run))
     for run in list(new_runs):
         markdownLinkToHyperlink(paragraph, run, styles)
+    for run in list(new_runs):
+        linkToHyperlinkStyle(paragraph, run, styles)
 
 def markdownToWordInDocument(document):
     ps = getParagraphs(document)
