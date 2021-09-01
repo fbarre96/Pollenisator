@@ -7,7 +7,7 @@ from werkzeug.exceptions import Unauthorized
 import six
 
 JWT_SECRET = str(uuid.uuid4())
-JWT_LIFETIME_SECONDS = 3600
+JWT_LIFETIME_SECONDS = 3600*8
 JWT_ALGORITHM = 'HS256'
 
 def getTokenFor(username, pentest="", owner=False):
