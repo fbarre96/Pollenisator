@@ -111,6 +111,8 @@ def insert(pentest, body):
     existing = mongoInstance.find("defects", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
+    if defect_o.ip.strip() == "" and defect_o.port.strip() != "":
+        return "If a port is specified, an ip should be specified to", 400
     parent = defect_o.getParentId()
     if "_id" in body:
         del body["_id"]
@@ -124,7 +126,7 @@ def insert(pentest, body):
             defects_to_edit.append(defect_to_edit_o)
         while defect_to_edit_o is not None:
             insert_pos+=1
-            defect_to_edit_o = ServerDefect.fetchObject(pentest, {"ip":"", "index":str(insert_pos)})
+            defect_to_edit_o = ServerDefect.fetchObject(pentest, {"ip":"",  "index":str(insert_pos)})
             if defect_to_edit_o is not None:
                 defects_to_edit.append(defect_to_edit_o)
             

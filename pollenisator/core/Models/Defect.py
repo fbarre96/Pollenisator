@@ -125,4 +125,4 @@ class Defect(Element):
         Returns:
             bool
         """
-        return self.ip != ""
+        return self.ip != "" and self.port != ""
