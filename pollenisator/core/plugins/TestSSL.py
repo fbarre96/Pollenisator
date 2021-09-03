@@ -71,7 +71,7 @@ def parseWarnings(pentest, file_opened):
                     defect_o.notes += notes
                     defect_o.update()
         if firstLine:
-        return None, None
+            return None, None
     return str(len(missconfiguredHosts.keys()))+" misconfigured hosts found. Defects created.", targets
 
 
