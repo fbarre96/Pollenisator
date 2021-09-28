@@ -386,6 +386,55 @@ def registerTag(body):
             mongoInstance.update("settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
     return True
 
+@permission("user")
+def unregisterTag(body):
+    name = body["name"]
+    isGlobal = body.get("global", False)
+    if isGlobal:
+        tags = json.loads(mongoInstance.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=JSONDecoder)
+        val = tags.pop(name, None)
+        if val is None:
+            return 404, "Not found"
+        mongoInstance.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=JSONEncoder)}}, many=False, notify=True)
+    else:
+        tags = mongoInstance.find("settings", {"key":"tags"}, False)
+        if tags is None:
+            return 404, "Not found"
+        else:
+            tags = tags.get("value", {})
+            val = tags.pop(name, None)
+            if val is None:
+                return 404, "Not found"
+            mongoInstance.update("settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
+            mongoInstance.update("scopes", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
+            mongoInstance.update("ips", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
+            mongoInstance.update("ports", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
+            mongoInstance.update("tools", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
+    return True
+
+@permission("user")
+def updateTag(body):
+    name = body["name"]
+    color = body["color"]
+    isGlobal = body.get("global", False)
+    if isGlobal:
+        tags = json.loads(mongoInstance.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=JSONDecoder)
+        if name not in tags:
+            return 404, "Not found"
+        tags[name] = color
+        mongoInstance.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=JSONEncoder)}}, many=False, notify=True)
+    else:
+        tags = mongoInstance.find("settings", {"key":"tags"}, False)
+        if tags is None:
+            return 404, "Not found"
+        else:
+            tags = tags.get("value", {})
+            if name not in tags:
+                return 404, "Not found"
+            tags[name] = color
+            mongoInstance.update("settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
+    return True
+
 @permission("pentester", "dbName")
 def dumpDb(dbName, collection=""):
     """

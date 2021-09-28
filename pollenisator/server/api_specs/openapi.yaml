@@ -1391,6 +1391,63 @@ paths:
               examples:
                 Success:
                   value: 'Success'
+  /settings/unregisterTag:
+    post:
+      operationId: pollenisator.server.mongo.unregisterTag
+      tags:
+        - Settings
+      summary: Unregister a tag
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                global:
+                  type: boolean
+                  default: false
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Success'
+  /settings/updateTag:
+    put:
+      operationId: pollenisator.server.mongo.updateTag
+      tags:
+        - Settings
+      summary: Update a tag color
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - color
+              properties:
+                name:
+                  type: string
+                color:
+                  type: string
+                global:
+                  type: boolean
+                  default: false
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Success'
   /workers:
     get:
       operationId: pollenisator.server.worker.listWorkers
