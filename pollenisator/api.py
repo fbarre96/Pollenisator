@@ -15,6 +15,7 @@ from getpass import getpass
 from flask_socketio import SocketIO
 import logging
 import uuid
+from flask_cors import CORS, cross_origin
 
 
 sockets = {}
@@ -31,6 +32,7 @@ socketio = SocketIO(logger=logger, engineio_logger=logger)
 socketio.init_app(flask_app, log_output=False, logger=False, engineio_logger=False)
 # Tell your app object which encoder to use to create JSON from objects. 
 flask_app.json_encoder = JSONEncoder
+CORS(flask_app)
 # Create a URL route in our application for "/"
 
 @app.route('/')
