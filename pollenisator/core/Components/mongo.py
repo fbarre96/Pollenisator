@@ -524,7 +524,8 @@ class MongoCalendar:
         Raises:
             Raise Exception if client is not connected to database
         Returns:
-            None if the server connection is not established. A list of string with pollenisator databases.
+            None if the server connection is not established. 
+            A list of object with pollenisator databases {"nom":"string","owner":"string", "creation_date":"datetime object"}.
         """
         ret = []
         try:
@@ -538,9 +539,9 @@ class MongoCalendar:
                     if username is not None:
                         res = self.findInDb(calendar["nom"], "settings", {"key":"pentesters", "value":username}, False)
                         if res is not None or username == calendar.get("owner"):
-                            ret.append(calendar["nom"])
+                            ret.append(calendar)
                     else:
-                        ret.append(calendar["nom"])
+                        ret.append(calendar)
             except OperationFailure:
                 print("The connected user has no rights")
                 return None
@@ -550,6 +551,21 @@ class MongoCalendar:
                   self.host + " and has a user mongAdmin with the correct password.")
             self.client = None
             return None
+        return ret
+
+    def listCalendarNames(self, username=None):
+        """Return the list of pollenisator databases.
+        Raises:
+            Raise Exception if client is not connected to database
+        Returns:
+            None if the server connection is not established. A list of string with pollenisator databases.
+        """
+        cals = self.listCalendars(username)
+        if cals is None:
+            return None
+        ret = []
+        for cal in cals:
+            ret.append(cal["nom"])
         return ret
 
     def hasACalendarOpen(self):
@@ -593,7 +609,7 @@ class MongoCalendar:
         elif " " in calendarName.strip():
             msg = "The name cannot contain a space."
             return False, msg
-        calendars = self.listCalendars()
+        calendars = self.listCalendarNames()
         if calendars is None:
             return False, "API has trouble connecting to db. Check api server config."
         calendars = [x.lower() for x in calendars]
@@ -629,7 +645,7 @@ class MongoCalendar:
             return False, msg
         # insert in database  calendars
         self.connectToDb("pollenisator")
-        self.db.calendars.insert({"nom": saveAsName.strip(), "owner":owner})
+        self.db.calendars.insert({"nom": saveAsName.strip(), "owner":owner, "creation_date": datetime.datetime.now()})
         self.connectToDb(saveAsName.strip())
         if autoconnect:
             self.connectToDb(saveAsName.strip())
@@ -661,7 +677,7 @@ class MongoCalendar:
             return "database to copy : empty name", 400
         if toCopyName == "":
             return "database destination name is empty", 400
-        if fromCopyName not in self.listCalendars():
+        if fromCopyName not in self.listCalendarNames():
             return "database to copy : not found", 404
         
         major_version = ".".join(self.client.server_info()["version"].split(".")[:2])

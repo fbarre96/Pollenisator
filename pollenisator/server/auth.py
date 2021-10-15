@@ -104,7 +104,7 @@ def login(body):
 def connectToPentest(pentest, **kwargs):
     username = kwargs["token_info"]["sub"]
     mongoInstance = MongoCalendar.getInstance()
-    if pentest not in mongoInstance.listCalendars():
+    if pentest not in mongoInstance.listCalendarNames():
         return "Pentest not found", 404
     testers = mongoInstance.getPentestUsers(pentest)
     token = kwargs.get("token_info", {})

@@ -1142,7 +1142,19 @@ paths:
               schema:
                 type: array
                 items:
-                  type: string
+                  type: object
+                  required:
+                    - creation_date
+                    - name
+                    - owner
+                  properties:
+                    owner:
+                      type: string
+                    name:
+                      type: string
+                    creation_date:
+                      type: string
+                      format: date-time
               examples:
                 Success:
                   value: '["pentest1", "pentest2"]'

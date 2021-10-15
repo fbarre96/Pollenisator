@@ -67,7 +67,7 @@ def delete(pentest, command_iid):
         "$pull": {"commands": command.name}}, True, True)
     # Remove from all waves this command.
     if command.indb == "pollenisator":
-        calendars = mongoInstance.listCalendars()
+        calendars = mongoInstance.listCalendarNames()
     else:
         calendars = [command.indb]
     for calendar in calendars:

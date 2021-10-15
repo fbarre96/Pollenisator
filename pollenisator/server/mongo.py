@@ -63,7 +63,7 @@ def insert(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in mongoInstance.listCalendars():
+    elif pentest not in mongoInstance.listCalendarNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
     res = mongoInstance.insertInDb(pentest, collection, pipeline, body["parent"], body["notify"])
     return str(res.inserted_id)
@@ -78,7 +78,7 @@ def find(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in mongoInstance.listCalendars():
+    elif pentest not in mongoInstance.listCalendarNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
     res = mongoInstance.findInDb(pentest, collection, pipeline, body["many"])
     if isinstance(res, dict):
@@ -97,7 +97,7 @@ def search(pentest, s):
     """Use a parser to convert the search query into mongo queries and returns all matching objects
     """
     searchQuery = s
-    if pentest not in mongoInstance.listCalendars():
+    if pentest not in mongoInstance.listCalendarNames():
         return "Pentest argument is not a valid pollenisator pentest", 400
     try:
         parser = Parser(searchQuery)
@@ -187,7 +187,7 @@ def count(pentest, collection, body):
             return "Collection argument is not a valid pollenisator collection", 403
     if not isinstance(pipeline, dict):
         return "Pipeline argument was not valid", 400
-    elif pentest not in mongoInstance.listCalendars():
+    elif pentest not in mongoInstance.listCalendarNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
     res = mongoInstance.findInDb(pentest, collection, pipeline, True).count()
     return res
@@ -205,7 +205,7 @@ def aggregate(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in mongoInstance.listCalendars():
+    elif pentest not in mongoInstance.listCalendarNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
     res = mongoInstance.aggregateFromDb(pentest, collection, body)
     for r in res:
@@ -222,7 +222,7 @@ def delete(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in mongoInstance.listCalendars():
+    elif pentest not in mongoInstance.listCalendarNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
     res = mongoInstance.deleteFromDb(pentest, collection, pipeline, body["many"], body["notify"])
     if res is None:
@@ -239,7 +239,7 @@ def bulk_delete(pentest, body):
         return "body was not a valid dictionnary", 400
     if pentest == "pollenisator":
         return "Impossible to bulk delete in this database", 403
-    elif pentest not in mongoInstance.listCalendars():
+    elif pentest not in mongoInstance.listCalendarNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
     deleted = 0
     for obj_type in data:
@@ -445,7 +445,7 @@ def dumpDb(dbName, collection=""):
         dbName: the database name to dump
         collection: (Opt.) the collection to dump.
     """
-    if dbName != "pollenisator" and dbName not in mongoInstance.listCalendars():
+    if dbName != "pollenisator" and dbName not in mongoInstance.listCalendarNames():
         return "Database not found", 404
     mongoInstance.connectToDb(dbName)
     if collection != "" and collection not in mongoInstance.db.collection_names():

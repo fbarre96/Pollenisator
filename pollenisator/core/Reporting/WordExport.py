@@ -451,7 +451,7 @@ def populate_defect_summary_table(document, defects_dict, pentest_type):
 
     _replaceTextInTable, cell_id = replaceTextInTable(table, "var_dsum_colId", translate("ID"))
     _replaceTextInTable, cell_tit = replaceTextInTable(table, "var_dsum_colTit", translate("Title"))
-    _, cell_ease = replaceTextInTable(table, "var_dsum_colEase", translate("Ease"))
+    _, cell_ease = replaceTextInTable(table, "var_dsum_colEase", translate("Defect_Ease"))
     _, cell_impact = replaceTextInTable(table, "var_dsum_colImpact", translate("Impact"))
     _replaceTextInParagraphes, cell_type = replaceTextInTable(table, "var_dsum_colType", translate("Type"))
 
@@ -631,7 +631,7 @@ def write_every_defect_fix(fixes, document, last_defect_paragraph, count):
         copied_table_c, _ = findRowContaining(document, "var_c_id")
         replaceTextInTable(copied_table_c, "var_c_id", id_correctif)
         replaceTextInTable(copied_table_c, "var_c_title", fixe["title"])
-        replaceTextInTable(copied_table_c, "var_h_ease", translate("Ease"))
+        replaceTextInTable(copied_table_c, "var_h_ease", translate("Fix_Ease"))
         replaceTextInTable(copied_table_c, "var_h_gain", translate("Gain"))
         replaceTextInTable(copied_table_c, "var_c_ease", translate(fixe["execution"]))
         replaceTextInTable(copied_table_c, "var_c_gain", translate(fixe["gain"]))
