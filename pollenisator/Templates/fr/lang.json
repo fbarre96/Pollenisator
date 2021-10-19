@@ -2,5 +2,5 @@
 "january":"janvier", "february":"février", "march":"mars", "april":"avril", "may":"mai", "june":"juin",
 	"july":"juillet", "august":"août", "september":"septembre", "october":"octobre", "november":"novembre", "december":"décembre",
 "IP":"IP", "Port":"Port", "Comments":"Commentaires", "Protocol":"Protocole", "Description":"Description","Vulnerable":"Vulnerable","Notes":"Notes",
-"ID":"ID", "Title":"Libellé", "Defect_Ease":"Exploitation", "Impact":"Impact", "Type":"Type", "Fix_Ease":"Mise en\nœuvre", "Gain":"Gain en sécurité", "Risk":"Risque",
+"ID":"ID", "Title":"Libellé", "Defect_Ease":"Exploitation", "Impact":"Impact", "Type":"Type", "Fix_Ease":"Mise en œuvre", "Gain":"Gain en sécurité", "Risk":"Risque",
 "DEFECT_SMALLER":"D", "FIX_SMALLER":"A", "Easy": "Facile", "Moderate": "Modérée", "Mean":"Moyen", "Difficult": "Difficile", "Arduous": "Très difficile", "Minor": "Mineur", "Major": "Majeur", "Critical": "Critique", "Base": "Socle", "Data": "Données", "Hard": "Envergure", "Weak": "Faible", "Strong": "Fort"}
