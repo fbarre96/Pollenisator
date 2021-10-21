@@ -451,14 +451,14 @@ def populate_defect_summary_table(document, defects_dict, pentest_type):
 
     _replaceTextInTable, cell_id = replaceTextInTable(table, "var_dsum_colId", translate("ID"))
     _replaceTextInTable, cell_tit = replaceTextInTable(table, "var_dsum_colTit", translate("Title"))
-    _, cell_ease = replaceTextInTable(table, "var_dsum_colEase", translate("Defect_Ease"))
-    _, cell_impact = replaceTextInTable(table, "var_dsum_colImpact", translate("Impact"))
+    _, cell_ease = replaceTextInTable(table, "var_dsum_colEase", translate("var_h_exploitation"))
+    _, cell_impact = replaceTextInTable(table, "var_dsum_colImpact", translate("var_h_impact"))
     _replaceTextInParagraphes, cell_type = replaceTextInTable(table, "var_dsum_colType", translate("Type"))
 
     _, cell_c_id = replaceTextInTable(table_c, "var_csum_colId", translate("ID"))
     _, cell_c_tit = replaceTextInTable(table_c, "var_csum_colTit", translate("Title"))
-    _, cell_c_ease = replaceTextInTable(table_c, "var_csum_colEase", translate("Fix_Ease"))
-    _, cell_c_gain = replaceTextInTable(table_c, "var_csum_colGain", translate("Gain"))
+    _, cell_c_ease = replaceTextInTable(table_c, "var_csum_colEase", translate("var_h_ease"))
+    _, cell_c_gain = replaceTextInTable(table_c, "var_csum_colGain", translate("var_h_gain"))
     strong_color = '002060'
     medium_color = '0070C0'
     quick_win_color = '00B0F0'
