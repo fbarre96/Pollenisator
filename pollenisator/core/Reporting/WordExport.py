@@ -633,6 +633,8 @@ def write_every_defect_fix(fixes, document, last_defect_paragraph, count):
         replaceTextInTable(copied_table_c, "var_c_title", fixe["title"])
         replaceTextInTable(copied_table_c, "var_c_ease", translate(fixe["execution"]))
         replaceTextInTable(copied_table_c, "var_c_gain", translate(fixe["gain"]))
+        replaceTextInTable(copied_table_c, "var_h_ease", translate("var_h_ease"))
+        replaceTextInTable(copied_table_c, "var_h_gain", translate("var_h_gain"))
         desc = fixe["description"].replace("\r", "")
         desc_paras = desc.split("\n")
         fixe_synthesis = fixe.get("synthesis", None)
@@ -742,6 +744,8 @@ def write_each_defect(pentest, document, defects_dict, pentest_type):
             replaceTextInTable(table_d, "var_d_title", o_defect["title"])
             replaceTextInTable(table_d, "var_d_ease", translate(o_defect["ease"]))
             replaceTextInTable(table_d, "var_d_impact", translate(o_defect["impact"]))
+            replaceTextInTable(table_d, "var_h_exploitation", translate("var_h_exploitation"))
+            replaceTextInTable(table_d, "var_h_impact", translate("var_h_impact"))
             result, status = Report.search("defect", o_defect["title"])
             if status != 200:
                 result = None
