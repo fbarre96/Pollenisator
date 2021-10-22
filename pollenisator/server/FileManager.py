@@ -7,11 +7,11 @@ import hashlib
 from datetime import datetime
 from pollenisator.core.Components.Utils import listPlugin, loadPlugin
 from pollenisator.core.Components.mongo import MongoCalendar
-from pollenisator.core.Components.Utils import JSONDecoder
+from pollenisator.core.Components.Utils import JSONDecoder, getMainDir
 from pollenisator.server.permission import permission
 
 mongoInstance = MongoCalendar.getInstance()
-local_path = "/etc/PollenisatorAPI/files"
+local_path = os.path.join(getMainDir(), "files")
 try:
     os.makedirs(local_path)
 except FileExistsError:
