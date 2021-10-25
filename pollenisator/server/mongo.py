@@ -453,7 +453,7 @@ def dumpDb(dbName, collection=""):
     path = mongoInstance.dumpDb(dbName, collection)
     if not os.path.isfile(path):
         return "Failed to export database", 503
-    return send_file(path, attachment_filename=os.path.basename(path))
+    return send_file(path, mimetype="application/gzip", attachment_filename=os.path.basename(path))
 
 @permission("user")
 def importDb(upfile, **kwargs):
