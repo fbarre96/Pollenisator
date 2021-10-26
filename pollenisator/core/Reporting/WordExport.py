@@ -466,7 +466,7 @@ def populate_defect_summary_table(document, defects_dict, pentest_type):
     black_rgb = RGBColor(0x26, 0x32, 0x32)
     risks_font_colors = {"Critical":white_rgb, "Major":white_rgb, "Important":white_rgb, "Minor":black_rgb}
     risks_bg_colors = {"Critical":"263232", "Major":"F8453C", "Important":"EE8200", "Minor":"FFFF00"}
-    fixes_bg_colors = {"Quick Win":quick_win_color, "Weak":quick_win_color, "Moderate":medium_color, "Moderate":medium_color, "Strong":strong_color, "Hard":strong_color}
+    fixes_bg_colors = {"Quick Win":quick_win_color, "Weak":quick_win_color, "Mean":medium_color, "Moderate":medium_color, "Strong":strong_color, "Hard":strong_color}
     levels = getDefaultLevels()
     count = 0
     start_defect_line_on_res_table = 0
