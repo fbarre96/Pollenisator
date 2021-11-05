@@ -5,7 +5,7 @@ from flask import send_file
 import pollenisator.core.Reporting.WordExport as WordExport
 from pollenisator.core.Components.Utils import loadServerConfig
 import pollenisator.core.Reporting.PowerpointExport as PowerpointExport
-from pollenisator.server.ServerModels.Defect import ServerDefect
+from pollenisator.server.ServerModels.Defect import ServerDefect, getGlobalDefects
 from pollenisator.core.Controllers.DefectController import DefectController
 from bson import ObjectId
 import requests
@@ -87,13 +87,14 @@ def generateReport(pentest, templateName, clientName, contractName, mainRedactor
     defectDict = getDefectsAsDict(pentest)
     if ext == ".docx":
         outfile = WordExport.createReport(pentest, defectDict, getRemarksAsDict(pentest), template_to_use_path, out_name, mainRedac=mainRedactor,
-                                client=clientName.strip(), contract=contractName.strip(), translation=lang_translation)
+                                          client=clientName.strip(), contract=contractName.strip(), translation=lang_translation)
     elif ext == ".pptx":
-        outfile = PowerpointExport.createReport(pentest, defectDict, getRemarksAsDict(pentest), template_to_use_path, out_name, client=clientName.strip(), contract=contractName.strip(), translation=lang_translation)
+        outfile = PowerpointExport.createReport(pentest, defectDict, getRemarksAsDict(
+            pentest), template_to_use_path, out_name, client=clientName.strip(), contract=contractName.strip(), translation=lang_translation)
     else:
-        return "Unknown template file extension", 400     
-    return send_file(outfile, attachment_filename=out_name+ext) 
-    
+        return "Unknown template file extension", 400
+    return send_file(outfile, attachment_filename=out_name+ext)
+
 
 @permission("user")
 def search(type, q):
@@ -102,14 +103,14 @@ def search(type, q):
     if api_url == "":
         return "There is no knowledge database implemented.", 503
     try:
-        resp = requests.get(api_url, params={"type":type, "terms": q})
+        resp = requests.get(api_url, params={"type": type, "terms": q})
     except Exception as e:
         return "The knowledge database is unreachable", 503
     if resp.status_code != 200:
         return "The knowledge dabatase encountered an issue : "+resp.text, 503
     answer = json.loads(resp.text)
     return answer, 200
-    
+
 
 def getDefectsAsDict(pentest):
     """
@@ -147,17 +148,10 @@ def getDefectsAsDict(pentest):
     defects_dict = dict()
     for level in ["Critical", "Major", "Important", "Minor"]:
         defects_dict[level] = dict()
-    defects_obj = ServerDefect.fetchObjects(pentest, {"ip": ""})
-    for defect_obj in defects_obj:
-        title = defect_obj.title
-        defect_recap = dict()
-        defect_recap["title"] = title
-        defect_recap["risk"] = defect_obj.risk
-        defect_recap["ease"] = defect_obj.ease
-        defect_recap["impact"] = defect_obj.impact
-        defect_recap["redactor"] = defect_obj.redactor
-        defect_recap["index"] = defect_obj.index
-        types = defect_obj.mtype
+    defect_recaps = getGlobalDefects(pentest)
+    for defect_recap in defect_recaps:
+        types = defect_recap["type"]
+        title = defect_recap["title"]
         d_types = []
         for d_type in types:
             d_types.append(d_type.strip())

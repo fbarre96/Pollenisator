@@ -180,6 +180,7 @@ def update(pentest, defect_iid, body):
                 del body["index"]
     res = mongoInstance.update("defects", {"_id":ObjectId(defect_iid)}, {"$set":body}, False, True)
     return res
+    
 @permission("pentester")
 def getGlobalDefects(pentest):
     defects = ServerDefect.fetchObjects(pentest, {"ip": ""})
