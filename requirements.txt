@@ -15,4 +15,5 @@ bcrypt
 python-jose>=3.3.0
 flask_socketio
 flask-cors
+docxtpl
 markdowntodocx
