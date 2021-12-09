@@ -49,7 +49,7 @@ def update(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in mongoInstance.listCalendars():
+    elif pentest not in mongoInstance.listCalendarNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
     return mongoInstance.updateInDb(pentest, collection, pipeline, updatePipeline, body["many"], body["notify"])
 
@@ -464,7 +464,7 @@ def importDb(upfile, **kwargs):
         f.write(upfile.stream.read())
     success = mongoInstance.importDatabase(username, tmpfile)
     print("DEBUG : "+str(dirpath))
-    #shutil.rmtree(dirpath)
+    shutil.rmtree(dirpath)
     return success
 
 @permission("admin")

@@ -10,6 +10,9 @@ from pollenisator.server.token import getTokenFor
 @permission("admin")
 def createUser(body):
     username = body.get("username", "")
+    name = body.get("name", "")
+    surname = body.get("surname", "")
+    email = body.get("email", "")
     pwd = body.get("pwd", "")
     if username == "":
         return "username is required", 400
@@ -20,7 +23,23 @@ def createUser(body):
     if user is not None:
         return "A user with this username already exists", 403
     salt = bcrypt.gensalt()
-    mongoInstance.insertInDb("pollenisator", "users", {"username":username, "hash":bcrypt.hashpw(pwd.encode(), salt), "scope":["user"]})
+    mongoInstance.insertInDb("pollenisator", "users", {"username":username, "hash":bcrypt.hashpw(pwd.encode(), salt), "name":name, "surname":surname, "email":email, "scope":["user"]})
+    return "Successully created user"
+
+
+@permission("admin")
+def updateUserInfos(body):
+    username = body.get("username", "")
+    if username == "":
+        return "username is required", 400
+    mongoInstance = MongoCalendar.getInstance()
+    user = mongoInstance.findInDb("pollenisator", "users", {"username":username}, False)
+    if user is None:
+        return "User not found", 404
+    name = body.get("name", user.get("name",""))
+    surname = body.get("surname", user.get("surname",""))
+    email = body.get("email", user.get("email",""))
+    mongoInstance.updateInDb("pollenisator", "users", {"username":username}, {"$set":{"name":name, "surname":surname, "email":email}})
     return "Successully created user"
 
 @permission("admin")

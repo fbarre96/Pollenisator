@@ -102,10 +102,12 @@ class Nmap(Plugin):
 
     def getFileOutputExt(self):
         """Returns the expected file extension for this command result file
+        NMAP EXPECT .nmap but -oN will append it
         Returns:
             string
         """
         return ".nmap"
+        
 
     def getFileOutputPath(self, commandExecuted):
         """Returns the output file path given in the executed command using getFileOutputArg
@@ -114,7 +116,7 @@ class Nmap(Plugin):
         Returns:
             string: the path to file created
         """
-        return (commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0])+".nmap"
+        return (commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0])
 
 
     def Parse(self, pentest, file_opened, **_kwargs):

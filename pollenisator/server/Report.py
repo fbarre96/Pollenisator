@@ -11,19 +11,26 @@ from bson import ObjectId
 import requests
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.server.permission import permission
+from docxtpl import RichText
+import re
+
 dir_path = os.path.dirname(os.path.realpath(__file__))
 template_path = os.path.normpath(os.path.join(dir_path, "../Templates/"))
 lang_translation = dict()
 
+
 def validate_lang(lang):
-    langs = [existing_lang for existing_lang in os.listdir(template_path) if os.path.isdir(os.path.join(template_path, existing_lang))]
+    langs = [existing_lang for existing_lang in os.listdir(
+        template_path) if os.path.isdir(os.path.join(template_path, existing_lang))]
     return lang in langs
+
 
 @permission("user")
 def getLangList():
     onlyfolders = [f for f in os.listdir(template_path) if not os.path.isfile(
         os.path.join(template_path, f))]
     return onlyfolders
+
 
 @permission("user")
 def getTemplateList(lang):
@@ -34,6 +41,7 @@ def getTemplateList(lang):
     onlyfiles = [f for f in os.listdir(langs_path) if os.path.isfile(
         os.path.join(langs_path, f)) and f != "lang.json"]
     return onlyfiles
+
 
 @permission("user")
 def downloadTemplate(lang, templateName):
@@ -48,6 +56,7 @@ def downloadTemplate(lang, templateName):
     if not os.path.isfile(template_to_download_path):
         return "Template file not found", 404
     return send_file(template_to_download_path, attachment_filename=fileName)
+
 
 @permission("user")
 def uploadTemplate(upfile, lang):
@@ -64,6 +73,7 @@ def uploadTemplate(upfile, lang):
         return "Success"
     return "Failure"
 
+
 @permission("user")
 def generateReport(pentest, templateName, clientName, contractName, mainRedactor, lang):
     if not templateName.endswith(".pptx") and not templateName.endswith(".docx"):
@@ -76,21 +86,22 @@ def generateReport(pentest, templateName, clientName, contractName, mainRedactor
     lang = os.path.basename(lang)
     if not validate_lang(lang):
         return "There is no existing templates for this lang", 400
-    template_to_use_path = os.path.join(template_path, lang+"/",templateName)
+    template_to_use_path = os.path.join(template_path, lang+"/", templateName)
     if not os.path.isfile(template_to_use_path):
         return "Template file not found", 404
     outfile = None
-    lang_file = os.path.join(template_path,lang+"/lang.json")
+    lang_file = os.path.join(template_path, lang+"/lang.json")
     global lang_translation
     with open(lang_file) as f:
         lang_translation = json.loads(f.read())
-    defectDict = getDefectsAsDict(pentest)
+    context = craftContext(pentest, mainRedac=mainRedactor,
+                           client=clientName.strip(), contract=contractName.strip())
     if ext == ".docx":
-        outfile = WordExport.createReport(pentest, defectDict, getRemarksAsDict(pentest), template_to_use_path, out_name, mainRedac=mainRedactor,
-                                          client=clientName.strip(), contract=contractName.strip(), translation=lang_translation)
+        outfile = WordExport.createReport(
+            context, template_to_use_path, out_name, translation=lang_translation)
     elif ext == ".pptx":
-        outfile = PowerpointExport.createReport(pentest, defectDict, getRemarksAsDict(
-            pentest), template_to_use_path, out_name, client=clientName.strip(), contract=contractName.strip(), translation=lang_translation)
+        outfile = PowerpointExport.createReport(
+            context, template_to_use_path, out_name, translation=lang_translation)
     else:
         return "Unknown template file extension", 400
     return send_file(outfile, attachment_filename=out_name+ext)
@@ -112,70 +123,154 @@ def search(type, q):
     return answer, 200
 
 
-def getDefectsAsDict(pentest):
-    """
-    Returns a dictionnary with treeview defects stored inside
-    Returns:
-        The returned dict will be formed this way (shown as json):
-        {
-            "Risk level describer 1":{
-                "defect title 1": {
-                    "description":{
-                        "title": "defect title 1",
-                        "risk": "Risk level 1",
-                        "ease": "Ease of exploitation 1",
-                        "impact": "Impact 1",
-                        "redactor": "Redactor name",
-                        "type": ['D', 'T', ...]
-                    },
-                    "defects_ids":[
-                        id 1,
-                        id 2...
-                    ]
-                },
-                "defect title 2":{
-                    ...
-                }
-                ...
-            },
-            "Risk level describer 2":{
-                ...
-            }
-            ...
-        }
-    """
-    
-    defects_dict = dict()
-    for level in ["Critical", "Major", "Important", "Minor"]:
-        defects_dict[level] = dict()
-    defect_recaps = getGlobalDefects(pentest)
-    for defect_recap in defect_recaps:
-        types = defect_recap["type"]
-        title = defect_recap["title"]
-        d_types = []
-        for d_type in types:
-            d_types.append(d_type.strip())
-        defect_recap["type"] = d_types
-        defects_dict[defect_recap["risk"]][title] = dict()
-        defects_dict[defect_recap["risk"]
-                        ][title]["description"] = defect_recap
-        defects_dict[defect_recap["risk"]][title]["defects_ids"] = []
-        defects = ServerDefect.fetchObjects(pentest, {"title": title})
-        for defect in defects:
-            defects_dict[defect_recap["risk"]
-                            ][title]["defects_ids"].append(defect.getId())
-    return defects_dict
-    
-
-def getRemarksAsDict(pentest):
-    remarks = {}
+def craftContext(pentest, **kwargs):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
-    ds = mongoInstance.find("remarks", {}, True)
-    if ds is None:
-        return None
-    for d in ds:
-        if d["type"] not in remarks:
-            remarks[d["type"]] = []
-        remarks[d["type"]].append(d["title"])
-    return remarks
+    context = {}
+    for k, v in kwargs.items():
+        context[k] = v
+    date = datetime.now()
+    context["year"] = date.strftime("%Y")
+    context["month"] = date.strftime("%B").lower()
+    context["positive_remarks"] = []
+    context["negative_remarks"] = []
+    context["neutral_remarks"] = []
+    remarks = mongoInstance.find("remarks", {}, True)
+    for remark in remarks:
+        remark_o = getKnownRemarkFromKnowledgeDB(remark)
+        if remark_o["type"].lower() == "positive":
+            context["positive_remarks"].append(remark_o["title"])
+        elif remark_o["type"].lower() == "negative":
+            context["negative_remarks"].append(remark_o["title"])
+        elif remark_o["type"].lower() == "neutral":
+            context["neutral_remarks"].append(remark_o["title"])
+    context["colors"] = {
+        "fix": {
+            "Easy": "00B0F0",
+            "Moderate": "0070C0",
+            "Mean": "0070C0",
+            "Hard": "002060",
+            "Quick Win": "00B0F0",
+            "Weak": "00B0F0",
+            "Strong": "002060",
+        }
+    }
+    scopes_list = [scope for scope in mongoInstance.find("scopes", {}, True)]
+    context["scopes"] = scopes_list
+    pentesters = mongoInstance.getPentestUsers(pentest)
+    context["pentesters"] = []
+    for pentesterName in pentesters:
+        p = mongoInstance.getUserRecordFromUsername(pentesterName)
+        if p is not None:
+            context["pentesters"].append(p)
+    owner = mongoInstance.getPentestOwner(pentest)
+    p = mongoInstance.getUserRecordFromUsername(owner)
+    context["owner"] = p if p is not None else None
+    ports = mongoInstance.find("ports", {}, True)
+    ports = [port for port in ports]
+    ports.sort(key=lambda x: (x["ip"],int(x["port"])))
+    context["ports"] = ports
+    defects = getGlobalDefects(pentest)
+    completed_defects = []
+    completed_fixes = []
+    defect_id = 1
+    for defect in defects:
+        defect_completed = getKnownDefectFromKnowledgeDB(defect)
+        defect_completed["id"] = str(defect_id)
+        completed_defects.append(defect_completed)
+        fix_id = 1
+        if len(defect_completed["fixes"]) > 1:
+            for fix in defect_completed["fixes"]:
+                fix["id"] = str(defect_id)+"."+str(fix_id)
+                fix_id += 1
+        else:
+            defect_completed["fixes"][0]["id"] = str(defect_id)
+        completed_fixes += defect_completed["fixes"]
+        defect_id += 1
+    context["defects"] = completed_defects
+    context["fixes"] = completed_fixes
+    return context
+
+
+def getKnownDefectFromKnowledgeDB(defect):
+    result, status = search("defect", defect["title"])
+    if status != 200:
+        result = None
+    impossible_to_connect = False
+    if result is None:
+        impossible_to_connect = True
+    elif isinstance(result, bool):
+        if result == False:
+            impossible_to_connect = True
+    elif len(result) == 0:
+        impossible_to_connect = True
+    if impossible_to_connect:
+        result = [
+            {
+                "id": "0",
+                "title": defect["title"],
+                "ease": defect["ease"],
+                "impact": defect["impact"],
+                "risk": defect["risk"],
+                "type": defect["type"],
+                "synthesis": "ToDo",
+                "description": "ToDo",
+                "redactor": "N/A",
+                "fixes": [
+                    {
+                        "title": "ToDo",
+                        "execution": "Moderate",
+                        "gain": "Moderate",
+                        "synthesis": "ToDo",
+                        "description": "ToDo",
+                    }
+                ]
+            }
+        ]
+
+    result = result[0]
+    if result["description"]:
+        result["description"] = result.get("description", "ToDo").replace(
+            "<", "&lt;").replace(">", "&gt;")
+        result["description_paragraphs"] = result["description"].replace(
+            "\r", "").split("\n\n")
+    if result["synthesis"]:
+        result["synthesis"] = result.get("synthesis", "ToDo").replace(
+            "<", "&lt;").replace(">", "&gt;")
+    for fix in result["fixes"]:
+        if fix["synthesis"]:
+            fix["synthesis"] = fix.get("synthesis", "ToDo").replace(
+                "<", "&lt;").replace(">", "&gt;")
+        if fix["description"]:
+            fix["description"] = fix.get("description", "ToDo").replace(
+                "<", "&lt;").replace(">", "&gt;")
+            fix["description_paragraphs"] = fix["description"].replace(
+                "\r", "").split("\n\n")
+    for key, val in defect.items():
+        if result.get(key, None) is None:
+            result[key] = val
+    return result
+
+
+def getKnownRemarkFromKnowledgeDB(remark):
+    result, status = search("remark", remark["title"])
+    if status != 200:
+        result = None
+    impossible_to_connect = False
+    if result is None:
+        impossible_to_connect = True
+    elif isinstance(result, bool):
+        if result == False:
+            impossible_to_connect = True
+    elif len(result) == 0:
+        impossible_to_connect = True
+    if impossible_to_connect:
+        result = [
+            {
+                "id": None,
+                "title": remark["title"],
+                "description": remark["title"],
+                "type": remark["type"],
+            }
+        ]
+    return result[0]

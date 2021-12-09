@@ -665,6 +665,11 @@ class MongoCalendar:
             return "admin"
         return pentest_data.get("owner", "admin")
 
+    def getUserRecordFromUsername(self, username):
+        ret = self.findInDb("pollenisator", "users", {"username": username}, False)
+        del ret["hash"]
+        return ret
+
     def copyDb(self, fromCopyName, toCopyName):
         """
         Copy a database.

@@ -132,6 +132,7 @@ def listFiles(pentest, attached_iid, filetype):
 
 @permission("pentester")
 def download(pentest, attached_iid, filetype, filename):
+    print(attached_iid)
     if filetype == "result":
         filepath = os.path.join(local_path, pentest, filetype, attached_iid)
         files = os.listdir(filepath)

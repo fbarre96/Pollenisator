@@ -207,19 +207,19 @@ def write_every_defect_fix(fixes, document, slide_i, count):
     if shape_fix is not None:
         deleteShape(shape_fix)
 
-def write_defect_from_knowledge_db(result, document, table_d, slide_i, o_defect, count):
-    desc = result[0]["description"].replace("\r", "")
+def write_defect_from_knowledge_db(o_defect, document, table_d, slide_i, count):
+    desc = o_defect["description"].replace("\r", "")
     desc_paras = desc.split("\n")
     desc_paras += o_defect.get("notes", "").strip().split("\n")
-    synthesis = result[0].get("synthesis", None)
+    synthesis = o_defect.get("synthesis", None)
     if synthesis is not None:
         desc_paras.insert(0, synthesis.replace("\r", ""))
     desc_paras.insert(1, "ToDo "+str(o_defect["redactor"]))
     replaceTextInTable(table_d, "var_d_description", desc_paras[0].strip())
-    write_every_defect_fix(result[0]["fixes"], document, slide_i, count)
-    return len(result[0]["fixes"])
+    write_every_defect_fix(o_defect["fixes"], document, slide_i, count)
+    return len(o_defect["fixes"])
 
-def write_each_defect(document, defects_dict):
+def write_each_defect(document, defects):
     """
     for each default
        Copy a table and a paragraph form the template marked with var_d_id and var_d_separator.
@@ -236,22 +236,25 @@ def write_each_defect(document, defects_dict):
     levels = getDefaultLevels()
     count_defects = 0
     count_fixes = 0
-    total_len = 0
-    for level in levels:
-        total_len += len(defects_dict[level].values())
+    defects_dict = {}
+    for defect in defects:
+        if defect["risk"] in defects_dict:
+            defects_dict[defect["risk"]] += [defect]
+        else:
+            defects_dict[defect["risk"]] = [defect]
     for level in levels:
         level_count = 0
         _, slide_copy_i = findSlideTableContaining(document, "var_d_id")
         # COPY SLIDE X TIME, SEPARATED
-        for i in range(1, len(defects_dict[level].values())):
+        for i in range(1, len(defects_dict[level])):
             duplicate_slide(document, slide_copy_i)
             new_slide_i = slide_copy_i+i
             move_slide(document, -1, new_slide_i)
         sorted_defects = {}
         keys = []
-        for d in defects_dict[level].values():
-            keys.append(int(d["description"]["index"]))
-            sorted_defects[d["description"]["index"]] = d
+        for d in defects_dict[level]:
+            keys.append(int(d["id"]))
+            sorted_defects[d["id"]] = d
         keys.sort()
         for key in keys:
             defect_dict = sorted_defects[str(key)]
@@ -259,51 +262,15 @@ def write_each_defect(document, defects_dict):
             new_slide_i = slide_copy_i + level_count
             level_count += 1
             count_defects += 1
-            o_defect = defect_dict["description"]
+            o_defect = defect_dict
             table_d = findTableInSlide(document, new_slide_i, "var_d_id")
-            replaceTextInTable(table_d, "var_d_id", translate("DEFECT_SMALLER")+str(count_defects))
+            replaceTextInTable(table_d, "var_d_id", "D"+str(count_defects))
             replaceTextInTable(table_d, "var_d_title", o_defect["title"])
             replaceTextInTable(table_d, "var_h_exploitation", translate("Exploitation"))
             replaceTextInTable(table_d, "var_h_impact", translate("Impact"))
             replaceTextInTable(table_d, "var_d_ease", translate(o_defect["ease"]))
             replaceTextInTable(table_d, "var_d_impact", translate(o_defect["impact"]))
-            result, status = Report.search( "defect", o_defect["title"])
-            if status != 200:
-                result = None
-            impossible_to_connect = False
-            if result is None:
-                impossible_to_connect = True
-            elif isinstance(result, bool):
-                if result == False:
-                    impossible_to_connect = True
-            elif len(result) == 0:
-                impossible_to_connect = True
-            if impossible_to_connect:
-                result = [
-                        {
-                            "id":"0",
-                            "title": o_defect["title"],
-                            "ease": o_defect["ease"],
-                            "impact": o_defect["impact"],
-                            "risk": o_defect["risk"],
-                            "type": o_defect["type"],
-                            "description": "Description",
-                            "notes": o_defect.get("notes", ""),
-                            "fixes": [
-                                {
-                                    "title": "ToDo",
-                                    "execution": "Moderate",
-                                    "gain": "Moderate",
-                                    "description": "ToDo"
-                                }
-                            ]
-                        }
-                    ]
-                print("Write each defect (not found "+str(count_defects)+")")
-            else:
-                #print(str(result))
-                print("Write each defect ( found "+str(count_defects)+")")
-            count_fixes += write_defect_from_knowledge_db(result, document, table_d, new_slide_i, o_defect, count_defects)
+            count_fixes += write_defect_from_knowledge_db(o_defect, document, table_d, new_slide_i, count_defects)
         if level_count == 0:
             table_d = findTableInSlide(document, slide_copy_i, "var_d_id")
             if table_d is not None:
@@ -314,49 +281,26 @@ def write_each_defect(document, defects_dict):
         _, slide_copy_i = findSlideTableContaining(document, "TO_DELETE")
     return count_defects, count_fixes
 
-def write_each_remark(document, remarks_dict):
-    for key in remarks_dict.keys():
-        slide_i = findTextInDocument(document, "var_remarks_"+key.lower())
-        if slide_i is None:
-            continue
+def write_each_remark(document, positive_remarks, neutral_remarks, negative_remarks):
+    write_remarks(document, positive_remarks, "var_remarks_positive")
+    write_remarks(document, neutral_remarks, "var_remarks_neutral")
+    write_remarks(document, negative_remarks, "var_remarks_negative")
+
+def write_remarks(document, remarks, var_to_replace):
+    slide_i = findTextInDocument(document, var_to_replace)
+    if slide_i is not None:
         for shape in document.slides[slide_i].shapes:
             if shape.has_text_frame:
                 tf = shape.text_frame
-                if "var_remarks_"+key.lower() in tf.text:
-                    for value in remarks_dict[key]:
+                if var_to_replace in tf.text:
+                    for title in remarks:
                         paragraph_copy = copy.deepcopy(tf.paragraphs[0]._p)
                         tf.paragraphs[0]._p.addnext(paragraph_copy)
                     i = 0
-                    for value in remarks_dict[key]:
-                        result,status = Report.search("remark", value)
-                        if status != 200:
-                            result = None
-                        impossible_to_connect = False
-                        if result is None:
-                            impossible_to_connect = True
-                        elif isinstance(result, bool):
-                            if result == False:
-                                impossible_to_connect = True
-                        elif len(result) == 0:
-                            impossible_to_connect = True
-                        if impossible_to_connect:
-                            result = [
-                                    {
-                                        "id": None,
-                                        "title": value,
-                                        "description": value,
-                                        "type": key,
-                                        "language": "fr",
-                                        "translation": 0
-                                    }
-                                ]
-                            print("Write each "+key+" remark (not found "+str(i+1)+")")
-                        else:
-                            #print(str(result))
-                            print("Write each "+key+" remark ( found "+str(i+1)+")")
-                        tf.paragraphs[i].text = result[0]["description"]
+                    for title in remarks:
+                        tf.paragraphs[i].text = title
                         i+=1
-                    tf.paragraphs[i].clear()
+                        tf.paragraphs[i].clear()
 
 
 def move_slide(presentation, old_index, new_index):
@@ -385,7 +329,7 @@ def addSerieToChart(presentation, index_chart, serie_name, serie):
                 count_chart += 1
     return False
 
-def createReport(pentest, defects_dict, remarks_list, template, out_name, **kwargs):
+def createReport(context, template, out_name, **kwargs):
     document = Presentation(template)
     global SLD_LAYOUT_TO_COPY
     global translation
@@ -393,41 +337,31 @@ def createReport(pentest, defects_dict, remarks_list, template, out_name, **kwar
     SLD_LAYOUT_TO_COPY = document.slide_layouts.get_by_name("TO_COPY")
     if SLD_LAYOUT_TO_COPY is None:
         raise Exception("The pptx template does not contain a TO_COPY layout")
-    client_name = kwargs.get("client", "").strip()
-    total_len = 0
-    levels = getDefaultLevels()
-    for level in levels:
-        total_len += len(defects_dict[level].values())
+    client_name = context.get("client", "").strip()
+    total_len = len(context["defects"])
     nb_steps = total_len # 1 step by defect
     nb_steps += 1 # step for general stuff
     nb_steps += 1 # step for saving
     if client_name != "":
         replaceTextInDocument(document, "var_client", client_name)
-    contract_name = kwargs.get("contract", "").strip()
+    contract_name = context.get("contract", "").strip()
     if contract_name != "":
         replaceTextInDocument(document, "var_contract", contract_name)
-    nb_critical = len(defects_dict["Critical"].keys())
-    nb_major = len(defects_dict["Major"].keys())
-    nb_important = len(defects_dict["Important"].keys())
-    nb_minor = len(defects_dict["Minor"].keys())
+    nb_critical = len([defect for defect in context["defects"] if defect["risk"] == "Critical"])
+    nb_major = len([defect for defect in context["defects"] if defect["risk"] == "Major"])
+    nb_important = len([defect for defect in context["defects"] if defect["risk"] == "Important"])
+    nb_minor = len([defect for defect in context["defects"] if defect["risk"] == "Minor"])
     replaceTextInDocument(document, "var_nb_d_critical", str(nb_critical))
     replaceTextInDocument(document, "var_nb_d_major", str(nb_major))
     replaceTextInDocument(document, "var_nb_d_important", str(nb_important))
     replaceTextInDocument(document, "var_nb_d_minor", str(nb_minor))
     addSerieToChart(document, 0, 'Criticity', (nb_critical,nb_major,nb_important,nb_minor))
     print("Write each defect ...")
-    count_defect, count_fixes = write_each_defect(document, defects_dict)
-    replaceTextInDocument(document, "var_nb_d_total", str(count_defect))
-    replaceTextInDocument(document, "var_nb_fix", str(count_fixes))
+    write_each_defect(document, context["defects"])
+    replaceTextInDocument(document, "var_nb_d_total", str(len(context["defects"])))
+    replaceTextInDocument(document, "var_nb_fix", str(len(context["fixes"])))
     print("Write each remark ...")
-    write_each_remark(document, remarks_list)
-    #print("Write services table ...")
-    #populate_services_table(document, kwargs.get("root", None))
-    #print("Converting Markdown ...")
-    #markdownToWordInDocument(document)
-    #print("Saving ...")
-    # After that, we add the previously copied table
-    #paragraph._p.addnext(new_tbl)
+    write_each_remark(document, context["positive_remarks"], context["neutral_remarks"], context["negative_remarks"])
     dir_path = os.path.dirname(os.path.realpath(__file__))
     out_path = os.path.join(dir_path, "../../exports/", out_name+".pptx")
     document.save(out_path)

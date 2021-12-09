@@ -123,12 +123,17 @@ class ServerTool(Tool, ServerElement):
         """
         mongoInstance = MongoCalendar.getInstance()
         toolHasCommand = self.text
-        if toolHasCommand is not None and toolHasCommand.strip() != "":
-            command = self.text
+        if isinstance(command_o, str):
+            command = command_o
+            self.text = command
             lvl = self.lvl
         else:
-            command = command_o.text
-            lvl = command_o.lvl
+            if toolHasCommand is not None and toolHasCommand.strip() != "":
+                command = self.text
+                lvl = self.lvl
+            else:
+                command = command_o.text
+                lvl = command_o.lvl
         command = command.replace("|wave|", self.wave)
         if lvl == "network" or lvl == "domain":
             command = command.replace("|scope|", self.scope)
@@ -352,6 +357,18 @@ def craftCommandLine(pentest, tool_iid, plugin):
     
     comm = mod.changeCommand(comm, "|outputDir|", mod.getFileOutputExt())
     return {"comm":comm, "ext":mod.getFileOutputExt(), "bin":bin_path.strip()}
+
+@permission("pentester")
+def completeDesiredOuput(pentest, tool_iid, plugin, command_line_options):
+    # CHECK TOOL EXISTS
+    toolModel = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
+    if toolModel is None:
+        return "Tool does not exist : "+str(tool_iid), 404
+    comm = toolModel.getCommandToExecute(command_line_options)
+    mod = loadPlugin(plugin)
+    # craft outputfile name
+    comm = mod.changeCommand(comm, "|outputDir|", "")
+    return {"command_line_options":comm, "ext":mod.getFileOutputExt()}
 
 @permission("user")
 def listPlugins():

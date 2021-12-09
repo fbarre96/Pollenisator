@@ -345,6 +345,15 @@ paths:
                   type: string
                 pwd:
                   type: string
+                name:
+                  type: string
+                  default: ""
+                surname:
+                  type: string
+                  default: ""
+                email:
+                  type: string
+                  default: ""
       responses:
         '200':
           description: successfully created a new user
@@ -367,7 +376,52 @@ paths:
               examples:
                 Success:
                   value: 'A user with this username already exists'
-                  
+  '/user/updateUserInfos':
+    post:
+      operationId: pollenisator.server.auth.updateUserInfos
+      tags:
+        - Admin
+      summary: Update a user infos
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+              properties:
+                username:
+                  type: string
+                name:
+                  type: string
+                surname:
+                  type: string
+                email:
+                  type: string
+      responses:
+        '200':
+          description: successfully updated user
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Successully updated user'
+        '400':
+          description: Incorrect parameters
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{parameter name} is required'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'User not found'
+
+
   '/user/delete/{username}':
     delete:
       operationId: pollenisator.server.auth.deleteUser
@@ -2838,6 +2892,58 @@ paths:
                   value: '{
   "bin": "nmap",
   "comm": "nmap -n -v -p443 www.algosecure.fr -oN |outputDir|.nmap",
+  "ext": ".nmap"
+}'
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                no plugin:
+                  value: '"This tool has no plugin configured and no plugin was specified"'
+                empty command line result:
+                  value: '"An empty command line was crafted"'
+  "/tools/{pentest}/completeDesiredOuput/{tool_iid}":
+    get:
+      operationId: pollenisator.server.ServerModels.Tool.completeDesiredOuput
+      tags:
+        - Tools
+      summary: add the plugin desired output option in the command (using plugin + parameters) a
+        marker for |outputDir| is to be replaced in the response. Also return the file expected extension
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: tool_iid
+          in: path
+          description: tool iid for which we want a command line
+          required: true
+          schema:
+            type: string
+        - name: command_line_options
+          in: query
+          description: tool command line options to be completed (without an outputfile)
+          required: true
+          schema:
+            type: string
+        - name: plugin
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The command line to execute with a marker for |outputDir| to be
+            replaced
+          content:
+            application/json:
+              examples:
+                Successful nmap craft:
+                  value: '{
+  "command_line_options": "nmap -n -v -p443 www.algosecure.fr -oN |outputDir|",
   "ext": ".nmap"
 }'
         "400":
