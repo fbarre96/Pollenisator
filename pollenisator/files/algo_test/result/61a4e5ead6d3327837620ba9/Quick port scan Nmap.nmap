@@ -1,0 +1,9 @@
+# Nmap 7.92 scan initiated Fri Dec 10 17:25:27 2021 as: nmap -p 22 -oN "/home/barre/bin/opensource/fbarre96/PollenisatorCLI/pollenisatorcli/./results/algo_test/Quick_port_scan_Nmap/algo_test/www.algosecure.fr/Quick port scan Nmap.nmap" www.algosecure.fr
+Nmap scan report for www.algosecure.fr (178.33.6.117)
+Host is up (0.030s latency).
+rDNS record for 178.33.6.117: ip117.ip-178-33-6.eu
+
+PORT   STATE    SERVICE
+22/tcp filtered ssh
+
+# Nmap done at Fri Dec 10 17:25:28 2021 -- 1 IP address (1 host up) scanned in 0.47 seconds

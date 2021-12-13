@@ -249,6 +249,10 @@ def getKnownDefectFromKnowledgeDB(defect):
     for key, val in defect.items():
         if result.get(key, None) is None:
             result[key] = val
+
+    result["ease"] = defect["ease"]
+    result["impact"] = defect["impact"]
+    result["risk"] = defect["risk"]
     return result
 
 
