@@ -57,6 +57,7 @@ target/
 pollenisator/results/*
 pollenisator/local/*
 pollenisator/local/states/*
+pollenisator/files/*
 pollenisator/centralizedResults/*
 *.pyc
 pollenisator/ssl/*
