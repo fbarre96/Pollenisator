@@ -667,7 +667,9 @@ class MongoCalendar:
 
     def getUserRecordFromUsername(self, username):
         ret = self.findInDb("pollenisator", "users", {"username": username}, False)
-        del ret["hash"]
+        if isinstance(ret, dict):
+            if "hash" in ret:
+                del ret["hash"]
         return ret
 
     def copyDb(self, fromCopyName, toCopyName):
