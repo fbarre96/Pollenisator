@@ -163,10 +163,8 @@ class ServerTool(Tool, ServerElement):
                 command = command.replace("|port.infos."+str(info)+"|", str(port_infos[info]))
         return command
 
-    def getPlugin(self, pluginSuggestion, toolConfig):
-        if pluginSuggestion.strip() == "":
-            mod = loadPlugin(toolConfig["plugin"])
-        elif pluginSuggestion.strip() == "auto-detect":
+    def getPlugin(self, pluginSuggestion):
+        if pluginSuggestion.strip() == "auto-detect":
             mod = loadPluginByBin(self.name.split("::")[0])
         else:
             mod = loadPlugin(pluginSuggestion)
@@ -340,23 +338,14 @@ def craftCommandLine(pentest, tool_iid, plugin):
         if toolModel.name not in list(tools_infos.keys()):
             return "This tool has no plugin configured and no plugin was specified", 400
     # Read file to execute for given tool and prepend to final command
-    if tools_infos.get(toolModel.name, None) is None:
-        bin_path = ""
-    else:
-        bin_path = tools_infos[toolModel.name].get("bin")
-        if bin_path is not None:
-            if not bin_path.endswith(" "):
-                bin_path = bin_path+" "
-    comm = bin_path+comm
+    
     if comm == "":
         return "An empty command line was crafted", 400
     # Load the plugin
-    mod = toolModel.getPlugin(plugin, tools_infos.get(toolModel.name, None))
-      
+    mod = toolModel.getPlugin(plugin)
     # craft outputfile name
-    
     comm = mod.changeCommand(comm, "|outputDir|", mod.getFileOutputExt())
-    return {"comm":comm, "ext":mod.getFileOutputExt(), "bin":bin_path.strip()}
+    return {"comm":comm, "ext":mod.getFileOutputExt()}
 
 @permission("pentester")
 def completeDesiredOuput(pentest, tool_iid, plugin, command_line_options):
@@ -400,11 +389,7 @@ def importResult(pentest, tool_iid, upfile, body):
     toolModel = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     if toolModel is None:
         return "Tool not found", 404
-    tools_infos = loadToolsConfig()
-    if plugin.strip() == "":
-        if toolModel.name not in list(tools_infos.keys()):
-            return "This tool has no plugin configured and no plugin was specified", 400
-    mod = toolModel.getPlugin(plugin, tools_infos.get(toolModel.name, None))
+    mod = toolModel.getPlugin(plugin)
     if mod is not None:
         try:
             # Check return code by plugin (can be always true if the return code is inconsistent)
