@@ -114,7 +114,7 @@ def search(type, q):
     if api_url == "":
         return "There is no knowledge database implemented.", 503
     try:
-        resp = requests.get(api_url, params={"type": type, "terms": q})
+        resp = requests.get(api_url, params={"type": type, "terms": q}, timeout=3)
     except Exception as e:
         return "The knowledge database is unreachable", 503
     if resp.status_code != 200:
