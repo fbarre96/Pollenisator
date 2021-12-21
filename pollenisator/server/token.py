@@ -20,7 +20,7 @@ def getTokenFor(username, pentest="", owner=False):
         scopes = set(decode_token(user_record["token"]).get("scope", []))
     except:
         scopes = set()
-    scopes = scopes.union(set(user_record.get("scopes", [])))
+    scopes = scopes.union(set(user_record.get("scope", [])))
     if pentest != "" and pentest not in scopes:
         scopes.add(pentest)
         if owner:
