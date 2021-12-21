@@ -32,7 +32,7 @@ def getTokenFor(username, pentest="", owner=False):
     if verifyToken(user_record["token"]) and not mod:
         token = user_record["token"]
     else:
-        token = generateNewToken(user_record, scopes)
+        token = generateNewToken(user_record, list(scopes))
     return token
 
 def generateNewToken(user_record, new_scopes):
