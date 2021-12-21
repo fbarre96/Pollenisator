@@ -17,17 +17,18 @@ def getTokenFor(username, pentest="", owner=False):
         return ""
     mod = False
     try:
-        scopes = decode_token(user_record["token"]).get("scope", [])
+        scopes = set(decode_token(user_record["token"]).get("scope", []))
     except:
-        scopes = []
+        scopes = set()
+    scopes = scopes.union(set(user_record.get("scopes", [])))
     if pentest != "" and pentest not in scopes:
-        scopes = scopes + [pentest]
+        scopes.add(pentest)
         if owner:
-            scopes.append("owner")
-        scopes.append("pentester")
+            scopes.add("owner")
+        scopes.add("owner")
         mod = True
     if "user" not in scopes:
-        scopes.append("user")
+        scopes.add("user")
     if verifyToken(user_record["token"]) and not mod:
         token = user_record["token"]
     else:
