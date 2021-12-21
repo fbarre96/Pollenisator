@@ -25,7 +25,7 @@ def getTokenFor(username, pentest="", owner=False):
         scopes.add(pentest)
         if owner:
             scopes.add("owner")
-        scopes.add("owner")
+        scopes.add("pentester")
         mod = True
     if "user" not in scopes:
         scopes.add("user")
