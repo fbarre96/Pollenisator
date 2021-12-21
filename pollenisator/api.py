@@ -1,35 +1,33 @@
+import eventlet
+eventlet.monkey_patch()
+
 import connexion
 from pollenisator.core.Components.mongo import MongoCalendar
 import json
 import os
 import bcrypt
 import sys
-from datetime import datetime
-from flask import jsonify, session, request
-from bson import ObjectId
-import threading
+from flask import request
 from pollenisator.core.Components.Utils import JSONEncoder, loadServerConfig
 from pollenisator.server.worker import removeWorkers, unregister
-from pollenisator.server.token import generateNewToken
 from getpass import getpass
 from flask_socketio import SocketIO
 import logging
-import uuid
-from flask_cors import CORS, cross_origin
-
+from flask_cors import CORS
+debug = False
 
 sockets = {}
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s][%(levelname)s] - %(funcName)s: %(message)s')
 logger = logging.getLogger(__name__)
 # Create the application instance
 server_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "./server/api_specs/")
-app = connexion.App(__name__, specification_dir=server_folder, debug=True)
+app = connexion.App(__name__, specification_dir=server_folder, debug=debug)
 
 # Read the openapi.yaml file to configure the endpoints
 app.add_api('openapi.yaml')
 flask_app = app.app
 socketio = SocketIO(logger=logger, engineio_logger=logger) 
-socketio.init_app(flask_app, log_output=False, logger=False, engineio_logger=False)
+socketio.init_app(flask_app, log_output=False, logger=False, engineio_logger=False, async_mode="eventlet")
 # Tell your app object which encoder to use to create JSON from objects. 
 flask_app.json_encoder = JSONEncoder
 CORS(flask_app)
@@ -108,8 +106,6 @@ def main():
             createAdmin("admin", "admin")
         else:
             createAdmin()
-        
-
     removeWorkers()
     conf = loadServerConfig()
     port = int(conf.get("api_port", 5000))
@@ -118,11 +114,11 @@ def main():
         ssl_context = "adhoc"
     else:
         ssl_context = None
-    flask_app.config["DEBUG"] = True
     try:
-        socketio.run(flask_app, host='0.0.0.0', port=port, debug=True, use_reloader=False)
+        socketio.run(flask_app, host='0.0.0.0', port=port, debug=debug, use_reloader=False, )
     except KeyboardInterrupt:
         pass
+    return socketio
 
 
 

@@ -15,23 +15,32 @@ def getTokenFor(username, pentest="", owner=False):
     user_record = mongoinstance.findInDb("pollenisator", "users", {"username":username}, False)
     if user_record is None:
         return ""
-    if pentest != "" and pentest not in user_record.get("scope", []):
-        user_record["scope"] = user_record.get("scope", []) + [pentest]
+    mod = False
+    try:
+        scopes = decode_token(user_record["token"]).get("scope", [])
+    except:
+        scopes = []
+    if pentest != "" and pentest not in scopes:
+        scopes = scopes + [pentest]
         if owner:
-            user_record["scope"].append("owner")
-        user_record["scope"].append("pentester")
-    if "user" not in user_record["scope"]:
-        user_record["scope"].append("user")
-    token = generateNewToken(user_record)
+            scopes.append("owner")
+        scopes.append("pentester")
+        mod = True
+    if "user" not in scopes:
+        scopes.append("user")
+    if verifyToken(user_record["token"]) and not mod:
+        token = user_record["token"]
+    else:
+        token = generateNewToken(user_record, scopes)
     return token
 
-def generateNewToken(user_record):
+def generateNewToken(user_record, new_scopes):
     timestamp = _current_timestamp()
     payload = {
         "iat": int(timestamp),
         "exp": int(timestamp + JWT_LIFETIME_SECONDS),
         "sub": str(user_record["username"]),
-        "scope": user_record["scope"],
+        "scope": new_scopes,
     }
     jwt_encoded = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
     mongoInstance = MongoCalendar.getInstance()
