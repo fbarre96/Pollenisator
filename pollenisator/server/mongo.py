@@ -283,12 +283,12 @@ def registerCalendar(pentest, body, **kwargs):
     if ret:
         #token = connectToPentest(pentest, **kwargs)
         #kwargs["token_info"] = decode_token(token[0])
-        prepareCalendar(pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"])
+        prepareCalendar(pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username)
         return msg
     else:
         return msg, 403
 
-def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings, pentesters, **kwargs):
+def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings, pentesters, owner, **kwargs):
     """
     Initiate a pentest database with wizard info
     Args:
@@ -335,7 +335,9 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     mongoInstance.insert("settings", {"key":"include_domains_with_ip_in_scope", "value": settings['Add domains whose IP are in scope'] == 1})
     mongoInstance.insert("settings", {"key":"include_domains_with_topdomain_in_scope", "value":settings["Add domains who have a parent domain in scope"] == 1})
     mongoInstance.insert("settings", {"key":"include_all_domains", "value":settings["Add all domains found"] == 1})
-    mongoInstance.insert("settings", {"key":"pentesters", "value":list(map(lambda x: x.strip(), pentesters.replace("\n",",").split(",")))})
+    pentester_list = list(map(lambda x: x.strip(), pentesters.replace("\n",",").split(",")))
+    pentester_list.insert(0, owner)
+    mongoInstance.insert("settings", {"key":"pentesters", "value": pentester_list})
 
 @permission("user")
 def getSettings():
