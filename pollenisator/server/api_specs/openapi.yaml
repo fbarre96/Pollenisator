@@ -3548,26 +3548,27 @@ paths:
                   value: '"the target global defect does not exist"'
 
   "/report/search":
-    get:
+    post:
       operationId: pollenisator.server.Report.search
       tags:
         - Report
       summary: search a defect/remark on an external app
-      parameters:
-        - name: type
-          in: query
-          description: defect or remark
-          required: true
-          schema:
-            type: string
-            enum:
-              - defect
-              - remark
-        - name: q
-          in: query
-          description: terms for the saerch
-          schema:
-            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - terms 
+                - type
+              properties:
+                terms:
+                  type: string
+                type:
+                  type: string
+                  enum:
+                    - defect
+                    - remark
       responses:
         "200":
           description: Success

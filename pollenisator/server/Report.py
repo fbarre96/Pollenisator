@@ -108,13 +108,13 @@ def generateReport(pentest, templateName, clientName, contractName, mainRedactor
 
 
 @permission("user")
-def search(type, q):
+def search(body):
     config = loadServerConfig()
     api_url = config.get('knowledge_api_url', '')
     if api_url == "":
         return "There is no knowledge database implemented.", 503
     try:
-        resp = requests.get(api_url, params={"type": type, "terms": q}, timeout=3)
+        resp = requests.get(api_url, params=body, timeout=3)
     except Exception as e:
         return "The knowledge database is unreachable", 503
     if resp.status_code != 200:
