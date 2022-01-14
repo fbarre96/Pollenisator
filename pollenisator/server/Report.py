@@ -193,7 +193,7 @@ def craftContext(pentest, **kwargs):
 
 
 def getKnownDefectFromKnowledgeDB(defect):
-    result, status = search("defect", defect["title"])
+    result, status = search({"type":"defect", "terms":defect["title"]})
     if status != 200:
         result = None
     impossible_to_connect = False
@@ -257,7 +257,7 @@ def getKnownDefectFromKnowledgeDB(defect):
 
 
 def getKnownRemarkFromKnowledgeDB(remark):
-    result, status = search("remark", remark["title"])
+    result, status = search({"type":"remark", "terms":remark["title"]})
     if status != 200:
         result = None
     impossible_to_connect = False
