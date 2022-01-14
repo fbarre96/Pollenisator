@@ -236,7 +236,7 @@ def write_each_defect(document, defects):
     levels = getDefaultLevels()
     count_defects = 0
     count_fixes = 0
-    defects_dict = {}
+    defects_dict = {"Critical": [], "Major": [], "Important":[], "Minor":[]}
     for defect in defects:
         if defect["risk"] in defects_dict:
             defects_dict[defect["risk"]] += [defect]
