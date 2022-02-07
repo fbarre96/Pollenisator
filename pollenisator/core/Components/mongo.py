@@ -290,7 +290,7 @@ class MongoCalendar:
                 for elem in elems:
                     self.notify(dbName, collection, elem["_id"], "update")
         else:
-            res = db[collection].update(pipeline, updatePipeline)
+            res = db[collection].update_one(pipeline, updatePipeline)
             elem = db[collection].find_one(pipeline)
             if elem is not None:
                 if notify:
@@ -344,6 +344,7 @@ class MongoCalendar:
         """
         self.connect()
         db = self.client[dbName]
+        print("Insertion "+str(collection)+" "+str(values)+" "+str(notify))
         res = db[collection].insert_one(values)
         if notify:
             self.notify(dbName, collection,
@@ -645,7 +646,7 @@ class MongoCalendar:
             return False, msg
         # insert in database  calendars
         self.connectToDb("pollenisator")
-        self.db.calendars.insert({"nom": saveAsName.strip(), "owner":owner, "creation_date": datetime.datetime.now()})
+        self.db.calendars.insert_one({"nom": saveAsName.strip(), "owner":owner, "creation_date": datetime.datetime.now()})
         self.connectToDb(saveAsName.strip())
         if autoconnect:
             self.connectToDb(saveAsName.strip())
