@@ -147,6 +147,8 @@ class ServerTool(Tool, ServerElement):
         if lvl == "ip":
             command = command.replace("|ip|", self.ip)
             ip_db = mongoInstance.find("ips", {"ip":self.ip}, False)
+            if ip_db is None:
+                return ""
             ip_infos = ip_db.get("infos", {})
             for info in ip_infos:
                 command = command.replace("|ip.infos."+str(info)+"|", command)

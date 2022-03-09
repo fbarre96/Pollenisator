@@ -254,7 +254,7 @@ def performLookUp(domain):
         Return the ip found from dns records, None if failed.
     """
     try:
-        return socket.gethostbyname(domain)
+        return socket.getaddrinfo(domain, 80)
     except socket.gaierror:
         return None
 

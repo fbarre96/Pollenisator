@@ -70,8 +70,8 @@ def changePassword(body, **kwargs):
     if not bcrypt.checkpw(oldPwd.encode(), user_record["hash"]):
         return "The old password is incorrect", 403
     hashed = bcrypt.hashpw(newPwd.encode(), salt)
-    return mongoInstance.updateInDb("pollenisator", "users", {"username":username}, {"$set":{"hash":hashed}}, False)
-
+    mongoInstance.updateInDb("pollenisator", "users", {"username":username}, {"$set":{"hash":hashed}}, False)
+    return True
 
 @permission("admin")
 def resetPassword(body):
@@ -87,7 +87,8 @@ def resetPassword(body):
         return "This user does not exist", 404
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(newPwd.encode(), salt)
-    return mongoInstance.updateInDb("pollenisator", "users", {"username":username}, {"$set":{"hash":hashed}}, False)
+    mongoInstance.updateInDb("pollenisator", "users", {"username":username}, {"$set":{"hash":hashed}}, False)
+    return True
 
 @permission("admin")
 def listUsers():
