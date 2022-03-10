@@ -463,7 +463,6 @@ def stopTask(pentest, tool_iid, body):
     mongoInstance.connectToDb(pentest)
     stopableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     print("Trying to stop task "+str(stopableTool))
-
     if stopableTool is None:
         return "Tool not found", 404
     workers = mongoInstance.getWorkers({})

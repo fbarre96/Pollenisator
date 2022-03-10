@@ -8,7 +8,6 @@ import json
 
 
 class ServerCommand(Command, ServerElement):
-
     def __init__(self, pentest, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pentest = pentest
