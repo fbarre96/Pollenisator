@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 # Create the application instance
 server_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "./server/api_specs/")
 app = connexion.App(__name__, specification_dir=server_folder, debug=debug)
-
 # Read the openapi.yaml file to configure the endpoints
 app.add_api('openapi.yaml')
 flask_app = app.app

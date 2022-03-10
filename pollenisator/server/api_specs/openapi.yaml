@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   description: Pollenisator index api file
-  version: 1.0.0
+  version: 1.1.0
   title: Swagger REST Article
 
 
@@ -301,6 +301,21 @@ paths:
               examples:
                 Status:
                   value: 'true'
+  /version:
+    get:
+      operationId: pollenisator.server.mongo.getVersion
+      tags:
+        - Other
+      summary: Get current version
+      security: []
+      responses:
+        '200':
+          description: Successful read status operation
+          content:
+            application/json:
+              examples:
+                Version:
+                  value: '1.1.0'      
   /issue:
     post:
       operationId: pollenisator.server.logger.report
