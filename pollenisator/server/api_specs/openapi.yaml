@@ -1916,7 +1916,74 @@ paths:
   "searchsploit",
   "dnsrecon"
 ]'
+  "/commands/addToMyCommands/{command_iid}":
+    post:
+      operationId: pollenisator.server.ServerModels.Command.addToMyCommands
+      tags:
+        - Commands
+      summary: "Mark this command as used by the current user"
+      parameters:
+        - name: command_iid
+          in: path
+          description: command iid to mark
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: command added success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: 'True'
+  "/commands/removeFromMyCommands/{command_iid}":
+    post:
+      operationId: pollenisator.server.ServerModels.Command.removeFromMyCommands
+      tags:
+        - Commands
+      summary: "Unmark this command as used by the current user"
+      parameters:
+        - name: command_iid
+          in: path
+          description: command iid to unmark
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: command remove success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: 'True'
 
+  "/waves/addMyCommandsToWave/{pentest}/{wave_iid}":
+    post:
+      operationId: pollenisator.server.ServerModels.Wave.addMyCommandsToWave
+      tags:
+        - Wave
+      summary: "Update wave to use my commands "
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: wave_iid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: 'True'
   "/commands/{pentest}":
     post:
       operationId: pollenisator.server.ServerModels.Command.insert

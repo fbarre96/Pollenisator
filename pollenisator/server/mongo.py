@@ -316,11 +316,11 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
                 default = os.path.join(getMainDir(), "exports/pollenisator_group_commands.gz")
                 res = mongoInstance.importCommands(default)
         commands = ServerCommand.getList({"$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}]})
-    # Duplicate commands in local database
-    allcommands = ServerCommand.fetchObjects({})
-    for command in allcommands:
-        command.indb = dbName
-        insert_command(command.indb, CommandController(command).getData(), **kwargs)
+    # Duplicate all commands in local database
+    # allcommands = ServerCommand.fetchObjects({})
+    # for command in allcommands:
+    #     command.indb = dbName
+    #     insert_command(command.indb, CommandController(command).getData(), **kwargs)
     wave_o = ServerWave().initialize(dbName, commands)
     insert_wave(dbName, WaveController(wave_o).getData(), **kwargs)
     interval_o = ServerInterval().initialize(dbName, start_date, end_date)

@@ -1,6 +1,7 @@
 from bson import ObjectId
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Models.Command import Command
+from pollenisator.core.Controllers.CommandController import CommandController
 from pollenisator.server.ServerModels.Element import ServerElement
 from pollenisator.core.Components.Utils import JSONEncoder
 from pollenisator.server.permission import permission
@@ -106,3 +107,30 @@ def insert(pentest, body):
 def update(pentest, command_iid, body):
     mongoInstance = MongoCalendar.getInstance()
     return mongoInstance.updateInDb(body["indb"], "commands", {"_id":ObjectId(command_iid)}, {"$set":body}, False, True)
+
+@permission("user")
+def addToMyCommands(command_iid, **kwargs):
+    user = kwargs["token_info"]["sub"]
+    mongoInstance = MongoCalendar.getInstance()
+    res = mongoInstance.findInDb("pollenisator", "commands", {"_id":ObjectId(command_iid), "users":user}, False)
+    if res is None:
+        return False
+    users = list(set(res.get("users", []) + [user]))
+    res = mongoInstance.updateInDb("pollenisator", "commands", {"_id":ObjectId(command_iid)}, {"$set":{"users":users}}, False, True)
+    return True
+
+@permission("user")
+def removeFromMyCommands(command_iid, **kwargs):
+    user = kwargs["token_info"]["sub"]
+    mongoInstance = MongoCalendar.getInstance()
+    res = mongoInstance.updateInDb("pollenisator", "commands", {"_id":ObjectId(command_iid)}, {"$pull":{"users":user}}, False, True)
+    return True
+
+def addMyCommandsToPentest(pentest, **kwargs):
+    user = kwargs["token_info"]["sub"]
+    mongoInstance = MongoCalendar.getInstance()
+    mycommands = mongoInstance.findInDb("pollenisator", "commands", {"users":user}, True)
+    for command in mycommands:
+        command["indb"] = pentest
+        insert(pentest, command, **kwargs)
+    return True

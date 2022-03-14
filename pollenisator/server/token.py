@@ -73,9 +73,11 @@ def encode_token(token_info):
     return jwt.encode(token_info, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 def decode_token(token):
+    print("Received token "+str(token))
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except JWTError as e:
+        print("Unauthorized, token is invalid")
         six.raise_from(Unauthorized, e)
 
 def _current_timestamp():

@@ -4,6 +4,7 @@ from pollenisator.core.Models.Wave import Wave
 from pollenisator.server.ServerModels.Tool import ServerTool
 from pollenisator.server.ServerModels.Scope import ServerScope
 from pollenisator.server.ServerModels.Element import ServerElement
+from pollenisator.server.ServerModels.Command import addMyCommandsToPentest
 from pollenisator.core.Components.Utils import JSONEncoder
 import json
 from pollenisator.server.permission import permission
@@ -32,8 +33,10 @@ class ServerWave(Wave, ServerElement):
         """
         mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(self.pentest)
-        command = mongoInstance.findInDb(self.pentest, "commands", {
+        command = mongoInstance.findInDb("pollenisator", "commands", {
                                          "name": command_name}, False)
+        if command is None:
+            return
         if command["lvl"] == "wave":
             newTool = ServerTool(self.pentest)
             newTool.initialize(command_name, self.wave, "", "", "", "", "wave")
@@ -71,6 +74,7 @@ def delete(pentest, wave_iid):
         return 0
     else:
         return res.deleted_count
+    
 @permission("pentester")
 def insert(pentest, body):
     mongoInstance = MongoCalendar.getInstance()
@@ -109,3 +113,13 @@ def update(pentest, wave_iid, body):
         if command_name not in oldCommands:
             # So add all of this command's tool to this wave.
             oldWave_o.addAllTool(command_name)
+
+@permission("pentester")
+def addMyCommandsToWave(pentest, wave_iid, **kwargs):
+    user = kwargs["token_info"]["sub"]
+    mongoInstance = MongoCalendar.getInstance()
+    addMyCommandsToPentest(pentest, kwargs)
+    mycommands = mongoInstance.findInDb(pentest, "commands", {"users":user}, True)
+    comms = [command["name"] for command in mycommands]
+    update(pentest, wave_iid, {"wave_commands": comms})
+    return True

@@ -174,6 +174,8 @@ class ServerIp(Ip, ServerElement):
         mongoInstance.connectToDb(self.pentest)
         command = mongoInstance.findInDb(self.pentest,
                                          "commands", {"name": command_name}, False)
+        if command is None:
+            return
         if command["lvl"] == "ip":
             # finally add tool
             newTool = ServerTool(self.pentest)

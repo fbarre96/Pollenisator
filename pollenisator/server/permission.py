@@ -20,6 +20,7 @@ def permission(*dec_args, **dec_kwargs):
                 return "Unauthorized", 401
             if not checkTokenValidity(token_info):
                 return "Unauthorized", 401
+            
             if arg_name == "worker.db":
                 print("error")
             token_scope = token_info.get("scope", []) 

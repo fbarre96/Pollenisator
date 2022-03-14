@@ -46,6 +46,8 @@ class ServerScope(Scope, ServerElement):
         mongoInstance.connectToDb(self.pentest)
         command = mongoInstance.findInDb(self.pentest, "commands", {
                                          "name": command_name}, False)
+        if command is None:
+            return
         if command["lvl"] == "network":
             newTool = ServerTool(self.pentest)
             newTool.initialize(
