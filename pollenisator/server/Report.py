@@ -183,8 +183,10 @@ def craftContext(pentest, **kwargs):
             for fix in defect_completed["fixes"]:
                 fix["id"] = str(defect_id)+"."+str(fix_id)
                 fix_id += 1
-        else:
+        elif len(defect_completed["fixes"]) == 1:
             defect_completed["fixes"][0]["id"] = str(defect_id)
+        else:
+            print("Warning: defect in polymathee with no fix")
         completed_fixes += defect_completed["fixes"]
         defect_id += 1
     context["defects"] = completed_defects

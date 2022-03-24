@@ -14,7 +14,7 @@ from getpass import getpass
 from flask_socketio import SocketIO
 import logging
 from flask_cors import CORS
-debug = False
+debug = True
 
 sockets = {}
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s][%(levelname)s] - %(funcName)s: %(message)s')

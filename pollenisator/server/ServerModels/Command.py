@@ -112,7 +112,7 @@ def update(pentest, command_iid, body):
 def addToMyCommands(command_iid, **kwargs):
     user = kwargs["token_info"]["sub"]
     mongoInstance = MongoCalendar.getInstance()
-    res = mongoInstance.findInDb("pollenisator", "commands", {"_id":ObjectId(command_iid), "users":user}, False)
+    res = mongoInstance.findInDb("pollenisator", "commands", {"_id":ObjectId(command_iid)}, False)
     if res is None:
         return False
     users = list(set(res.get("users", []) + [user]))
@@ -131,6 +131,10 @@ def addMyCommandsToPentest(pentest, **kwargs):
     mongoInstance = MongoCalendar.getInstance()
     mycommands = mongoInstance.findInDb("pollenisator", "commands", {"users":user}, True)
     for command in mycommands:
-        command["indb"] = pentest
-        insert(pentest, command, **kwargs)
+        mycommand = command
+        mycommand["indb"] = pentest
+        if "body" in kwargs:
+            del kwargs["body"]
+        res = insert(pentest, mycommand, **kwargs)
+        print(res)
     return True

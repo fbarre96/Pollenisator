@@ -13,7 +13,7 @@ from pollenisator.core.Controllers.WaveController import WaveController
 from pollenisator.core.Controllers.IntervalController import IntervalController
 from pollenisator.server.ServerModels.Command import ServerCommand
 from pollenisator.server.ServerModels.Command import insert as insert_command
-from pollenisator.server.ServerModels.Wave import ServerWave, insert as insert_wave
+from pollenisator.server.ServerModels.Wave import ServerWave, addMyCommandsToWave, insert as insert_wave
 from pollenisator.server.ServerModels.Interval import ServerInterval, insert as insert_interval
 from pollenisator.server.ServerModels.Scope import insert as insert_scope
 from pollenisator.server.FileManager import deletePentestFiles
@@ -285,7 +285,7 @@ def registerCalendar(pentest, body, **kwargs):
     if ret:
         #token = connectToPentest(pentest, **kwargs)
         #kwargs["token_info"] = decode_token(token[0])
-        prepareCalendar(pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username)
+        prepareCalendar(pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username, **kwargs)
         return msg
     else:
         return msg, 403
@@ -322,17 +322,17 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     #     command.indb = dbName
     #     insert_command(command.indb, CommandController(command).getData(), **kwargs)
     wave_o = ServerWave().initialize(dbName, commands)
-    insert_wave(dbName, WaveController(wave_o).getData(), **kwargs)
+    insert_wave(dbName, WaveController(wave_o).getData())
     interval_o = ServerInterval().initialize(dbName, start_date, end_date)
-    insert_interval(dbName, IntervalController(interval_o).getData(), **kwargs)
+    insert_interval(dbName, IntervalController(interval_o).getData())
     scope = scope.replace("https://", "").replace("http://","")
     scope = scope.replace("\n", ",").split(",")
     for scope_item in scope:
         if scope_item.strip() != "":
             if isIp(scope_item.strip()):
-                insert_scope(dbName, {"wave":dbName, "scope":scope_item.strip()+"/32"}, **kwargs)
+                insert_scope(dbName, {"wave":dbName, "scope":scope_item.strip()+"/32"})
             else:
-                insert_scope(dbName, {"wave":dbName, "scope":scope_item.strip()}, **kwargs)
+                insert_scope(dbName, {"wave":dbName, "scope":scope_item.strip()})
     mongoInstance.insert("settings", {"key":"pentest_type", "value":pentest_type})
     mongoInstance.insert("settings", {"key":"include_domains_with_ip_in_scope", "value": settings['Add domains whose IP are in scope'] == 1})
     mongoInstance.insert("settings", {"key":"include_domains_with_topdomain_in_scope", "value":settings["Add domains who have a parent domain in scope"] == 1})
@@ -340,6 +340,7 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     pentester_list = list(map(lambda x: x.strip(), pentesters.replace("\n",",").split(",")))
     pentester_list.insert(0, owner)
     mongoInstance.insert("settings", {"key":"pentesters", "value": pentester_list})
+    addMyCommandsToWave(dbName, dbName, **kwargs)
 
 @permission("user")
 def getSettings():

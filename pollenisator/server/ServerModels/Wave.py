@@ -118,7 +118,7 @@ def update(pentest, wave_iid, body):
 def addMyCommandsToWave(pentest, wave_iid, **kwargs):
     user = kwargs["token_info"]["sub"]
     mongoInstance = MongoCalendar.getInstance()
-    addMyCommandsToPentest(pentest, kwargs)
+    addMyCommandsToPentest(pentest, **kwargs)
     mycommands = mongoInstance.findInDb(pentest, "commands", {"users":user}, True)
     comms = [command["name"] for command in mycommands]
     update(pentest, wave_iid, {"wave_commands": comms})
