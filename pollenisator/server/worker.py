@@ -6,15 +6,12 @@ from pollenisator.server.ServerModels.Command import addUserCommandsToPentest
 from pollenisator.server.ServerModels.CommandGroup import addUserGroupCommandsToPentest
 from pollenisator.server.ServerModels.Tool import ServerTool, update as tool_update
 from bson import ObjectId
-from datetime import datetime
 from pollenisator.server.permission import permission
 import pollenisator.core.Components.Utils as Utils
 import shutil
-import threading
 import os
 import docker
-import re
-
+import logging
 try:
     import git
     git_available = True
@@ -70,13 +67,6 @@ def removeWorkers():
     return {"n":int(count)}
 
 
-
-
-
-# @permission("user")
-# def getRegisteredCommands(name):
-#     return mongoInstance.getRegisteredCommands(name)
-
 def start_docker(force_reinstall):
     worker_subdir = os.path.join(Utils.getMainDir(), "PollenisatorWorker")
     if os.path.isdir(worker_subdir) and force_reinstall:
@@ -92,11 +82,11 @@ def start_docker(force_reinstall):
     if len(image) == 0 or force_reinstall:
         try:
             log_generator = clientAPI.build(path=os.path.join(Utils.getMainDir(), "PollenisatorWorker/"), rm=True, tag="pollenisatorworker", nocache=force_reinstall)
-            change_max = None
             for byte_log in log_generator:
                 log_line = byte_log.decode("utf-8").strip()
                 if log_line.startswith("{\"stream\":\""):
                     log_line = log_line[len("{\"stream\":\""):-4]
+                    logging.info(log_line)
         except docker.errors.BuildError as e:
             return False, "Build docker error:\n"+str(e)
         image = client.images.list("pollenisatorworker")
@@ -114,6 +104,7 @@ def startWorker(pentest, **kwargs):
     existing = mongoInstance.findInDb(pentest, "workers", {"pentests": pentest}, False)
     if existing is not None:
         return str(existing["_id"])
+   
     ret, msg = start_docker(False)
     if ret:
         return msg
