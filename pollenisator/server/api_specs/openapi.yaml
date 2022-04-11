@@ -40,7 +40,7 @@ components:
           schema:
             $ref: "#/components/schemas/Defects"
       required: true
-    pollenisator.server.mongo.importDb:
+    binary_upfile:
       content:
         multipart/form-data:
           schema:
@@ -1029,7 +1029,7 @@ paths:
         - Mongo
       summary: Import an existing database file
       requestBody:
-        $ref: "#/components/requestBodies/pollenisator.server.mongo.importDb"
+        $ref: "#/components/requestBodies/binary_upfile"
       responses:
         "200":
           description: Successfully imported the file
@@ -1039,6 +1039,8 @@ paths:
       tags:
         - Mongo
       summary: Import an existing command database file
+      requestBody:
+        $ref: "#/components/requestBodies/binary_upfile"
       responses:
         "200":
           description: Successfully imported the file
@@ -2836,7 +2838,7 @@ paths:
           schema:
             type: string
       requestBody:
-        $ref: "#/components/requestBodies/pollenisator.server.mongo.importDb"
+        $ref: "#/components/requestBodies/binary_upfile"
       responses:
         "200":
           description: Successfully uploaded file
@@ -3504,7 +3506,7 @@ paths:
           schema:
             type: string
       requestBody:
-        $ref: "#/components/requestBodies/pollenisator.server.mongo.importDb"
+        $ref: "#/components/requestBodies/binary_upfile"
       responses:
         "200":
           description: An indication of success or failure for upload

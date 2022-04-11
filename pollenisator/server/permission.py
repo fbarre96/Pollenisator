@@ -1,7 +1,6 @@
 import logging
-import connexion
 import inspect
-from copy import deepcopy
+
 from pollenisator.server.token import checkTokenValidity
 # permission decorator
 
