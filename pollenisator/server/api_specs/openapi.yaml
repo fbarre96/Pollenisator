@@ -1039,8 +1039,6 @@ paths:
       tags:
         - Mongo
       summary: Import an existing command database file
-      requestBody:
-        $ref: "#/components/requestBodies/pollenisator.server.mongo.importDb"
       responses:
         "200":
           description: Successfully imported the file

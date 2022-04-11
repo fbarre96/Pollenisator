@@ -306,16 +306,6 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     mongoInstance.connectToDb(dbName)
     addUserCommandsToPentest(dbName, user)  
     addUserGroupCommandsToPentest(dbName, user)
-    commands = ServerCommand.getList({"$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}], "owner":user}, dbName)
-    if not commands:
-        commandslist = ServerCommand.getList()
-        if not commandslist:
-            default = os.path.join(getMainDir(), "exports/pollenisator_commands.gz")
-            res = mongoInstance.importCommands(default)
-            if res:
-                default = os.path.join(getMainDir(), "exports/pollenisator_group_commands.gz")
-                res = mongoInstance.importCommands(default)
-        commands = ServerCommand.getList({"$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}]}, dbName)
     # Duplicate all commands in local database
     # allcommands = ServerCommand.fetchObjects({})
     # for command in allcommands:
