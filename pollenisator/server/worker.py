@@ -104,7 +104,6 @@ def startWorker(pentest, **kwargs):
     existing = mongoInstance.findInDb(pentest, "workers", {"pentests": pentest}, False)
     if existing is not None:
         return str(existing["_id"])
-   
     ret, msg = start_docker(False)
     if ret:
         return msg

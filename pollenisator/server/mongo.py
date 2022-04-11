@@ -485,9 +485,8 @@ def importDb(upfile, **kwargs):
     shutil.rmtree(dirpath)
     return success
 
-@permission("user")
-def importCommands(upfile, **kwargs):
-    user = kwargs["token_info"]["sub"]
+
+def doImportCommands(upfile, user):
     try:
         commands_and_groups = json.loads(upfile.stream.read())
     except:
@@ -521,6 +520,16 @@ def importCommands(upfile, **kwargs):
         if not obj_ins["res"]:
             failed.append(group)
     return failed
+
+@permission("user")
+def importCommandsForWorker(upfile, **kwargs):
+    doImportCommands(upfile, "Worker")
+    
+@permission("user")
+def importCommands(upfile, **kwargs):
+    user = kwargs["token_info"]["sub"]
+    return doImportCommands(upfile, user)
+    
 
 @permission("user")
 def exportCommands(**kwargs):

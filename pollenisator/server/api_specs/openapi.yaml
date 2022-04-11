@@ -1049,6 +1049,22 @@ paths:
               examples:
                 Success:
                   value: 'true'
+  /importCommands/worker:
+    post:
+      operationId: pollenisator.server.mongo.importCommandsForWorker
+      tags:
+        - Commands
+      summary: Import an existing command database file
+      requestBody:
+        $ref: "#/components/requestBodies/binary_upfile"
+      responses:
+        "200":
+          description: Successfully imported the file
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
   /copyDb:
     post:
       operationId: pollenisator.server.mongo.copyDb
