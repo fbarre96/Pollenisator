@@ -1,36 +1,51 @@
-import eventlet
-eventlet.monkey_patch()
+# ENABLE debug mode early because evenlet monkey patch other libs
+debug = False 
+if debug:
+    async_mode = "threading" # Be aware thats sockets does not seems to work when debugging
+else:
+    import eventlet
+    eventlet.monkey_patch()
+    async_mode = "eventlet"
+    
+# ENABLE LOGGING EARLY ON
+from charset_normalizer import logging
+logging.basicConfig(filename='error.log', level=logging.INFO,
+                    format='[%(asctime)s][%(levelname)s] - %(funcName)s: %(message)s')
 
-import connexion
-from pollenisator.core.Components.mongo import MongoCalendar
-import json
-import os
-import bcrypt
-import sys
-from flask import request
-from pollenisator.core.Components.Utils import JSONEncoder, loadServerConfig
-from pollenisator.server.worker import removeWorkers, unregister
-from getpass import getpass
-from flask_socketio import SocketIO
-import logging
 from flask_cors import CORS
-debug = True
+from flask_socketio import SocketIO
+from getpass import getpass
+from pollenisator.server.worker import removeWorkers, unregister
+from pollenisator.core.Components.Utils import JSONEncoder, loadServerConfig
+from flask import request
+import sys
+import bcrypt
+import os
+import json
+from pollenisator.core.Components.mongo import MongoCalendar
+import connexion
+
+
 
 sockets = {}
-logging.basicConfig(level=logging.INFO, format='[%(asctime)s][%(levelname)s] - %(funcName)s: %(message)s')
+
 logger = logging.getLogger(__name__)
 # Create the application instance
-server_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "./server/api_specs/")
+server_folder = os.path.join(os.path.dirname(
+    os.path.realpath(__file__)), "./server/api_specs/")
 app = connexion.App(__name__, specification_dir=server_folder, debug=debug)
 # Read the openapi.yaml file to configure the endpoints
 app.add_api('openapi.yaml')
 flask_app = app.app
-socketio = SocketIO(logger=logger, engineio_logger=logger) 
-socketio.init_app(flask_app, log_output=False, logger=False, engineio_logger=False, async_mode="eventlet")
-# Tell your app object which encoder to use to create JSON from objects. 
+socketio = SocketIO(logger=logger, engineio_logger=logger)
+
+socketio.init_app(flask_app, log_output=False, logger=False,
+                  engineio_logger=False, async_mode=async_mode)
+# Tell your app object which encoder to use to create JSON from objects.
 flask_app.json_encoder = JSONEncoder
 CORS(flask_app)
 # Create a URL route in our application for "/"
+
 
 @app.route('/')
 def home():
@@ -39,6 +54,14 @@ def home():
     localhost:5000/ with a string "Api working"
     """
     return "Api working"
+
+
+def createWorker():
+    salt = bcrypt.gensalt()
+    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance.insertInDb("pollenisator", "users", {
+                             "username": "Worker", "hash": bcrypt.hashpw("", salt), "scope": ["worker"]})
+    print("Worker created")
 
 
 def createAdmin(username="", password=""):
@@ -55,15 +78,18 @@ def createAdmin(username="", password=""):
             password = getpass("password: ")
     salt = bcrypt.gensalt()
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.insertInDb("pollenisator", "users", {"username":username, "hash":bcrypt.hashpw(password.encode(), salt), "scope":["admin","user"]})
+    mongoInstance.insertInDb("pollenisator", "users", {"username": username, "hash": bcrypt.hashpw(
+        password.encode(), salt), "scope": ["admin", "user"]})
     print("Administrator created")
+
 
 def notify_clients(notif):
     """Notify clients websockets
     """
     global socketio
     socketio.emit("notif", json.dumps(notif, cls=JSONEncoder))
-    
+
+
 @socketio.event
 def registerCommands(data):
     mongoInstance = MongoCalendar.getInstance()
@@ -73,6 +99,16 @@ def registerCommands(data):
     sockets[workerName] = request.sid
     command_names = tools
     mongoInstance.registerCommands(workerName, command_names)
+
+
+@socketio.event
+def register(data):
+    mongoInstance = MongoCalendar.getInstance()
+    workerName = data.get("workerName")
+    global sockets
+    sockets[workerName] = request.sid
+    mongoInstance.registerWorker(workerName)
+
 
 @socketio.event
 def disconnect():
@@ -85,6 +121,7 @@ def disconnect():
     if todel:
         unregister(todel)
         del sockets[todel]
+
 
 def main():
     mongoInstance = MongoCalendar.getInstance()
@@ -105,6 +142,7 @@ def main():
             createAdmin("admin", "admin")
         else:
             createAdmin()
+        createWorker()
     removeWorkers()
     conf = loadServerConfig()
     port = int(conf.get("api_port", 5000))
@@ -114,11 +152,11 @@ def main():
     else:
         ssl_context = None
     try:
-        socketio.run(flask_app, host='0.0.0.0', port=port, debug=debug, use_reloader=False, )
+        socketio.run(flask_app, host='0.0.0.0', port=port,
+                     debug=debug, use_reloader=False, )
     except KeyboardInterrupt:
         pass
     return socketio
-
 
 
 # If we're running in stand alone mode, run the application

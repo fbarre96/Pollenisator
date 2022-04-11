@@ -1,4 +1,5 @@
 """Module for orchestrating an automatic scan. Must be run in a separate thread/process."""
+import logging
 import time
 import pstats
 import io
@@ -10,7 +11,7 @@ from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.server.ServerModels.Interval import ServerInterval
 from pollenisator.server.ServerModels.Command import ServerCommand
 from pollenisator.server.ServerModels.CommandGroup import ServerCommandGroup
-from pollenisator.server.ServerModels.Tool import ServerTool, getNbOfLaunchedCommand, launchTask, stopTask
+from pollenisator.server.ServerModels.Tool import ServerTool, launchTask, stopTask
 from pollenisator.server.ServerModels.Scope import ServerScope
 from pollenisator.server.ServerModels.Ip import ServerIp
 from pollenisator.server.permission import permission
@@ -52,19 +53,18 @@ def autoScan(pentest, endoded_token):
         while check:
             launchableTools, waiting = findLaunchableTools(pentest)
             launchableTools.sort(key=lambda tup: (tup["timedout"], int(tup["priority"])))
-            #TODO CHECK SPACE 
             for launchableTool in launchableTools:
                 check = getAutoScanStatus(pentest)
                 if not check:
                     break
-                res, statuscode = launchTask(pentest, launchableTool["tool"].getId(), {"checks":True, "plugin":""}, worker_token=endoded_token)
+                res, statuscode = launchTask(pentest, launchableTool["tool"].getId(), {"checks":True}, worker_token=endoded_token)
             check = getAutoScanStatus(pentest)
             time.sleep(3)
     except(KeyboardInterrupt, SystemExit):
-        print("stop autoscan : Kill received...")
+        logging.info("stop autoscan : Kill received...")
         mongoInstance.delete("autoscan", {}, True)
     except Exception as e:
-        print(str(e))
+        logging.error(str(e))
 
 @permission("pentester")
 def stopAutoScan(pentest):

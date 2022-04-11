@@ -1,3 +1,4 @@
+import logging
 import os
 import json
 from datetime import datetime
@@ -186,7 +187,7 @@ def craftContext(pentest, **kwargs):
         elif len(defect_completed["fixes"]) == 1:
             defect_completed["fixes"][0]["id"] = str(defect_id)
         else:
-            print("Warning: defect in polymathee with no fix")
+            logging.warning("Warning: defect in polymathee with no fix")
         completed_fixes += defect_completed["fixes"]
         defect_id += 1
     context["defects"] = completed_defects

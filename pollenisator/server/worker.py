@@ -1,11 +1,25 @@
 import json
+import logging
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Controllers.ToolController import ToolController
+from pollenisator.server.ServerModels.Command import addUserCommandsToPentest
+from pollenisator.server.ServerModels.CommandGroup import addUserGroupCommandsToPentest
 from pollenisator.server.ServerModels.Tool import ServerTool, update as tool_update
 from bson import ObjectId
 from datetime import datetime
 from pollenisator.server.permission import permission
+import pollenisator.core.Components.Utils as Utils
+import shutil
+import threading
+import os
+import docker
+import re
 
+try:
+    import git
+    git_available = True
+except:
+    git_available = False
 
 mongoInstance = MongoCalendar.getInstance()
 
@@ -25,8 +39,12 @@ def listWorkers(pipeline=None):
     return ret
 
 @permission("pentester", "body.db")
-def setInclusion(name, body):
+def setInclusion(name, body, **kwargs):
     "Set a worker inclusion in a pentest"
+    user = kwargs["token_info"]["sub"]
+    if name != user: # is Worker
+        addUserCommandsToPentest( body["db"], "Worker")
+        addUserGroupCommandsToPentest( body["db"], "Worker")
     return mongoInstance.setWorkerInclusion(name, body["db"], body["setInclusion"])
 
 @permission("user")
@@ -55,21 +73,51 @@ def removeWorkers():
 
 
 
-@permission("user")
-def getRegisteredCommands(name):
-    return mongoInstance.getRegisteredCommands(name)
+# @permission("user")
+# def getRegisteredCommands(name):
+#     return mongoInstance.getRegisteredCommands(name)
 
-@permission("user")
-def setCommandConfig(name, body):
-    plugin = body["plugin"]
-    command_name = body["command_name"]
-    remote_bin = body["remote_bin"]
-    worker = mongoInstance.getWorker(name)
-    if worker is None:
-        return "Worker not found", 404
-    from pollenisator.api import socketio, sockets
-    socketio.emit('editToolConfig', {'command_name': command_name, "remote_bin":remote_bin,"plugin": plugin}, room=sockets[name])
-    return True
+def start_docker(force_reinstall):
+    worker_subdir = os.path.join(Utils.getMainDir(), "PollenisatorWorker")
+    if os.path.isdir(worker_subdir) and force_reinstall:
+        shutil.rmtree(worker_subdir)
+    if not os.path.isdir(worker_subdir):
+        git.Git(Utils.getMainDir()).clone("https://github.com/fbarre96/PollenisatorWorker.git")
+    try:
+        client = docker.from_env()
+        clientAPI = docker.APIClient()
+    except Exception as e:
+        return False, "Unable to launch docker "+str(e)
+    image = client.images.list("pollenisatorworker")
+    if len(image) == 0 or force_reinstall:
+        try:
+            log_generator = clientAPI.build(path=os.path.join(Utils.getMainDir(), "PollenisatorWorker/"), rm=True, tag="pollenisatorworker", nocache=force_reinstall)
+            change_max = None
+            for byte_log in log_generator:
+                log_line = byte_log.decode("utf-8").strip()
+                if log_line.startswith("{\"stream\":\""):
+                    log_line = log_line[len("{\"stream\":\""):-4]
+        except docker.errors.BuildError as e:
+            return False, "Build docker error:\n"+str(e)
+        image = client.images.list("pollenisatorworker")
+    if len(image) == 0:
+        return False, "The docker build command failed, try to install manually..."
+    network_mode = "host"
+    container = client.containers.run(image=image[0], network_mode=network_mode, volumes={os.path.join(Utils.getMainDir(), "PollenisatorWorker"):{'bind':'/home/Pollenisator', 'mode':'rw'}}, detach=True)
+    if container.logs() != b"":
+        logging.warning(container.logs())
+    return True, str(container.id)
+
+@permission("pentester")
+def startWorker(pentest, **kwargs):
+    user = kwargs["token_info"]["sub"]
+    existing = mongoInstance.findInDb(pentest, "workers", {"pentests": pentest}, False)
+    if existing is not None:
+        return str(existing["_id"])
+    ret, msg = start_docker(False)
+    if ret:
+        return msg
+    return 500, msg
 
 @permission("worker")
 def registerWorker(body):

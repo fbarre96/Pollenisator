@@ -1,3 +1,4 @@
+import logging
 from docx import Document
 import os
 from docxtpl import DocxTemplate
@@ -38,7 +39,7 @@ def createReport(context, template, out_name, **kwargs):
     dir_path = os.path.dirname(os.path.realpath(__file__))
     out_path = os.path.join(dir_path, "../../exports/", out_name+".docx")
     doc.save(out_path)
-    print("Converting Markdown ...")
+    logging.info("Converting Markdown ...")
     convertMarkdownInFile(out_path, out_path, {"Header":"Sous-défaut"})
-    print("Generated report at "+str(out_path))
+    logging.info("Generated report at "+str(out_path))
     return out_path

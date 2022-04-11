@@ -1,25 +1,22 @@
 import json
+import logging
 import os
 from bson import ObjectId
-from datetime import datetime
 from flask import send_file
 import tempfile
 import shutil
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Components.parser import Parser, ParseError, Term
 from pollenisator.core.Components.Utils import JSONDecoder, getMainDir, isIp, JSONEncoder
-from pollenisator.core.Controllers.CommandController import CommandController
 from pollenisator.core.Controllers.WaveController import WaveController
 from pollenisator.core.Controllers.IntervalController import IntervalController
-from pollenisator.server.ServerModels.Command import ServerCommand
-from pollenisator.server.ServerModels.Command import insert as insert_command
-from pollenisator.server.ServerModels.Wave import ServerWave, addMyCommandsToWave, insert as insert_wave
+from pollenisator.server.ServerModels.Command import ServerCommand, addUserCommandsToPentest
+from pollenisator.server.ServerModels.CommandGroup import addUserGroupCommandsToPentest
+from pollenisator.server.ServerModels.Wave import ServerWave, insert as insert_wave
 from pollenisator.server.ServerModels.Interval import ServerInterval, insert as insert_interval
 from pollenisator.server.ServerModels.Scope import insert as insert_scope
 from pollenisator.server.FileManager import deletePentestFiles
 from pollenisator.server.permission import permission
-from pollenisator.server.auth import connectToPentest
-from pollenisator.server.token import decode_token
 mongoInstance = MongoCalendar.getInstance()
 
 searchable_collections = ["waves","scopes","ips","ports","tools","defects"]
@@ -107,7 +104,7 @@ def search(pentest, s):
         # Searching
         collections = []
         builtPipeline = _evaluateCondition(collections, condition_list)
-        print(f"DEBUG : coll={collections} pipeline={builtPipeline}")
+        logging.debug(f"DEBUG : coll={collections} pipeline={builtPipeline}")
         if len(collections) == 0:
             collections = searchable_collections
         list_of_objects = {}
@@ -304,9 +301,12 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
             * "Add domains who have a parent domain in scope": if 1, will add a new domain if a parent domain is in scope
             * "Add all domains found":  Unsafe. if 1, all new domains found by tools will be considered in scope.
     """
+    user = kwargs["token_info"]["sub"]
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(dbName)
-    commands = ServerCommand.getList({"$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}]})
+    addUserCommandsToPentest(dbName, user)  
+    addUserGroupCommandsToPentest(dbName, user)
+    commands = ServerCommand.getList({"$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}], "owner":user}, dbName)
     if not commands:
         commandslist = ServerCommand.getList()
         if not commandslist:
@@ -315,14 +315,14 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
             if res:
                 default = os.path.join(getMainDir(), "exports/pollenisator_group_commands.gz")
                 res = mongoInstance.importCommands(default)
-        commands = ServerCommand.getList({"$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}]})
+        commands = ServerCommand.getList({"$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}]}, dbName)
     # Duplicate all commands in local database
     # allcommands = ServerCommand.fetchObjects({})
     # for command in allcommands:
     #     command.indb = dbName
     #     insert_command(command.indb, CommandController(command).getData(), **kwargs)
     wave_o = ServerWave().initialize(dbName, commands)
-    insert_wave(dbName, WaveController(wave_o).getData())
+    result_wave = insert_wave(dbName, WaveController(wave_o).getData())
     interval_o = ServerInterval().initialize(dbName, start_date, end_date)
     insert_interval(dbName, IntervalController(interval_o).getData())
     scope = scope.replace("https://", "").replace("http://","")
@@ -340,7 +340,6 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     pentester_list = list(map(lambda x: x.strip(), pentesters.replace("\n",",").split(",")))
     pentester_list.insert(0, owner)
     mongoInstance.insert("settings", {"key":"pentesters", "value": pentester_list})
-    addMyCommandsToWave(dbName, dbName, **kwargs)
 
 @permission("user")
 def getSettings():
@@ -468,7 +467,7 @@ def importDb(upfile, **kwargs):
     with open(tmpfile, "wb") as f:
         f.write(upfile.stream.read())
     success = mongoInstance.importDatabase(username, tmpfile)
-    print("DEBUG : "+str(dirpath))
+    logging.debug("DEBUG : "+str(dirpath))
     shutil.rmtree(dirpath)
     return success
 

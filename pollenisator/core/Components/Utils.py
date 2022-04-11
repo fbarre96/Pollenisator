@@ -12,6 +12,7 @@ import shutil
 from netaddr import IPNetwork
 from netaddr.core import AddrFormatError
 from bson import ObjectId
+import logging
 
 class JSONEncoder(json.JSONEncoder):
     def default(self, o):
@@ -31,19 +32,7 @@ class JSONDecoder(json.JSONDecoder):
                 dct[k] = ObjectId(v.split('ObjectId|')[1])
         return dct
 
-def loadPluginByBin(binName):
-    """
-    Load a the plugin python corresponding to the given binary name.
-    Args:
-        binName: the binary name to load a plugin for
-    Returns:
-        return the module plugin loaded or default plugin if bin name was not found in conf file
-    """
-    toolsCfg = loadToolsConfig()
-    for conf in toolsCfg.values():
-        if binName == os.path.splitext(conf["bin"])[0]:
-            return loadPlugin(conf["plugin"])
-    return loadPlugin("Default")
+
 
 def loadPlugin(pluginName):
     """
@@ -228,7 +217,7 @@ def execute(command, timeout=None, printStdout=True):
                 if str(stderr) != "":
                     print(str(stderr))
         except Exception as e:
-            print(str(e))
+            logging.error(f"ERROR in command execution of command {command}: {e}")
             proc.kill()
             return -1
         finally:
@@ -279,50 +268,6 @@ def loadCfg(cfgfile):
     return default_tools_infos
 
 
-def loadToolsConfig():
-    """
-    Load tools config file in the config/tools.d/ folder starting with
-    config/tools.d/tools.json as default values
-    Args:
-        cfgfile: the path to a json config file
-    Returns:
-        Return the json converted values of the config file.
-    """
-    tool_config_folder =  getMainDir()+"config/tools.d/"
-    default_tools_config = os.path.join(tool_config_folder, "tools.json")
-    default_tools_infos = None
-    try:
-        with open(default_tools_config) as f:
-            default_tools_infos = json.loads(f.read())
-    except Exception as e:
-        raise Exception("Error when loading tools to register : "+str(e))
-    for _r, _d, f in os.walk(tool_config_folder):
-        for fil in f:
-            if fil != "tools.json":
-                try:
-                    with open(default_tools_config) as f:
-                        tools_infos = json.loads(f.read())
-                        for key, value in tools_infos.items():
-                            default_tools_infos[key] = value
-                except json.JSONDecodeError:
-                    print("Invalid json file : "+str(fil))
-    return default_tools_infos
-
-def saveToolsConfig(dic):
-    """
-    Save tools config file in the config/tools.d/ in tools.json 
-    Args:
-        dic: a dictionnary to write values
-    """
-    tool_config_folder =  getMainDir()+"config/tools.d/"
-    try:
-        os.makedirs(tool_config_folder)
-    except:
-        pass
-    default_tools_config = os.path.join(tool_config_folder, "tools.json")
-    with open(default_tools_config, "w") as f:
-        f.write(json.dumps(dic))
-
 def getServerConfigFolder():
     c = os.path.join(os.path.expanduser("~"), ".config/pollenisator/")
     try:
@@ -343,10 +288,10 @@ def loadServerConfig():
             try:
                 shutil.copyfile(sample_config_file, config_file)
             except PermissionError:
-                print(f"Permission denied when trying to create a config file\n Please create the file {os.path.normpath(config_file)} (you can use the serverSample.cfg as a base)")
+                (f"Permission denied when trying to create a config file\n Please create the file {os.path.normpath(config_file)} (you can use the serverSample.cfg as a base)")
                 sys.exit(0)
         else:
-            print(f"Config file not found inside {os.path.normpath(config_file)}, please create one based on the provided serverSample.cfg inside the same directory.")
+            logging.waring(f"Config file not found inside {os.path.normpath(config_file)}, please create one based on the provided serverSample.cfg inside the same directory.")
             sys.exit(0)
     return loadCfg(config_file)
 

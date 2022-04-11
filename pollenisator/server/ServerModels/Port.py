@@ -28,12 +28,12 @@ class ServerPort(Port, ServerElement):
         mongoInstance.connectToDb(self.pentest)
         return mongoInstance.find("ips", {"ip": self.ip}, False)["_id"]
 
-    def addAllTool(self, command_name, wave_name, scope, check=True):
+    def addAllTool(self, command_iid, wave_name, scope, check=True):
         """
         Add the appropriate tools (level check and wave's commands check) for this port.
 
         Args:
-            command_name: The command that we want to create all the tools for.
+            command_iid: The command that we want to create all the tools for.
             wave_name: name of the was to fetch allowed commands from
             scope: a scope matching this tool (should only be used by network level tools)
             check: A boolean to bypass checks. Force adding this command tool to this port if False. Default is True
@@ -42,7 +42,7 @@ class ServerPort(Port, ServerElement):
         mongoInstance.connectToDb(self.pentest)
         if not check:
             newTool = ServerTool(self.pentest)
-            newTool.initialize(command_name, wave_name, scope,
+            newTool.initialize(command_iid, wave_name, None, scope,
                                self.ip, self.port, self.proto, "port")
             newTool.addInDb()
             return
@@ -50,11 +50,11 @@ class ServerPort(Port, ServerElement):
         wave = mongoInstance.find(
             "waves", {"wave": wave_name}, False)
         commands = wave["wave_commands"]
-        try:
-            index = commands.index(command_name)
+        if command_iid in commands:
+            index = commands.index(command_iid)
             # retrieve the command level
             command = mongoInstance.findInDb(self.pentest,
-                                             "commands", {"name": commands[index]}, False)
+                                             "commands", {"_id": ObjectId(command_iid)}, False)
             if command["lvl"] == "port":
                 # 3. checking if the added port fit into the command's allowed service
                 # 3.1 first, default the selected port as tcp if no protocole is defined.
@@ -81,10 +81,8 @@ class ServerPort(Port, ServerElement):
                         # finally add tool
                         newTool = ServerTool(self.pentest)
                         newTool.initialize(
-                            command_name, wave_name, scope, self.ip, self.port, self.proto, "port")
+                            command_iid, wave_name, None, scope, self.ip, self.port, self.proto, "port")
                         newTool.addInDb()
-        except ValueError:
-            pass
     
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
@@ -165,10 +163,10 @@ def insert(pentest, body):
     for wave in waves:
         waveName = wave["wave"]
         commands = wave["wave_commands"]
-        for commName in commands:
+        for comm_iid in commands:
             # 2. finding the command only if lvl is port
             comm = mongoInstance.findInDb(pentest, "commands",
-                                            {"name": commName, "lvl": "port"}, False)
+                                            {"_id": ObjectId(comm_iid), "lvl": "port"}, False)
             if comm is not None:
                 # 3. checking if the added port fit into the command's allowed service
                 # 3.1 first, default the selected port as tcp if no protocole is defined.
@@ -193,7 +191,7 @@ def insert(pentest, body):
                         # finally add tool
                         newTool = ServerTool(pentest)
                         newTool.initialize(
-                            comm["name"], waveName, "", port_o.ip, port_o.port, port_o.proto, "port")
+                            comm["_id"], waveName, None, "", port_o.ip, port_o.port, port_o.proto, "port")
                         newTool.addInDb()
     return {"res":True, "iid":iid}
 
@@ -219,9 +217,9 @@ def update(pentest, port_iid, body):
                     allowed_services[i] = "tcp/"+str(elem)
             if port_o.proto+"/"+str(port_o.service) in allowed_services:
                 waves = mongoInstance.find("waves", {"wave_commands": {"$elemMatch": {
-                    "$eq": port_command["name"].strip()}}})
+                    "$eq": str(port_command["_id"]).strip()}}})
                 for wave in waves:
-                    tool_m = ServerTool(pentest).initialize(port_command["name"], wave["wave"], "",
+                    tool_m = ServerTool(pentest).initialize(port_command["_id"], wave["wave"], None, "",
                                                 port_o.ip, port_o.port, port_o.proto, "port")
                     tool_m.addInDb()
     return mongoInstance.update("ports", {"_id":ObjectId(port_iid)}, {"$set":body}, False, True)

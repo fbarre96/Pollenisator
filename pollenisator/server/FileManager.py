@@ -83,7 +83,7 @@ def importExistingFile(pentest, upfile, body):
                 proto = target.get("proto", None)
             mongoInstance.connectToDb(pentest)
             mongoInstance.insert("waves", {"wave":"Imported", "wave_commands":[]})
-            tool_m = ServerTool().initialize(toolName, "Imported", scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
+            tool_m = ServerTool().initialize("", "Imported", name=toolName, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
                                         dated=date, datef=date, scanner_ip="Imported", status="done", notes=notes, tags=tags)
             ret = tool_m.addInDb()
             upfile.stream.seek(0)
@@ -132,7 +132,6 @@ def listFiles(pentest, attached_iid, filetype):
 
 @permission("pentester")
 def download(pentest, attached_iid, filetype, filename):
-    print(attached_iid)
     if filetype == "result":
         filepath = os.path.join(local_path, pentest, filetype, attached_iid)
         files = os.listdir(filepath)

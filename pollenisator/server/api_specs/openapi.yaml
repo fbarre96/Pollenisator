@@ -138,6 +138,8 @@ components:
           type: integer
         max_thread:
           type: integer
+        indb:
+          type: string
         commands:
           type: array
           items:
@@ -1715,7 +1717,28 @@ paths:
               examples:
                 success:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
-  /workers/register/:
+  /workers/start/{pentest}:
+    get:
+      operationId: pollenisator.server.worker.startWorker
+      tags:
+        - Worker
+      summary: start or get a worker for given pentest
+      description: start or get a worker for given pentest
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful worker unregister
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'docker id'
+  /workers/register:
     post:
       operationId: pollenisator.server.worker.registerWorker
       tags:
@@ -1744,79 +1767,7 @@ paths:
               examples:
                 Success:
                   value: 'true'
-  # "/workers/{name}/registerCommands":
-  #   put:
-  #     operationId: pollenisator.server.worker.registerCommands
-  #     tags:
-  #       - Worker
-  #     summary: Set a worker registered commands
-  #     description: Set a worker registered commands
-  #     security: []
-  #     parameters:
-  #       - name: name
-  #         in: path
-  #         required: true
-  #         schema:
-  #           type: string
-  #     requestBody:
-  #       content:
-  #         application/json:
-  #           schema:
-  #             type: array
-  #             items:
-  #               type: string
-  #     responses:
-  #       "200":
-  #         description: Successful update of worker registered commands
-  #         content:
-  #           application/json:
-  #             examples:
-  #               Success:
-  #                 value: 'true'
-  
-  "/workers/{name}/setCommandConfig":
-    put:
-      operationId: pollenisator.server.worker.setCommandConfig
-      tags:
-        - Worker
-      summary: Set a worker registered command plugin and bin path
-      parameters:
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - command_name
-                - remote_bin
-                - plugin
-              properties:
-                command_name:
-                  type: string
-                remote_bin:
-                  type: string
-                plugin:
-                  type: string
-      responses:
-        "200":
-          description: Successful update of worker registed command configuration
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: 'true'
-        "404":
-          description: Worker not found
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: 'Worker not found'
+
   "/workers/{name}/unregister":
     post:
       operationId: pollenisator.server.worker.unregister
@@ -1846,76 +1797,157 @@ paths:
               examples:
                 Success:
                   value: 'Worker not found'
-  "/workers/{name}/getRegisteredCommands":
-    get:
-      operationId: pollenisator.server.worker.getRegisteredCommands
+#   "/workers/{name}/getRegisteredCommands":
+#     get:
+#       operationId: pollenisator.server.worker.getRegisteredCommands
+#       tags:
+#         - Worker
+#       summary: Get a worker registered commands
+#       description: Get a worker registered commands
+#       parameters:
+#         - name: name
+#           in: path
+#           required: true
+#           schema:
+#             type: string
+#       responses:
+#         "200":
+#           description: Successful get
+#           content:
+#             application/json:
+#               schema:
+#                 type: array
+#                 items:
+#                   type: string
+#               examples:
+#                 list of registered commands:
+#                   value: '[
+#   "Nmap.tcp",
+#   "Nmap.top_udp",
+#   "Nmap.bdd",
+#   "Nmap.vpn",
+#   "Nmap.supervision",
+#   "Nmap.services",
+#   "Nmap.services.udp",
+#   "Nmap.services_scripts",
+#   "Nmap.all.tcp",
+#   "Nmap.ip.allTcp",
+#   "Nmap.ip.udp",
+#   "WhatWeb.http",
+#   "WhatWeb.https",
+#   "TestSSL",
+#   "Nikto",
+#   "digReverseLookUp",
+#   "pythonReverseLookUp",
+#   "Sublist3r",
+#   "Dirsearch.http",
+#   "Dirsearch.https",
+#   "Knockpy",
+#   "crtsh",
+#   "ssh_scan",
+#   "amap",
+#   "amap.udp",
+#   "http-methods",
+#   "smbmap",
+#   "smbmap_anon",
+#   "smbmap_greybox",
+#   "smb-enum-users",
+#   "nmap-script-vuln",
+#   "enum4linux",
+#   "ftp-anon",
+#   "Nmap.quick",
+#   "ike-scan",
+#   "Nmap.verify.tcp",
+#   "Nmap.verify.udp",
+#   "CME.recon",
+#   "CME.usecreds",
+#   "eternalblue",
+#   "bluekeep",
+#   "openrelay",
+#   "searchsploit",
+#   "dnsrecon"
+# ]'
+  "/commands/find":
+    post:
+      operationId: pollenisator.server.ServerModels.Command.getCommands
       tags:
-        - Worker
-      summary: Get a worker registered commands
-      description: Get a worker registered commands
+        - Commands
+      summary: "Return all exisiting"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pipeline:
+                  type: string
+                  example: "{}"
+      responses:
+        "200":
+          description: successful find command with parameters
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '[{"_id": "60a3aaa129926f9ad7197919", "parent": "ObjectId|60a3aaa129926f9ad7197915",  "scope": "test",   "wave": "Testina" },  { "_id": "60f58598d8357e0f40e7fa66","scope": "test.fr" }]'
+  "/commands/delete/{command_iid}":
+    delete:
+      operationId: pollenisator.server.ServerModels.Command.deleteCommand
+      tags:
+        - Mongo
+      summary: Delete something in db
+      description: Delete something in db
       parameters:
-        - name: name
+        - name: command_iid
           in: path
+          description: command iid to mark
           required: true
           schema:
             type: string
       responses:
         "200":
-          description: Successful get
+          description: Successful delete command
           content:
             application/json:
-              schema:
-                type: array
-                items:
-                  type: string
               examples:
-                list of registered commands:
-                  value: '[
-  "Nmap.tcp",
-  "Nmap.top_udp",
-  "Nmap.bdd",
-  "Nmap.vpn",
-  "Nmap.supervision",
-  "Nmap.services",
-  "Nmap.services.udp",
-  "Nmap.services_scripts",
-  "Nmap.all.tcp",
-  "Nmap.ip.allTcp",
-  "Nmap.ip.udp",
-  "WhatWeb.http",
-  "WhatWeb.https",
-  "TestSSL",
-  "Nikto",
-  "digReverseLookUp",
-  "pythonReverseLookUp",
-  "Sublist3r",
-  "Dirsearch.http",
-  "Dirsearch.https",
-  "Knockpy",
-  "crtsh",
-  "ssh_scan",
-  "amap",
-  "amap.udp",
-  "http-methods",
-  "smbmap",
-  "smbmap_anon",
-  "smbmap_greybox",
-  "smb-enum-users",
-  "nmap-script-vuln",
-  "enum4linux",
-  "ftp-anon",
-  "Nmap.quick",
-  "ike-scan",
-  "Nmap.verify.tcp",
-  "Nmap.verify.udp",
-  "CME.recon",
-  "CME.usecreds",
-  "eternalblue",
-  "bluekeep",
-  "openrelay",
-  "searchsploit",
-  "dnsrecon"
-]'
+                Deleted count:
+                  value: '1'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                pipeline is not a dict:
+                  value: '"Pipeline argument was not a valid dictionnary"'
+  "/group_commands/delete/{command_group_iid}":
+    delete:
+      operationId: pollenisator.server.ServerModels.CommandGroup.deleteCommandGroup
+      tags:
+        - Mongo
+      summary: Delete something in db
+      description: Delete something in db
+      parameters:
+        - name: command_group_iid
+          in: path
+          description: group command iid to delete
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful delete command group
+          content:
+            application/json:
+              examples:
+                Deleted count:
+                  value: '1'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                pipeline is not a dict:
+                  value: '"Pipeline argument was not a valid dictionnary"'
   "/commands/addToMyCommands/{command_iid}":
     post:
       operationId: pollenisator.server.ServerModels.Command.addToMyCommands
@@ -1937,31 +1969,35 @@ paths:
               examples:
                 success:
                   value: 'True'
-  "/commands/removeFromMyCommands/{command_iid}":
+
+  "/waves/addMyCommandsToWave/{pentest}/{wave_iid}":
     post:
-      operationId: pollenisator.server.ServerModels.Command.removeFromMyCommands
+      operationId: pollenisator.server.ServerModels.Wave.addMyCommandsToWave
       tags:
-        - Commands
-      summary: "Unmark this command as used by the current user"
+        - Wave
+      summary: "Update wave to use my commands "
       parameters:
-        - name: command_iid
+        - name: pentest
           in: path
-          description: command iid to unmark
+          required: true
+          schema:
+            type: string
+        - name: wave_iid
+          in: path
           required: true
           schema:
             type: string
       responses:
         "200":
-          description: command remove success
+          description: update success
           content:
             application/json:
               examples:
                 success:
                   value: 'True'
-
-  "/waves/addMyCommandsToWave/{pentest}/{wave_iid}":
+  "/waves/addWorkerCommandsToWave/{pentest}/{wave_iid}":
     post:
-      operationId: pollenisator.server.ServerModels.Wave.addMyCommandsToWave
+      operationId: pollenisator.server.ServerModels.Wave.addWorkerCommandsToWave
       tags:
         - Wave
       summary: "Update wave to use my commands "
@@ -2062,6 +2098,29 @@ paths:
             application/json:
               schema:
                 type: integer
+  "/group_commands/find":
+    post:
+      operationId: pollenisator.server.ServerModels.CommandGroup.getCommandGroups
+      tags:
+        - CommandGroup
+      summary: "Return all existing"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pipeline:
+                  type: string
+                  example: "{}"
+      responses:
+        "200":
+          description: successful find command with parameters
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '[{"_id": "60a3aaa129926f9ad7197919", "name":"Nmaps", "owner":"user1", commands:["5f9150fbed75193ef71ba47f"]}]'
   "/group_commands/{pentest}/{command_group_iid}":
     delete:
       operationId: pollenisator.server.ServerModels.CommandGroup.delete
@@ -2957,12 +3016,6 @@ paths:
           required: true
           schema:
             type: string
-        - name: plugin
-          in: query
-          required: false
-          schema:
-            type: string
-            default: ""
       responses:
         "200":
           description: The command line to execute with a marker for |outputDir| to be
@@ -3118,9 +3171,6 @@ paths:
             schema:
               type: object
               properties:
-                plugin:
-                  type: string
-                  default: ""
                 checks:
                   type: boolean
                   default: true

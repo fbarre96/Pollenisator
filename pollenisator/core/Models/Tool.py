@@ -1,5 +1,6 @@
 """Tool Model. A tool is an instanciation of a command against a target"""
 
+from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Models.Element import Element
 from bson.objectid import ObjectId
 from datetime import datetime
@@ -32,7 +33,8 @@ class Tool(Element):
         self.scanner_ip = "None"
         self.resultfile = ""
         self.status = []
-        self.initialize(valuesFromDb.get("name", ""), valuesFromDb.get("wave", ""),
+        self.initialize(str(valuesFromDb.get("command_iid", "")), valuesFromDb.get("wave", ""),
+                        valuesFromDb.get("name", None),
                         valuesFromDb.get(
                             "scope", ""), valuesFromDb.get("ip", ""),
                         str(valuesFromDb.get("port", "")), valuesFromDb.get(
@@ -44,13 +46,14 @@ class Tool(Element):
                         valuesFromDb.get(
                             "scanner_ip", "None"), valuesFromDb.get("status", []), valuesFromDb.get("notes", ""), valuesFromDb.get("resultfile", ""), valuesFromDb.get("tags", []), valuesFromDb.get("infos", {}))
 
-    def initialize(self, name, wave="", scope="", ip="", port="", proto="tcp", lvl="", text="",
+    def initialize(self, command_iid, wave="", name=None, scope="", ip="", port="", proto="tcp", lvl="", text="",
                    dated="None", datef="None", scanner_ip="None", status=None, notes="", resultfile="", tags=None, infos=None):
         
         """Set values of tool
         Args:
-            name: name of the tool (should match a command name)
+            command_iid: name of the tool (should match a command iid)
             wave: the target wave name of this tool (only if lvl is "wave"). Default  ""
+            name: tool name, if None it will be crafted
             scope: the scope string of the target scope of this tool (only if lvl is "network"). Default  ""
             ip: the target ip "ip" of this tool (only if lvl is "ip" or "port"). Default  ""
             port: the target port "port number" of this tool (only if lvl is "port"). Default  ""
@@ -68,6 +71,11 @@ class Tool(Element):
         Returns:
             this object
         """
+        self.command_iid = str(command_iid)
+        if name is None and self.command_iid != "":
+            mongoInstance = MongoCalendar.getInstance()
+            res = mongoInstance.findInDb(self.pentest, "commands", {"_id":ObjectId(command_iid)}, False)
+            name = res["owner"]+":"+res["name"]
         self.name = name
         self.wave = wave
         self.scope = scope
@@ -88,6 +96,7 @@ class Tool(Element):
         elif isinstance(status, str):
             status = [status]
         self.status = status
+        
         return self
 
 
