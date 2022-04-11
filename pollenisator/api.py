@@ -1,5 +1,5 @@
 # ENABLE debug mode early because evenlet monkey patch other libs
-debug = True 
+debug = False 
 if debug:
     async_mode = "threading" # Be aware thats sockets does not seems to work when debugging
 else:
