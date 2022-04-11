@@ -18,3 +18,5 @@ flask_socketio
 flask-cors
 docxtpl
 markdowntodocx
+docker
+GitPython
