@@ -1,4 +1,4 @@
-from charset_normalizer import logging
+import logging
 import connexion
 import inspect
 from copy import deepcopy

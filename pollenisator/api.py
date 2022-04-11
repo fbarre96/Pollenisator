@@ -8,7 +8,7 @@ else:
     async_mode = "eventlet"
     
 # ENABLE LOGGING EARLY ON
-from charset_normalizer import logging
+import logging
 logging.basicConfig(filename='error.log', level=logging.INFO,
                     format='[%(asctime)s][%(levelname)s] - %(funcName)s: %(message)s')
 

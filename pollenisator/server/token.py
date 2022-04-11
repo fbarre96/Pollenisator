@@ -1,4 +1,4 @@
-from charset_normalizer import logging
+import logging
 from jose import JWTError, jwt
 from pollenisator.core.Components.mongo import MongoCalendar
 import datetime
