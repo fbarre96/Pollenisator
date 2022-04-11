@@ -781,31 +781,31 @@ class MongoCalendar:
             execute(cmd, None, True)
         return msg, 200 if success else 403
 
-    def importCommands(self, filename):
-        """
-        Import a database dump into a calendar database.
-            It uses the mongorestore utily installed with mongodb-org-tools
+    # def importCommands(self, filename):
+    #     """
+    #     Import a database dump into a calendar database.
+    #         It uses the mongorestore utily installed with mongodb-org-tools
 
-        Args:
-            filename: the gzip archive name that was exported to be reimported.
+    #     Args:
+    #         filename: the gzip archive name that was exported to be reimported.
 
-        Returns:
-            returns True if the import is successfull, False
-        """
-        from pollenisator.core.Components.Utils import execute
-        if not os.path.isfile(filename):
-            raise IOError("File does not exist")
-        connectionString = '' if self.user.strip() == '' else "-u "+self.user + \
-            " -p "+self.password + " --authenticationDatabase admin "
-        cmd = "mongorestore "+connectionString+"--host " + \
-            self.host+" --archive="+filename+" --gzip"
-        if self.ssl.strip() != "":
-            cmd += " --ssl --sslPEMKeyFile "+self.ssldir+"/client.pem --sslCAFile " + \
-                self.ssldir+"/ca.pem --sslAllowInvalidHostnames"
+    #     Returns:
+    #         returns True if the import is successfull, False
+    #     """
+    #     from pollenisator.core.Components.Utils import execute
+    #     if not os.path.isfile(filename):
+    #         raise IOError("File does not exist")
+    #     connectionString = '' if self.user.strip() == '' else "-u "+self.user + \
+    #         " -p "+self.password + " --authenticationDatabase admin "
+    #     cmd = "mongorestore "+connectionString+"--host " + \
+    #         self.host+" --archive="+filename+" --gzip"
+    #     if self.ssl.strip() != "":
+    #         cmd += " --ssl --sslPEMKeyFile "+self.ssldir+"/client.pem --sslCAFile " + \
+    #             self.ssldir+"/ca.pem --sslAllowInvalidHostnames"
         
 
-        execute(cmd, None, False)
-        return True
+    #     execute(cmd, None, False)
+    #     return True
 
     def notify(self, db, collection, iid, action, parentId=""):
         """

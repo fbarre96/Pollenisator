@@ -66,11 +66,11 @@ def doInsert(pentest, body, user):
     if "_id" in body:
         del body["_id"]
     existing = mongoInstance.findInDb(
-            body["indb"], "group_commands", {"name": body["name"], "owner":user}, False)
+            body.get("indb", "pollenisator"), "group_commands", {"name": body["name"], "owner":user}, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
     body["owner"] = user
-    ins_result = mongoInstance.insertInDb(body["indb"], "group_commands", body, '', True)
+    ins_result = mongoInstance.insertInDb(body.get("indb", "pollenisator"), "group_commands", body, '', True)
     iid = ins_result.inserted_id
     return {"res":True, "iid":iid}
 

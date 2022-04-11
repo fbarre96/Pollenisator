@@ -5,13 +5,16 @@ from bson import ObjectId
 from flask import send_file
 import tempfile
 import shutil
+from pendulum import instance
+
+from soupsieve import match
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Components.parser import Parser, ParseError, Term
 from pollenisator.core.Components.Utils import JSONDecoder, getMainDir, isIp, JSONEncoder
 from pollenisator.core.Controllers.WaveController import WaveController
 from pollenisator.core.Controllers.IntervalController import IntervalController
-from pollenisator.server.ServerModels.Command import ServerCommand, addUserCommandsToPentest
-from pollenisator.server.ServerModels.CommandGroup import addUserGroupCommandsToPentest
+from pollenisator.server.ServerModels.Command import ServerCommand, addUserCommandsToPentest, doInsert as command_insert
+from pollenisator.server.ServerModels.CommandGroup import addUserGroupCommandsToPentest, doInsert as command_group_insert
 from pollenisator.server.ServerModels.Wave import ServerWave, insert as insert_wave
 from pollenisator.server.ServerModels.Interval import ServerInterval, insert as insert_interval
 from pollenisator.server.ServerModels.Scope import insert as insert_scope
@@ -471,15 +474,57 @@ def importDb(upfile, **kwargs):
     shutil.rmtree(dirpath)
     return success
 
-@permission("admin")
-def importCommands(upfile):
-    dirpath = tempfile.mkdtemp()
-    tmpfile = os.path.join(dirpath, os.path.basename(upfile.filename))
-    with open(tmpfile, "wb") as f:
-        f.write(upfile.stream.read())
-    success = mongoInstance.importCommands(tmpfile)
-    shutil.rmtree(dirpath)
-    return success
+@permission("user")
+def importCommands(upfile, **kwargs):
+    user = kwargs["token_info"]["sub"]
+    try:
+        commands_and_groups = json.loads(upfile.stream.read())
+    except:
+        return "Invalid file format, json expected", 400
+    if not isinstance(commands_and_groups, dict):
+        return "Invalid file format, object expected", 400
+    if "commands" not in commands_and_groups.keys():
+        return "Invalid file format, object expected property: commands", 400
+    if "command_groups" not in commands_and_groups.keys():
+        return "Invalid file format, object expected property: command_groups", 400
+    if not isinstance(commands_and_groups["commands"], list) or not isinstance(commands_and_groups["command_groups"], list) :
+        return "Invalid file format, commands and command_groups properties must be lists", 400
+    matchings = {}
+    failed = []
+    for command in commands_and_groups["commands"]:
+        save_id = str(command["_id"])
+        del command["_id"]
+        command["owner"] = user
+        obj_ins = command_insert("pollenisator", command, user)
+        if obj_ins["res"]:
+            matchings[save_id] = str(obj_ins["iid"])
+        else:
+            failed.append(command)
+    for group in commands_and_groups["command_groups"]:
+        del group["_id"]
+        group["owner"] = user
+        old_ids = group["commands"]
+        new_ids = [matchings.get(str(old_id)) for old_id in old_ids if matchings.get(str(old_id)) is not None]
+        group["commands"] = new_ids
+        obj_ins = command_group_insert("pollenisator", group, user)
+        if not obj_ins["res"]:
+            failed.append(group)
+    return failed
+
+@permission("user")
+def exportCommands(**kwargs):
+    user = kwargs["token_info"]["sub"]
+    mongoInstance = MongoCalendar.getInstance()
+    res = {"commands":[], "command_groups":[]}
+    commands = mongoInstance.findInDb("pollenisator", "commands", {"owner":user}, True)
+    for command in commands:
+        c = command
+        res["commands"].append(c)
+    g_commands = mongoInstance.findInDb("pollenisator", "group_commands", {"owner":user}, True)
+    for g_command in g_commands:
+        g = g_command
+        res["command_groups"].append(g)
+    return res
 
 @permission("pentester", "body.fromDb")
 def copyDb(body):

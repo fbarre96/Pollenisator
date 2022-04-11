@@ -961,6 +961,27 @@ paths:
               examples:
                 Success:
                   value: 'Pentest argument is not a valid pollenisator pentest'
+
+  "/exportCommands":
+    get:
+      operationId: pollenisator.server.mongo.exportCommands
+      tags:
+        - Mongo
+      summary: Return user commands as json
+      responses:
+        "200":
+          description:  content
+          content:
+              application/json:
+                schema:
+                  type: string
+        '503':
+          description: Failed to create an export
+          content:
+            application/json:
+              examples:
+                Server issue:
+                  value: 'Failed to export'
   "/dumpDb/{dbName}":
     get:
       operationId: pollenisator.server.mongo.dumpDb
@@ -1016,7 +1037,7 @@ paths:
     post:
       operationId: pollenisator.server.mongo.importCommands
       tags:
-        - Admin
+        - Mongo
       summary: Import an existing command database file
       requestBody:
         $ref: "#/components/requestBodies/pollenisator.server.mongo.importDb"
