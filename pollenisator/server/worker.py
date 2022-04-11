@@ -117,7 +117,7 @@ def startWorker(pentest, **kwargs):
     ret, msg = start_docker(False)
     if ret:
         return msg
-    return 500, msg
+    return msg, 403
 
 @permission("worker")
 def registerWorker(body):
