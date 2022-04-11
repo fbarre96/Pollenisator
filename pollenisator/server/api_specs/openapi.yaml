@@ -966,7 +966,7 @@ paths:
     get:
       operationId: pollenisator.server.mongo.exportCommands
       tags:
-        - Mongo
+        - Commands
       summary: Return user commands as json
       responses:
         "200":
@@ -1037,7 +1037,7 @@ paths:
     post:
       operationId: pollenisator.server.mongo.importCommands
       tags:
-        - Mongo
+        - Commands
       summary: Import an existing command database file
       requestBody:
         $ref: "#/components/requestBodies/binary_upfile"
@@ -1198,7 +1198,7 @@ paths:
               
       responses:
         "200":
-          description: Successful bulk delete command
+          description: Successful bulk delete
           content:
             application/json:
               examples:
@@ -1220,6 +1220,41 @@ paths:
                   value: '"Collection|Pentest argument is not a valid pollenisator collection|pentest"'
                 Pollenisator db:
                   value: 'Impossible to bulk delete in this database'
+  "/commands/delete/bulk":
+    post:
+      operationId: pollenisator.server.mongo.bulk_delete_commands
+      tags:
+        - Commands
+        - CommandGroup
+      summary: Delete many commmands and group of commands in db
+      description: Delete many commmands and group of commands in db
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Successful bulk delete
+          content:
+            application/json:
+              examples:
+                Deleted count:
+                  value: '4'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                body is not a dict:
+                  value: '"body was not a valid dictionnary"'
+        '403':
+          description: Invalid parameters values in given object
+          content:
+            application/json:
+              examples:
+                invalid collection in body:
+                  value: 'You can delete only commands and group_commands'
   /pentests:
     get:
       operationId: pollenisator.server.mongo.listPentests

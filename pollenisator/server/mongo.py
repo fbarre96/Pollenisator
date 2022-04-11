@@ -252,6 +252,27 @@ def bulk_delete(pentest, body):
     return deleted
 
 @permission("user")
+def bulk_delete_commands(body, **kwargs):
+    user = kwargs["token_info"]["sub"]
+    data = body
+    if isinstance(data, str):
+        data = json.loads(data, cls=JSONDecoder)
+    if not isinstance(data, dict):
+        return "body was not a valid dictionnary", 400
+    deleted = 0
+    for obj_type in data:
+        if obj_type != "commands" and obj_type != "group_commands":
+            return "You can delete only commands and group_commands", 403
+        for obj_id in data[obj_type]:
+            if not isinstance(obj_id, ObjectId):
+                if obj_id.startswith("ObjectId|"):
+                    obj_id = ObjectId(obj_id.split("ObjectId|")[1])
+            res = mongoInstance.deleteFromDb("pollenisator", obj_type, {"_id": ObjectId(obj_id), "owner":user}, False, True)
+            if res is not None:
+                deleted += res.deleted_count
+    return deleted
+
+@permission("user")
 def listPentests(**kwargs):
     username = kwargs["token_info"]["sub"]
     if "admin" in kwargs["token_info"]["scope"]:
