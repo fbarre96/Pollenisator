@@ -982,6 +982,26 @@ paths:
               examples:
                 Server issue:
                   value: 'Failed to export'
+  "/exportCommands/worker":
+    get:
+      operationId: pollenisator.server.mongo.exportCommandsForWorker
+      tags:
+        - Commands
+      summary: Return workers commands as json
+      responses:
+        "200":
+          description:  content
+          content:
+              application/json:
+                schema:
+                  type: string
+        '503':
+          description: Failed to create an export
+          content:
+            application/json:
+              examples:
+                Server issue:
+                  value: 'Failed to export'
   "/dumpDb/{dbName}":
     get:
       operationId: pollenisator.server.mongo.dumpDb

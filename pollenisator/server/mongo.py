@@ -530,10 +530,7 @@ def importCommands(upfile, **kwargs):
     user = kwargs["token_info"]["sub"]
     return doImportCommands(upfile, user)
     
-
-@permission("user")
-def exportCommands(**kwargs):
-    user = kwargs["token_info"]["sub"]
+def doExportCommands(user):
     mongoInstance = MongoCalendar.getInstance()
     res = {"commands":[], "command_groups":[]}
     commands = mongoInstance.findInDb("pollenisator", "commands", {"owner":user}, True)
@@ -545,6 +542,16 @@ def exportCommands(**kwargs):
         g = g_command
         res["command_groups"].append(g)
     return res
+
+@permission("user")
+def exportCommands(**kwargs):
+    user = kwargs["token_info"]["sub"]
+    return doExportCommands(user)
+    
+
+@permission("user")
+def exportCommandsForWorker(**kwargs):
+    return doExportCommands("Worker")
 
 @permission("pentester", "body.fromDb")
 def copyDb(body):
