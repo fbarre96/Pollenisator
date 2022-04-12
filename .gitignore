@@ -68,6 +68,7 @@ pollenisator/exports/*
 pollenisator/config/tools.d/*
 !pollenisator/config/tools.d/tools.json
 .vscode
+error.log
 pollenisator/.vscode
 venv/
 pollenisator/config/client.cfg

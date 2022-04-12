@@ -161,7 +161,7 @@ def update(pentest, command_iid, body, **kwargs):
         del body["owner"]
     if "_id" in body:
         del body["_id"]
-    mongoInstance.updateInDb(body["indb"], "commands", {"_id": ObjectId(command_iid)}, {"$set": body}, False, True)
+    mongoInstance.updateInDb(command["indb"], "commands", {"_id": ObjectId(command_iid)}, {"$set": body}, False, True)
     return True
 
 @permission("user")

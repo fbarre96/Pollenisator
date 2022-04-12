@@ -108,7 +108,7 @@ def update(pentest, command_group_iid, body, **kwargs):
         del body["_id"]
     if "name" in body:
         del body["name"]
-    res = mongoInstance.updateInDb(body["indb"], "group_commands", {"_id":ObjectId(command_group_iid), "owner":user}, {"$set":body}, False, True)
+    res = mongoInstance.updateInDb(group["indb"], "group_commands", {"_id":ObjectId(command_group_iid), "owner":user}, {"$set":body}, False, True)
     return True
 
 def addUserGroupCommandsToPentest(pentest, user):
