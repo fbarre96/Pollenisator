@@ -103,8 +103,9 @@ class Nuclei(Plugin):
             inserted = ip_o.addInDb()
             if not inserted["res"]:
                 ip_o = ServerIp.fetchObject(pentest, {"_id": inserted["iid"]})
-                ip_o.notes += "\nNuclei:\n"+notes
-                ip_o.update()
+                if ip_o is not None:
+                    ip_o.notes += "\nNuclei:\n"+notes
+                    ip_o.update()
             cumulative_notes.append(notes+"\n")
             
             
