@@ -166,11 +166,17 @@ class ServerTool(Tool, ServerElement):
                 command = command.replace("|port.infos."+str(info)+"|", str(port_infos[info]))
         return command_o.bin_path + " "+command
 
-    def getPlugin(self):
+    def getPluginName(self):
         mongoInstance = MongoCalendar.getInstance()
         command_o = mongoInstance.findInDb(self.pentest,"commands",{"_id":ObjectId(self.command_iid)}, False)
         if command_o and "plugin" in command_o.keys():
-            mod = loadPlugin(command_o["plugin"])
+            return command_o["plugin"]
+        return None
+
+    def getPlugin(self):
+        mod_name = self.getPluginName()
+        if mod_name:
+            mod = loadPlugin(mod_name)
             return mod
         return None
 
@@ -313,6 +319,8 @@ def insert(pentest, body):
     base["dated"] = body.get("dated", "None")
     base["datef"] = body.get("datef", "None")
     base["text"] = body.get("text", "")
+    base["status"] = body.get("status", [])
+    base["notes"] = body.get("notes", "")
     res_insert = mongoInstance.insert("tools", base, parent)
     ret = res_insert.inserted_id
     tool_o._id = ret
@@ -406,7 +414,7 @@ def importResult(pentest, tool_iid, upfile, body):
             # if the success is validated, mark tool as done
             toolModel.notes = notes
             toolModel.tags = tags
-            toolModel.markAsDone(filepath)
+            toolModel.markAsDone(filepath, toolModel.getPluginName())
             # And update the tool in database
             update(pentest, tool_iid, ToolController(toolModel).getData())
             # Upload file to SFTP

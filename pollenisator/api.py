@@ -1,5 +1,5 @@
 # ENABLE debug mode early because evenlet monkey patch other libs
-debug = True 
+debug = False 
 if debug:
     async_mode = "threading" # Be aware thats sockets does not seems to work when debugging
 else:
@@ -9,6 +9,9 @@ else:
     
 # ENABLE LOGGING EARLY ON
 import logging
+from posix import environ
+
+from pollenisator.server.permission import permission
 logging.basicConfig(filename='error.log', level=logging.INFO,
                     format='[%(asctime)s][%(levelname)s] - %(funcName)s: %(message)s')
 
@@ -16,6 +19,7 @@ from flask_cors import CORS
 from flask_socketio import SocketIO
 from getpass import getpass
 from pollenisator.server.worker import removeWorkers, unregister
+from pollenisator.server.token import verifyToken, decode_token
 from pollenisator.core.Components.Utils import JSONEncoder, loadServerConfig
 from flask import request
 import sys
@@ -87,7 +91,13 @@ def notify_clients(notif):
     """Notify clients websockets
     """
     global socketio
-    socketio.emit("notif", json.dumps(notif, cls=JSONEncoder))
+    global sockets
+    if notif["db"] == "pollenisator":
+        socketio.emit("notif", json.dumps(notif, cls=JSONEncoder))
+    else:
+        for sid, pentest in sockets.items():
+            if pentest == notif["db"]:
+                socketio.emit("notif", json.dumps(notif, cls=JSONEncoder), to=sid)
 
 
 @socketio.event
@@ -100,7 +110,6 @@ def registerCommands(data):
     command_names = tools
     mongoInstance.registerCommands(workerName, command_names)
 
-
 @socketio.event
 def register(data):
     mongoInstance = MongoCalendar.getInstance()
@@ -109,6 +118,18 @@ def register(data):
     sockets[workerName] = request.sid
     mongoInstance.registerWorker(workerName)
 
+@socketio.event
+def registerForNotifications(data):
+    sid = request.sid
+    token = str(data.get("token", ""))
+    pentest = str(data.get("pentest", ""))
+    global sockets
+    res = verifyToken(token)
+    token_info = decode_token(token)
+    if res:
+        if pentest in token_info["scope"]:
+            sockets[sid] = pentest
+        
 
 @socketio.event
 def disconnect():

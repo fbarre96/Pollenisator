@@ -74,13 +74,16 @@ class dnsrecon(Plugin):
             dnsrecon_content = json.loads(file_opened.read().decode("utf-8"))
         except json.decoder.JSONDecodeError:
             return None, None, None, None
-        if len(dnsrecon_content) == 0:
-            return None, None, None, None
-        if not isinstance(dnsrecon_content[0], dict):
-            return None, None, None, None
-        if dnsrecon_content[0].get("type", "") != "ScanInfo":
-            return None, None, None, None
-        if dnsrecon_content[0].get("date", "") == "":
+        try:
+            if isinstance(dnsrecon_content, list) and len(dnsrecon_content) == 0:
+                return None, None, None, None
+            if not isinstance(dnsrecon_content[0], dict):
+                return None, None, None, None
+            if dnsrecon_content[0].get("type", "") != "ScanInfo":
+                return None, None, None, None
+            if dnsrecon_content[0].get("date", "") == "":
+                return None, None, None, None
+        except:
             return None, None, None, None
         for record in dnsrecon_content[1:]:
             ip = record["address"]

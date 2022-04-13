@@ -4,6 +4,7 @@ import shutil
 from bson import ObjectId
 from flask import send_file
 import hashlib
+import logging
 from datetime import datetime
 from pollenisator.core.Components.Utils import listPlugin, loadPlugin
 from pollenisator.core.Components.mongo import MongoCalendar
@@ -63,9 +64,14 @@ def importExistingFile(pentest, upfile, body):
     else:
         # SET PLUGIN 
         mod = loadPlugin(plugin)
-        notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream)
-        results[plugin] = results.get(
-            plugin, 0) + 1
+        try:
+            notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream)
+            results[plugin] = results.get(
+                plugin, 0) + 1
+        except Exception as e:
+            logging.error("Plugin exception : "+str(e))
+            notes = tags = lvl = targets = None
+        
     # IF PLUGIN FOUND SOMETHING
     if notes is not None and tags is not None:
         # ADD THE RESULTING TOOL TO AFFECTED
@@ -82,14 +88,15 @@ def importExistingFile(pentest, upfile, body):
                 port = target.get("port", None)
                 proto = target.get("proto", None)
             mongoInstance.connectToDb(pentest)
-            mongoInstance.insert("waves", {"wave":"Imported", "wave_commands":[]})
+            if mongoInstance.find("waves", {"wave":"Imported"}) is None:
+                mongoInstance.insert("waves", {"wave":"Imported", "wave_commands":[]})
             tool_m = ServerTool().initialize("", "Imported", name=toolName, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
-                                        dated=date, datef=date, scanner_ip="Imported", status="done", notes=notes, tags=tags)
+                                        dated=date, datef=date, scanner_ip="Imported", status=["done"], notes=notes, tags=tags)
             ret = tool_m.addInDb()
             upfile.stream.seek(0)
             msg, status, filepath = _upload(pentest, str(ret["iid"]), "result", upfile)
             if status == 200:
-                mongoInstance.update("tools", {"_id":ObjectId(ret["iid"])}, {"resultfile":  filepath})
+                mongoInstance.update("tools", {"_id":ObjectId(ret["iid"])}, {"$set":{"resultfile":  filepath, "plugin_used":plugin}})
     return results
 
 
