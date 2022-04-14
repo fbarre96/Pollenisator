@@ -45,7 +45,7 @@ class Tool(Element):
                         valuesFromDb.get("dated", "None"), valuesFromDb.get(
                             "datef", "None"),
                         valuesFromDb.get(
-                            "scanner_ip", "None"), valuesFromDb.get("status", []), valuesFromDb.get("notes", ""), valuesFromDb.get("resultfile", ""), valuesFromDb.get("tags", []), valuesFromDb.get("infos", {}))
+                            "scanner_ip", "None"), valuesFromDb.get("status", []), valuesFromDb.get("notes", ""), valuesFromDb.get("resultfile", ""), valuesFromDb.get("plugin_used", ""), valuesFromDb.get("tags", []), valuesFromDb.get("infos", {}))
 
     def initialize(self, command_iid, wave="", name=None, scope="", ip="", port="", proto="tcp", lvl="", text="",
                    dated="None", datef="None", scanner_ip="None", status=None, notes="", resultfile="", plugin_used="", tags=None, infos=None):

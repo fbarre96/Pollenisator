@@ -8,6 +8,7 @@ import pollenisator.core.Components.Utils as Utils
 import sys
 import logging
 
+
 class MongoCalendar:
     # pylint: disable=unsubscriptable-object
     """
@@ -78,16 +79,16 @@ class MongoCalendar:
     def setWorkerInclusion(self, name, db, setInclusion):
         if setInclusion:
             self.updateInDb("pollenisator", "workers", {"name": name}, {
-                            "$push": {"pentests": db}}, False, True)
+                            "$set": {"pentest": db}}, False, True)
         else:
             self.updateInDb("pollenisator", "workers", {"name": name}, {
-                            "$pull": {"pentests": db}}, False, True)
+                            "$set": {"pentest": ""}}, False, True)
         return True
 
     def deleteWorker(self, worker_hostname):
         """Remove given worker.
         Args:
-            worker_hostname: the worker shortname to update."""
+            worker_hostname: the worker name to update."""
         res = self.deleteFromDb("pollenisator", "workers", {
             "name": worker_hostname}, False, True)
         return res
@@ -187,17 +188,19 @@ class MongoCalendar:
             "name": worker_name}, False, True)
 
     def registerWorker(self, worker_name):
+        from pollenisator.server.worker import doSetInclusion
         try:
             if self.client is None:
                 self.connect()
                 if self.client is None:
                     raise IOError("Failed to register Worker")
-            res = self.findInDb("pollenisator", "workers", {
-                "name": worker_name}, False)
-            worker_shortname = worker_name.split("@")[0]
+            res = self.findInDb("pollenisator", "workers", {"name": worker_name}, False)
             if res is None:
-                self.insertInDb("pollenisator", "workers", {
-                    "name": worker_name, "shortname": worker_shortname, "last_heartbeat":datetime.datetime.now(), "pentests":[]}, '', True)
+                self.insertInDb("pollenisator", "workers", {"name": worker_name, "last_heartbeat":datetime.datetime.now(), "pentest":""}, '', True)
+            else:
+                self.updateInDb("pollenisator", "workers", {"name": worker_name},
+                    {"$set":{"last_heartbeat":datetime.datetime.now()}}, notify=True)
+                doSetInclusion(worker_name, "Worker", res["pentest"], True)
             print("Registered worker "+str(worker_name))
             return True
         except IOError as e:
@@ -206,57 +209,6 @@ class MongoCalendar:
                   self.host + " and has a user mongAdmin with the correct password.")
             self.client = None
             return False
-
-    # def registerCommands(self, worker_name, command_names):
-    #     """Update or insert the worker name with given commands.
-    #     Args:
-    #         worker_name: the worker shortname.
-    #         command_names: a list of commands that the worker want to register."""
-    #     try:
-    #         if self.client is None:
-    #             self.connect()
-    #             if self.client is None:
-    #                 raise IOError("Failed to register commands")
-    #         res = self.findInDb("pollenisator", "workers", {
-    #             "name": worker_name}, False)
-    #         worker_shortname = worker_name.split("@")[0]
-    #         if res is not None:
-    #             self.updateInDb("pollenisator", "workers",
-    #                             {"name": worker_name}, {"$set": {"registeredCommands": command_names}}, False, True)
-    #         else:
-    #             self.insertInDb("pollenisator", "workers", {
-    #                 "name": worker_name, "shortname": worker_shortname, "registeredCommands": command_names, "last_heartbeat":datetime.datetime.now(), "pentests":[]}, '', True)
-    #         print("Registered commands "+str(command_names) +
-    #               " for  "+str(worker_name))
-    #         return True
-    #     except IOError as e:
-    #         print("Failed to connect." + str(e))
-    #         print("Please verify that the mongod service is running on host " +
-    #               self.host + " and has a user mongAdmin with the correct password.")
-    #         self.client = None
-    #         return False
-            
-    # def getRegisteredCommands(self, worker_name):
-    #     """Return the commands list registered by the given worker name
-    #     Args:
-    #         worker_name: the wworker shortname.
-    #     """
-    #     try:
-    #         if self.client is None:
-    #             self.connect()
-    #             if self.client is None:
-    #                 raise ServerSelectionTimeoutError()
-    #         worker_res = self.findInDb("pollenisator", "workers", {
-    #             "name": worker_name}, False)
-    #         if worker_res is not None:
-    #             return worker_res["registeredCommands"]
-    #     except ServerSelectionTimeoutError as e:
-    #         print("Failed to connect." + str(e))
-    #         print("Please verify that the mongod service is running on host " +
-    #               self.host + " and has a user mongAdmin with the correct password.")
-    #         self.client = None
-
-    
 
     def update(self, collection, pipeline, updatePipeline, many=False, notify=True):
         """

@@ -113,7 +113,7 @@ def registerCommands(data):
 @socketio.event
 def register(data):
     mongoInstance = MongoCalendar.getInstance()
-    workerName = data.get("workerName")
+    workerName = data.get("name")
     global sockets
     sockets[workerName] = request.sid
     mongoInstance.registerWorker(workerName)

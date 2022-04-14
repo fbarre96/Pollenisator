@@ -523,7 +523,7 @@ def doImportCommands(upfile, user):
 
 @permission("user")
 def importCommandsForWorker(upfile, **kwargs):
-    doImportCommands(upfile, "Worker")
+    return doImportCommands(upfile, "Worker")
     
 @permission("user")
 def importCommands(upfile, **kwargs):

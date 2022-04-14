@@ -26,7 +26,7 @@ def startAutoScan(pentest, **kwargs):
     autoscanRunning = mongoInstance.find("autoscan", {"special":True}, False) is not None
     if autoscanRunning:
         return "An auto scan is already running", 403
-    workers = mongoInstance.getWorkers({"pentests":pentest})
+    workers = mongoInstance.getWorkers({"pentest":pentest})
     if workers is None:
         return "No worker registered for this pentest", 404
     mongoInstance.insert("autoscan", {"start":datetime.now(), "special":True})
@@ -71,7 +71,7 @@ def stopAutoScan(pentest):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     toolsRunning = []
-    workers = mongoInstance.getWorkers({"pentests":pentest})
+    workers = mongoInstance.getWorkers({"pentest":pentest})
     for worker in workers:
         tools = mongoInstance.find("tools", {"scanner_ip": worker["name"], "status":"running"}, True)
         for tool in tools:

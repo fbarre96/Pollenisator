@@ -1,5 +1,6 @@
 import json
 import logging
+import uuid
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Controllers.ToolController import ToolController
 from pollenisator.server.ServerModels.Command import addUserCommandsToPentest
@@ -35,18 +36,29 @@ def listWorkers(pipeline=None):
         ret.append(w)
     return ret
 
+def doSetInclusion(name, user, pentest, setInclusion):
+    if name != user: # is Worker
+        addUserCommandsToPentest( pentest, "Worker")
+        addUserGroupCommandsToPentest( pentest, "Worker")
+    return mongoInstance.setWorkerInclusion(name, pentest, setInclusion)
+
 @permission("pentester", "body.db")
 def setInclusion(name, body, **kwargs):
     "Set a worker inclusion in a pentest"
     user = kwargs["token_info"]["sub"]
-    if name != user: # is Worker
-        addUserCommandsToPentest( body["db"], "Worker")
-        addUserGroupCommandsToPentest( body["db"], "Worker")
-    return mongoInstance.setWorkerInclusion(name, body["db"], body["setInclusion"])
+    return doSetInclusion(name, user, body["db"], body["setInclusion"])
+
+def doDeleteWorker(name):
+    res = mongoInstance.findInDb("pollenisator","workers",{"name":name}, False)
+    if res is None:
+        return None
+    if res.get("container_id") is not None:
+        stop_docker(res["container_id"])
+    return mongoInstance.deleteWorker(name)
 
 @permission("user")
 def deleteWorker(name):
-    res = mongoInstance.deleteWorker(name)
+    res = doDeleteWorker(name)
     if res is None:
         return "Worker not found", 404
     
@@ -62,12 +74,19 @@ def removeWorkers():
             if "running" in tool_m.getStatus():
                 tool_m.markAsNotDone()
                 tool_update(running_tool["pentest"], running_tool["iid"], ToolController(tool_m).getData())
-        deleteWorker(worker["name"])
+        doDeleteWorker(worker["name"])
         count += 1
     return {"n":int(count)}
 
+def stop_docker(docker_id):
+    try:
+        client = docker.from_env()
+        container = client.containers.get(docker_id)
+        container.stop()
+    except Exception as e:
+        return False, "Unable to stop docker "+str(e)
 
-def start_docker(force_reinstall):
+def start_docker(force_reinstall, docker_id):
     worker_subdir = os.path.join(Utils.getMainDir(), "PollenisatorWorker")
     if os.path.isdir(worker_subdir) and force_reinstall:
         shutil.rmtree(worker_subdir)
@@ -93,7 +112,11 @@ def start_docker(force_reinstall):
     if len(image) == 0:
         return False, "The docker build command failed, try to install manually..."
     network_mode = "host"
-    container = client.containers.run(image=image[0], network_mode=network_mode, volumes={os.path.join(Utils.getMainDir(), "PollenisatorWorker"):{'bind':'/home/Pollenisator', 'mode':'rw'}}, detach=True)
+    container = client.containers.run(image=image[0], 
+                    network_mode=network_mode,
+                    volumes={os.path.join(Utils.getMainDir(), "PollenisatorWorker"):{'bind':'/home/Pollenisator', 'mode':'rw'}},
+                    environment={"POLLENISATOR_WORKER_NAME":str(docker_id)},
+                    detach=True)
     if container.logs() != b"":
         logging.warning(container.logs())
     return True, str(container.id)
@@ -101,12 +124,15 @@ def start_docker(force_reinstall):
 @permission("pentester")
 def startWorker(pentest, **kwargs):
     user = kwargs["token_info"]["sub"]
-    existing = mongoInstance.findInDb(pentest, "workers", {"pentests": pentest}, False)
+    existing = mongoInstance.findInDb("pollenisator", "workers", {"pentest": pentest}, False)
     if existing is not None:
-        return str(existing["_id"])
-    ret, msg = start_docker(False)
+        return str(existing["name"])
+    docker_id = uuid.uuid4()
+    existing = mongoInstance.insertInDb("pollenisator", "workers", {"pentest": pentest, "name":str(docker_id)}, False, False)
+    ret, msg = start_docker(False, docker_id)
     if ret:
-        return msg
+        mongoInstance.updateInDb("pollenisator", "workers", {"pentest": pentest, "name":str(docker_id)}, {"$set":{"container_id":msg}}, False, False)
+        return docker_id
     return msg, 403
 
 @permission("worker")
@@ -125,6 +151,6 @@ def unregister(name):
             if "running" in tool_m.getStatus():
                 tool_m.markAsNotDone()
                 tool_update(running_tool["pentest"], running_tool["iid"], ToolController(tool_m).getData())
-        mongoInstance.deleteFromDb("pollenisator", "workers", {"name": name}, False, True)
+        doDeleteWorker(name)
         return True
     return "Worker not Found", 404

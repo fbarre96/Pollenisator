@@ -85,7 +85,7 @@ class Plugin(metaclass=MetaPlugin):
         notes = ""
         tags = ["todo"]
         notes = file_opened.read().decode("utf-8")
-        return notes, tags, "wave", {"wave": None}
+        return notes, tags, "wave", {"wave": {"wave":"Imported"}}
 
     def getFilePath(self, commandExecuted):
         """Returns the output file path given in the executed command using getFileOutputArg

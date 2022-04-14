@@ -1,4 +1,5 @@
 from distutils import command
+from json import tool
 import logging
 from bson import ObjectId
 from pollenisator.core.Components.mongo import MongoCalendar
@@ -164,10 +165,14 @@ class ServerTool(Tool, ServerElement):
             port_infos = port_db.get("infos", {})
             for info in port_infos:
                 command = command.replace("|port.infos."+str(info)+"|", str(port_infos[info]))
+        if isinstance(command_o, str):
+            return command
         return command_o.bin_path + " "+command
 
     def getPluginName(self):
         mongoInstance = MongoCalendar.getInstance()
+        if self.plugin_used != "":
+            return self.plugin_used
         command_o = mongoInstance.findInDb(self.pentest,"commands",{"_id":ObjectId(self.command_iid)}, False)
         if command_o and "plugin" in command_o.keys():
             return command_o["plugin"]
@@ -341,9 +346,11 @@ def craftCommandLine(pentest, tool_iid):
     if toolModel is None:
         return "Tool does not exist : "+str(tool_iid), 404
     # GET COMMAND OBJECT FOR THE TOOL
-    command_o = ServerCommand.fetchObject({"_id": ObjectId(toolModel.command_iid)}, pentest)
-    if command_o is None:
+    if toolModel.text == "":
+        command_o = ServerCommand.fetchObject({"_id": ObjectId(toolModel.command_iid)}, pentest)
         return "Associated command was not found", 404
+    else:
+        command_o = str(toolModel.text)
     # Replace vars in command text (command line)
     comm = toolModel.getCommandToExecute(command_o)
     # Read file to execute for given tool and prepend to final command
@@ -368,6 +375,14 @@ def completeDesiredOuput(pentest, tool_iid, plugin, command_line_options):
     mod = loadPlugin(plugin)
     # craft outputfile name
     comm = mod.changeCommand(comm, "|outputDir|", "")
+    return {"command_line_options":comm, "ext":mod.getFileOutputExt()}
+
+@permission("user")
+def getDesiredOutputForPlugin(body):
+    cmdline = body.get("cmdline")
+    plugin = body.get("plugin")
+    mod = loadPlugin(plugin)
+    comm = mod.changeCommand(cmdline, "|outputDir|", "")
     return {"command_line_options":comm, "ext":mod.getFileOutputExt()}
 
 @permission("user")
@@ -414,7 +429,7 @@ def importResult(pentest, tool_iid, upfile, body):
             # if the success is validated, mark tool as done
             toolModel.notes = notes
             toolModel.tags = tags
-            toolModel.markAsDone(filepath, toolModel.getPluginName())
+            toolModel.markAsDone(filepath)
             # And update the tool in database
             update(pentest, tool_iid, ToolController(toolModel).getData())
             # Upload file to SFTP
@@ -445,7 +460,7 @@ def launchTask(pentest, tool_iid, body, **kwargs):
 
     checks = body["checks"]
     # Find a worker that can launch the tool without breaking limitations
-    workers = [x["name"] for x in mongoInstance.getWorkers({"pentests":pentest})]
+    workers = [x["name"] for x in mongoInstance.getWorkers({"pentest":pentest})]
     choosenWorker = ""
     if command_o.owner != "Worker":
         if command_o.owner in workers:

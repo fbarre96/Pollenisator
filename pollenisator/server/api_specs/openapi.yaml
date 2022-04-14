@@ -1655,11 +1655,7 @@ paths:
                       type: string
                     name:
                       type: string
-                    pentests:
-                      type: array
-                      items:
-                        type: string
-                    shortname:
+                    pentest:
                       type: string
                     registeredCommands:
                       type: array
@@ -1672,7 +1668,7 @@ paths:
                       "_id": "60f686d8e15510a2957cb263",
                       "last_heartbeat": "2021-07-20 10:18:35.269000",
                       "name": "078cbd54-6c26-4ba9-b84d-fdb12f239af3@barre",
-                      "pentests": [],
+                      "pentest": "",
                       "registeredCommands": [
                         "Nmap.tcp",
                         "Nmap.top_udp",
@@ -1719,8 +1715,7 @@ paths:
                         "searchsploit",
                         "dnsrecon",
                         "CME_greybox"
-                      ],
-                      "shortname": "078cbd54-6c26-4ba9-b84d-fdb12f239af3"
+                      ]
                     }
                   ]'
         "400":
@@ -3075,6 +3070,10 @@ paths:
                 plugin:
                   description: plugin name to use or "auto-detect"
                   type: string
+                default_target:
+                  description: Default pentest object to affect to
+                  type: string
+                  default: ""
               required:
                 - upfile
                 - plugin
@@ -3161,6 +3160,47 @@ paths:
           required: true
           schema:
             type: string
+      responses:
+        "200":
+          description: The command line to execute with a marker for |outputDir| to be
+            replaced
+          content:
+            application/json:
+              examples:
+                Successful nmap craft:
+                  value: '{
+  "command_line_options": "nmap -n -v -p443 www.algosecure.fr -oN |outputDir|",
+  "ext": ".nmap"
+}'
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                no plugin:
+                  value: '"This tool has no plugin configured and no plugin was specified"'
+                empty command line result:
+                  value: '"An empty command line was crafted"'
+  "/tools/getDesiredOutputForPlugin":
+    post:
+      operationId: pollenisator.server.ServerModels.Tool.getDesiredOutputForPlugin
+      tags:
+        - Tools
+      summary: add the plugin desired output option in the command (using plugin + parameters) a
+        marker for |outputDir| is to be replaced in the response. 
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - plugin
+                - cmdline
+              properties:
+                plugin:
+                  type: string
+                cmdline:
+                  type: string
       responses:
         "200":
           description: The command line to execute with a marker for |outputDir| to be
