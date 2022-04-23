@@ -158,6 +158,10 @@ components:
             - tcp
             - udp
             - ""
+        synthesis:
+          type: string
+        description:
+          type: string
         notes:
           type: string
         ease:
@@ -190,6 +194,8 @@ components:
           type: array
           items:
             type: string
+        language:
+          type: string
         proofs:
           type: array
           items:
@@ -197,6 +203,30 @@ components:
         index:
           type: string
           default: end
+        fixes:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              execution:
+                type: string
+                enum:
+                  - Quick Win
+                  - Moderate
+                  - Hard
+              gain:
+                type: string
+                enum:
+                  - Weak
+                  - Moderate
+                  - Mean
+                  - Strong
+              synthesis:
+                type: string
+              title:
+                type: string
     Intervals:
       properties:
         wave:
@@ -1509,7 +1539,7 @@ paths:
                   value: '{
     "_id": "ObjectId|5fa5819aed75191f22168a40",
     "key": "tags",
-    "value": "{\"todo\": \"orange\", \"unscanned\": \"yellow\", \"P0wned!\": \"red\", \"Interesting\": \"dark green\", \"Uninteresting\": \"sky blue\", \"Neutral\": \"white\"}"
+    "value": "{\"todo\": \"orange\", \"unscanned\": \"yellow\", \"pwned\": \"red\", \"Interesting\": \"dark green\", \"Uninteresting\": \"sky blue\", \"Neutral\": \"white\"}"
   }'
   /settings:
     get:
@@ -1528,7 +1558,7 @@ paths:
   {
     "_id": "ObjectId|5fa5819aed75191f22168a40",
     "key": "tags",
-    "value": "{\"todo\": \"orange\", \"unscanned\": \"yellow\", \"P0wned!\": \"red\", \"Interesting\": \"dark green\", \"Uninteresting\": \"sky blue\", \"Neutral\": \"white\"}"
+    "value": "{\"todo\": \"orange\", \"unscanned\": \"yellow\", \"pwned\": \"red\", \"Interesting\": \"dark green\", \"Uninteresting\": \"sky blue\", \"Neutral\": \"white\"}"
   },
   {
     "_id": "ObjectId|5fbb793bed75195fe4274412",
@@ -1884,76 +1914,7 @@ paths:
               examples:
                 Success:
                   value: 'Worker not found'
-#   "/workers/{name}/getRegisteredCommands":
-#     get:
-#       operationId: pollenisator.server.worker.getRegisteredCommands
-#       tags:
-#         - Worker
-#       summary: Get a worker registered commands
-#       description: Get a worker registered commands
-#       parameters:
-#         - name: name
-#           in: path
-#           required: true
-#           schema:
-#             type: string
-#       responses:
-#         "200":
-#           description: Successful get
-#           content:
-#             application/json:
-#               schema:
-#                 type: array
-#                 items:
-#                   type: string
-#               examples:
-#                 list of registered commands:
-#                   value: '[
-#   "Nmap.tcp",
-#   "Nmap.top_udp",
-#   "Nmap.bdd",
-#   "Nmap.vpn",
-#   "Nmap.supervision",
-#   "Nmap.services",
-#   "Nmap.services.udp",
-#   "Nmap.services_scripts",
-#   "Nmap.all.tcp",
-#   "Nmap.ip.allTcp",
-#   "Nmap.ip.udp",
-#   "WhatWeb.http",
-#   "WhatWeb.https",
-#   "TestSSL",
-#   "Nikto",
-#   "digReverseLookUp",
-#   "pythonReverseLookUp",
-#   "Sublist3r",
-#   "Dirsearch.http",
-#   "Dirsearch.https",
-#   "Knockpy",
-#   "crtsh",
-#   "ssh_scan",
-#   "amap",
-#   "amap.udp",
-#   "http-methods",
-#   "smbmap",
-#   "smbmap_anon",
-#   "smbmap_greybox",
-#   "smb-enum-users",
-#   "nmap-script-vuln",
-#   "enum4linux",
-#   "ftp-anon",
-#   "Nmap.quick",
-#   "ike-scan",
-#   "Nmap.verify.tcp",
-#   "Nmap.verify.udp",
-#   "CME.recon",
-#   "CME.usecreds",
-#   "eternalblue",
-#   "bluekeep",
-#   "openrelay",
-#   "searchsploit",
-#   "dnsrecon"
-# ]'
+
   "/commands/find":
     post:
       operationId: pollenisator.server.ServerModels.Command.getCommands
@@ -3635,6 +3596,22 @@ paths:
               examples:
                 unexpected extension:
                   value: '"Invalid extension for template, must be pptx or docx"'
+  "/report/DefectTemplates/import":
+    post:
+      operationId: pollenisator.server.ServerModels.Defect.importDefectTemplates
+      tags:
+        - Admin
+      summary: Import Defect templates in pollenisator from json file
+      requestBody:
+        $ref: "#/components/requestBodies/binary_upfile"
+      responses:
+        "200":
+          description: a indicator of success
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: "True"
               
   "/report/{pentest}/generate":
     get:
@@ -3744,29 +3721,22 @@ paths:
     "risk": "Critical",
     "tags": [],
     "title": "XSS",
+    "synthesis": "An XSS or Cross-Site-Scripting attack is ..."
+    "description": "The XXX server is vulnerable to XSS in XXX form ...",
+    "language": "en",
     "type": [
       "Application"
+    ],
+    "fixes":[
+      {
+        "title":"Filter user input",
+        "synthesis": "..",
+        "description":"...",
+        "execution": "Easy"
+        "gain": "Strong"
+      },
     ]
   },
-  {
-    "_id": "ObjectId|60f190815955e6cf385a405d",
-    "ease": "Moderate",
-    "impact": "Major",
-    "index": "1",
-    "infos": {},
-    "ip": "",
-    "notes": "",
-    "port": "",
-    "proofs": [],
-    "proto": "",
-    "redactor": "N/A",
-    "risk": "Major",
-    "tags": [],
-    "title": "sql",
-    "type": [
-      "Application"
-    ]
-  }
 ]'
   "/report/{pentest}/defects/move/{defect_id_to_move}/{target_id}":
     post:
@@ -3872,7 +3842,13 @@ paths:
                       type: string
                     title:
                       type: string
+                    description:
+                      type: string
+                    synthesis:
+                      type: string
                     type:
+                      type: string
+                    language:
                       type: string
                     fixes:
                       type: array
@@ -3886,12 +3862,14 @@ paths:
                             enum:
                               - Quick Win
                               - Moderate
+                              - Mean
                               - Hard
                           gain:
                             type: string
                             enum:
                               - Weak
                               - Moderate
+                              - Mean
                               - Strong
                           synthesis:
                             type: string

@@ -30,7 +30,7 @@ class Crtsh(Plugin):
         Returns:
             string
         """
-        return " > "
+        return " | tee "
 
     def getFileOutputExt(self):
         """Returns the expected file extension for this command result file
@@ -90,5 +90,5 @@ class Crtsh(Plugin):
         if notes.strip() == "":
             return None, None, None, None
         elif countInserted != 0:
-            tags.append("todo")
+            tags.append("found-domains-info")
         return notes, tags, "wave", {"wave": None}

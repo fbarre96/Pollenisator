@@ -76,3 +76,6 @@ pollenisator/config/server.cfg
 pollenisator/config/settings.cfg
 pollenisator/AllInOne/results/*
 !pollenisator/AllInOne/results
+.scannerwork/.sonar_lock
+.scannerwork/report-task.txt
+pollenisator/PollenisatorWorker

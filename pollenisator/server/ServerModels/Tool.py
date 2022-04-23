@@ -326,6 +326,7 @@ def insert(pentest, body):
     base["text"] = body.get("text", "")
     base["status"] = body.get("status", [])
     base["notes"] = body.get("notes", "")
+    base["tags"] = body.get("tags", [])
     res_insert = mongoInstance.insert("tools", base, parent)
     ret = res_insert.inserted_id
     tool_o._id = ret
@@ -336,6 +337,9 @@ def insert(pentest, body):
 def update(pentest, tool_iid, body):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
+    tags = body.get("tags", [])
+    for tag in tags:
+        mongoInstance.doRegisterTag(tag)
     res = mongoInstance.update("tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
     return True
     
@@ -348,7 +352,8 @@ def craftCommandLine(pentest, tool_iid):
     # GET COMMAND OBJECT FOR THE TOOL
     if toolModel.text == "":
         command_o = ServerCommand.fetchObject({"_id": ObjectId(toolModel.command_iid)}, pentest)
-        return "Associated command was not found", 404
+        if command_o is None:
+            return "Associated command was not found", 404
     else:
         command_o = str(toolModel.text)
     # Replace vars in command text (command line)
@@ -428,14 +433,15 @@ def importResult(pentest, tool_iid, upfile, body):
             # Success could be change to False by the plugin function (evaluating the return code for exemple)
             # if the success is validated, mark tool as done
             toolModel.notes = notes
-            toolModel.tags = tags
+            for tag in tags:
+                toolModel.addTag(tag)
             toolModel.markAsDone(filepath)
             # And update the tool in database
             update(pentest, tool_iid, ToolController(toolModel).getData())
             # Upload file to SFTP
             msg = "TASK SUCCESS : "+toolModel.name
         except IOError as e:
-            toolModel.tags = ["todo"]
+            toolModel.addTag("no-output")
             toolModel.notes = "Failed to read results file"
             toolModel.markAsDone()
             update(pentest, tool_iid, ToolController(toolModel).getData())
@@ -481,8 +487,9 @@ def launchTask(pentest, tool_iid, body, **kwargs):
     update(pentest, tool_iid, ToolController(launchableTool).getData())
     # Mark the tool as running (scanner_ip is set and dated is set, datef is "None")
     # Use socket sid as room so that only this worker will receive this task
-    from pollenisator.api import socketio, sockets
-    socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(launchableToolId)}, room=sockets[workerName])
+    from pollenisator.api import socketio
+    socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":workerName}, False)
+    socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(launchableToolId)}, room=socket["sid"])
     return "Success ", 200
 
     
@@ -507,8 +514,9 @@ def stopTask(pentest, tool_iid, body):
         return "Tools running in localhost cannot be stopped through API", 405
     if saveScannerip not in workerNames:
         return "The worker running this tool is not running anymore", 404
-    from pollenisator.api import socketio, sockets
-    socketio.emit('stopCommand', {'pentest': pentest, "tool_iid":str(tool_iid)}, room=sockets[saveScannerip])
+    from pollenisator.api import socketio
+    socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":saveScannerip})
+    socketio.emit('stopCommand', {'pentest': pentest, "tool_iid":str(tool_iid)}, room=socket["sid"])
     if not forceReset:
         stopableTool.markAsNotDone()
         update(pentest, tool_iid, ToolController(stopableTool).getData())

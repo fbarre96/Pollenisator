@@ -11,7 +11,7 @@ class SearchSploit(Plugin):
         Returns:
             string
         """
-        return " > "
+        return " | tee "
 
     def getFileOutputExt(self):
         """Returns the expected file extension for this command result file

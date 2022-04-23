@@ -6,6 +6,7 @@ from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError, OperationFailure
 import pollenisator.core.Components.Utils as Utils
 import sys
+import json
 import logging
 
 
@@ -732,6 +733,53 @@ class MongoCalendar:
                 cmd += " --nsFrom='"+kwargs.get("nsFrom")+".*' --nsTo='"+toDbName+".*'"
             execute(cmd, None, True)
         return msg, 200 if success else 403
+
+
+    def getRegisteredTags(self):
+        tags = self.find("settings", {"key":"tags"}, False)
+        if tags is None:
+            return []
+        pentest_tags = list(tags.keys())
+        global_tags = list(self.getGlobalTags().keys())
+        return global_tags+pentest_tags
+
+    def getGlobalTags(self):
+        mongoInstance = MongoCalendar.getInstance()
+        tags = mongoInstance.findInDb("pollenisator", "settings", {"key": "tags"}, False)
+        if tags is not None:
+            if isinstance(tags["value"], dict):
+                return tags["value"]
+            elif isinstance(tags["value"], str):
+                try:
+                    return json.loads(tags["value"])
+                except:
+                    pass
+        return {"todo":"orange", "unscanned":"yellow", "pwned":"red", "Interesting":"dark green", "Uninteresting":"sky blue", "neutral":"white"}
+        
+    def getTagsGroups(self):
+        """Returns groups of tags that may not be applied at the same time
+        Returns:
+            List of list of strings
+        """
+        tags = self.getGlobalTags()
+        return [tags, ["hidden"]]
+
+    def doRegisterTag(self, name, color="white", isGlobal=False):
+        if name in self.getRegisteredTags():
+            return False
+        if isGlobal:
+            tags = json.loads(self.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=Utils.JSONDecoder)
+            self.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=Utils.JSONEncoder)}}, many=False, notify=True)
+        else:
+            tags = self.find("settings", {"key":"tags"}, False)
+            if tags is None:
+                self.insert("settings", {"key":"tags", "value":{name:color}})
+            else:
+                tags = tags.get("value", {})
+                if name not in tags:
+                    tags[name] = color
+                    self.update("settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
+        return True    
 
     # def importCommands(self, filename):
     #     """

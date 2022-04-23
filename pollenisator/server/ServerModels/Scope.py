@@ -154,4 +154,5 @@ def insert(pentest, body):
 def update(pentest, scope_iid, body):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
-    return mongoInstance.update("scopes", {"_id":ObjectId(scope_iid)}, {"$set":body}, False, True)
+    mongoInstance.update("scopes", {"_id":ObjectId(scope_iid)}, {"$set":body}, False, True)
+    return True

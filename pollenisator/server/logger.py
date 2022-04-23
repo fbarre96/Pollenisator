@@ -6,5 +6,5 @@ def report(body):
     if err != "":
         logs_folder = os.path.join(os.path.dirname(
             os.path.realpath(__file__)), "./logs/clients/error.log")
-        with open(logs_folder, "a+") as f:
+        with open(logs_folder, "a") as f:
             f.write(str(datetime.now())+": "+err)

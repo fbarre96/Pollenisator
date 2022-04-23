@@ -1,5 +1,6 @@
 # ENABLE debug mode early because evenlet monkey patch other libs
-debug = False 
+import os
+debug = os.environ.get("FLASK_DEBUG", False)
 if debug:
     async_mode = "threading" # Be aware thats sockets does not seems to work when debugging
 else:
@@ -9,7 +10,8 @@ else:
     
 # ENABLE LOGGING EARLY ON
 import logging
-from posix import environ
+
+from aiohttp import worker
 
 from pollenisator.server.permission import permission
 logging.basicConfig(filename='error.log', level=logging.INFO,
@@ -30,9 +32,6 @@ from pollenisator.core.Components.mongo import MongoCalendar
 import connexion
 
 
-
-sockets = {}
-
 logger = logging.getLogger(__name__)
 # Create the application instance
 server_folder = os.path.join(os.path.dirname(
@@ -50,7 +49,6 @@ flask_app.json_encoder = JSONEncoder
 CORS(flask_app)
 # Create a URL route in our application for "/"
 
-
 @app.route('/')
 def home():
     """
@@ -65,7 +63,6 @@ def createWorker():
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.insertInDb("pollenisator", "users", {
                              "username": "Worker", "hash": bcrypt.hashpw("", salt), "scope": ["worker"]})
-    print("Worker created")
 
 
 def createAdmin(username="", password=""):
@@ -91,31 +88,31 @@ def notify_clients(notif):
     """Notify clients websockets
     """
     global socketio
-    global sockets
+    mongoInstance = MongoCalendar.getInstance()
+    sockets = mongoInstance.findInDb("pollenisator","sockets",{}, True)
     if notif["db"] == "pollenisator":
         socketio.emit("notif", json.dumps(notif, cls=JSONEncoder))
     else:
-        for sid, pentest in sockets.items():
-            if pentest == notif["db"]:
-                socketio.emit("notif", json.dumps(notif, cls=JSONEncoder), to=sid)
+        for socket in sockets:
+            if socket["pentest"] == notif["db"]:
+                socketio.emit("notif", json.dumps(notif, cls=JSONEncoder), to=socket["sid"])
 
 
-@socketio.event
-def registerCommands(data):
-    mongoInstance = MongoCalendar.getInstance()
-    workerName = data.get("workerName")
-    tools = data.get("tools")
-    global sockets
-    sockets[workerName] = request.sid
-    command_names = tools
-    mongoInstance.registerCommands(workerName, command_names)
+# @socketio.event
+# def registerCommands(data):
+#     mongoInstance = MongoCalendar.getInstance()
+#     workerName = data.get("workerName")
+#     tools = data.get("tools")
+#     global sockets
+#     sockets[workerName] = request.sid
+#     command_names = tools
+#     mongoInstance.registerCommands(workerName, command_names)
 
 @socketio.event
 def register(data):
     mongoInstance = MongoCalendar.getInstance()
     workerName = data.get("name")
-    global sockets
-    sockets[workerName] = request.sid
+    socket = mongoInstance.insertInDb("pollenisator","sockets", {"sid":request.sid, "pentest":"", "user":workerName})
     mongoInstance.registerWorker(workerName)
 
 @socketio.event
@@ -123,29 +120,32 @@ def registerForNotifications(data):
     sid = request.sid
     token = str(data.get("token", ""))
     pentest = str(data.get("pentest", ""))
-    global sockets
     res = verifyToken(token)
     token_info = decode_token(token)
     if res:
         if pentest in token_info["scope"]:
-            sockets[sid] = pentest
+            mongoInstance = MongoCalendar.getInstance()
+            socket = mongoInstance.findInDb("pollenisator", "sockets", {"sid":sid}, False)
+            if socket is None:
+                mongoInstance.insertInDb("pollenisator", "sockets", {"sid":sid, "pentest":pentest}, False)
+            else:
+                mongoInstance.updateInDb("pollenisator", "sockets", {"sid":sid}, {"$set":{"pentest":pentest}}, notify=False)
         
 
 @socketio.event
 def disconnect():
     sid = request.sid
     todel = None
-    global sockets
-    for key, val in sockets.items():
-        if val == sid:
-            todel = key
+    mongoInstance = MongoCalendar.getInstance()
+    todel = mongoInstance.findInDb("pollenisator", "sockets", {"sid":sid}, False)
     if todel:
         unregister(todel)
-        del sockets[todel]
+        mongoInstance.deleteFromDb("pollenisator", "sockets", {"sid":sid}, False)
 
 
 def main():
     mongoInstance = MongoCalendar.getInstance()
+    mongoInstance.deleteFromDb("pnenisator", "sockets", {}, many=True, notify=False)
     any_user = mongoInstance.findInDb("pollenisator", "users", {}, False)
     noninteractive = False
     if any_user is None:

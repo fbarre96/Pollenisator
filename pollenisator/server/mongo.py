@@ -50,7 +50,8 @@ def update(pentest, collection, body):
             return "Collection argument is not a valid pollenisator collection", 403
     elif pentest not in mongoInstance.listCalendarNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
-    return mongoInstance.updateInDb(pentest, collection, pipeline, updatePipeline, body["many"], body["notify"])
+    mongoInstance.updateInDb(pentest, collection, pipeline, updatePipeline, body["many"], body["notify"])
+    return True
 
 @permission("pentester")
 def insert(pentest, collection, body):
@@ -383,26 +384,18 @@ def createSetting(body):
 def updateSetting(body):
     key = body['key']
     value = body["value"]
-    return mongoInstance.updateInDb("pollenisator", "settings", {
+    mongoInstance.updateInDb("pollenisator", "settings", {
                     "key": key}, {"$set": {"value": value}})
+    return True
 
-@permission("user")
+
+
+@permission("pentester")
 def registerTag(body):
     name = body["name"]
     color = body["color"]
     isGlobal = body.get("global", False)
-    if isGlobal:
-        tags = json.loads(mongoInstance.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=JSONDecoder)
-        mongoInstance.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=JSONEncoder)}}, many=False, notify=True)
-    else:
-        tags = mongoInstance.find("settings", {"key":"tags"}, False)
-        if tags is None:
-            mongoInstance.insert("settings", {"key":"tags", "value":{name:color}})
-        else:
-            tags = tags.get("value", {})
-            tags[name] = color
-            mongoInstance.update("settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
-    return True
+    return mongoInstance.doRegisterTag(name, color, isGlobal)
 
 @permission("user")
 def unregisterTag(body):

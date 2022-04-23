@@ -69,7 +69,7 @@ class Knockpy(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         notes = ""
-        tags = ["todo"]
+        tags = ["found-domains-info"]
         marker = "IpaddressCodeSubdomainServerRealhostname"
         markerFound = False
         countFound = 0

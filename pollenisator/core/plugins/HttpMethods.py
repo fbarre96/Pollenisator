@@ -63,7 +63,7 @@ class HttpMethods(Plugin):
         Returns:
             string
         """
-        return " > "
+        return " | tee "
 
     def getFileOutputExt(self):
         """Returns the expected file extension for this command result file
@@ -112,11 +112,11 @@ class HttpMethods(Plugin):
         p_o.updateInfos({"Methods": ", ".join(supported_methods)})
         targets[str(p_o.getId())] = {"ip": host, "port": port, "proto": proto}
         if "TRACE" in risky_methods:
-            ServerDefect().initialize(host, port, proto, "TRACE Method activated", "Difficult", "Important", "Important",
-                                 "N/A", ["Base"], notes="TRACE detected", proofs=[]).addInDb()
+            p_o.addTag("HTTP-TRACE")
             risky_methods.remove("TRACE")
         if len(risky_methods) > 0:
             notes = "RISKY HTTP METHODS ALLOWED : " + " ".join(risky_methods)
             tags = []
+            p_o.addTag("RISKY-HTTP-METHODS")
             tags.append("Interesting")
         return notes, tags, "port", targets

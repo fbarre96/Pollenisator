@@ -86,7 +86,7 @@ class Nuclei(Plugin):
         parsed_by_hosts = parse(file_opened)
         if parsed_by_hosts is None:
             return None, None, None, None
-        tags = ["todo"]
+        tags = ["todo-nuclei"]
         cumulative_notes = []
         targets = {}
         for parsed_host in parsed_by_hosts:

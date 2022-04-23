@@ -13,7 +13,7 @@ class EternalBlue(Plugin):
         Returns:
             string
         """
-        return " > "
+        return " | tee "
 
     def getFileOutputExt(self):
         """Returns the expected file extension for this command result file
@@ -72,11 +72,8 @@ class EternalBlue(Plugin):
             targets[str(p_o.getId())] = {
                 "ip": ip, "port": port, "proto": proto}
         if "VULNERABLE" in notes:
-            d_o = ServerDefect()
-            d_o.initialize(ip, port, proto, "EternalBlue",
-                           "Difficult", "Critical", "Critical", "N/A", ["Base"], notes=notes, proofs=[])
-            d_o.addInDb()
-            tags=["P0wned!"]
+            tags=["pwned", "eternalblue"]
             if res_insert is not None:
-                p_o.addTag("P0wned!")
+                p_o.addTag("pwned")
+                p_o.addTag("eternalblue")
         return notes, tags, "port", targets

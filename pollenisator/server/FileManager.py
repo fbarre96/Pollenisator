@@ -85,6 +85,9 @@ def importExistingFile(pentest, upfile, body, **kwargs):
         if default_target_objects:
             targets["default"] = {"lvl":default_target_objects[0], "wave":default_target_objects[1],"scope":default_target_objects[2], "ip":default_target_objects[3], 
                                 "port":default_target_objects[4], "proto":default_target_objects[5]}
+        for tag in tags:
+            res = mongoInstance.doRegisterTag(tag)
+
         # ADD THE RESULTING TOOL TO AFFECTED
         for target in targets.values():
             date = datetime.now().strftime("%d/%m/%Y %H:%M:%S")

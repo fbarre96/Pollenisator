@@ -61,7 +61,7 @@ class Sublist3r(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         notes = ""
-        tags = ["todo"]
+        tags = ["found-domains-info"]
         ret = parseContent(file_opened)
         for domain in ret:
             insert_res = ServerIp().initialize(domain.strip()).addInDb()

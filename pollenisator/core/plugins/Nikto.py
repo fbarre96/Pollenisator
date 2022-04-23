@@ -72,7 +72,7 @@ class Nikto(Plugin):
         Returns:
             string
         """
-        return " > "
+        return " | tee "
 
     def getFileOutputExt(self):
         """Returns the expected file extension for this command result file
@@ -103,7 +103,7 @@ class Nikto(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
-        tags = ["todo"]
+        tags = ["nikto-todo"]
         targets = {}
         notes = file_opened.read().decode("utf-8")
         if notes == "":

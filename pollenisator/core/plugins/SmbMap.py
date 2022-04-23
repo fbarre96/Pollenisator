@@ -64,7 +64,7 @@ class SmbMap(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         notes = ""
-        tags = ["todo"]
+        tags = ["todo-smbmap"]
         targets = {}
         interesting_files = {}
         less_interesting_notes = ""

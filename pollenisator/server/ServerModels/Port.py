@@ -222,7 +222,8 @@ def update(pentest, port_iid, body):
                     tool_m = ServerTool(pentest).initialize(port_command["_id"], wave["wave"], None, "",
                                                 port_o.ip, port_o.port, port_o.proto, "port")
                     tool_m.addInDb()
-    return mongoInstance.update("ports", {"_id":ObjectId(port_iid)}, {"$set":body}, False, True)
+    mongoInstance.update("ports", {"_id":ObjectId(port_iid)}, {"$set":body}, False, True)
+    return True
     
 @permission("pentester")
 def addCustomTool(pentest, port_iid, body):
