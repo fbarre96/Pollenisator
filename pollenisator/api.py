@@ -11,8 +11,6 @@ else:
 # ENABLE LOGGING EARLY ON
 import logging
 
-from aiohttp import worker
-
 from pollenisator.server.permission import permission
 logging.basicConfig(filename='error.log', level=logging.INFO,
                     format='[%(asctime)s][%(levelname)s] - %(funcName)s: %(message)s')

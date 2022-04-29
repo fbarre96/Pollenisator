@@ -1,5 +1,4 @@
 from bson import ObjectId
-from jwt import DecodeError
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Models.Defect import Defect
 from pollenisator.core.Controllers.DefectController import DefectController
@@ -237,6 +236,6 @@ def importDefectTemplates(upfile):
                 if invalid in defect:
                     del defect[invalid]
             insert("pollenisator", defect)
-    except json.DecodeError as e:
+    except Exception as e:
         return "Invalid json sent", 400
     return True

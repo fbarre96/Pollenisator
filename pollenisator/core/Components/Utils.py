@@ -7,7 +7,6 @@ import time
 from datetime import datetime
 from threading import Timer
 import json
-import requests
 import shutil
 from netaddr import IPNetwork
 from netaddr.core import AddrFormatError
