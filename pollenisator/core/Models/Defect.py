@@ -128,6 +128,8 @@ class Defect(Element):
         Returns:
             A dict (4 keys :"ip", "port", "proto", "title")
         """
+        if self.pentest == "pollenisator":
+            return {"title": self.title}
         return {"ip": self.ip, "port": self.port, "proto": self.proto, "title": self.title}
 
     def isAssigned(self):

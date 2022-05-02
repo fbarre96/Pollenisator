@@ -81,10 +81,11 @@ class ServerDefect(Defect, ServerElement):
 def delete(pentest, defect_iid):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
-    defect = ServerDefect(pentest, mongoInstance.find("defects", {"_id": ObjectId(defect_iid)}, False))
+    defect = ServerDefect(pentest, mongoInstance.findInDb(pentest, "defects", {"_id": ObjectId(defect_iid)}, False))
     if defect is None:
         return 0
-    if not defect.isAssigned():
+    if not defect.isAssigned() and pentest != "pollenisator":
+        # if not assigned to a pentest object it's a report defect (except in pollenisator db where it's a defect template)
         globalDefects = ServerDefect.fetchObjects(pentest, {"ip":""})
         for globalDefect in globalDefects:
             if int(globalDefect.index) > int(defect.index):
@@ -92,14 +93,15 @@ def delete(pentest, defect_iid):
         thisAssignedDefects = ServerDefect.fetchObjects(pentest, {"global_defect": ObjectId(defect_iid)})
         for thisAssignedDefects in thisAssignedDefects:
             delete(pentest, thisAssignedDefects.getId())
-    proofs_path = getProofPath(pentest, defect_iid)
-    if os.path.isdir(proofs_path):
-        files = os.listdir(proofs_path)
-        for filetodelete in files:
-            os.remove(os.path.join(proofs_path, filetodelete))
-        os.rmdir(proofs_path)
+    if pentest != "pollenisator":
+        proofs_path = getProofPath(pentest, defect_iid)
+        if os.path.isdir(proofs_path):
+            files = os.listdir(proofs_path)
+            for filetodelete in files:
+                os.remove(os.path.join(proofs_path, filetodelete))
+            os.rmdir(proofs_path)
     
-    res = mongoInstance.delete("defects", {"_id": ObjectId(defect_iid)}, False)
+    res = mongoInstance.deleteFromDb(pentest, "defects", {"_id": ObjectId(defect_iid)}, False)
     if res is None:
         return 0
     else:
@@ -111,7 +113,7 @@ def insert(pentest, body):
     mongoInstance.connectToDb(pentest)
     defect_o = ServerDefect(pentest, body)
     base = defect_o.getDbKey()
-    existing = mongoInstance.find("defects", base, False)
+    existing = mongoInstance.findInDb(pentest, "defects", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
     if defect_o.ip.strip() == "" and defect_o.port.strip() != "":
@@ -180,7 +182,7 @@ def update(pentest, defect_iid, body):
         return "This defect does not exist", 404
     oldRisk = defect_o.risk
     if not defect_o.isAssigned():
-        if body.get("risk", None) is not None:
+        if body.get("risk", None) is not None and pentest != "pollenisator":
             if body["risk"] != oldRisk:
                 insert_pos = str(findInsertPosition(pentest, body["risk"]))
                 if int(insert_pos) > int(defect_o.index):
@@ -226,7 +228,7 @@ def moveDefect(pentest, defect_id_to_move, target_id):
     update(pentest, defect_to_move.getId(), {"index":str(target_ind)})
     return target_ind
 
-@permission("admin")
+@permission("user")
 def importDefectTemplates(upfile):
     try:
         defects = json.loads(upfile.stream.read())
@@ -239,3 +241,15 @@ def importDefectTemplates(upfile):
     except Exception as e:
         return "Invalid json sent", 400
     return True
+
+@permission("user")
+def insertDefectTemplate(body):
+    return insert("pollenisator", body)
+
+@permission("user")
+def updateDefectTemplate(iid, body):
+    return update("pollenisator", iid, body)
+
+@permission("user")
+def deleteDefectTemplate(iid):
+    return delete("pollenisator", iid)

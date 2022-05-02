@@ -110,6 +110,7 @@ def generateReport(pentest, templateName, clientName, contractName, mainRedactor
 def search(body):
     type = body.get("type", "")
     terms = body.get("terms", "")
+    lang = body.get("language", "")
     if type == "remark":
         coll = "remarks"
     elif type == "defect":
@@ -117,11 +118,14 @@ def search(body):
     else:
         return "Invalid parameter: type must be either defect or remark.", 400
     mongoInstance = MongoCalendar.getInstance()
-    res = mongoInstance.findInDb("pollenisator", coll, {"title":re.compile(terms, re.IGNORECASE)}, True)
+    p = {"title":re.compile(terms, re.IGNORECASE)}
+    if lang != "":
+        p["language"] = lang
+    res = mongoInstance.findInDb("pollenisator", coll, p, True)
     ret = []
     for x in res:
         ret.append(x)
-    return ret, 200
+    return ret
 
 
 def craftContext(pentest, **kwargs):

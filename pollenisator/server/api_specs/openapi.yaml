@@ -40,6 +40,12 @@ components:
           schema:
             $ref: "#/components/schemas/Defects"
       required: true
+    DefectTemplate:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/DefectTemplate"
+      required: true
     binary_upfile:
       content:
         multipart/form-data:
@@ -203,6 +209,68 @@ components:
         index:
           type: string
           default: end
+        fixes:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              execution:
+                type: string
+                enum:
+                  - Quick Win
+                  - Moderate
+                  - Hard
+              gain:
+                type: string
+                enum:
+                  - Weak
+                  - Moderate
+                  - Mean
+                  - Strong
+              synthesis:
+                type: string
+              title:
+                type: string
+    DefectTemplate:
+      properties:
+        title:
+          type: string
+        synthesis:
+          type: string
+        description:
+          type: string
+        ease:
+          type: string
+          enum:
+            - Easy
+            - Moderate
+            - Difficult
+            - Arduous
+            - N/A
+        impact:
+          type: string
+          enum:
+            - Minor
+            - Important
+            - Major
+            - Critical
+            - N/A
+        risk:
+          type: string
+          enum:
+            - Minor
+            - Important
+            - Major
+            - Critical
+            - N/A
+        type:
+          type: array
+          items:
+            type: string
+        language:
+          type: string
         fixes:
           type: array
           items:
@@ -3601,6 +3669,7 @@ paths:
       operationId: pollenisator.server.ServerModels.Defect.importDefectTemplates
       tags:
         - Admin
+        - Defect Template
       summary: Import Defect templates in pollenisator from json file
       requestBody:
         $ref: "#/components/requestBodies/binary_upfile"
@@ -3612,6 +3681,80 @@ paths:
               examples:
                 Success:
                   value: "True"
+  "/report/DefectTemplates/insert":
+    post:
+      operationId: pollenisator.server.ServerModels.Defect.insertDefectTemplate
+      tags:
+        - Defect Template
+      summary: Creat a Defect template
+      requestBody:
+         $ref: "#/components/requestBodies/DefectTemplate"
+      responses:
+        "200":
+          description: a indicator of success
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: "True"
+  '/report/DefectTemplates/delete/{iid}':
+    delete:
+      operationId: pollenisator.server.ServerModels.Defect.deleteDefectTemplate
+      tags:
+        - Defect Template
+      summary: Delete a defect template
+      parameters:
+        - name: iid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: successfully deleted a template
+        '404':
+          description: not found
+
+  "/report/DefectTemplates/update/{iid}":
+    put:
+      operationId: pollenisator.server.ServerModels.Defect.updateDefectTemplate
+      tags:
+        - Defect Template
+      summary: Update Defect template in db
+      description: Update Defect template in db
+      parameters:
+        - name: iid
+          in: path
+          description: Defect template iid to edit
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/DefectTemplate"
+              
+      responses:
+        "200":
+          description: successfully updated an item
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+        '400':
+          description: Pipeline argument invalid
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pipeline|Update pipeline argument was not valid'
+        '403':
+          description: Unknown param value
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pentest|Collection argument is not a valid pollenisator collection'
+  
               
   "/report/{pentest}/generate":
     get:
@@ -3786,7 +3929,7 @@ paths:
       operationId: pollenisator.server.Report.search
       tags:
         - Report
-      summary: search a defect/remark on an external app
+      summary: search a defect/remark in  templates
       requestBody:
         content:
           application/json:
