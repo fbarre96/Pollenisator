@@ -108,12 +108,6 @@ components:
           type: string
         lvl:
           type: string
-          enum:
-            - port
-            - ip
-            - wave
-            - domain
-            - network
         priority:
           type: integer
           minimum: 0
@@ -367,12 +361,7 @@ components:
           type: string
         lvl:
           type: string
-          enum:
-            - port
-            - ip
-            - wave
-            - domain
-            - network
+          
     Waves:
       properties:
         wave:
@@ -3668,7 +3657,6 @@ paths:
     post:
       operationId: pollenisator.server.ServerModels.Defect.importDefectTemplates
       tags:
-        - Admin
         - Defect Template
       summary: Import Defect templates in pollenisator from json file
       requestBody:

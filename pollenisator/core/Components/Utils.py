@@ -358,3 +358,25 @@ def getMainDir():
         os.path.realpath(__file__)), "../../")
     return p
 
+def checkCommandService(allowed_ports_services, port, proto, service):
+    for i, elem in enumerate(allowed_ports_services):
+        if not(elem.strip().startswith("tcp/") or elem.strip().startswith("udp/")):
+            allowed_ports_services[i] = "tcp/"+str(elem.strip())
+    for allowed in allowed_ports_services:
+        protoRange = "udp" if allowed.startswith("udp/") else "tcp"
+        maybeRange = str(allowed)[4:].split("-")
+        startAllowedRange = -1
+        endAllowedRange = -1
+        if len(maybeRange) == 2:
+            try:
+                startAllowedRange = int(maybeRange[0])
+                endAllowedRange = int(maybeRange[1])
+            except ValueError:
+                pass
+        if (proto+"/"+port == allowed) or \
+            (proto+"/"+service == allowed) or \
+            (proto == protoRange and
+                int(port) >= int(startAllowedRange) and
+                int(port) <= int(endAllowedRange)):
+            return True
+    return False

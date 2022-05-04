@@ -9,11 +9,8 @@ from pollenisator.server.ServerModels.Command import ServerCommand
 from pollenisator.server.ServerModels.CommandGroup import ServerCommandGroup
 from pollenisator.server.ServerModels.Element import ServerElement
 from pollenisator.server.FileManager import _upload
-from pollenisator.core.Components.Utils import JSONEncoder, fitNowTime, isNetworkIp, loadPlugin, listPlugin
-import json
-import time
+from pollenisator.core.Components.Utils import JSONEncoder, checkCommandService, isNetworkIp, loadPlugin
 from datetime import datetime
-import io
 import os
 import sys
 from pollenisator.server.permission import permission
@@ -136,7 +133,7 @@ class ServerTool(Tool, ServerElement):
                 lvl = self.lvl
             else:
                 command = command_o.text
-                lvl = command_o.lvl
+                lvl = self.lvl #not command lvl as it can be changed by modules
         command = command.replace("|wave|", self.wave)
         if lvl == "network" or lvl == "domain":
             command = command.replace("|scope|", self.scope)
@@ -309,6 +306,8 @@ def insert(pentest, body):
     mongoInstance.connectToDb(pentest)
     if not mongoInstance.isUserConnected():
         return "Not connected", 503
+    if body.get("name", "") == "None" or body.get("name", "") == "" or body.get("name", "") is None:
+        del body["name"]
     tool_o = ServerTool(pentest, body)
     # Checking unicity
     base = tool_o.getDbKey()
@@ -317,8 +316,16 @@ def insert(pentest, body):
         return {"res":False, "iid":existing["_id"]}
     if "_id" in body:
         del body["_id"]
-    # Inserting scope
+    # Checking port /service tool
     parent = tool_o.getParentId()
+    if tool_o.lvl == "port" and tool_o.command_iid is not None and tool_o.command_iid != "":
+        comm = mongoInstance.find("commands", {"_id":ObjectId(tool_o.command_iid)}, False)
+        port = mongoInstance.find("ports", {"_id":ObjectId(parent)}, False)
+        if comm:
+            allowed_ports_services = comm["ports"].split(",")
+            if not checkCommandService(allowed_ports_services, port["port"], port["proto"], port["service"]):
+                return "This tool parent does not match its command ports/services allowed list", 403
+    # Inserting tool
     base["command_iid"] = body.get("command_iid", "")
     base["scanner_ip"] = body.get("scanner_ip", "None")
     base["dated"] = body.get("dated", "None")
@@ -327,6 +334,7 @@ def insert(pentest, body):
     base["status"] = body.get("status", [])
     base["notes"] = body.get("notes", "")
     base["tags"] = body.get("tags", [])
+    base["infos"] = body.get("infos", {})
     res_insert = mongoInstance.insert("tools", base, parent)
     ret = res_insert.inserted_id
     tool_o._id = ret

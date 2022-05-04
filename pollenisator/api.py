@@ -38,7 +38,7 @@ app = connexion.App(__name__, specification_dir=server_folder, debug=debug)
 # Read the openapi.yaml file to configure the endpoints
 app.add_api('openapi.yaml')
 flask_app = app.app
-socketio = SocketIO(logger=logger, engineio_logger=logger)
+socketio = SocketIO(logger=logger, engineio_logger=logger, cors_allowed_origins="*")
 
 socketio.init_app(flask_app, log_output=False, logger=False,
                   engineio_logger=False, async_mode=async_mode)

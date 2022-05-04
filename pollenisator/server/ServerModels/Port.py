@@ -5,7 +5,7 @@ from pollenisator.core.Controllers.PortController import PortController
 from pollenisator.server.ServerModels.Tool import ServerTool, delete as tool_delete
 from pollenisator.server.ServerModels.Defect import delete as defect_delete
 from pollenisator.server.ServerModels.Element import ServerElement
-from pollenisator.core.Components.Utils import JSONEncoder
+from pollenisator.core.Components.Utils import JSONEncoder, checkCommandService
 import json
 from pollenisator.server.permission import permission
 
@@ -27,6 +27,8 @@ class ServerPort(Port, ServerElement):
         mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(self.pentest)
         return mongoInstance.find("ips", {"ip": self.ip}, False)["_id"]
+
+    
 
     def addAllTool(self, command_iid, wave_name, scope, check=True):
         """
@@ -54,36 +56,17 @@ class ServerPort(Port, ServerElement):
             index = commands.index(command_iid)
             # retrieve the command level
             command = mongoInstance.findInDb(self.pentest,
-                                             "commands", {"_id": ObjectId(command_iid)}, False)
+                                            "commands", {"_id": ObjectId(command_iid)}, False)
             if command["lvl"] == "port":
                 # 3. checking if the added port fit into the command's allowed service
                 # 3.1 first, default the selected port as tcp if no protocole is defined.
                 allowed_ports_services = command["ports"].split(",")
-                for i, elem in enumerate(allowed_ports_services):
-                    if not(elem.strip().startswith("tcp/") or elem.strip().startswith("udp/")):
-                        allowed_ports_services[i] = "tcp/"+str(elem.strip())
-                for allowed in allowed_ports_services:
-                    protoRange = "udp" if allowed.startswith("udp/") else "tcp"
-                    maybeRange = str(allowed)[4:].split("-")
-                    startAllowedRange = -1
-                    endAllowedRange = -1
-                    if len(maybeRange) == 2:
-                        try:
-                            startAllowedRange = int(maybeRange[0])
-                            endAllowedRange = int(maybeRange[1])
-                        except ValueError:
-                            pass
-                    if (self.proto+"/"+self.port == allowed) or \
-                       (self.proto+"/"+self.service == allowed) or \
-                       (self.proto == protoRange and
-                           int(self.port) >= int(startAllowedRange) and
-                            int(self.port) <= int(endAllowedRange)):
-                        # finally add tool
-                        newTool = ServerTool(self.pentest)
-                        newTool.initialize(
-                            command_iid, wave_name, None, scope, self.ip, self.port, self.proto, "port")
-                        newTool.addInDb()
-    
+                if checkCommandService(allowed_ports_services, self.port, self.proto, self.service):
+                    newTool = ServerTool(self.pentest)
+                    newTool.initialize(
+                        command_iid, wave_name, None, scope, self.ip, self.port, self.proto, "port")
+                    newTool.addInDb()
+
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
         """Fetch many commands from database and return a Cursor to iterate over model objects
