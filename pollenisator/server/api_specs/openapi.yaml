@@ -815,6 +815,9 @@ paths:
                 notify:
                   type: boolean
                   default: false
+                upsert:
+                  type: boolean
+                  default: false
       responses:
         "200":
           description: successfully updated an item
@@ -3090,6 +3093,10 @@ paths:
                   type: string
                 default_target:
                   description: Default pentest object to affect to
+                  type: string
+                  default: ""
+                cmdline:
+                  description: command line used if knowingly
                   type: string
                   default: ""
               required:

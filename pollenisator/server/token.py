@@ -77,7 +77,6 @@ def decode_token(token):
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except JWTError as e:
         logging.info(f"Unauthorized, token is invalid : token ({token}) error ({e})")
-
         six.raise_from(Unauthorized, e)
 
 def _current_timestamp():

@@ -50,7 +50,7 @@ def update(pentest, collection, body):
             return "Collection argument is not a valid pollenisator collection", 403
     elif pentest not in mongoInstance.listCalendarNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
-    mongoInstance.updateInDb(pentest, collection, pipeline, updatePipeline, body["many"], body["notify"])
+    mongoInstance.updateInDb(pentest, collection, pipeline, updatePipeline, body["many"], body["notify"], body.get("upsert", False))
     return True
 
 @permission("pentester")

@@ -14,7 +14,13 @@ import logging
 from pollenisator.server.permission import permission
 logging.basicConfig(filename='error.log', level=logging.INFO,
                     format='[%(asctime)s][%(levelname)s] - %(funcName)s: %(message)s')
-
+if debug:
+    console = logging.StreamHandler()
+    console.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+    console.setFormatter(formatter)
+    # add the handler to the root logger
+    logging.getLogger('').addHandler(console)
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from getpass import getpass
@@ -110,7 +116,11 @@ def notify_clients(notif):
 def register(data):
     mongoInstance = MongoCalendar.getInstance()
     workerName = data.get("name")
-    socket = mongoInstance.insertInDb("pollenisator","sockets", {"sid":request.sid, "pentest":"", "user":workerName})
+    socket = mongoInstance.findInDb("pollenisator","sockets", {"sid":request.sid}, False)
+    if socket is None:
+        mongoInstance.insertInDb("pollenisator", "sockets", {"sid":request.sid, "user":workerName, "pentest":""}, notify=False)
+    else:
+        mongoInstance.updateInDb("pollenisator", "sockets", {"sid":request.sid}, {"$set":{"user":workerName, "pentest":""}}, notify=False)
     mongoInstance.registerWorker(workerName)
 
 @socketio.event
@@ -143,7 +153,7 @@ def disconnect():
 
 def main():
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.deleteFromDb("pnenisator", "sockets", {}, many=True, notify=False)
+    mongoInstance.deleteFromDb("pollenisator", "sockets", {}, many=True, notify=False)
     any_user = mongoInstance.findInDb("pollenisator", "users", {}, False)
     noninteractive = False
     if any_user is None:

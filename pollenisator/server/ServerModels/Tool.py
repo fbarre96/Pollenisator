@@ -431,7 +431,7 @@ def importResult(pentest, tool_iid, upfile, body):
     if mod is not None:
         try:
             # Check return code by plugin (can be always true if the return code is inconsistent)
-            notes, tags, _, _ = mod.Parse(pentest, upfile)
+            notes, tags, _, _ = mod.Parse(pentest, upfile, tool=toolModel)
             if notes is None:
                 notes = "No results found by plugin."
             if tags is None:
@@ -497,6 +497,8 @@ def launchTask(pentest, tool_iid, body, **kwargs):
     # Use socket sid as room so that only this worker will receive this task
     from pollenisator.api import socketio
     socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":workerName}, False)
+    if socket is None:
+        return "Socket not found", 503
     socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(launchableToolId)}, room=socket["sid"])
     return "Success ", 200
 
@@ -523,7 +525,7 @@ def stopTask(pentest, tool_iid, body):
     if saveScannerip not in workerNames:
         return "The worker running this tool is not running anymore", 404
     from pollenisator.api import socketio
-    socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":saveScannerip})
+    socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":saveScannerip}, False)
     socketio.emit('stopCommand', {'pentest': pentest, "tool_iid":str(tool_iid)}, room=socket["sid"])
     if not forceReset:
         stopableTool.markAsNotDone()

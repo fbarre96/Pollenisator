@@ -45,53 +45,110 @@ CONNECTED
         r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+\S+\s+\S+\[-\]\S+ ([^\\]+)\\([^:]+):.+ (STATUS_\S+)\s*$", re.MULTILINE)
     regex_success = re.compile(
         r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[\+\]\S+ ([^\\]+)\\([^:]+):(.*?)(?= \x1b)(.+)$", re.MULTILINE)
+    regex_module_lsassy = re.compile(r"^\S+LSASSY\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[33m([^\\]+)\\(\S+)\s+(\S+)(?=\x1b).+$")
+    regex_module_ntds = re.compile(r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[33m(.+)\x1b\S*$")
     notes = ""
     countFound = 0
     countPwn = 0
     countSuccess = 0
     cmeFound = False
+    lsassy = False
+    mode = ""
+    secrets = []
     for line in cme_file:
         if isinstance(line, bytes):
             line = line.decode("utf-8")
+        line=line.strip()
         # Search ip in file
         if "\x1b[1m\x1b[34mSMB\x1b[0m" in line:
             cmeFound = True
-        toAdd = {}
-        res_infos = re.search(regex_info, line)
-        if res_infos is not None:
-            toAdd["type"] = "info"
-            toAdd["ip"] = res_infos.group(1)
-            toAdd["port"] = res_infos.group(2)
-            toAdd["OS"] = res_infos.group(3)
-            toAdd["machine_name"] = res_infos.group(4)
-            toAdd["domain"] = res_infos.group(5)
-            toAdd["signing"] = res_infos.group(6)
-            toAdd["SMBv1"] = res_infos.group(7)
-            countFound += 1
-        else:
-            success_infos = re.search(regex_success, line)
-            if success_infos is not None:
-                toAdd["type"] = "success"
-                toAdd["ip"] = success_infos.group(1)
-                toAdd["port"] = success_infos.group(2)
-                toAdd["machine_name"] = success_infos.group(3)
-                toAdd["domain"] = success_infos.group(4)
-                toAdd["username"] = success_infos.group(5)
-                toAdd["password"] = success_infos.group(6)
-                pwned = "(Pwn3d!)" in success_infos.group(7)
-                toAdd["powned"] = pwned
-                if pwned:
-                    countPwn += 1
+        if "Dumping LSA secrets" in line:
+            mode = "lsa"
+            continue
+        elif "Dumped"  in line and "LSA secrets" in line:
+            mode = ""
+            continue
+        elif "Dumping SAM hashes" in line:
+            mode = "sam"
+            continue
+        elif "Added " in line and " SAM hashes" in line:
+            mode = ""
+            continue
+        elif "Dumping the NTDS" in line:
+            mode = "ntds"
+            continue
+        elif "Dumped " in line and "NTDS hashes" in line:
+            mode = ""
+            continue
+        if mode == "":
+            toAdd = {}
+            if "LSASSY" in line and "Unable to dump lsass" not in line:
+                lsassy = True
+                res_lsassy = re.search(regex_module_lsassy, line)
+                if res_lsassy is not None:
+                    toAdd["type"] = "success"
+                    toAdd["ip"] = res_lsassy.group(1)
+                    toAdd["port"] = res_lsassy.group(2)
+                    toAdd["machine_name"] = res_lsassy.group(3)
+                    toAdd["domain"] = res_lsassy.group(4)
+                    toAdd["username"] = success_infos.group(5)
+                    password = success_infos.group(6)
+                    if len(password) == 32:
+                        try:
+                            toAdd["hashNT"] = success_infos.group(6)
+                        except:
+                            toAdd["password"] = success_infos.group(6)
+                    else:
+                        toAdd["password"] = success_infos.group(6)
+            else:
+                res_infos = re.search(regex_info, line)
+                if res_infos is not None:
+                    toAdd["type"] = "info"
+                    toAdd["ip"] = res_infos.group(1)
+                    toAdd["port"] = res_infos.group(2)
+                    toAdd["OS"] = res_infos.group(3)
+                    toAdd["machine_name"] = res_infos.group(4)
+                    toAdd["domain"] = res_infos.group(5)
+                    toAdd["signing"] = res_infos.group(6)
+                    toAdd["SMBv1"] = res_infos.group(7)
+                    countFound += 1
                 else:
-                    countSuccess += 1
-            
-        if toAdd.keys():
-            retour.append(toAdd)
-
+                    success_infos = re.search(regex_success, line)
+                    if success_infos is not None:
+                        toAdd["type"] = "success"
+                        toAdd["ip"] = success_infos.group(1)
+                        toAdd["port"] = success_infos.group(2)
+                        toAdd["machine_name"] = success_infos.group(3)
+                        toAdd["domain"] = success_infos.group(4)
+                        toAdd["username"] = success_infos.group(5)
+                        toAdd["password"] = success_infos.group(6)
+                        pwned = "(Pwn3d!)" in success_infos.group(7)
+                        toAdd["powned"] = pwned
+                        if pwned:
+                            countPwn += 1
+                        else:
+                            countSuccess += 1
+                        
+            if toAdd.keys():
+                retour.append(toAdd)
+        
+        if mode == "lsa" or mode == "sam":
+            if toAdd.get("ip", None) is not None:
+                if "toAdd" in locals():
+                    toAdd["secrets"] = toAdd.get("secrets", []) + [module_infos.group(4)+"\\"+module_infos.group(5)+":"+module_infos.group(6)]
+            secrets.append(line)
+        elif mode == "ntds":
+            module_infos = re.search(regex_module_ntds, line)
+            if module_infos is None:
+                continue
+            if "toAdd" in locals():
+                toAdd["ntds"] = toAdd.get("ntds", []) + [module_infos.group(4)]
     if not cmeFound:
         return None, None, None, None
-    notes = f"Pwn3d count : {countPwn}\nConnection success count : {countSuccess}\nHost found : {countFound}\n" + notes
-    return retour, countPwn, countSuccess, notes
+    if lsassy:
+        notes = f"CME LSASSY Success"
+    notes = f"Pwn3d count : {countPwn}\nConnection success count : {countSuccess}\nHost found : {countFound}\nSecrets found : {len(secrets)}\n"+ ("\n".join(secrets)) + notes
+    return retour, countPwn, countSuccess, notes, secrets, lsassy
 
 
 def editScopeIPs(pentest, hostsInfos):
@@ -123,10 +180,15 @@ def editScopeIPs(pentest, hostsInfos):
                     infosToAdd["domain"] = domain
             elif infos["type"] == "success":
                 powned = infos.get("powned", False)
+                creds = (infos.get("domain", ""), infos.get("username", ""), infos.get("password", infos.get("hashNT", "")))
+                infosToAdd["users"] = infosToAdd.get("users", []) + [creds]
                 if powned:
                     infosToAdd["powned"] = powned
-                creds = infos.get("domain", "")+"\\"+infos.get("username", "")+":"+infos.get("password", "")
-                infosToAdd["creds"] = creds
+                    infosToAdd["admins"] = infosToAdd.get("admins", []) + [creds]
+                secrets = infos.get("secrets", [])
+                if secrets:
+                    infosToAdd["secrets"] = infosToAdd.get("secrets", []) + secrets
+                
             ip_m = ServerIp().initialize(str(infos["ip"]))
             insert_ret = ip_m.addInDb()
             if not insert_ret["res"]:
@@ -143,6 +205,14 @@ def editScopeIPs(pentest, hostsInfos):
             port_m = ServerPort().initialize(host, port, proto, service)
             insert_ret = port_m.addInDb()
             port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
+            creds = infosToAdd.get("users", [])
+            admins = infosToAdd.get("admins", [])
+            port_m.infos["users"] = list(set(map(tuple, port_m.infos.get("users", []))).union(creds))
+            port_m.infos["admins"] = list(set(map(tuple, port_m.infos.get("admins", []))).union(admins))
+            if "users" in infosToAdd:
+                del infosToAdd["users"]
+            if "admins" in infosToAdd:
+                del infosToAdd["admins"]
             port_m.updateInfos(infosToAdd)
             if infos.get("powned", False):
                 port_m.addTag("pwned")
@@ -194,13 +264,17 @@ class CME(Plugin):
         """
         notes = ""
         tags = []
-        hostsInfos, countPwnd,  countSuccess, notes = getInfos(file_opened)
+        hostsInfos, countPwnd,  countSuccess, notes, secrets, lsassy = getInfos(file_opened)
         if countPwnd is not None:
             if int(countPwnd) > 0:
                 tags = ["cme-pwned"]
         if countSuccess is not None:
             if int(countSuccess) > 0:
                 tags += ["cme-connection-success"]
+            if len(secrets) > 0:
+                tags += ["cme-secrets-dump"]
+            if lsassy:
+                tags += ["lsassy-success"]
         if hostsInfos is None:
             return None, None, None, None
         targets = editScopeIPs(pentest, hostsInfos)

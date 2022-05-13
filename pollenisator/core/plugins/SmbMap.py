@@ -1,8 +1,11 @@
 """A plugin to parse smbmap scan"""
 
 from pollenisator.core.plugins.plugin import Plugin
-import re
-import csv
+from pollenisator.server.ServerModels.Ip import ServerIp
+from pollenisator.server.ServerModels.Port import ServerPort
+import shlex
+import logging
+
 
 def smbmap_format(row):
     """Parse row of smbmap csv file
@@ -22,8 +25,22 @@ def smbmap_format(row):
                 interesting_type = interesting_name
                 break
     return interesting_type, row[0]
-   
 
+def getUserInfoFromCmdLine(cmdline=None):
+    if cmdline is None:
+        return None, None, None
+    parts = shlex.split(cmdline)
+    domain = None
+    user = None
+    password = None
+    for part_i, part in enumerate(parts):
+        if part == "-u" and user is None:
+            user = parts[part_i+1]
+        if part == "-d" and domain is None:
+            domain = parts[part_i+1]
+        if part == "-p" and password is None:
+            password = parts[part_i+1]
+    return domain, user, password
 
 class SmbMap(Plugin):
     def getFileOutputArg(self):
@@ -50,12 +67,14 @@ class SmbMap(Plugin):
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
 
-    def Parse(self, pentest, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
         Args:
             file_opened: the open file
-            _kwargs: not used
+            kwargs: 
+                "tool" -> ToolModel if file is associated with a tool
+                "cmdline" -> if cmdline was given , the command line runned to get this
         Returns:
             a tuple with 4 values (All set to None if Parsing wrong file): 
                 0. notes: notes to be inserted in tool giving direct info to pentester
@@ -64,11 +83,17 @@ class SmbMap(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         notes = ""
-        tags = ["todo-smbmap"]
+        tags = ["smbmap-todo"]
         targets = {}
+        cmdline = kwargs.get("cmdline", None)
+        tool_m = kwargs.get("tool", None)
+        if cmdline is None and tool_m is not None:
+            cmdline = tool_m.infos.get("cmdline", None)
+        domain, user, password = getUserInfoFromCmdLine(cmdline)
         interesting_files = {}
         less_interesting_notes = ""
         first_row = True
+        shares = {}
         for row in file_opened:
 
             if isinstance(row, bytes):
@@ -80,13 +105,23 @@ class SmbMap(Plugin):
                 first_row = False
                 continue
             interesting_file_type, target = smbmap_format(row)
-            targets[target] = {"ip": target, "port": 445, "proto": "tcp"}
+            share = row[1]
+            privs = row[2]  
+            path = row[4]
+            fileSize = row[5]
+            isInteresting = False
+            
             if interesting_file_type is not None:
                 interesting_files[interesting_file_type] = interesting_files.get(interesting_file_type, [])
                 interesting_files[interesting_file_type].append(', '.join(row))
-                tags=["Interesting"]
+                isInteresting = True
+                tags=["smbmap-interesting"]
             else:
                 less_interesting_notes += ", ".join(row)+"\n"
+            shares[target] = shares.get(target, {}) #{"<ip>":{"<shareName">:set(<tuple>)}}
+            shares[target][share] = set(shares[target].get(share, set()))
+            shares[target][share].add((path, isInteresting, privs, fileSize, domain, user))
+            targets[target] = {"ip": target, "port": 445, "proto": "tcp"}
         for interesting_file_type in interesting_files.keys():
             notes += "\n=====================Interesting files:=====================\n"
             notes += str(interesting_file_type)+":\n"
@@ -94,4 +129,27 @@ class SmbMap(Plugin):
                  notes += "\t"+str(elem)+"\n"
         notes += "\n=====================Other files:=====================\n"+less_interesting_notes
         
+        for ip, share_dict in shares.items():
+            ip_m = ServerIp().initialize(ip)
+            insert_ret = ip_m.addInDb()
+            if not insert_ret["res"]:
+                ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
+            host = str(target)
+            port = str(445)
+            proto = "tcp"
+            service = "netbios-ssn"
+            port_m = ServerPort().initialize(host, port, proto, service)
+            insert_ret = port_m.addInDb()
+            if not insert_ret["res"]:
+                port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
+            old_share_dict = port_m.infos.get("shares", {})
+            for share_name, set_of_infos in share_dict.items():
+                if share_name in old_share_dict:
+                    old_set = set(map(tuple, old_share_dict[share_name]))
+                    old_share_dict[share_name] = list(old_set.union(set_of_infos))
+                else:
+                    old_share_dict[share_name] = list(set(set_of_infos))
+            oldUsers = set(map(tuple, port_m.infos.get("users", set())))
+            oldUsers.add((domain, user, password))
+            port_m.updateInfos({"shares":old_share_dict, "users":list(oldUsers)})
         return notes, tags, "port", targets

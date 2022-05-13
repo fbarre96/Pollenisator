@@ -42,6 +42,7 @@ def importExistingFile(pentest, upfile, body, **kwargs):
     user = kwargs["token_info"]["sub"]
     plugin = body.get("plugin", "auto-detect")
     default_target = body.get("default_target", "")
+    cmdline = body.get("cmdline", "")
     default_target_objects = None
     if default_target != "":
         default_target_objects = default_target.split("|")
@@ -63,7 +64,7 @@ def importExistingFile(pentest, upfile, body, **kwargs):
                 break
             mod = loadPlugin(pluginName)
             if mod.autoDetectEnabled():
-                notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream)
+                notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline)
                 upfile.stream.seek(0)
                 if notes is not None and tags is not None:
                     foundPlugin = pluginName
@@ -73,7 +74,8 @@ def importExistingFile(pentest, upfile, body, **kwargs):
         # SET PLUGIN 
         mod = loadPlugin(plugin)
         try:
-            notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream)
+            logging.info("PLUGIN for cmdline "+str(cmdline))
+            notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline)
             results[plugin] = results.get(
                 plugin, 0) + 1
         except Exception as e:

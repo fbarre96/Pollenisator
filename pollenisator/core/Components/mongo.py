@@ -211,7 +211,7 @@ class MongoCalendar:
             self.client = None
             return False
 
-    def update(self, collection, pipeline, updatePipeline, many=False, notify=True):
+    def update(self, collection, pipeline, updatePipeline, many=False, notify=True, upsert=False):
         """
         Wrapper for the pymongo update and update_many functions. Then notify observers.
 
@@ -224,9 +224,9 @@ class MongoCalendar:
         Returns:
             Return the pymongo result of the update or update_many function.
         """
-        return self._update(self.calendarName, collection, pipeline, updatePipeline, many=many, notify=notify)
+        return self._update(self.calendarName, collection, pipeline, updatePipeline, many=many, notify=notify, upsert=upsert)
 
-    def updateInDb(self, db, collection, pipeline, updatePipeline, many=False, notify=False):
+    def updateInDb(self, db, collection, pipeline, updatePipeline, many=False, notify=False, upsert=False):
         """
         update something in the database.
         Args:
@@ -240,9 +240,9 @@ class MongoCalendar:
             Return the pymongo result of the find command for the command collection
         """
         self.connect()
-        return self._update(db, collection, pipeline, updatePipeline, many=many, notify=notify)
+        return self._update(db, collection, pipeline, updatePipeline, many=many, notify=notify, upsert=upsert)
 
-    def _update(self, dbName, collection, pipeline, updatePipeline, many=False, notify=True):
+    def _update(self, dbName, collection, pipeline, updatePipeline, many=False, notify=True, upsert=False):
         """
         Wrapper for the pymongo update and update_many functions. Then notify observers  if notify is true.
 
@@ -266,11 +266,14 @@ class MongoCalendar:
                 for elem in elems:
                     self.notify(dbName, collection, elem["_id"], "update")
         else:
-            res = db[collection].update_one(pipeline, updatePipeline)
-            elem = db[collection].find_one(pipeline)
-            if elem is not None:
-                if notify:
-                    self.notify(dbName, collection, elem["_id"], "update")
+            res = db[collection].update_one(pipeline, updatePipeline, upsert=upsert)
+            if upsert and res.upserted_id is not None:
+                self.notify(dbName, collection, res.upserted_id, "insert")
+            else:
+                elem = db[collection].find_one(pipeline)
+                if elem is not None:
+                    if notify:
+                        self.notify(dbName, collection, elem["_id"], "update")
         return res
 
     def insert(self, collection, values, parent=''):
