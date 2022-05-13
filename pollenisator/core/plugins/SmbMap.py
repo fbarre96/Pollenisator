@@ -40,6 +40,8 @@ def getUserInfoFromCmdLine(cmdline=None):
             domain = parts[part_i+1]
         if part == "-p" and password is None:
             password = parts[part_i+1]
+        if part == "-no-pass":
+            password = ""
     return domain, user, password
 
 class SmbMap(Plugin):
@@ -152,4 +154,6 @@ class SmbMap(Plugin):
             oldUsers = set(map(tuple, port_m.infos.get("users", set())))
             oldUsers.add((domain, user, password))
             port_m.updateInfos({"shares":old_share_dict, "users":list(oldUsers)})
+            if password == "":
+                tags += ["anon-share-found"]
         return notes, tags, "port", targets
