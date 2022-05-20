@@ -130,6 +130,7 @@ def startWorker(pentest, **kwargs):
     docker_id = uuid.uuid4()
     existing = mongoInstance.insertInDb("pollenisator", "workers", {"pentest": pentest, "name":str(docker_id)}, False, False)
     ret, msg = start_docker(False, docker_id)
+    
     if ret:
         mongoInstance.updateInDb("pollenisator", "workers", {"pentest": pentest, "name":str(docker_id)}, {"$set":{"container_id":msg}}, False, False)
         return str(docker_id)
