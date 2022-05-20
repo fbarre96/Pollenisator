@@ -197,12 +197,12 @@ class MongoCalendar:
                     raise IOError("Failed to register Worker")
             res = self.findInDb("pollenisator", "workers", {"name": worker_name}, False)
             if res is None:
-                self.insertInDb("pollenisator", "workers", {"name": worker_name, "last_heartbeat":datetime.datetime.now(), "pentest":""}, '', True)
+                self.insertInDb("pollenisator", "workers", {"name": worker_name, "pentest": ""}, '', True)
             else:
-                self.updateInDb("pollenisator", "workers", {"name": worker_name},
+                self.updateInDb("pollenisator", "workers", {"name": worker_name, "last_heartbeat":datetime.datetime.now(), "pentest":""},
                     {"$set":{"last_heartbeat":datetime.datetime.now()}}, notify=True)
                 doSetInclusion(worker_name, "Worker", res["pentest"], True)
-            print("Registered worker "+str(worker_name))
+            logging.info("Registered worker "+str(worker_name))
             return True
         except IOError as e:
             print("Failed to connect." + str(e))
@@ -344,6 +344,12 @@ class MongoCalendar:
         if pipeline is None:
             pipeline = {}
         return self._find(self.db, collection, pipeline, multi)
+
+    def countInDb(self, db, collection, pipeline=None):
+        if pipeline is None:
+            pipeline = {}
+        self.connect()
+        return self.client[db][collection].count_documents(pipeline)
 
     def findInDb(self, db, collection, pipeline=None, multi=True):
         """

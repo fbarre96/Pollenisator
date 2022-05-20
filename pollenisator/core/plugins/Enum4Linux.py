@@ -78,7 +78,7 @@ def updateDatabase(pentest, enum_infos):
     port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
     targets = {"enum4linux":{"ip": enum_infos["ip"], "port": "445", "proto": "tcp"}}
     infosToAdd = enum_infos
-    if enum_infos["session_allowed"]:
+    if enum_infos.get("session_allowed", False):
         creds = (enum_infos.get("domain", ""), enum_infos.get("username", ""), enum_infos.get("password", ""))
         port_m.infos["users"] = list(set(map(tuple, port_m.infos.get("users", []))).union(creds))
     if "users" in infosToAdd:

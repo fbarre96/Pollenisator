@@ -275,6 +275,12 @@ def getServerConfigFolder():
         pass
     return c
 
+def getDefaultWorkerCommandsFile():
+    return os.path.join(getMainDir(), "config", "worker_commands.json")
+
+def getDefaultCommandsFile():
+    return os.path.join(getMainDir(), "config", "default_commands.json")
+
 def loadServerConfig():
     """Return data converted from json inside config/server.cfg
     Returns:

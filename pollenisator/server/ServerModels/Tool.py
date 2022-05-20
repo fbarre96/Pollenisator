@@ -579,8 +579,8 @@ def getNbOfLaunchedCommand(calendarName, worker, command_iid):
         Return the total of running tools with this command's name as an integer.
     """
     mongoInstance = MongoCalendar.getInstance()
-    t = mongoInstance.findInDb(calendarName, "tools", {"command_iid": str(command_iid), "scanner_ip": worker, "dated": {
+    t = mongoInstance.countInDb(calendarName, "tools", {"command_iid": str(command_iid), "scanner_ip": worker, "dated": {
                             "$ne": "None"}, "datef": "None"})
     if t is not None:
-        return t.count()
+        return t
     return 0

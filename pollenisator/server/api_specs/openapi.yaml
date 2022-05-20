@@ -755,6 +755,15 @@ paths:
         required: true
         schema:
           type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                addDefaultCommands:
+                  type: boolean
+                  default: false
       responses:
         "200":
           description: successfully logged in, returns a token with extended scope

@@ -189,7 +189,7 @@ def count(pentest, collection, body):
         return "Pipeline argument was not valid", 400
     elif pentest not in mongoInstance.listCalendarNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
-    res = mongoInstance.findInDb(pentest, collection, pipeline, True).count()
+    res = mongoInstance.countInDb(pentest, collection, pipeline)
     return res
 
 @permission("pentester")
@@ -479,9 +479,9 @@ def importDb(upfile, **kwargs):
     return success
 
 
-def doImportCommands(upfile, user):
+def doImportCommands(data, user):
     try:
-        commands_and_groups = json.loads(upfile.stream.read())
+        commands_and_groups = json.loads(data)
     except:
         return "Invalid file format, json expected", 400
     if not isinstance(commands_and_groups, dict):
@@ -516,12 +516,14 @@ def doImportCommands(upfile, user):
 
 @permission("user")
 def importCommandsForWorker(upfile, **kwargs):
-    return doImportCommands(upfile, "Worker")
+    data = upfile.stream.read()
+    return doImportCommands(data, "Worker")
     
 @permission("user")
 def importCommands(upfile, **kwargs):
     user = kwargs["token_info"]["sub"]
-    return doImportCommands(upfile, user)
+    data = upfile.stream.read()
+    return doImportCommands(data, user)
     
 def doExportCommands(user):
     mongoInstance = MongoCalendar.getInstance()
@@ -529,6 +531,9 @@ def doExportCommands(user):
     commands = mongoInstance.findInDb("pollenisator", "commands", {"owner":user}, True)
     for command in commands:
         c = command
+        del c["owner"]
+        if "users" in c:
+            del c["users"]
         res["commands"].append(c)
     g_commands = mongoInstance.findInDb("pollenisator", "group_commands", {"owner":user}, True)
     for g_command in g_commands:

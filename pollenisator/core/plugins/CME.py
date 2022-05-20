@@ -144,7 +144,7 @@ CONNECTED
             if "toAdd" in locals():
                 toAdd["ntds"] = toAdd.get("ntds", []) + [module_infos.group(4)]
     if not cmeFound:
-        return None, None, None, None
+        return None, None, None, None, None, None
     if lsassy:
         notes = f"CME LSASSY Success"
     notes = f"Pwn3d count : {countPwn}\nConnection success count : {countSuccess}\nHost found : {countFound}\nSecrets found : {len(secrets)}\n"+ ("\n".join(secrets)) + notes
