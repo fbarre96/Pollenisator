@@ -1,8 +1,9 @@
 from bson import ObjectId
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Models.Command import Command
+from pollenisator.core.Controllers.CommandController import CommandController
 from pollenisator.server.ServerModels.Element import ServerElement
-from pollenisator.core.Components.Utils import JSONEncoder
+from pollenisator.core.Components.Utils import JSONEncoder, JSONDecoder
 from pollenisator.server.permission import permission
 import json
 
@@ -28,7 +29,7 @@ class ServerCommand(Command, ServerElement):
             return None
         for result in results:
             yield(ServerCommand(targetdb, result))
-    
+
     @classmethod
     def fetchObject(cls, pipeline, targetdb="pollenisator"):
         """Fetch one command from database and return a ServerCommand object
@@ -55,15 +56,24 @@ class ServerCommand(Command, ServerElement):
         """
         if pipeline is None:
             pipeline = {}
-        return [command.name for command in cls.fetchObjects(pipeline, targetdb)]
+        return [command._id for command in cls.fetchObjects(pipeline, targetdb)]
 
-@permission("pentester")
-def delete(pentest, command_iid):
+@permission("user")
+def getCommands(body):
+    pipeline = body.get("pipeline", {})
+    if isinstance(pipeline, str):
+        pipeline = json.loads(pipeline, cls=JSONDecoder)
+    mongoInstance = MongoCalendar.getInstance()
+    results = mongoInstance.findInDb("pollenisator", "commands", pipeline, True)
+    if results is None:
+        return []
+    return [x for x in results]
+
+def doDelete(pentest, command):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
-    command = Command(mongoInstance.find("commands", {"_id":ObjectId(command_iid)}, False))
-    mongoInstance.updateInDb(command.indb, "group_commands", {}, {
-        "$pull": {"commands": command.name}}, True, True)
+    mongoInstance.updateInDb("pollenisator", "group_commands", {"owner": command.owner}, {
+        "$pull": {"commands": command._id}}, True, True)
     # Remove from all waves this command.
     if command.indb == "pollenisator":
         calendars = mongoInstance.listCalendarNames()
@@ -73,36 +83,106 @@ def delete(pentest, command_iid):
         waves = mongoInstance.findInDb(calendar, "waves")
         for wave in waves:
             toBeUpdated = wave["wave_commands"]
-            if command.name in wave["wave_commands"]:
-                toBeUpdated.remove(command.name)
+            if command._id in wave["wave_commands"]:
+                toBeUpdated.remove(command._id)
                 mongoInstance.updateInDb(calendar, "waves", {"_id": wave["_id"]}, {
                     "$set": {"wave_commands": toBeUpdated}}, False)
         # Remove all tools refering to this command's name.
         mongoInstance.deleteFromDb(calendar,
-                                "tools", {"name": command.name}, True, True)
+                                   "tools", {"name": command.name}, True, True)
 
-    print(f'deleting from {command.indb} id {str(command_iid)}')
     res = mongoInstance.deleteFromDb(command.indb, "commands", {
-                                   "_id": ObjectId(command_iid)}, False, True)
+        "_id": ObjectId(command._id)}, False, True)
     if res is None:
         return 0
     else:
         return res.deleted_count
 
+@permission("user")
+def deleteCommand(command_iid, **kwargs):
+    user = kwargs["token_info"]["sub"]
+    mongoInstance = MongoCalendar.getInstance()
+    c = mongoInstance.findInDb("pollenisator",
+        "commands", {"_id": ObjectId(command_iid)}, False)
+    if c is None:
+        return "Not found", 404
+    command = Command(c)
+    if command.owner != user and command.owner != "" and command.owner != "Worker":
+        return "Forbidden", 403
+    return doDelete("pollenisator", command)
+
 @permission("pentester")
-def insert(pentest, body):
+def delete(pentest, command_iid, **kwargs):
+    user = kwargs["token_info"]["sub"]
+    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance.connectToDb(pentest)
+    c = mongoInstance.find(
+        "commands", {"_id": ObjectId(command_iid)}, False)
+    if c is None:
+        return "Not found", 404
+    command = Command(c)
+    if command.owner != "Worker":
+        if command.owner != user and command.owner != "":
+            return "Forbidden", 403
+    return doDelete(pentest, command)
+    
+
+def doInsert(pentest, body, user):
     mongoInstance = MongoCalendar.getInstance()
     existing = mongoInstance.findInDb(
-            body["indb"], "commands", {"name": body["name"]}, False)
+        body["indb"], "commands", {"owner": user, "name": body["name"]}, False)
     if existing is not None:
-        return {"res":False, "iid":existing["_id"]}
+        return {"res": False, "iid": existing["_id"]}
     if "_id" in body:
         del body["_id"]
-    ins_result = mongoInstance.insertInDb(body["indb"], "commands", body, '', True)
+    body["owner"] = user
+    ins_result = mongoInstance.insertInDb(
+        body["indb"], "commands", body, '', True)
     iid = ins_result.inserted_id
-    return {"res":True, "iid":iid}
-    
+    return {"res": True, "iid": iid}
+
 @permission("pentester")
-def update(pentest, command_iid, body):
+def insert(pentest, body, **kwargs):
+    user = kwargs["token_info"]["sub"]
+    if body.get("owner", "") == "Worker":
+        return doInsert(pentest, body, "Worker")
+    return doInsert(pentest, body, user)
+   
+
+@permission("pentester")
+def update(pentest, command_iid, body, **kwargs):
+    user = kwargs["token_info"]["sub"] if body.get("owner", "") != "Worker" else "Worker"
     mongoInstance = MongoCalendar.getInstance()
-    return mongoInstance.updateInDb(body["indb"], "commands", {"_id":ObjectId(command_iid)}, {"$set":body}, False, True)
+    command = Command(mongoInstance.find(
+        "commands", {"_id": ObjectId(command_iid)}, False))
+    if command.owner != user  and command.owner != "" and command.owner != "Worker":
+        return "Forbidden", 403
+    if "owner" in body:
+        del body["owner"]
+    if "_id" in body:
+        del body["_id"]
+    mongoInstance.updateInDb(command.indb, "commands", {"_id": ObjectId(command_iid)}, {"$set": body}, False, True)
+    return True
+
+@permission("user")
+def addToMyCommands(command_iid, **kwargs):
+    user = kwargs["token_info"]["sub"]
+    mongoInstance = MongoCalendar.getInstance()
+    res = mongoInstance.findInDb("pollenisator", "commands", {
+                                 "_id": ObjectId(command_iid)}, False)
+    if res is None:
+        return False
+    res["owner"] = user
+    res["indb"] = "pollenisator"
+    return doInsert("pollenisator", res, user)
+
+
+def addUserCommandsToPentest(pentest, user):
+    mongoInstance = MongoCalendar.getInstance()
+    mycommands = mongoInstance.findInDb(
+        "pollenisator", "commands", {"owner": user}, True)
+    for command in mycommands:
+        mycommand = command
+        mycommand["indb"] = pentest
+        res = doInsert(pentest, mycommand, user)
+    return True

@@ -40,7 +40,13 @@ components:
           schema:
             $ref: "#/components/schemas/Defects"
       required: true
-    pollenisator.server.mongo.importDb:
+    DefectTemplate:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/DefectTemplate"
+      required: true
+    binary_upfile:
       content:
         multipart/form-data:
           schema:
@@ -102,12 +108,6 @@ components:
           type: string
         lvl:
           type: string
-          enum:
-            - port
-            - ip
-            - wave
-            - domain
-            - network
         priority:
           type: integer
           minimum: 0
@@ -138,6 +138,8 @@ components:
           type: integer
         max_thread:
           type: integer
+        indb:
+          type: string
         commands:
           type: array
           items:
@@ -156,6 +158,10 @@ components:
             - tcp
             - udp
             - ""
+        synthesis:
+          type: string
+        description:
+          type: string
         notes:
           type: string
         ease:
@@ -188,6 +194,8 @@ components:
           type: array
           items:
             type: string
+        language:
+          type: string
         proofs:
           type: array
           items:
@@ -195,6 +203,92 @@ components:
         index:
           type: string
           default: end
+        fixes:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              execution:
+                type: string
+                enum:
+                  - Quick Win
+                  - Moderate
+                  - Hard
+              gain:
+                type: string
+                enum:
+                  - Weak
+                  - Moderate
+                  - Mean
+                  - Strong
+              synthesis:
+                type: string
+              title:
+                type: string
+    DefectTemplate:
+      properties:
+        title:
+          type: string
+        synthesis:
+          type: string
+        description:
+          type: string
+        ease:
+          type: string
+          enum:
+            - Easy
+            - Moderate
+            - Difficult
+            - Arduous
+            - N/A
+        impact:
+          type: string
+          enum:
+            - Minor
+            - Important
+            - Major
+            - Critical
+            - N/A
+        risk:
+          type: string
+          enum:
+            - Minor
+            - Important
+            - Major
+            - Critical
+            - N/A
+        type:
+          type: array
+          items:
+            type: string
+        language:
+          type: string
+        fixes:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              execution:
+                type: string
+                enum:
+                  - Quick Win
+                  - Moderate
+                  - Hard
+              gain:
+                type: string
+                enum:
+                  - Weak
+                  - Moderate
+                  - Mean
+                  - Strong
+              synthesis:
+                type: string
+              title:
+                type: string
     Intervals:
       properties:
         wave:
@@ -267,12 +361,7 @@ components:
           type: string
         lvl:
           type: string
-          enum:
-            - port
-            - ip
-            - wave
-            - domain
-            - network
+          
     Waves:
       properties:
         wave:
@@ -666,6 +755,15 @@ paths:
         required: true
         schema:
           type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                addDefaultCommands:
+                  type: boolean
+                  default: false
       responses:
         "200":
           description: successfully logged in, returns a token with extended scope
@@ -724,6 +822,9 @@ paths:
                   type: boolean
                   default: false
                 notify:
+                  type: boolean
+                  default: false
+                upsert:
                   type: boolean
                   default: false
       responses:
@@ -959,6 +1060,47 @@ paths:
               examples:
                 Success:
                   value: 'Pentest argument is not a valid pollenisator pentest'
+
+  "/exportCommands":
+    get:
+      operationId: pollenisator.server.mongo.exportCommands
+      tags:
+        - Commands
+      summary: Return user commands as json
+      responses:
+        "200":
+          description:  content
+          content:
+              application/json:
+                schema:
+                  type: string
+        '503':
+          description: Failed to create an export
+          content:
+            application/json:
+              examples:
+                Server issue:
+                  value: 'Failed to export'
+  "/exportCommands/worker":
+    get:
+      operationId: pollenisator.server.mongo.exportCommandsForWorker
+      tags:
+        - Commands
+      summary: Return workers commands as json
+      responses:
+        "200":
+          description:  content
+          content:
+              application/json:
+                schema:
+                  type: string
+        '503':
+          description: Failed to create an export
+          content:
+            application/json:
+              examples:
+                Server issue:
+                  value: 'Failed to export'
   "/dumpDb/{dbName}":
     get:
       operationId: pollenisator.server.mongo.dumpDb
@@ -1006,7 +1148,7 @@ paths:
         - Mongo
       summary: Import an existing database file
       requestBody:
-        $ref: "#/components/requestBodies/pollenisator.server.mongo.importDb"
+        $ref: "#/components/requestBodies/binary_upfile"
       responses:
         "200":
           description: Successfully imported the file
@@ -1014,10 +1156,26 @@ paths:
     post:
       operationId: pollenisator.server.mongo.importCommands
       tags:
-        - Admin
+        - Commands
       summary: Import an existing command database file
       requestBody:
-        $ref: "#/components/requestBodies/pollenisator.server.mongo.importDb"
+        $ref: "#/components/requestBodies/binary_upfile"
+      responses:
+        "200":
+          description: Successfully imported the file
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
+  /importCommands/worker:
+    post:
+      operationId: pollenisator.server.mongo.importCommandsForWorker
+      tags:
+        - Commands
+      summary: Import an existing command database file
+      requestBody:
+        $ref: "#/components/requestBodies/binary_upfile"
       responses:
         "200":
           description: Successfully imported the file
@@ -1175,7 +1333,7 @@ paths:
               
       responses:
         "200":
-          description: Successful bulk delete command
+          description: Successful bulk delete
           content:
             application/json:
               examples:
@@ -1197,6 +1355,41 @@ paths:
                   value: '"Collection|Pentest argument is not a valid pollenisator collection|pentest"'
                 Pollenisator db:
                   value: 'Impossible to bulk delete in this database'
+  "/commands/delete/bulk":
+    post:
+      operationId: pollenisator.server.mongo.bulk_delete_commands
+      tags:
+        - Commands
+        - CommandGroup
+      summary: Delete many commmands and group of commands in db
+      description: Delete many commmands and group of commands in db
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Successful bulk delete
+          content:
+            application/json:
+              examples:
+                Deleted count:
+                  value: '4'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                body is not a dict:
+                  value: '"body was not a valid dictionnary"'
+        '403':
+          description: Invalid parameters values in given object
+          content:
+            application/json:
+              examples:
+                invalid collection in body:
+                  value: 'You can delete only commands and group_commands'
   /pentests:
     get:
       operationId: pollenisator.server.mongo.listPentests
@@ -1415,7 +1608,7 @@ paths:
                   value: '{
     "_id": "ObjectId|5fa5819aed75191f22168a40",
     "key": "tags",
-    "value": "{\"todo\": \"orange\", \"unscanned\": \"yellow\", \"P0wned!\": \"red\", \"Interesting\": \"dark green\", \"Uninteresting\": \"sky blue\", \"Neutral\": \"white\"}"
+    "value": "{\"todo\": \"orange\", \"unscanned\": \"yellow\", \"pwned\": \"red\", \"Interesting\": \"dark green\", \"Uninteresting\": \"sky blue\", \"Neutral\": \"white\"}"
   }'
   /settings:
     get:
@@ -1434,7 +1627,7 @@ paths:
   {
     "_id": "ObjectId|5fa5819aed75191f22168a40",
     "key": "tags",
-    "value": "{\"todo\": \"orange\", \"unscanned\": \"yellow\", \"P0wned!\": \"red\", \"Interesting\": \"dark green\", \"Uninteresting\": \"sky blue\", \"Neutral\": \"white\"}"
+    "value": "{\"todo\": \"orange\", \"unscanned\": \"yellow\", \"pwned\": \"red\", \"Interesting\": \"dark green\", \"Uninteresting\": \"sky blue\", \"Neutral\": \"white\"}"
   },
   {
     "_id": "ObjectId|5fbb793bed75195fe4274412",
@@ -1561,11 +1754,7 @@ paths:
                       type: string
                     name:
                       type: string
-                    pentests:
-                      type: array
-                      items:
-                        type: string
-                    shortname:
+                    pentest:
                       type: string
                     registeredCommands:
                       type: array
@@ -1578,7 +1767,7 @@ paths:
                       "_id": "60f686d8e15510a2957cb263",
                       "last_heartbeat": "2021-07-20 10:18:35.269000",
                       "name": "078cbd54-6c26-4ba9-b84d-fdb12f239af3@barre",
-                      "pentests": [],
+                      "pentest": "",
                       "registeredCommands": [
                         "Nmap.tcp",
                         "Nmap.top_udp",
@@ -1625,8 +1814,7 @@ paths:
                         "searchsploit",
                         "dnsrecon",
                         "CME_greybox"
-                      ],
-                      "shortname": "078cbd54-6c26-4ba9-b84d-fdb12f239af3"
+                      ]
                     }
                   ]'
         "400":
@@ -1715,7 +1903,28 @@ paths:
               examples:
                 success:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
-  /workers/register/:
+  /workers/start/{pentest}:
+    get:
+      operationId: pollenisator.server.worker.startWorker
+      tags:
+        - Worker
+      summary: start or get a worker for given pentest
+      description: start or get a worker for given pentest
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful worker unregister
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'docker id'
+  /workers/register:
     post:
       operationId: pollenisator.server.worker.registerWorker
       tags:
@@ -1744,79 +1953,7 @@ paths:
               examples:
                 Success:
                   value: 'true'
-  # "/workers/{name}/registerCommands":
-  #   put:
-  #     operationId: pollenisator.server.worker.registerCommands
-  #     tags:
-  #       - Worker
-  #     summary: Set a worker registered commands
-  #     description: Set a worker registered commands
-  #     security: []
-  #     parameters:
-  #       - name: name
-  #         in: path
-  #         required: true
-  #         schema:
-  #           type: string
-  #     requestBody:
-  #       content:
-  #         application/json:
-  #           schema:
-  #             type: array
-  #             items:
-  #               type: string
-  #     responses:
-  #       "200":
-  #         description: Successful update of worker registered commands
-  #         content:
-  #           application/json:
-  #             examples:
-  #               Success:
-  #                 value: 'true'
-  
-  "/workers/{name}/setCommandConfig":
-    put:
-      operationId: pollenisator.server.worker.setCommandConfig
-      tags:
-        - Worker
-      summary: Set a worker registered command plugin and bin path
-      parameters:
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - command_name
-                - remote_bin
-                - plugin
-              properties:
-                command_name:
-                  type: string
-                remote_bin:
-                  type: string
-                plugin:
-                  type: string
-      responses:
-        "200":
-          description: Successful update of worker registed command configuration
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: 'true'
-        "404":
-          description: Worker not found
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: 'Worker not found'
+
   "/workers/{name}/unregister":
     post:
       operationId: pollenisator.server.worker.unregister
@@ -1846,77 +1983,160 @@ paths:
               examples:
                 Success:
                   value: 'Worker not found'
-  "/workers/{name}/getRegisteredCommands":
-    get:
-      operationId: pollenisator.server.worker.getRegisteredCommands
+
+  "/commands/find":
+    post:
+      operationId: pollenisator.server.ServerModels.Command.getCommands
       tags:
-        - Worker
-      summary: Get a worker registered commands
-      description: Get a worker registered commands
+        - Commands
+      summary: "Return all exisiting"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pipeline:
+                  type: string
+                  example: "{}"
+      responses:
+        "200":
+          description: successful find command with parameters
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '[{"_id": "60a3aaa129926f9ad7197919", "parent": "ObjectId|60a3aaa129926f9ad7197915",  "scope": "test",   "wave": "Testina" },  { "_id": "60f58598d8357e0f40e7fa66","scope": "test.fr" }]'
+  "/commands/delete/{command_iid}":
+    delete:
+      operationId: pollenisator.server.ServerModels.Command.deleteCommand
+      tags:
+        - Mongo
+      summary: Delete something in db
+      description: Delete something in db
       parameters:
-        - name: name
+        - name: command_iid
+          in: path
+          description: command iid to mark
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful delete command
+          content:
+            application/json:
+              examples:
+                Deleted count:
+                  value: '1'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                pipeline is not a dict:
+                  value: '"Pipeline argument was not a valid dictionnary"'
+  "/group_commands/delete/{command_group_iid}":
+    delete:
+      operationId: pollenisator.server.ServerModels.CommandGroup.deleteCommandGroup
+      tags:
+        - Mongo
+      summary: Delete something in db
+      description: Delete something in db
+      parameters:
+        - name: command_group_iid
+          in: path
+          description: group command iid to delete
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful delete command group
+          content:
+            application/json:
+              examples:
+                Deleted count:
+                  value: '1'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                pipeline is not a dict:
+                  value: '"Pipeline argument was not a valid dictionnary"'
+  "/commands/addToMyCommands/{command_iid}":
+    post:
+      operationId: pollenisator.server.ServerModels.Command.addToMyCommands
+      tags:
+        - Commands
+      summary: "Mark this command as used by the current user"
+      parameters:
+        - name: command_iid
+          in: path
+          description: command iid to mark
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: command added success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: 'True'
+
+  "/waves/addMyCommandsToWave/{pentest}/{wave_iid}":
+    post:
+      operationId: pollenisator.server.ServerModels.Wave.addMyCommandsToWave
+      tags:
+        - Wave
+      summary: "Update wave to use my commands "
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: wave_iid
           in: path
           required: true
           schema:
             type: string
       responses:
         "200":
-          description: Successful get
+          description: update success
           content:
             application/json:
-              schema:
-                type: array
-                items:
-                  type: string
               examples:
-                list of registered commands:
-                  value: '[
-  "Nmap.tcp",
-  "Nmap.top_udp",
-  "Nmap.bdd",
-  "Nmap.vpn",
-  "Nmap.supervision",
-  "Nmap.services",
-  "Nmap.services.udp",
-  "Nmap.services_scripts",
-  "Nmap.all.tcp",
-  "Nmap.ip.allTcp",
-  "Nmap.ip.udp",
-  "WhatWeb.http",
-  "WhatWeb.https",
-  "TestSSL",
-  "Nikto",
-  "digReverseLookUp",
-  "pythonReverseLookUp",
-  "Sublist3r",
-  "Dirsearch.http",
-  "Dirsearch.https",
-  "Knockpy",
-  "crtsh",
-  "ssh_scan",
-  "amap",
-  "amap.udp",
-  "http-methods",
-  "smbmap",
-  "smbmap_anon",
-  "smbmap_greybox",
-  "smb-enum-users",
-  "nmap-script-vuln",
-  "enum4linux",
-  "ftp-anon",
-  "Nmap.quick",
-  "ike-scan",
-  "Nmap.verify.tcp",
-  "Nmap.verify.udp",
-  "CME.recon",
-  "CME.usecreds",
-  "eternalblue",
-  "bluekeep",
-  "openrelay",
-  "searchsploit",
-  "dnsrecon"
-]'
-
+                success:
+                  value: 'True'
+  "/waves/addWorkerCommandsToWave/{pentest}/{wave_iid}":
+    post:
+      operationId: pollenisator.server.ServerModels.Wave.addWorkerCommandsToWave
+      tags:
+        - Wave
+      summary: "Update wave to use my commands "
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: wave_iid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: update success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: 'True'
   "/commands/{pentest}":
     post:
       operationId: pollenisator.server.ServerModels.Command.insert
@@ -1995,6 +2215,29 @@ paths:
             application/json:
               schema:
                 type: integer
+  "/group_commands/find":
+    post:
+      operationId: pollenisator.server.ServerModels.CommandGroup.getCommandGroups
+      tags:
+        - CommandGroup
+      summary: "Return all existing"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pipeline:
+                  type: string
+                  example: "{}"
+      responses:
+        "200":
+          description: successful find command with parameters
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '[{"_id": "60a3aaa129926f9ad7197919", "name":"Nmaps", "owner":"user1", commands:["5f9150fbed75193ef71ba47f"]}]'
   "/group_commands/{pentest}/{command_group_iid}":
     delete:
       operationId: pollenisator.server.ServerModels.CommandGroup.delete
@@ -2691,7 +2934,7 @@ paths:
           schema:
             type: string
       requestBody:
-        $ref: "#/components/requestBodies/pollenisator.server.mongo.importDb"
+        $ref: "#/components/requestBodies/binary_upfile"
       responses:
         "200":
           description: Successfully uploaded file
@@ -2857,6 +3100,14 @@ paths:
                 plugin:
                   description: plugin name to use or "auto-detect"
                   type: string
+                default_target:
+                  description: Default pentest object to affect to
+                  type: string
+                  default: ""
+                cmdline:
+                  description: command line used if knowingly
+                  type: string
+                  default: ""
               required:
                 - upfile
                 - plugin
@@ -2890,12 +3141,6 @@ paths:
           required: true
           schema:
             type: string
-        - name: plugin
-          in: query
-          required: false
-          schema:
-            type: string
-            default: ""
       responses:
         "200":
           description: The command line to execute with a marker for |outputDir| to be
@@ -2949,6 +3194,47 @@ paths:
           required: true
           schema:
             type: string
+      responses:
+        "200":
+          description: The command line to execute with a marker for |outputDir| to be
+            replaced
+          content:
+            application/json:
+              examples:
+                Successful nmap craft:
+                  value: '{
+  "command_line_options": "nmap -n -v -p443 www.algosecure.fr -oN |outputDir|",
+  "ext": ".nmap"
+}'
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                no plugin:
+                  value: '"This tool has no plugin configured and no plugin was specified"'
+                empty command line result:
+                  value: '"An empty command line was crafted"'
+  "/tools/getDesiredOutputForPlugin":
+    post:
+      operationId: pollenisator.server.ServerModels.Tool.getDesiredOutputForPlugin
+      tags:
+        - Tools
+      summary: add the plugin desired output option in the command (using plugin + parameters) a
+        marker for |outputDir| is to be replaced in the response. 
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - plugin
+                - cmdline
+              properties:
+                plugin:
+                  type: string
+                cmdline:
+                  type: string
       responses:
         "200":
           description: The command line to execute with a marker for |outputDir| to be
@@ -3051,9 +3337,6 @@ paths:
             schema:
               type: object
               properties:
-                plugin:
-                  type: string
-                  default: ""
                 checks:
                   type: boolean
                   default: true
@@ -3368,7 +3651,7 @@ paths:
           schema:
             type: string
       requestBody:
-        $ref: "#/components/requestBodies/pollenisator.server.mongo.importDb"
+        $ref: "#/components/requestBodies/binary_upfile"
       responses:
         "200":
           description: An indication of success or failure for upload
@@ -3386,6 +3669,96 @@ paths:
               examples:
                 unexpected extension:
                   value: '"Invalid extension for template, must be pptx or docx"'
+  "/report/DefectTemplates/import":
+    post:
+      operationId: pollenisator.server.ServerModels.Defect.importDefectTemplates
+      tags:
+        - Defect Template
+      summary: Import Defect templates in pollenisator from json file
+      requestBody:
+        $ref: "#/components/requestBodies/binary_upfile"
+      responses:
+        "200":
+          description: a indicator of success
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: "True"
+  "/report/DefectTemplates/insert":
+    post:
+      operationId: pollenisator.server.ServerModels.Defect.insertDefectTemplate
+      tags:
+        - Defect Template
+      summary: Creat a Defect template
+      requestBody:
+         $ref: "#/components/requestBodies/DefectTemplate"
+      responses:
+        "200":
+          description: a indicator of success
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: "True"
+  '/report/DefectTemplates/delete/{iid}':
+    delete:
+      operationId: pollenisator.server.ServerModels.Defect.deleteDefectTemplate
+      tags:
+        - Defect Template
+      summary: Delete a defect template
+      parameters:
+        - name: iid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: successfully deleted a template
+        '404':
+          description: not found
+
+  "/report/DefectTemplates/update/{iid}":
+    put:
+      operationId: pollenisator.server.ServerModels.Defect.updateDefectTemplate
+      tags:
+        - Defect Template
+      summary: Update Defect template in db
+      description: Update Defect template in db
+      parameters:
+        - name: iid
+          in: path
+          description: Defect template iid to edit
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/DefectTemplate"
+              
+      responses:
+        "200":
+          description: successfully updated an item
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+        '400':
+          description: Pipeline argument invalid
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pipeline|Update pipeline argument was not valid'
+        '403':
+          description: Unknown param value
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Pentest|Collection argument is not a valid pollenisator collection'
+  
               
   "/report/{pentest}/generate":
     get:
@@ -3495,29 +3868,22 @@ paths:
     "risk": "Critical",
     "tags": [],
     "title": "XSS",
+    "synthesis": "An XSS or Cross-Site-Scripting attack is ..."
+    "description": "The XXX server is vulnerable to XSS in XXX form ...",
+    "language": "en",
     "type": [
       "Application"
+    ],
+    "fixes":[
+      {
+        "title":"Filter user input",
+        "synthesis": "..",
+        "description":"...",
+        "execution": "Easy"
+        "gain": "Strong"
+      },
     ]
   },
-  {
-    "_id": "ObjectId|60f190815955e6cf385a405d",
-    "ease": "Moderate",
-    "impact": "Major",
-    "index": "1",
-    "infos": {},
-    "ip": "",
-    "notes": "",
-    "port": "",
-    "proofs": [],
-    "proto": "",
-    "redactor": "N/A",
-    "risk": "Major",
-    "tags": [],
-    "title": "sql",
-    "type": [
-      "Application"
-    ]
-  }
 ]'
   "/report/{pentest}/defects/move/{defect_id_to_move}/{target_id}":
     post:
@@ -3567,7 +3933,7 @@ paths:
       operationId: pollenisator.server.Report.search
       tags:
         - Report
-      summary: search a defect/remark on an external app
+      summary: search a defect/remark in  templates
       requestBody:
         content:
           application/json:
@@ -3623,7 +3989,13 @@ paths:
                       type: string
                     title:
                       type: string
+                    description:
+                      type: string
+                    synthesis:
+                      type: string
                     type:
+                      type: string
+                    language:
                       type: string
                     fixes:
                       type: array
@@ -3637,12 +4009,14 @@ paths:
                             enum:
                               - Quick Win
                               - Moderate
+                              - Mean
                               - Hard
                           gain:
                             type: string
                             enum:
                               - Weak
                               - Moderate
+                              - Mean
                               - Strong
                           synthesis:
                             type: string

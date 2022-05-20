@@ -1,3 +1,4 @@
+import logging
 from jose import JWTError, jwt
 from pollenisator.core.Components.mongo import MongoCalendar
 import datetime
@@ -5,7 +6,6 @@ import datetime
 import uuid
 from werkzeug.exceptions import Unauthorized
 import six
-
 JWT_SECRET = str(uuid.uuid4())
 JWT_LIFETIME_SECONDS = 3600*8
 JWT_ALGORITHM = 'HS256'
@@ -76,6 +76,7 @@ def decode_token(token):
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except JWTError as e:
+        logging.info(f"Unauthorized, token is invalid : token ({token}) error ({e})")
         six.raise_from(Unauthorized, e)
 
 def _current_timestamp():

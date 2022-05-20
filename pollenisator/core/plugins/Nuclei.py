@@ -86,7 +86,7 @@ class Nuclei(Plugin):
         parsed_by_hosts = parse(file_opened)
         if parsed_by_hosts is None:
             return None, None, None, None
-        tags = ["todo"]
+        tags = ["info-nuclei"]
         cumulative_notes = []
         targets = {}
         for parsed_host in parsed_by_hosts:
@@ -98,13 +98,14 @@ class Nuclei(Plugin):
                 notes += finding["info"]["name"]+" ("+finding["info"]["severity"]+") "+finding["info"].get("description", "")+"\n"
             for finding in findings:
                 if finding["info"]["severity"] in ["medium", "high", "critical"]:
-                    tags = ["Interesting"]
+                    tags = ["interesting-nuclei"]
             ip_o = ServerIp().initialize(host, notes)
             inserted = ip_o.addInDb()
             if not inserted["res"]:
                 ip_o = ServerIp.fetchObject(pentest, {"_id": inserted["iid"]})
-                ip_o.notes += "\nNuclei:\n"+notes
-                ip_o.update()
+                if ip_o is not None:
+                    ip_o.notes += "\nNuclei:\n"+notes
+                    ip_o.update()
             cumulative_notes.append(notes+"\n")
             
             

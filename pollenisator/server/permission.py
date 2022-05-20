@@ -1,6 +1,6 @@
-import connexion
+import logging
 import inspect
-from copy import deepcopy
+
 from pollenisator.server.token import checkTokenValidity
 # permission decorator
 
@@ -20,16 +20,14 @@ def permission(*dec_args, **dec_kwargs):
                 return "Unauthorized", 401
             if not checkTokenValidity(token_info):
                 return "Unauthorized", 401
-            if arg_name == "worker.db":
-                print("error")
+            
             token_scope = token_info.get("scope", []) 
             if "admin" in token_scope and "user" not in token_scope:
                 token_scope.append("user")
                 token_info["scope"] = token_scope
-
             # Check scope inside token
             if scope not in token_scope:
-                print(f"{scope} not in {token_info}")
+                logging.debug(f"FORBIDDEN : {scope} not in {token_info}")
                 return f"Forbidden : {scope} is required", 403
             if (scope == "pentester" or scope == "owner") and "worker" not in token_scope:
                 if "." in arg_name:
@@ -43,7 +41,7 @@ def permission(*dec_args, **dec_kwargs):
                         arg_value = args[arg_value_i]
                 if arg_value not in token_scope:
                     if "admin" not in token_scope:
-                        print(f"{arg_value} is not in the token scope {token_info}")
+                        logging.debug(f"{arg_value} is not in the token scope {token_info}")
                         return f"Forbidden : you do not have access to {arg_value}", 403
             if scope == "worker":
                 if arg_name == "pentest":
@@ -51,7 +49,7 @@ def permission(*dec_args, **dec_kwargs):
                 ind = args_spec.args.index(arg_name)
                 arg_value = args[ind]
                 if arg_value not in token_scope:
-                    print(f"{arg_value} for workers is not in the token scope {token_info}")
+                    logging.debug(f"{arg_value} for workers is not in the token scope {token_info}")
                     return f"Forbidden : scope required worker and name {arg_value}", 403
             
             args_recalc = []
@@ -66,10 +64,10 @@ def permission(*dec_args, **dec_kwargs):
                 args_recalc.append(value)
             expect_kw = args_spec.varkw is not None
             if expect_kw:
-                #print("Calling function with args "+str(args_recalc)+" , "+str(kwargs))
+                logging.debug("Calling function with args "+str(args_recalc)+" , "+str(kwargs))
                 result = function(*args_recalc, **kwargs)
             else:
-                #print("Calling function with args "+str(args_recalc))
+                logging.debug("Calling function with args "+str(args_recalc))
                 result = function(*args_recalc)
             return result
             

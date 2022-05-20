@@ -17,16 +17,17 @@ def parse_knockpy_line(line):
                 1. the domain found by knockpy on this line or None if no domain exists on this line.
                 2. a boolean indicating that knockpy marked this domain as alias
     """
-    regexIP_domain = r"((?:[0-9]{1,3}\.){3}[0-9]{1,3}).+(host|alias)\s+(\S+)"
+    regexIP_domain = r"dns: ((?:\d{1,3}.){3}\d{1,3}) \| \S+//((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9])"
     ipSearch = re.search(regexIP_domain, line)
     ip = None
     domain = None
-    alias = None
-    if(ipSearch is not None):  # regex match
-        ip = ipSearch.group(1).strip()
-        alias = ipSearch.group(2).strip() == "alias"
-        domain = ipSearch.group(3).strip()
-    return ip, domain, alias
+    if ipSearch is not None:  # regex match
+        try:
+            ip = ipSearch.group(1).strip()
+            domain = ipSearch.group(2).strip()
+        except Exception as e:
+            raise e
+    return ip, domain
 
 
 class Knockpy(Plugin):
@@ -35,7 +36,7 @@ class Knockpy(Plugin):
         Returns:
             string
         """
-        return " > "
+        return " -o /tmp/ > "
 
     def getFileOutputExt(self):
         """Returns the expected file extension for this command result file
@@ -68,30 +69,27 @@ class Knockpy(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         notes = ""
-        tags = ["todo"]
-        marker = "- scanning for subdomain..."
+        tags = ["found-domains-info"]
+        marker = "IpaddressCodeSubdomainServerRealhostname"
         markerFound = False
         countFound = 0
         for line in file_opened:
             line = line.decode("utf-8")
-            if marker == line.strip():
+            if marker == line.replace(" ","").strip():
                 markerFound = True
             if not markerFound:
                 continue
-            ip, domain, alias = parse_knockpy_line(line)
+            ip, domain = parse_knockpy_line(line)
             if ip is not None and domain is not None:
                 # a domain has been found
                 insert_res = ServerIp().initialize(domain).addInDb()
                 if insert_res["res"]:
                     ServerIp().initialize(ip).addInDb()
-                    notes += line+"\n"
+                    notes += f"{domain} inserted ({ip})\n"
                     countFound += 1
                 # failed, domain is out of scope
                 else:
                     notes += domain+" exists but already added.\n"
-                ip_m = ServerIp.fetchObject(pentest, {"_id": insert_res["iid"]})
-                if alias:
-                    ip_m.updateInfos({"alias": ip})
         if notes.strip() == "":
             return None, None, None, None
         return notes, tags, "wave", {"wave": None}

@@ -103,4 +103,5 @@ def update(pentest, interval_iid, body):
     mongoInstance.connectToDb(pentest)
     interval_o = ServerInterval(pentest, mongoInstance.find("intervals", {"_id": ObjectId(interval_iid)}, False))
     interval_o.setToolsInTime()
-    return mongoInstance.update("intervals", {"_id":ObjectId(interval_iid)}, {"$set":body}, False, True)
+    mongoInstance.update("intervals", {"_id":ObjectId(interval_iid)}, {"$set":body}, False, True)
+    return True

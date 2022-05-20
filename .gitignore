@@ -68,6 +68,7 @@ pollenisator/exports/*
 pollenisator/config/tools.d/*
 !pollenisator/config/tools.d/tools.json
 .vscode
+error.log
 pollenisator/.vscode
 venv/
 pollenisator/config/client.cfg
@@ -75,3 +76,6 @@ pollenisator/config/server.cfg
 pollenisator/config/settings.cfg
 pollenisator/AllInOne/results/*
 !pollenisator/AllInOne/results
+.scannerwork/.sonar_lock
+.scannerwork/report-task.txt
+pollenisator/PollenisatorWorker

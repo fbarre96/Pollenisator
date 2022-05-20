@@ -1,25 +1,22 @@
 import json
+import logging
 import os
 from bson import ObjectId
-from datetime import datetime
 from flask import send_file
 import tempfile
 import shutil
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Components.parser import Parser, ParseError, Term
 from pollenisator.core.Components.Utils import JSONDecoder, getMainDir, isIp, JSONEncoder
-from pollenisator.core.Controllers.CommandController import CommandController
 from pollenisator.core.Controllers.WaveController import WaveController
 from pollenisator.core.Controllers.IntervalController import IntervalController
-from pollenisator.server.ServerModels.Command import ServerCommand
-from pollenisator.server.ServerModels.Command import insert as insert_command
+from pollenisator.server.ServerModels.Command import ServerCommand, addUserCommandsToPentest, doInsert as command_insert
+from pollenisator.server.ServerModels.CommandGroup import addUserGroupCommandsToPentest, doInsert as command_group_insert
 from pollenisator.server.ServerModels.Wave import ServerWave, insert as insert_wave
 from pollenisator.server.ServerModels.Interval import ServerInterval, insert as insert_interval
 from pollenisator.server.ServerModels.Scope import insert as insert_scope
 from pollenisator.server.FileManager import deletePentestFiles
 from pollenisator.server.permission import permission
-from pollenisator.server.auth import connectToPentest
-from pollenisator.server.token import decode_token
 mongoInstance = MongoCalendar.getInstance()
 
 searchable_collections = ["waves","scopes","ips","ports","tools","defects"]
@@ -53,7 +50,8 @@ def update(pentest, collection, body):
             return "Collection argument is not a valid pollenisator collection", 403
     elif pentest not in mongoInstance.listCalendarNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
-    return mongoInstance.updateInDb(pentest, collection, pipeline, updatePipeline, body["many"], body["notify"])
+    mongoInstance.updateInDb(pentest, collection, pipeline, updatePipeline, body["many"], body["notify"], body.get("upsert", False))
+    return True
 
 @permission("pentester")
 def insert(pentest, collection, body):
@@ -107,7 +105,7 @@ def search(pentest, s):
         # Searching
         collections = []
         builtPipeline = _evaluateCondition(collections, condition_list)
-        print(f"DEBUG : coll={collections} pipeline={builtPipeline}")
+        logging.debug(f"DEBUG : coll={collections} pipeline={builtPipeline}")
         if len(collections) == 0:
             collections = searchable_collections
         list_of_objects = {}
@@ -191,7 +189,7 @@ def count(pentest, collection, body):
         return "Pipeline argument was not valid", 400
     elif pentest not in mongoInstance.listCalendarNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
-    res = mongoInstance.findInDb(pentest, collection, pipeline, True).count()
+    res = mongoInstance.countInDb(pentest, collection, pipeline)
     return res
 
 @permission("pentester")
@@ -255,6 +253,27 @@ def bulk_delete(pentest, body):
     return deleted
 
 @permission("user")
+def bulk_delete_commands(body, **kwargs):
+    user = kwargs["token_info"]["sub"]
+    data = body
+    if isinstance(data, str):
+        data = json.loads(data, cls=JSONDecoder)
+    if not isinstance(data, dict):
+        return "body was not a valid dictionnary", 400
+    deleted = 0
+    for obj_type in data:
+        if obj_type != "commands" and obj_type != "group_commands":
+            return "You can delete only commands and group_commands", 403
+        for obj_id in data[obj_type]:
+            if not isinstance(obj_id, ObjectId):
+                if obj_id.startswith("ObjectId|"):
+                    obj_id = ObjectId(obj_id.split("ObjectId|")[1])
+            res = mongoInstance.deleteFromDb("pollenisator", obj_type, {"_id": ObjectId(obj_id), "owner":user}, False, True)
+            if res is not None:
+                deleted += res.deleted_count
+    return deleted
+
+@permission("user")
 def listPentests(**kwargs):
     username = kwargs["token_info"]["sub"]
     if "admin" in kwargs["token_info"]["scope"]:
@@ -285,7 +304,7 @@ def registerCalendar(pentest, body, **kwargs):
     if ret:
         #token = connectToPentest(pentest, **kwargs)
         #kwargs["token_info"] = decode_token(token[0])
-        prepareCalendar(pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username)
+        prepareCalendar(pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username, **kwargs)
         return msg
     else:
         return msg, 403
@@ -304,35 +323,31 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
             * "Add domains who have a parent domain in scope": if 1, will add a new domain if a parent domain is in scope
             * "Add all domains found":  Unsafe. if 1, all new domains found by tools will be considered in scope.
     """
+    user = kwargs["token_info"]["sub"]
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(dbName)
-    commands = ServerCommand.getList({"$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}]})
+    addUserCommandsToPentest(dbName, user)  
+    addUserGroupCommandsToPentest(dbName, user)
+    # Duplicate all commands in local database
+    # allcommands = ServerCommand.fetchObjects({})
+    # for command in allcommands:
+    #     command.indb = dbName
+    #     insert_command(command.indb, CommandController(command).getData(), **kwargs)
+    commands = ServerCommand.getList({"owner":user, "$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}]})
     if not commands:
-        commandslist = ServerCommand.getList()
-        if not commandslist:
-            default = os.path.join(getMainDir(), "exports/pollenisator_commands.gz")
-            res = mongoInstance.importCommands(default)
-            if res:
-                default = os.path.join(getMainDir(), "exports/pollenisator_group_commands.gz")
-                res = mongoInstance.importCommands(default)
-        commands = ServerCommand.getList({"$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}]})
-    # Duplicate commands in local database
-    allcommands = ServerCommand.fetchObjects({})
-    for command in allcommands:
-        command.indb = dbName
-        insert_command(command.indb, CommandController(command).getData(), **kwargs)
+        commands = []
     wave_o = ServerWave().initialize(dbName, commands)
-    insert_wave(dbName, WaveController(wave_o).getData(), **kwargs)
+    result_wave = insert_wave(dbName, WaveController(wave_o).getData())
     interval_o = ServerInterval().initialize(dbName, start_date, end_date)
-    insert_interval(dbName, IntervalController(interval_o).getData(), **kwargs)
+    insert_interval(dbName, IntervalController(interval_o).getData())
     scope = scope.replace("https://", "").replace("http://","")
     scope = scope.replace("\n", ",").split(",")
     for scope_item in scope:
         if scope_item.strip() != "":
             if isIp(scope_item.strip()):
-                insert_scope(dbName, {"wave":dbName, "scope":scope_item.strip()+"/32"}, **kwargs)
+                insert_scope(dbName, {"wave":dbName, "scope":scope_item.strip()+"/32"})
             else:
-                insert_scope(dbName, {"wave":dbName, "scope":scope_item.strip()}, **kwargs)
+                insert_scope(dbName, {"wave":dbName, "scope":scope_item.strip()})
     mongoInstance.insert("settings", {"key":"pentest_type", "value":pentest_type})
     mongoInstance.insert("settings", {"key":"include_domains_with_ip_in_scope", "value": settings['Add domains whose IP are in scope'] == 1})
     mongoInstance.insert("settings", {"key":"include_domains_with_topdomain_in_scope", "value":settings["Add domains who have a parent domain in scope"] == 1})
@@ -369,26 +384,18 @@ def createSetting(body):
 def updateSetting(body):
     key = body['key']
     value = body["value"]
-    return mongoInstance.updateInDb("pollenisator", "settings", {
+    mongoInstance.updateInDb("pollenisator", "settings", {
                     "key": key}, {"$set": {"value": value}})
+    return True
 
-@permission("user")
+
+
+@permission("pentester")
 def registerTag(body):
     name = body["name"]
     color = body["color"]
     isGlobal = body.get("global", False)
-    if isGlobal:
-        tags = json.loads(mongoInstance.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=JSONDecoder)
-        mongoInstance.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=JSONEncoder)}}, many=False, notify=True)
-    else:
-        tags = mongoInstance.find("settings", {"key":"tags"}, False)
-        if tags is None:
-            mongoInstance.insert("settings", {"key":"tags", "value":{name:color}})
-        else:
-            tags = tags.get("value", {})
-            tags[name] = color
-            mongoInstance.update("settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
-    return True
+    return mongoInstance.doRegisterTag(name, color, isGlobal)
 
 @permission("user")
 def unregisterTag(body):
@@ -467,19 +474,82 @@ def importDb(upfile, **kwargs):
     with open(tmpfile, "wb") as f:
         f.write(upfile.stream.read())
     success = mongoInstance.importDatabase(username, tmpfile)
-    print("DEBUG : "+str(dirpath))
+    logging.debug("DEBUG : "+str(dirpath))
     shutil.rmtree(dirpath)
     return success
 
-@permission("admin")
-def importCommands(upfile):
-    dirpath = tempfile.mkdtemp()
-    tmpfile = os.path.join(dirpath, os.path.basename(upfile.filename))
-    with open(tmpfile, "wb") as f:
-        f.write(upfile.stream.read())
-    success = mongoInstance.importCommands(tmpfile)
-    shutil.rmtree(dirpath)
-    return success
+
+def doImportCommands(data, user):
+    try:
+        commands_and_groups = json.loads(data)
+    except:
+        return "Invalid file format, json expected", 400
+    if not isinstance(commands_and_groups, dict):
+        return "Invalid file format, object expected", 400
+    if "commands" not in commands_and_groups.keys():
+        return "Invalid file format, object expected property: commands", 400
+    if "command_groups" not in commands_and_groups.keys():
+        return "Invalid file format, object expected property: command_groups", 400
+    if not isinstance(commands_and_groups["commands"], list) or not isinstance(commands_and_groups["command_groups"], list) :
+        return "Invalid file format, commands and command_groups properties must be lists", 400
+    matchings = {}
+    failed = []
+    for command in commands_and_groups["commands"]:
+        save_id = str(command["_id"])
+        del command["_id"]
+        command["owner"] = user
+        obj_ins = command_insert("pollenisator", command, user)
+        if obj_ins["res"]:
+            matchings[save_id] = str(obj_ins["iid"])
+        else:
+            failed.append(command)
+    for group in commands_and_groups["command_groups"]:
+        del group["_id"]
+        group["owner"] = user
+        old_ids = group["commands"]
+        new_ids = [matchings.get(str(old_id)) for old_id in old_ids if matchings.get(str(old_id)) is not None]
+        group["commands"] = new_ids
+        obj_ins = command_group_insert("pollenisator", group, user)
+        if not obj_ins["res"]:
+            failed.append(group)
+    return failed
+
+@permission("user")
+def importCommandsForWorker(upfile, **kwargs):
+    data = upfile.stream.read()
+    return doImportCommands(data, "Worker")
+    
+@permission("user")
+def importCommands(upfile, **kwargs):
+    user = kwargs["token_info"]["sub"]
+    data = upfile.stream.read()
+    return doImportCommands(data, user)
+    
+def doExportCommands(user):
+    mongoInstance = MongoCalendar.getInstance()
+    res = {"commands":[], "command_groups":[]}
+    commands = mongoInstance.findInDb("pollenisator", "commands", {"owner":user}, True)
+    for command in commands:
+        c = command
+        del c["owner"]
+        if "users" in c:
+            del c["users"]
+        res["commands"].append(c)
+    g_commands = mongoInstance.findInDb("pollenisator", "group_commands", {"owner":user}, True)
+    for g_command in g_commands:
+        g = g_command
+        res["command_groups"].append(g)
+    return res
+
+@permission("user")
+def exportCommands(**kwargs):
+    user = kwargs["token_info"]["sub"]
+    return doExportCommands(user)
+    
+
+@permission("user")
+def exportCommandsForWorker(**kwargs):
+    return doExportCommands("Worker")
 
 @permission("pentester", "body.fromDb")
 def copyDb(body):

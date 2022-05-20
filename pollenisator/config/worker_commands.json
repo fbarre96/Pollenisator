@@ -1,0 +1,788 @@
+{
+  "command_groups": [
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649ea",
+      "commands": [
+        "6257ef56bb36517ae7e649c0",
+        "6257ef56bb36517ae7e649c2",
+        "6257ef56bb36517ae7e649c3",
+        "6257ef56bb36517ae7e649c4",
+        "6257ef56bb36517ae7e649c5",
+        "6257ef56bb36517ae7e649e9",
+        "627b7df1878da1ccea8fb607"
+      ],
+      "max_thread": 4,
+      "name": "Nmaps",
+      "owner": "Worker",
+      "sleep_between": 0
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649eb",
+      "commands": [
+        "6257ef56bb36517ae7e649c0",
+        "6257ef56bb36517ae7e649c1",
+        "6257ef56bb36517ae7e649c2",
+        "6257ef56bb36517ae7e649c3",
+        "6257ef56bb36517ae7e649c4",
+        "6257ef56bb36517ae7e649c5",
+        "6257ef56bb36517ae7e649c6",
+        "6257ef56bb36517ae7e649c7",
+        "6257ef56bb36517ae7e649c8",
+        "6257ef56bb36517ae7e649c9",
+        "6257ef56bb36517ae7e649ca",
+        "6257ef56bb36517ae7e649cb",
+        "6257ef56bb36517ae7e649cc",
+        "6257ef56bb36517ae7e649cd",
+        "6257ef56bb36517ae7e649ce",
+        "6257ef56bb36517ae7e649cf",
+        "6257ef56bb36517ae7e649d0",
+        "6257ef56bb36517ae7e649d1",
+        "6257ef56bb36517ae7e649d2",
+        "6257ef56bb36517ae7e649d3",
+        "6257ef56bb36517ae7e649d4",
+        "6257ef56bb36517ae7e649d5",
+        "6257ef56bb36517ae7e649d6",
+        "6257ef56bb36517ae7e649d7",
+        "6257ef56bb36517ae7e649d8",
+        "6257ef56bb36517ae7e649d9",
+        "6257ef56bb36517ae7e649da",
+        "6257ef56bb36517ae7e649db",
+        "6257ef56bb36517ae7e649dc",
+        "6257ef56bb36517ae7e649dd",
+        "6257ef56bb36517ae7e649de",
+        "6257ef56bb36517ae7e649df",
+        "6257ef56bb36517ae7e649e0",
+        "6257ef56bb36517ae7e649e1",
+        "6257ef56bb36517ae7e649e2",
+        "6257ef56bb36517ae7e649e3",
+        "6257ef56bb36517ae7e649e4",
+        "6257ef56bb36517ae7e649e5",
+        "6257ef56bb36517ae7e649e6",
+        "6257ef56bb36517ae7e649e7",
+        "6257ef56bb36517ae7e649e8",
+        "6257ef56bb36517ae7e649e9",
+        "627b7df1878da1ccea8fb607"
+      ],
+      "max_thread": 10,
+      "name": "ALL",
+      "owner": "Worker",
+      "sleep_between": 0
+    }
+  ],
+  "commands": [
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649c0",
+      "bin_path": "nmap",
+      "indb": "pollenisator",
+      "lvl": "network",
+      "max_thread": 1,
+      "name": "nmap",
+      "plugin": "Nmap",
+      "ports": "",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-n -v -sT -sV -T3 -Pn --randomize-hosts -p21,22,23,25,53,80,81,88,139,389,443,445,513,514,587,636,990,1080,1099,1194,3128,3389,4443,5900,5985,5986,8000,8001,8009,8080,8081,8443,9000,9999,10443 |scope|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649c1",
+      "bin_path": "bluekeep",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 1,
+      "name": "bluekeep",
+      "plugin": "BlueKeep",
+      "ports": "3389",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-p |port| |ip|",
+      "timeout": 300,
+      "types": [
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649c2",
+      "bin_path": "nmap",
+      "indb": "pollenisator",
+      "lvl": "network",
+      "max_thread": 4,
+      "name": "Nmap.top_udp",
+      "neededDir": "|scope.wave_id|/nmap/|scope.scope_dir|/",
+      "plugin": "Nmap",
+      "ports": "",
+      "priority": 99,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-n -v -sU --top-ports 100 -sV -Pn |scope|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649c6",
+      "bin_path": "nmap",
+      "indb": "pollenisator",
+      "lvl": "network",
+      "max_thread": 4,
+      "name": "Nmap.all.tcp",
+      "neededDir": "|scope.wave_id|/nmap/|scope.scope_dir|/",
+      "plugin": "Nmap",
+      "ports": "",
+      "priority": 98,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-n -v -sT -sV -Pn --randomize-hosts -p- |scope|",
+      "timeout": 1200,
+      "types": [
+        "Web"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649c7",
+      "bin_path": "whatweb",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 10,
+      "name": "WhatWeb.http",
+      "neededDir": "|scope.wave_id|/whatweb/",
+      "plugin": "WhatWeb",
+      "ports": "http",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-a 3 http://|ip|:|port|",
+      "timeout": 30,
+      "types": [
+        "Web"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649c8",
+      "bin_path": "testssl",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 10,
+      "name": "TestSSL",
+      "neededDir": "|scope.wave_id|/testssl/",
+      "plugin": "TestSSL",
+      "ports": "ssl,https,http/ssl,ssl/http,ssl/ssl,ssl/https",
+      "priority": 2,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "|ip|:|port|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649c9",
+      "bin_path": "nikto",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 3,
+      "name": "Nikto",
+      "neededDir": "|scope.wave_id|/nikto/",
+      "plugin": "Nikto",
+      "ports": "http,https,ssl/http,http/ssl,ssl/ssl,ssl/https",
+      "priority": 3,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-h |ip| -port |port|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649ca",
+      "bin_path": "dig",
+      "indb": "pollenisator",
+      "lvl": "ip",
+      "max_thread": 10,
+      "name": "digReverseLookUp",
+      "neededDir": "|scope.wave_id|/ReverseLookUp/|scope.ip|/",
+      "plugin": "DigReverseLookup",
+      "ports": "",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-x |ip|",
+      "timeout": 10,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649cb",
+      "bin_path": "python",
+      "indb": "pollenisator",
+      "lvl": "ip",
+      "max_thread": 10,
+      "name": "pythonReverseLookUp",
+      "neededDir": "|scope.wave_id|/ReverseLookUp/|scope.ip|/",
+      "plugin": "PythonReverseLookup",
+      "ports": "",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-c \"import socket; print('pythonReverseLookup//|ip|//'+str(socket.gethostbyaddr('|ip|')))\"",
+      "timeout": 10,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649cc",
+      "bin_path": "dirsearch.py",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 3,
+      "name": "Dirsearch.http",
+      "neededDir": "|scope.wave_id|/Dirsearch/|scope.scope_dir|/|scope.ip_dir|/|scope.port|/",
+      "plugin": "Dirsearch",
+      "ports": "http",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-u http://|ip|:|port|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649cd",
+      "bin_path": "dirsearch.py",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 3,
+      "name": "Dirsearch.https",
+      "neededDir": "|scope.wave_id|/Dirsearch/|scope.scope_dir|/|scope.ip_dir|/|scope.port|/",
+      "plugin": "Dirsearch",
+      "ports": "https,http/ssl,ssl/http,ssl/ssl,ssl/https,ssl/http",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-u https://|ip|:|port|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649ce",
+      "bin_path": "whatweb",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 5,
+      "name": "WhatWeb.https",
+      "neededDir": "|scope.wave_id|/whatweb/",
+      "plugin": "WhatWeb",
+      "ports": "https,http/ssl,ssl/http,ssl/ssl,ssl/https",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-a 3 https://|ip|:|port|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649cf",
+      "bin_path": "ssh_scan",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 10,
+      "name": "ssh_scan",
+      "neededDir": "|scope.wave_id|/|scope.scope_dir|/|scope.ip_dir|/ssh_scan",
+      "plugin": "SSHScan",
+      "ports": "ssh",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-t |ip| -p |port|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649d0",
+      "bin_path": "crtsh.py",
+      "indb": "pollenisator",
+      "lvl": "domain",
+      "max_thread": 10,
+      "name": "crtsh",
+      "neededDir": "|scope.wave_id|/DiscoverDomains/crtsh/",
+      "plugin": "Crtsh",
+      "ports": "",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "--domains |parent_domain| --verbose",
+      "timeout": 30,
+      "types": [
+        "Web"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649d1",
+      "bin_path": "knockpy",
+      "indb": "pollenisator",
+      "lvl": "domain",
+      "max_thread": 5,
+      "name": "Knockpy",
+      "neededDir": "|scope.wave_id|/DiscoverDomains/Knockpy/",
+      "plugin": "Knockpy",
+      "ports": "",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "|parent_domain|",
+      "timeout": 300,
+      "types": [
+        "Web"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649d2",
+      "bin_path": "sublist3r",
+      "indb": "pollenisator",
+      "lvl": "domain",
+      "max_thread": 5,
+      "name": "Sublist3r",
+      "neededDir": "|scope.wave_id|/DiscoverDomains/Sublist3r/",
+      "plugin": "Sublist3r",
+      "ports": "",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-d |parent_domain|",
+      "timeout": 300,
+      "types": [
+        "Web"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649d3",
+      "bin_path": "nmap",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 5,
+      "name": "Nmap.services",
+      "neededDir": "|scope.wave_id|/|scope.scope_dir|/|scope.ip_dir|/DiscoverService/|scope.port|/",
+      "plugin": "Nmap",
+      "ports": "unknown,tcpwrapped,ssl/unknown",
+      "priority": 2,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-sV --version-all -p |port| |ip|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649d4",
+      "bin_path": "nmap",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 3,
+      "name": "Nmap.services_scripts",
+      "neededDir": "|scope.wave_id|/|scope.scope_dir|/|scope.ip_dir|/DiscoverService/|scope.port|/",
+      "plugin": "Nmap",
+      "ports": "unknown,tcpwrapped,ssl/unknown",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-vvv -A --reason --script=\"+(safe or default) and not broadcast\" -p |port| |ip|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649d5",
+      "bin_path": "nmap",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 3,
+      "name": "Nmap.services.udp",
+      "neededDir": "|scope.wave_id|/|scope.scope_dir|/",
+      "plugin": "Nmap",
+      "ports": "udp/unknown",
+      "priority": 99,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-sV -sU --version-all -p |port| |ip|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649d6",
+      "bin_path": "nmap",
+      "indb": "pollenisator",
+      "lvl": "ip",
+      "max_thread": 4,
+      "name": "Nmap.ip.allTcp",
+      "neededDir": "|scope.wave_id|/|scope.scope_dir|/|scope.ip_dir|/",
+      "plugin": "Nmap",
+      "ports": "",
+      "priority": 90,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-n -v -sT -sV -T3 -Pn --randomize-hosts -p- |ip|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649d7",
+      "bin_path": "nmap",
+      "indb": "pollenisator",
+      "lvl": "ip",
+      "max_thread": 4,
+      "name": "Nmap.ip.udp",
+      "neededDir": "|scope.wave_id|/|scope.scope_dir|/|scope.ip_dir|/",
+      "plugin": "Nmap",
+      "ports": "",
+      "priority": 91,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-n -v -sV -sU -Pn --randomize-hosts --top-ports 100 |ip|",
+      "timeout": 300,
+      "types": [
+        "Web"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649d8",
+      "bin_path": "nmap",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 10,
+      "name": "http-methods",
+      "neededDir": "|scope.wave_id|/|scope.scope_dir|/|scope.ip_dir|/|scope.port|/",
+      "plugin": "Nmap",
+      "ports": "http,ssl/ssl,http/ssl,ssl/http,https,ssl/https",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-p |port| --script http-methods |ip|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649d9",
+      "bin_path": "nmap",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 10,
+      "name": "ftp-anon",
+      "neededDir": "|scope.wave_id|/|scope.scope_dir|/|scope.ip_dir|/|scope.port|/ftp/",
+      "plugin": "Nmap",
+      "ports": "ftp",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-Pn -n -sT -sV -p |port| --script ftp-anon |ip|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649da",
+      "bin_path": "smbmap",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 10,
+      "name": "smbmap",
+      "neededDir": "|scope.wave_id|/|scope.scope_dir|/|scope.ip_dir|/smb/",
+      "plugin": "SmbMap",
+      "ports": "445,smb,samba,netbios-ssn",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-u '' -p '' -d '' -H |ip| -R",
+      "timeout": 300,
+      "types": [
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649db",
+      "bin_path": "nmap",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 10,
+      "name": "smb-enum-users",
+      "neededDir": "|scope.wave_id|/|scope.scope_dir|/|scope.ip_dir|/smb/",
+      "plugin": "Nmap",
+      "ports": "smb,445,139,netbios-ssn",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-Pn -n -sT -sV -p |port| --script smb-enum-users.nse |ip|",
+      "timeout": 300,
+      "types": [
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649dc",
+      "bin_path": "enum4linux.pl",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 5,
+      "name": "enum4linux",
+      "neededDir": "|scope.wave_id|/|scope.scope_dir|/|scope.ip_dir|/smb/",
+      "plugin": "Enum4Linux",
+      "ports": "445,139,netbios-ssn",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-a |ip|",
+      "timeout": 300,
+      "types": [
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649dd",
+      "bin_path": "nmap",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 3,
+      "name": "nmap-script-vuln",
+      "neededDir": "|scope.wave_id|/|scope.scope_dir|/|scope.ip|/vulns/",
+      "plugin": "Nmap",
+      "ports": "445,netbios-ssn",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-p|port| --script vuln |ip|",
+      "timeout": 300,
+      "types": [
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649de",
+      "bin_path": "sudo ikescan",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 10,
+      "name": "ike-scan",
+      "neededDir": "|scope.wave_id|/|scope.scope_dir|/|scope.ip_dir|/udp_|scope.port|/",
+      "plugin": "Default",
+      "ports": "udp/500,udp/isakmp",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-M -A |ip| --id=blah -P",
+      "timeout": 300,
+      "types": [
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649e0",
+      "bin_path": "cme",
+      "indb": "pollenisator",
+      "lvl": "network",
+      "max_thread": 4,
+      "name": "CME.recon",
+      "neededDir": "|scope.wave_id|/|scope.scope_dir|/crackmapexec/",
+      "plugin": "CME",
+      "ports": "",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "smb |scope|",
+      "timeout": 300,
+      "types": [
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649e1",
+      "bin_path": "nmap",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 5,
+      "name": "eternalblue",
+      "neededDir": "|scope.wave_id|/|scope.scope_dir|/eternalblue/",
+      "plugin": "EternalBlue",
+      "ports": "445,139",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-Pn -n -sT -p |port| --script smb-vuln-ms17-010 --open |ip|",
+      "timeout": 300,
+      "types": [
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649e3",
+      "bin_path": "searchsploit",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 5,
+      "name": "searchsploit",
+      "plugin": "SearchSploit",
+      "ports": "1-65535",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "\"|port.product|\" --json",
+      "timeout": 10,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649e4",
+      "bin_path": "dnsrecon",
+      "indb": "pollenisator",
+      "lvl": "network",
+      "max_thread": 3,
+      "name": "dnsrecon",
+      "plugin": "dnsrecon",
+      "ports": "",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-r |scope|",
+      "timeout": 300,
+      "types": [
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649e5",
+      "bin_path": "smbmap",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 5,
+      "name": "smbmap_anon",
+      "plugin": "SmbMap",
+      "ports": "445",
+      "priority": 1,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-u 'anonymous' -p '' -H |ip| -R",
+      "timeout": 300,
+      "types": [
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649e6",
+      "bin_path": "nuclei",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 1,
+      "name": "nuclei.http",
+      "plugin": "Nuclei",
+      "ports": "80,http",
+      "priority": 10,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-u http://|ip|:|port|",
+      "timeout": 300,
+      "types": [
+        "Web"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649e7",
+      "bin_path": "nuclei",
+      "indb": "pollenisator",
+      "lvl": "port",
+      "max_thread": 1,
+      "name": "nuclei.https",
+      "plugin": "Nuclei",
+      "ports": "https,http/ssl,ssl/http,ssl/ssl,ssl/https,ssl/http,ssl/ssl",
+      "priority": 10,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-u https://|ip|:|port|",
+      "timeout": 300,
+      "types": [
+        "Web"
+      ]
+    },
+    {
+      "_id": "ObjectId|6257ef56bb36517ae7e649e9",
+      "bin_path": "nmap",
+      "indb": "pollenisator",
+      "lvl": "network",
+      "max_thread": 4,
+      "name": "Nmap.tcp",
+      "neededDir": "|scope.wave_id|/nmap/|scope.scope_dir|/",
+      "plugin": "Nmap",
+      "ports": "",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-n -v -sT -sV -T3 -Pn --randomize-hosts -p21,22,23,25,53,80,81,88,139,389,443,445,513,514,587,636,990,1080,1099,1194,3128,3389,4443,5900,5985,5986,8000,8001,8009,8080,8081,8443,9000,9999,10443,1 |scope|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|627b7df1878da1ccea8fb607",
+      "bin_path": "nmap",
+      "indb": "pollenisator",
+      "lvl": "network",
+      "max_thread": 3,
+      "name": "Nmap.ping-sweep",
+      "plugin": "Nmap",
+      "ports": "",
+      "priority": 0,
+      "safe": true,
+      "sleep_between": 0,
+      "text": "-n -sP |scope|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    }
+  ]
+}

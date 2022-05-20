@@ -1,4 +1,5 @@
 """Module for orchestrating an automatic scan. Must be run in a separate thread/process."""
+import logging
 import time
 import pstats
 import io
@@ -10,7 +11,7 @@ from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.server.ServerModels.Interval import ServerInterval
 from pollenisator.server.ServerModels.Command import ServerCommand
 from pollenisator.server.ServerModels.CommandGroup import ServerCommandGroup
-from pollenisator.server.ServerModels.Tool import ServerTool, getNbOfLaunchedCommand, launchTask, stopTask
+from pollenisator.server.ServerModels.Tool import ServerTool, launchTask, stopTask
 from pollenisator.server.ServerModels.Scope import ServerScope
 from pollenisator.server.ServerModels.Ip import ServerIp
 from pollenisator.server.permission import permission
@@ -25,7 +26,7 @@ def startAutoScan(pentest, **kwargs):
     autoscanRunning = mongoInstance.find("autoscan", {"special":True}, False) is not None
     if autoscanRunning:
         return "An auto scan is already running", 403
-    workers = mongoInstance.getWorkers({"pentests":pentest})
+    workers = mongoInstance.getWorkers({"pentest":pentest})
     if workers is None:
         return "No worker registered for this pentest", 404
     mongoInstance.insert("autoscan", {"start":datetime.now(), "special":True})
@@ -52,26 +53,25 @@ def autoScan(pentest, endoded_token):
         while check:
             launchableTools, waiting = findLaunchableTools(pentest)
             launchableTools.sort(key=lambda tup: (tup["timedout"], int(tup["priority"])))
-            #TODO CHECK SPACE 
             for launchableTool in launchableTools:
                 check = getAutoScanStatus(pentest)
                 if not check:
                     break
-                res, statuscode = launchTask(pentest, launchableTool["tool"].getId(), {"checks":True, "plugin":""}, worker_token=endoded_token)
+                res, statuscode = launchTask(pentest, launchableTool["tool"].getId(), {"checks":True}, worker_token=endoded_token)
             check = getAutoScanStatus(pentest)
             time.sleep(3)
     except(KeyboardInterrupt, SystemExit):
-        print("stop autoscan : Kill received...")
+        logging.info("stop autoscan : Kill received...")
         mongoInstance.delete("autoscan", {}, True)
     except Exception as e:
-        print(str(e))
+        logging.error(str(e))
 
 @permission("pentester")
 def stopAutoScan(pentest):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     toolsRunning = []
-    workers = mongoInstance.getWorkers({"pentests":pentest})
+    workers = mongoInstance.getWorkers({"pentest":pentest})
     for worker in workers:
         tools = mongoInstance.find("tools", {"scanner_ip": worker["name"], "status":"running"}, True)
         for tool in tools:

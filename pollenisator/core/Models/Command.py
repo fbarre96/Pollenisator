@@ -17,24 +17,26 @@ class Command(Element):
         Args:
             valueFromDb: a dict holding values to load into the object. A mongo fetched command is optimal.
                         possible keys with default values are : _id (None), parent (None), tags([]), infos({}), name(""), sleep_between("0"), priority("0),
-                        max_thread("1"), text(""), lvl("network"), ports(""), safe(True), types([]), indb="pollenisator", timeout="300"
+                        max_thread("1"), text(""), lvl("network"), ports(""), safe(True), types([]), indb="pollenisator", owner="",timeout="300"
         """
         if valuesFromDb is None:
             valuesFromDb = dict()
         super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None),  valuesFromDb.get(
             "tags", []), valuesFromDb.get("infos", {}))
-        self.initialize(valuesFromDb.get("name", ""), valuesFromDb.get("sleep_between", 0),
+        self.initialize(valuesFromDb.get("name", ""), valuesFromDb.get("bin_path", ""), valuesFromDb.get("plugin", ""), valuesFromDb.get("sleep_between", 0),
                         valuesFromDb.get("priority", 0), valuesFromDb.get(
                             "max_thread", 1),
                         valuesFromDb.get("text", ""), valuesFromDb.get(
                             "lvl", "network"),
                         valuesFromDb.get("ports", ""),
-                        bool(valuesFromDb.get("safe", True)), valuesFromDb.get("types", []), valuesFromDb.get("indb", "pollenisator"), valuesFromDb.get("timeout", 300), valuesFromDb.get("infos", {}))
+                        bool(valuesFromDb.get("safe", True)), valuesFromDb.get("types", []), valuesFromDb.get("indb", "pollenisator"), valuesFromDb.get("owner", ""), valuesFromDb.get("timeout", 300), valuesFromDb.get("infos", {}))
 
-    def initialize(self, name, sleep_between=0, priority=0, max_thread=1, text="", lvl="network", ports="", safe=True, types=None, indb=False, timeout=300, infos=None):
+    def initialize(self, name, bin_path, plugin="Default", sleep_between=0, priority=0, max_thread=1, text="", lvl="network", ports="", safe=True, types=None, indb=False, owner="", timeout=300, infos=None):
         """Set values of command
         Args:
             name: the command name
+            bin_path: local command, binary path or command line
+            plugin: plugin that goes with this command
             sleep_between: delay to wait between two call to this command. Default is 0
             priority: priority of the command (0 is highest). Default is 0
             max_thread: number of parallel execution possible of this command. Default is 1
@@ -44,12 +46,15 @@ class Command(Element):
             safe: True or False with True as default. Indicates if autoscan is authorized to launch this command.
             types: type for the command. Lsit of string. Default to None.
             indb: db name : global (pollenisator database) or  local pentest database
+            owner: the user owning this command
             timeout: a timeout to kill stuck tools and retry them later. Default is 300 (in seconds)
             infos: a dictionnary with key values as additional information. Default to None
         Returns:
             this object
         """
         self.name = name
+        self.bin_path = bin_path
+        self.plugin = plugin
         self.sleep_between = sleep_between
         self.priority = priority
         self.max_thread = max_thread
@@ -59,6 +64,7 @@ class Command(Element):
         self.safe = bool(safe)
         self.infos = infos if infos is not None else {}
         self.indb = indb
+        self.owner = owner
         self.timeout = timeout
         self.types = types if types is not None else []
         return self
@@ -70,11 +76,11 @@ class Command(Element):
         Returns:
             Returns the command's name string.
         """
-        return self.name
+        return self.owner+":"+self.name
 
     def getDbKey(self):
         """Return a dict from model to use as unique composed key.
         Returns:
             A dict (1 key :"name")
         """
-        return {"name": self.name}
+        return {"name": self.name, "owner":self.owner}

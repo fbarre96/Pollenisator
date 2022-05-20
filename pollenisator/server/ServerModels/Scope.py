@@ -36,7 +36,7 @@ class ServerScope(Scope, ServerElement):
         res = mongoInstance.find("waves", {"wave": self.wave}, False)
         return res["_id"]
 
-    def addAllTool(self, command_name):
+    def addAllTool(self, command_iid):
         """
         Add the appropriate tools (level check and wave's commands check) for this scope.
         Args:
@@ -45,24 +45,26 @@ class ServerScope(Scope, ServerElement):
         mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(self.pentest)
         command = mongoInstance.findInDb(self.pentest, "commands", {
-                                         "name": command_name}, False)
+                                         "_id": ObjectId(command_iid)}, False)
+        if command is None:
+            return
         if command["lvl"] == "network":
             newTool = ServerTool(self.pentest)
             newTool.initialize(
-                command["name"], self.wave, self.scope, "", "", "", "network")
+                command_iid, self.wave, None, self.scope, "", "", "", "network")
             newTool.addInDb()
             return
         if command["lvl"] == "domain":
             if not isNetworkIp(self.scope):
                 newTool = ServerTool(self.pentest)
                 newTool.initialize(
-                    command["name"], self.wave, self.scope, "", "", "", "domain")
+                    command_iid, self.wave, None, self.scope, "", "", "", "domain")
                 newTool.addInDb()
             return
         ips = self.getIpsFitting()
         for ip in ips:
             i = ServerIp(self.pentest, ip)
-            i.addAllTool(command_name, self.wave, self.scope)
+            i.addAllTool(command_iid, self.wave, self.scope)
 
     def getIpsFitting(self):
         """Returns a list of ip mongo dict fitting this scope
@@ -137,9 +139,8 @@ def insert(pentest, body):
     # adding the appropriate tools for this scope.
     wave = mongoInstance.find("waves", {"wave": scope_o.wave}, False)
     commands = wave["wave_commands"]
-    for commName in commands:
-        if commName.strip() != "":
-            scope_o.addAllTool(commName)
+    for comm_iid in commands:
+        scope_o.addAllTool(comm_iid)
     # Testing this scope against every ips
     ips = mongoInstance.find("ips", {})
     for ip in ips:
@@ -153,4 +154,5 @@ def insert(pentest, body):
 def update(pentest, scope_iid, body):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
-    return mongoInstance.update("scopes", {"_id":ObjectId(scope_iid)}, {"$set":body}, False, True)
+    mongoInstance.update("scopes", {"_id":ObjectId(scope_iid)}, {"$set":body}, False, True)
+    return True

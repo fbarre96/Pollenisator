@@ -4,6 +4,21 @@ from pollenisator.core.plugins.plugin import Plugin
 from pollenisator.server.ServerModels.Ip import ServerIp
 import re
 
+def parseContent(file_opened):
+    ret = set()
+    for line in file_opened:
+        line = line.decode("utf-8")
+        domainGroup = re.search(
+            r"((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9])", line.strip())
+        if domainGroup is not None:
+            # a domain has been found
+            domain = domainGroup.group(1)
+            if line.strip() != domain.strip():
+                return set()
+            ret.add(domain)
+        else:
+            return set()
+    return ret
 
 class Sublist3r(Plugin):
     def getFileOutputArg(self):
@@ -11,7 +26,7 @@ class Sublist3r(Plugin):
         Returns:
             string
         """
-        return " > "
+        return " -n -o "
 
     def getFileOutputExt(self):
         """Returns the expected file extension for this command result file
@@ -29,6 +44,9 @@ class Sublist3r(Plugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
+
+    
+
     def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
@@ -43,34 +61,15 @@ class Sublist3r(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         notes = ""
-        tags = ["todo"]
-        countInserted = 0
-        markerSublister = "# Coded By Ahmed Aboul-Ela - @aboul3la"
-        markerFound = False
-        for line in file_opened:
-            line = line.decode("utf-8")
-            if markerSublister in line:
-                markerFound = True
-            if not markerFound:
-                continue
-            if line.startswith("\x1b[92m"):
-                line = line[len("\x1b[92m"):]
-            if line.endswith("\x1b[0m"):
-                line = line[:-1*len("\x1b[0m")]
-            domainGroup = re.search(
-                r"((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9])", line.strip())
-            if domainGroup is not None:
-                # a domain has been found
-                domain = domainGroup.group(1)
-                insert_res = ServerIp().initialize(domain).addInDb()
-                # failed, domain is out of wave, still noting thi
-                if not insert_res["res"]:
-                    notes += domain+" exists but already added.\n"
-                else:
-                    countInserted += 1
-                    notes += domain+" inserted.\n"
+        tags = ["found-domains-info"]
+        ret = parseContent(file_opened)
+        for domain in ret:
+            insert_res = ServerIp().initialize(domain.strip()).addInDb()
+            # failed, domain is out of wave, still noting thi
+            if not insert_res["res"]:
+                notes += domain+" exists but already added.\n"
+            else:
+                notes += domain+" inserted.\n"
         if notes.strip() == "":
-            return None, None, None, None
-        if not markerFound:
             return None, None, None, None
         return notes, tags, "wave", {"wave": None}

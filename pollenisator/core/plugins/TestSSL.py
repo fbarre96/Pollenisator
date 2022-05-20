@@ -62,14 +62,9 @@ def parseWarnings(pentest, file_opened):
                     "ip": ip, "port": port, "proto": "tcp"}
                 missconfiguredHosts[ip][port].sort()
                 notes = "\n".join(missconfiguredHosts[ip][port])
-                res, _ = ServerDefect().initialize(ip, port, "tcp", "SSL/TLS implementation flaws",
-                                            "Arduous", "Major", "Important", "N/A", ["Base"], notes=notes, proofs=[]).addInDb()
-                if not res:
-                    p_o.updateInfos({"compliant": "False"})
-                    defect_o = ServerDefect.fetchObject(
-                        {"ip": ip, "title": "SSL/TLS implementation flaws", "port": port, "proto": "tcp"})
-                    defect_o.notes += notes
-                    defect_o.update()
+                p_o.addTag("SSL/TLS-flaws")
+                p_o.updateInfos({"compliant": "False"})
+                
         if firstLine:
             return None, None
     return str(len(missconfiguredHosts.keys()))+" misconfigured hosts found. Defects created.", targets

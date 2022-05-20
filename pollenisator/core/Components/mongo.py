@@ -5,8 +5,9 @@ import datetime
 from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError, OperationFailure
 import pollenisator.core.Components.Utils as Utils
-import json
 import sys
+import json
+import logging
 
 
 class MongoCalendar:
@@ -78,16 +79,17 @@ class MongoCalendar:
 
     def setWorkerInclusion(self, name, db, setInclusion):
         if setInclusion:
-            return self.updateInDb("pollenisator", "workers", {"name": name}, {
-                            "$push": {"pentests": db}}, False, True)
+            self.updateInDb("pollenisator", "workers", {"name": name}, {
+                            "$set": {"pentest": db}}, False, True)
         else:
-            return self.updateInDb("pollenisator", "workers", {"name": name}, {
-                            "$pull": {"pentests": db}}, False, True)
+            self.updateInDb("pollenisator", "workers", {"name": name}, {
+                            "$set": {"pentest": ""}}, False, True)
+        return True
 
     def deleteWorker(self, worker_hostname):
         """Remove given worker.
         Args:
-            worker_hostname: the worker shortname to update."""
+            worker_hostname: the worker name to update."""
         res = self.deleteFromDb("pollenisator", "workers", {
             "name": worker_hostname}, False, True)
         return res
@@ -119,7 +121,6 @@ class MongoCalendar:
         """
         if self.client is not None:
             return
-        dir_path = os.path.dirname(os.path.realpath(__file__))
         cfg = config if config is not None else Utils.loadServerConfig()
         try:
             self.host = str(cfg["host"])
@@ -127,12 +128,14 @@ class MongoCalendar:
             self.password = str(cfg["password"])
             self.user = str(cfg["user"])
             self.ssl = str(cfg["ssl"])
+
             connectionString = ""
             if self.user != "":
                 connectionString = self.user+':'+self.password+'@'
             self.calendarName = None
             try:
                 if cfg["ssl"].strip() != "":
+
                     self.ssldir = cfg["ssl"].strip()
                     self.client = MongoClient('mongodb://'+connectionString+self.host+":"+self.port, ssl=True, ssl_certfile=os.path.join(
                         self.ssldir, "client.pem"), ssl_cert_reqs=ssl.CERT_REQUIRED, ssl_ca_certs=os.path.join(self.ssldir, "ca.pem"), serverSelectionTimeoutMS=timeoutInMS, socketTimeoutMS=2000, connectTimeoutMS=2000)
@@ -143,6 +146,7 @@ class MongoCalendar:
                 return True and self.client is not None and server_info is not None
             except ServerSelectionTimeoutError as e:  # Unable to connect
                 print(f"Unable to connect to the database:\nPlease check the mongo db is up and reachable and your configuration file is correct: \n{os.path.normpath(Utils.getServerConfigFolder())}/server.cfg")
+                print(e)
                 sys.exit(0)
             except OperationFailure as e:  #  Authentication failed
                 raise e
@@ -180,31 +184,25 @@ class MongoCalendar:
         """Remove the given worker shortname from database.
         Args:
             worker_name: the worker shortname to be deleted from database."""
-        print("Remove worker as offline received")
+        
         self.deleteFromDb("pollenisator", "workers", {
             "name": worker_name}, False, True)
 
-    def registerCommands(self, worker_name, command_names):
-        """Update or insert the worker name with given commands.
-        Args:
-            worker_name: the worker shortname.
-            command_names: a list of commands that the worker want to register."""
+    def registerWorker(self, worker_name):
+        from pollenisator.server.worker import doSetInclusion
         try:
             if self.client is None:
                 self.connect()
                 if self.client is None:
-                    raise IOError("Failed to register commands")
-            res = self.findInDb("pollenisator", "workers", {
-                "name": worker_name}, False)
-            worker_shortname = worker_name.split("@")[0]
-            if res is not None:
-                self.updateInDb("pollenisator", "workers",
-                                {"name": worker_name}, {"$set": {"registeredCommands": command_names}}, False, True)
+                    raise IOError("Failed to register Worker")
+            res = self.findInDb("pollenisator", "workers", {"name": worker_name}, False)
+            if res is None:
+                self.insertInDb("pollenisator", "workers", {"name": worker_name, "pentest": ""}, '', True)
             else:
-                self.insertInDb("pollenisator", "workers", {
-                    "name": worker_name, "shortname": worker_shortname, "registeredCommands": command_names, "last_heartbeat":datetime.datetime.now(), "pentests":[]}, '', True)
-            print("Registered commands "+str(command_names) +
-                  " for  "+str(worker_name))
+                self.updateInDb("pollenisator", "workers", {"name": worker_name, "last_heartbeat":datetime.datetime.now(), "pentest":""},
+                    {"$set":{"last_heartbeat":datetime.datetime.now()}}, notify=True)
+                doSetInclusion(worker_name, "Worker", res["pentest"], True)
+            logging.info("Registered worker "+str(worker_name))
             return True
         except IOError as e:
             print("Failed to connect." + str(e))
@@ -212,30 +210,8 @@ class MongoCalendar:
                   self.host + " and has a user mongAdmin with the correct password.")
             self.client = None
             return False
-            
-    def getRegisteredCommands(self, worker_name):
-        """Return the commands list registered by the given worker name
-        Args:
-            worker_name: the wworker shortname.
-        """
-        try:
-            if self.client is None:
-                self.connect()
-                if self.client is None:
-                    raise ServerSelectionTimeoutError()
-            worker_res = self.findInDb("pollenisator", "workers", {
-                "name": worker_name}, False)
-            if worker_res is not None:
-                return worker_res["registeredCommands"]
-        except ServerSelectionTimeoutError as e:
-            print("Failed to connect." + str(e))
-            print("Please verify that the mongod service is running on host " +
-                  self.host + " and has a user mongAdmin with the correct password.")
-            self.client = None
 
-    
-
-    def update(self, collection, pipeline, updatePipeline, many=False, notify=True):
+    def update(self, collection, pipeline, updatePipeline, many=False, notify=True, upsert=False):
         """
         Wrapper for the pymongo update and update_many functions. Then notify observers.
 
@@ -248,9 +224,9 @@ class MongoCalendar:
         Returns:
             Return the pymongo result of the update or update_many function.
         """
-        return self._update(self.calendarName, collection, pipeline, updatePipeline, many=many, notify=notify)
+        return self._update(self.calendarName, collection, pipeline, updatePipeline, many=many, notify=notify, upsert=upsert)
 
-    def updateInDb(self, db, collection, pipeline, updatePipeline, many=False, notify=False):
+    def updateInDb(self, db, collection, pipeline, updatePipeline, many=False, notify=False, upsert=False):
         """
         update something in the database.
         Args:
@@ -264,9 +240,9 @@ class MongoCalendar:
             Return the pymongo result of the find command for the command collection
         """
         self.connect()
-        return self._update(db, collection, pipeline, updatePipeline, many=many, notify=notify)
+        return self._update(db, collection, pipeline, updatePipeline, many=many, notify=notify, upsert=upsert)
 
-    def _update(self, dbName, collection, pipeline, updatePipeline, many=False, notify=True):
+    def _update(self, dbName, collection, pipeline, updatePipeline, many=False, notify=True, upsert=False):
         """
         Wrapper for the pymongo update and update_many functions. Then notify observers  if notify is true.
 
@@ -290,11 +266,14 @@ class MongoCalendar:
                 for elem in elems:
                     self.notify(dbName, collection, elem["_id"], "update")
         else:
-            res = db[collection].update_one(pipeline, updatePipeline)
-            elem = db[collection].find_one(pipeline)
-            if elem is not None:
-                if notify:
-                    self.notify(dbName, collection, elem["_id"], "update")
+            res = db[collection].update_one(pipeline, updatePipeline, upsert=upsert)
+            if upsert and res.upserted_id is not None:
+                self.notify(dbName, collection, res.upserted_id, "insert")
+            else:
+                elem = db[collection].find_one(pipeline)
+                if elem is not None:
+                    if notify:
+                        self.notify(dbName, collection, elem["_id"], "update")
         return res
 
     def insert(self, collection, values, parent=''):
@@ -344,7 +323,6 @@ class MongoCalendar:
         """
         self.connect()
         db = self.client[dbName]
-        print("Insertion "+str(collection)+" "+str(values)+" "+str(notify))
         res = db[collection].insert_one(values)
         if notify:
             self.notify(dbName, collection,
@@ -366,6 +344,12 @@ class MongoCalendar:
         if pipeline is None:
             pipeline = {}
         return self._find(self.db, collection, pipeline, multi)
+
+    def countInDb(self, db, collection, pipeline=None):
+        if pipeline is None:
+            pipeline = {}
+        self.connect()
+        return self.client[db][collection].count_documents(pipeline)
 
     def findInDb(self, db, collection, pipeline=None, multi=True):
         """
@@ -409,7 +393,8 @@ class MongoCalendar:
                 res = db[collection].find(pipeline)
             else:
                 res = db[collection].find_one(pipeline)
-        except TypeError:
+        except TypeError as e:
+            logging.error("ERROR TypeError : "+str(e))
             return None
         return res
 
@@ -637,7 +622,7 @@ class MongoCalendar:
         authorized, msg = self.validateCalendarName(saveAsName.strip().lower())
         # check for forbidden names
         if not authorized:
-            print("LOG : add database attempt failed:", msg)
+            logging.warn("LOG : add database attempt failed:"+str(msg))
             return False, msg
         # check if already exists
         self.connectToDb("pollenisator")
@@ -758,31 +743,78 @@ class MongoCalendar:
             execute(cmd, None, True)
         return msg, 200 if success else 403
 
-    def importCommands(self, filename):
-        """
-        Import a database dump into a calendar database.
-            It uses the mongorestore utily installed with mongodb-org-tools
 
-        Args:
-            filename: the gzip archive name that was exported to be reimported.
+    def getRegisteredTags(self):
+        tags = self.find("settings", {"key":"tags"}, False)
+        if tags is None:
+            return []
+        pentest_tags = list(tags.keys())
+        global_tags = list(self.getGlobalTags().keys())
+        return global_tags+pentest_tags
 
+    def getGlobalTags(self):
+        mongoInstance = MongoCalendar.getInstance()
+        tags = mongoInstance.findInDb("pollenisator", "settings", {"key": "tags"}, False)
+        if tags is not None:
+            if isinstance(tags["value"], dict):
+                return tags["value"]
+            elif isinstance(tags["value"], str):
+                try:
+                    return json.loads(tags["value"])
+                except:
+                    pass
+        return {"todo":"orange", "unscanned":"yellow", "pwned":"red", "Interesting":"dark green", "Uninteresting":"sky blue", "neutral":"white"}
+        
+    def getTagsGroups(self):
+        """Returns groups of tags that may not be applied at the same time
         Returns:
-            returns True if the import is successfull, False
+            List of list of strings
         """
-        from pollenisator.core.Components.Utils import execute
-        if not os.path.isfile(filename):
-            raise IOError("File does not exist")
-        connectionString = '' if self.user.strip() == '' else "-u "+self.user + \
-            " -p "+self.password + " --authenticationDatabase admin "
-        cmd = "mongorestore "+connectionString+"--host " + \
-            self.host+" --archive="+filename+" --gzip"
-        if self.ssl.strip() != "":
-            cmd += " --ssl --sslPEMKeyFile "+self.ssldir+"/client.pem --sslCAFile " + \
-                self.ssldir+"/ca.pem --sslAllowInvalidHostnames"
+        tags = self.getGlobalTags()
+        return [tags, ["hidden"]]
+
+    def doRegisterTag(self, name, color="white", isGlobal=False):
+        if name in self.getRegisteredTags():
+            return False
+        if isGlobal:
+            tags = json.loads(self.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=Utils.JSONDecoder)
+            self.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=Utils.JSONEncoder)}}, many=False, notify=True)
+        else:
+            tags = self.find("settings", {"key":"tags"}, False)
+            if tags is None:
+                self.insert("settings", {"key":"tags", "value":{name:color}})
+            else:
+                tags = tags.get("value", {})
+                if name not in tags:
+                    tags[name] = color
+                    self.update("settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
+        return True    
+
+    # def importCommands(self, filename):
+    #     """
+    #     Import a database dump into a calendar database.
+    #         It uses the mongorestore utily installed with mongodb-org-tools
+
+    #     Args:
+    #         filename: the gzip archive name that was exported to be reimported.
+
+    #     Returns:
+    #         returns True if the import is successfull, False
+    #     """
+    #     from pollenisator.core.Components.Utils import execute
+    #     if not os.path.isfile(filename):
+    #         raise IOError("File does not exist")
+    #     connectionString = '' if self.user.strip() == '' else "-u "+self.user + \
+    #         " -p "+self.password + " --authenticationDatabase admin "
+    #     cmd = "mongorestore "+connectionString+"--host " + \
+    #         self.host+" --archive="+filename+" --gzip"
+    #     if self.ssl.strip() != "":
+    #         cmd += " --ssl --sslPEMKeyFile "+self.ssldir+"/client.pem --sslCAFile " + \
+    #             self.ssldir+"/ca.pem --sslAllowInvalidHostnames"
         
 
-        execute(cmd, None, False)
-        return True
+    #     execute(cmd, None, False)
+    #     return True
 
     def notify(self, db, collection, iid, action, parentId=""):
         """

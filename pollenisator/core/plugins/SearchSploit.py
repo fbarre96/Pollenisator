@@ -11,7 +11,7 @@ class SearchSploit(Plugin):
         Returns:
             string
         """
-        return " > "
+        return " | tee "
 
     def getFileOutputExt(self):
         """Returns the expected file extension for this command result file
@@ -47,6 +47,8 @@ class SearchSploit(Plugin):
         notes = file_opened.read().decode("utf-8")
         try:
             jsonFile = json.loads(notes)
+            if not isinstance(jsonFile, dict):
+                return None, None, None, None
             if jsonFile.get("RESULTS_EXPLOIT", None) is None or jsonFile.get("RESULTS_SHELLCODE", None) is None:
                 return None,None,None,None
             if jsonFile.get("SEARCH", "None") == "None":

@@ -75,14 +75,13 @@ class SSHScan(Plugin):
                         "ip": ip, "port": port, "proto": "tcp"}
                     oneScanIsValid = True
                     if "nopassword" in scan["auth_methods"]:
-                        tags = ["P0wned!"]
+                        tags = ["pwned"]
                     # Will not exit if port was not ssh
                     is_ok = scan["compliance"]["compliant"]
                     if str(is_ok) == "False":
                         port_o.updateInfos({"compliant": "False"})
                         port_o.updateInfos({"auth_methods": scan["auth_methods"]})
-                        ServerDefect().initialize(ip, port, "tcp", "SSH configuration implementation flaws",
-                                            "Arduous", "Major", "Important",  "N/A", ["Base"], notes=notes, proofs=[]).addInDb()
+                        port_o.addTag("SSH-flaw")
             except KeyError:
                 continue
         if not oneScanIsValid:

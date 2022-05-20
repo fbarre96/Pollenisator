@@ -80,7 +80,7 @@ class Dirsearch(Plugin):
         Returns:
             string
         """
-        return " --plain-text-report "
+        return " --format=plain -o "
 
     def getFileOutputExt(self):
         """Returns the expected file extension for this command result file
@@ -112,7 +112,7 @@ class Dirsearch(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
-        tags = ["todo"]
+        tags = ["todo-dirsearch"]
         data = file_opened.read().decode("utf-8")
         notes = ""
         if data.strip() == "":
@@ -139,9 +139,10 @@ class Dirsearch(Plugin):
                     newInfos = {}
                     for statuscode in hosts[host][port]:
                         if isinstance(statuscode, int):
-                            if hosts[host][port].get(statuscode, []):
-                                newInfos["Dirsearch_"+str(statuscode)
-                                         ] = hosts[host][port][statuscode]
+                            if statuscode != 404:
+                                if hosts[host][port].get(statuscode, []):
+                                    newInfos["Dirsearch_"+str(statuscode)
+                                            ] = hosts[host][port][statuscode]
                     newInfos["SSL"] = "True" if hosts[host][port]["service"] == "https" else "False"
                     port_o.updateInfos(newInfos)
         return notes, tags, "port", targets

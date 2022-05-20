@@ -14,7 +14,7 @@ class BlueKeep(Plugin):
         Returns:
             string
         """
-        return " > "
+        return " | tee "
 
     def getFileOutputExt(self):
         """Returns the expected file extension for this command result file
@@ -53,7 +53,7 @@ class BlueKeep(Plugin):
         # 5. Parse the file has you want.
         # Here add a note to the tool's notes of each warnings issued by this testssl run.
         notes = ""
-        tags = ["Neutral"]
+        tags = ["neutral"]
         targets = {}
         for line in file_opened:
             # Auto Detect
@@ -74,15 +74,15 @@ class BlueKeep(Plugin):
                 targets[str(p_o.getId())] = {"ip": ip, "port": kwargs.get(
                     "port", None), "proto": kwargs.get("proto", None)}
             if "VULNERABLE" in line:
-                ServerDefect().initialize(ip, kwargs.get("port", None), kwargs.get("proto", None), "BlueKeep",
-                                    "Difficult", "Critical", "Critical", "N/A", ["Base"], notes=notes, proofs=[]).addInDb()
-                tags=["P0wned!"]
+                tags=["pwned", "bluekeep"]
                 if p_o is not None:
-                    p_o.addTag("P0wned!")
+                    p_o.addTag("pwned")
+                    p_o.addTag("bluekeep")
                 ip_o = ServerIp.fetchObject(pentest, {"ip": ip})
                 if ip_o is not None:
-                    ip_o.addTag("P0wned!")
+                    ip_o.addTag("pwned")
+                    ip_o.addTag("bluekeep")
             elif "UNKNOWN" in line:
-                tags = ["todo"]
+                tags = ["todo-bluekeep"]
             notes += line
         return notes, tags, "port", targets

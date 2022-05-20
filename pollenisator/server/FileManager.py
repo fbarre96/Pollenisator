@@ -4,6 +4,7 @@ import shutil
 from bson import ObjectId
 from flask import send_file
 import hashlib
+import logging
 from datetime import datetime
 from pollenisator.core.Components.Utils import listPlugin, loadPlugin
 from pollenisator.core.Components.mongo import MongoCalendar
@@ -36,9 +37,18 @@ def upload(pentest, defect_iid, upfile):
     return msg, status
     
 @permission("pentester")
-def importExistingFile(pentest, upfile, body):
+def importExistingFile(pentest, upfile, body, **kwargs):
     from pollenisator.server.ServerModels.Tool import ServerTool
+    user = kwargs["token_info"]["sub"]
     plugin = body.get("plugin", "auto-detect")
+    default_target = body.get("default_target", "")
+    cmdline = body.get("cmdline", "")
+    default_target_objects = None
+    if default_target != "":
+        default_target_objects = default_target.split("|")
+        if len(default_target_objects) != 6:
+            return "Default target is badly crafted", 400
+
     mongoInstance.connectToDb(pentest)
     md5File = md5(upfile.stream)
     upfile.stream.seek(0)
@@ -54,7 +64,7 @@ def importExistingFile(pentest, upfile, body):
                 break
             mod = loadPlugin(pluginName)
             if mod.autoDetectEnabled():
-                notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream)
+                notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline)
                 upfile.stream.seek(0)
                 if notes is not None and tags is not None:
                     foundPlugin = pluginName
@@ -63,33 +73,51 @@ def importExistingFile(pentest, upfile, body):
     else:
         # SET PLUGIN 
         mod = loadPlugin(plugin)
-        notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream)
-        results[plugin] = results.get(
-            plugin, 0) + 1
+        try:
+            logging.info("PLUGIN for cmdline "+str(cmdline))
+            notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline)
+            results[plugin] = results.get(
+                plugin, 0) + 1
+        except Exception as e:
+            logging.error("Plugin exception : "+str(e))
+            notes = tags = lvl = targets = None
+        
     # IF PLUGIN FOUND SOMETHING
     if notes is not None and tags is not None:
+        if default_target_objects:
+            targets["default"] = {"lvl":default_target_objects[0], "wave":default_target_objects[1],"scope":default_target_objects[2], "ip":default_target_objects[3], 
+                                "port":default_target_objects[4], "proto":default_target_objects[5]}
+        for tag in tags:
+            res = mongoInstance.doRegisterTag(tag)
+
         # ADD THE RESULTING TOOL TO AFFECTED
         for target in targets.values():
             date = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
             if target is None:
+                wave = None
                 scope = None
                 ip = None
                 port = None
                 proto = None
             else:
+                lvl = target.get("lvl", lvl)
+                wave = target.get("wave", None)
                 scope = target.get("scope", None)
                 ip = target.get("ip", None)
                 port = target.get("port", None)
                 proto = target.get("proto", None)
             mongoInstance.connectToDb(pentest)
-            mongoInstance.insert("waves", {"wave":"Imported", "wave_commands":[]})
-            tool_m = ServerTool().initialize(toolName, "Imported", scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
-                                        dated=date, datef=date, scanner_ip="Imported", status="done", notes=notes, tags=tags)
+            if wave is None:
+                wave = "Imported"
+            if mongoInstance.find("waves", {"wave":wave}, False) is None:
+                mongoInstance.insert("waves", {"wave":wave, "wave_commands":[]})
+            tool_m = ServerTool().initialize("", wave, name=toolName, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
+                                        dated=date, datef=date, scanner_ip=user, status=["done"], notes=notes, tags=tags)
             ret = tool_m.addInDb()
             upfile.stream.seek(0)
             msg, status, filepath = _upload(pentest, str(ret["iid"]), "result", upfile)
             if status == 200:
-                mongoInstance.update("tools", {"_id":ObjectId(ret["iid"])}, {"resultfile":  filepath})
+                mongoInstance.update("tools", {"_id":ObjectId(ret["iid"])}, {"$set":{"resultfile":  filepath, "plugin_used":plugin}})
     return results
 
 
@@ -132,7 +160,6 @@ def listFiles(pentest, attached_iid, filetype):
 
 @permission("pentester")
 def download(pentest, attached_iid, filetype, filename):
-    print(attached_iid)
     if filetype == "result":
         filepath = os.path.join(local_path, pentest, filetype, attached_iid)
         files = os.listdir(filepath)

@@ -1,3 +1,6 @@
+from distutils import command
+from json import tool
+import logging
 from bson import ObjectId
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Models.Tool import Tool
@@ -6,11 +9,8 @@ from pollenisator.server.ServerModels.Command import ServerCommand
 from pollenisator.server.ServerModels.CommandGroup import ServerCommandGroup
 from pollenisator.server.ServerModels.Element import ServerElement
 from pollenisator.server.FileManager import _upload
-from pollenisator.core.Components.Utils import JSONEncoder, fitNowTime, loadToolsConfig, isNetworkIp, loadPlugin, loadPluginByBin, listPlugin
-import json
-import time
+from pollenisator.core.Components.Utils import JSONEncoder, checkCommandService, isNetworkIp, loadPlugin
 from datetime import datetime
-import io
 import os
 import sys
 from pollenisator.server.permission import permission
@@ -19,7 +19,6 @@ from pollenisator.server.token import encode_token
 class ServerTool(Tool, ServerElement):
 
     def __init__(self, pentest="", *args, **kwargs):
-        super().__init__(*args, **kwargs)
         mongoInstance = MongoCalendar.getInstance()
         if pentest != "":
             self.pentest = pentest
@@ -27,6 +26,7 @@ class ServerTool(Tool, ServerElement):
             self.pentest = mongoInstance.calendarName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
+        super().__init__(*args, **kwargs)
         mongoInstance.connectToDb(self.pentest)
 
     def setOutOfTime(self, pentest):
@@ -72,7 +72,7 @@ class ServerTool(Tool, ServerElement):
         """
         mongoInstance = MongoCalendar.getInstance()
         commandTemplate = mongoInstance.findInDb(self.pentest,
-                                                 "commands", {"name": self.name}, False)
+                                                 "commands", {"_id": ObjectId(self.command_iid)}, False)
         return commandTemplate
 
     def setInScope(self):
@@ -133,7 +133,7 @@ class ServerTool(Tool, ServerElement):
                 lvl = self.lvl
             else:
                 command = command_o.text
-                lvl = command_o.lvl
+                lvl = self.lvl #not command lvl as it can be changed by modules
         command = command.replace("|wave|", self.wave)
         if lvl == "network" or lvl == "domain":
             command = command.replace("|scope|", self.scope)
@@ -161,16 +161,26 @@ class ServerTool(Tool, ServerElement):
             command = command.replace("|port.product|", port_db["product"])
             port_infos = port_db.get("infos", {})
             for info in port_infos:
-                # print("replacing "+"|port.infos."+str(info)+"|"+ "by "+str(info))
                 command = command.replace("|port.infos."+str(info)+"|", str(port_infos[info]))
-        return command
+        if isinstance(command_o, str):
+            return command
+        return command_o.bin_path + " "+command
 
-    def getPlugin(self, pluginSuggestion):
-        if pluginSuggestion.strip() == "auto-detect":
-            mod = loadPluginByBin(self.name.split("::")[0])
-        else:
-            mod = loadPlugin(pluginSuggestion)
-        return mod
+    def getPluginName(self):
+        mongoInstance = MongoCalendar.getInstance()
+        if self.plugin_used != "":
+            return self.plugin_used
+        command_o = mongoInstance.findInDb(self.pentest,"commands",{"_id":ObjectId(self.command_iid)}, False)
+        if command_o and "plugin" in command_o.keys():
+            return command_o["plugin"]
+        return None
+
+    def getPlugin(self):
+        mod_name = self.getPluginName()
+        if mod_name:
+            mod = loadPlugin(mod_name)
+            return mod
+        return None
 
     def markAsDone(self, file_name=None):
         """Set this tool status as done but keeps OOT or OOS.
@@ -296,6 +306,8 @@ def insert(pentest, body):
     mongoInstance.connectToDb(pentest)
     if not mongoInstance.isUserConnected():
         return "Not connected", 503
+    if body.get("name", "") == "None" or body.get("name", "") == "" or body.get("name", "") is None:
+        del body["name"]
     tool_o = ServerTool(pentest, body)
     # Checking unicity
     base = tool_o.getDbKey()
@@ -304,12 +316,25 @@ def insert(pentest, body):
         return {"res":False, "iid":existing["_id"]}
     if "_id" in body:
         del body["_id"]
-    # Inserting scope
+    # Checking port /service tool
     parent = tool_o.getParentId()
+    if tool_o.lvl == "port" and tool_o.command_iid is not None and tool_o.command_iid != "":
+        comm = mongoInstance.find("commands", {"_id":ObjectId(tool_o.command_iid)}, False)
+        port = mongoInstance.find("ports", {"_id":ObjectId(parent)}, False)
+        if comm:
+            allowed_ports_services = comm["ports"].split(",")
+            if not checkCommandService(allowed_ports_services, port["port"], port["proto"], port["service"]):
+                return "This tool parent does not match its command ports/services allowed list", 403
+    # Inserting tool
+    base["command_iid"] = body.get("command_iid", "")
     base["scanner_ip"] = body.get("scanner_ip", "None")
     base["dated"] = body.get("dated", "None")
     base["datef"] = body.get("datef", "None")
     base["text"] = body.get("text", "")
+    base["status"] = body.get("status", [])
+    base["notes"] = body.get("notes", "")
+    base["tags"] = body.get("tags", [])
+    base["infos"] = body.get("infos", {})
     res_insert = mongoInstance.insert("tools", base, parent)
     ret = res_insert.inserted_id
     tool_o._id = ret
@@ -320,31 +345,35 @@ def insert(pentest, body):
 def update(pentest, tool_iid, body):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
+    tags = body.get("tags", [])
+    for tag in tags:
+        mongoInstance.doRegisterTag(tag)
     res = mongoInstance.update("tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
-    return res
+    return True
     
 @permission("pentester")
-def craftCommandLine(pentest, tool_iid, plugin):
+def craftCommandLine(pentest, tool_iid):
     # CHECK TOOL EXISTS
     toolModel = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     if toolModel is None:
         return "Tool does not exist : "+str(tool_iid), 404
     # GET COMMAND OBJECT FOR THE TOOL
-    command_o = ServerCommand.fetchObject({"name": toolModel.name}, pentest)
-    
+    if toolModel.text == "":
+        command_o = ServerCommand.fetchObject({"_id": ObjectId(toolModel.command_iid)}, pentest)
+        if command_o is None:
+            return "Associated command was not found", 404
+    else:
+        command_o = str(toolModel.text)
     # Replace vars in command text (command line)
     comm = toolModel.getCommandToExecute(command_o)
-    # Load tool config
-    tools_infos = loadToolsConfig()
-    if plugin.strip() == "":
-        if toolModel.name not in list(tools_infos.keys()):
-            return "This tool has no plugin configured and no plugin was specified", 400
     # Read file to execute for given tool and prepend to final command
-    
     if comm == "":
         return "An empty command line was crafted", 400
     # Load the plugin
-    mod = toolModel.getPlugin(plugin)
+    
+    mod = toolModel.getPlugin()
+    if mod is None:
+        return "Plugin not found for this tool", 400
     # craft outputfile name
     comm = mod.changeCommand(comm, "|outputDir|", mod.getFileOutputExt())
     return {"comm":comm, "ext":mod.getFileOutputExt()}
@@ -359,6 +388,14 @@ def completeDesiredOuput(pentest, tool_iid, plugin, command_line_options):
     mod = loadPlugin(plugin)
     # craft outputfile name
     comm = mod.changeCommand(comm, "|outputDir|", "")
+    return {"command_line_options":comm, "ext":mod.getFileOutputExt()}
+
+@permission("user")
+def getDesiredOutputForPlugin(body):
+    cmdline = body.get("cmdline")
+    plugin = body.get("plugin")
+    mod = loadPlugin(plugin)
+    comm = mod.changeCommand(cmdline, "|outputDir|", "")
     return {"command_line_options":comm, "ext":mod.getFileOutputExt()}
 
 @permission("user")
@@ -380,7 +417,6 @@ def listPlugins():
 @permission("pentester")
 def importResult(pentest, tool_iid, upfile, body):
     #STORE FILE
-    plugin = body.get("plugin", "")
     res, status, filepath = _upload(pentest, tool_iid, "result", upfile)
     if status != 200:
         return res, status
@@ -391,11 +427,11 @@ def importResult(pentest, tool_iid, upfile, body):
     toolModel = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     if toolModel is None:
         return "Tool not found", 404
-    mod = toolModel.getPlugin(plugin)
+    mod = toolModel.getPlugin()
     if mod is not None:
         try:
             # Check return code by plugin (can be always true if the return code is inconsistent)
-            notes, tags, _, _ = mod.Parse(pentest, upfile)
+            notes, tags, _, _ = mod.Parse(pentest, upfile, tool=toolModel)
             if notes is None:
                 notes = "No results found by plugin."
             if tags is None:
@@ -405,14 +441,15 @@ def importResult(pentest, tool_iid, upfile, body):
             # Success could be change to False by the plugin function (evaluating the return code for exemple)
             # if the success is validated, mark tool as done
             toolModel.notes = notes
-            toolModel.tags = tags
+            for tag in tags:
+                toolModel.addTag(tag)
             toolModel.markAsDone(filepath)
             # And update the tool in database
             update(pentest, tool_iid, ToolController(toolModel).getData())
             # Upload file to SFTP
             msg = "TASK SUCCESS : "+toolModel.name
         except IOError as e:
-            toolModel.tags = ["todo"]
+            toolModel.addTag("no-output")
             toolModel.notes = "Failed to read results file"
             toolModel.markAsDone()
             update(pentest, tool_iid, ToolController(toolModel).getData())
@@ -429,16 +466,22 @@ def launchTask(pentest, tool_iid, body, **kwargs):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     launchableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
+    command_o = ServerCommand.fetchObject({"_id": ObjectId(launchableTool.command_iid)}, pentest)
     if launchableTool is None:
         return "Tool not found", 404
+    if command_o is None:
+        return "Command associated not found", 404
+
     checks = body["checks"]
-    plugin = body["plugin"]
     # Find a worker that can launch the tool without breaking limitations
-    workers = mongoInstance.getWorkers({"pentests":pentest})
+    workers = [x["name"] for x in mongoInstance.getWorkers({"pentest":pentest})]
     choosenWorker = ""
-    for worker in workers:
-        workerName = worker["name"]
-        if hasRegistered(workerName, launchableTool):
+    if command_o.owner != "Worker":
+        if command_o.owner in workers:
+            if hasSpaceFor(command_o.owner, launchableTool, pentest):
+                choosenWorker = command_o.owner
+    else:
+        for workerName in workers:
             if not checks:
                 choosenWorker = workerName
             elif hasSpaceFor(workerName, launchableTool, pentest):
@@ -452,8 +495,11 @@ def launchTask(pentest, tool_iid, body, **kwargs):
     update(pentest, tool_iid, ToolController(launchableTool).getData())
     # Mark the tool as running (scanner_ip is set and dated is set, datef is "None")
     # Use socket sid as room so that only this worker will receive this task
-    from pollenisator.api import socketio, sockets
-    socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(launchableToolId), "parser": plugin}, room=sockets[workerName])
+    from pollenisator.api import socketio
+    socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":workerName}, False)
+    if socket is None:
+        return "Socket not found", 503
+    socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(launchableToolId)}, room=socket["sid"])
     return "Success ", 200
 
     
@@ -462,7 +508,7 @@ def stopTask(pentest, tool_iid, body):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     stopableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
-    print("Trying to stop task "+str(stopableTool))
+    logging.info("Trying to stop task "+str(stopableTool))
     if stopableTool is None:
         return "Tool not found", 404
     workers = mongoInstance.getWorkers({})
@@ -478,26 +524,14 @@ def stopTask(pentest, tool_iid, body):
         return "Tools running in localhost cannot be stopped through API", 405
     if saveScannerip not in workerNames:
         return "The worker running this tool is not running anymore", 404
-    from pollenisator.api import socketio, sockets
-    socketio.emit('stopCommand', {'pentest': pentest, "tool_iid":str(tool_iid)}, room=sockets[saveScannerip])
+    from pollenisator.api import socketio
+    socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":saveScannerip}, False)
+    socketio.emit('stopCommand', {'pentest': pentest, "tool_iid":str(tool_iid)}, room=socket["sid"])
     if not forceReset:
         stopableTool.markAsNotDone()
         update(pentest, tool_iid, ToolController(stopableTool).getData())
     return "Success", 200
 
-def hasRegistered(worker, launchableTool):
-    """
-    Returns a bool indicating if the worker has registered a given tool
-    Args:
-        launchableTool: the tool object to check registration of.
-    Returns:
-        Return bool.
-    """
-    mongoInstance = MongoCalendar.getInstance()
-    list_registered_command = mongoInstance.getRegisteredCommands(worker)
-    if list_registered_command is None:
-        return False
-    return (launchableTool.name in list_registered_command)
 
 def hasSpaceFor(worker, launchableTool, calendarName):
     """
@@ -510,41 +544,43 @@ def hasSpaceFor(worker, launchableTool, calendarName):
         Return True if a command of the tool's type can be launched on this worker, False otherwise.
     """
     # 1. Find command with command id
-    command = ServerCommand.fetchObject({"name": launchableTool.name}, calendarName)
+    command = ServerCommand.fetchObject({"_id": ObjectId(launchableTool.command_iid)}, calendarName)
+    if command is None:
+        raise ValueError("command "+str(launchableTool.command_iid)+" not found")
     if str(command.safe) == "False":
-        #print("Can't launch "+command.name+" on worker cause not safe")
+        logging.debug("Can't launch "+command.name+" on worker cause not safe")
         return False
     # 2. Calculate individual command limit for the server
-    nb = getNbOfLaunchedCommand(calendarName, worker, command.name) + 1
+    nb = getNbOfLaunchedCommand(calendarName, worker, command._id) + 1
     if nb > int(command.max_thread):
-        #print("Can't launch "+command.name+" on worker cause command max_trhad "+str(nb)+" > "+str(int(command.max_thread)))
+        logging.debug("Can't launch "+command.name+" on worker cause command max_trhad "+str(nb)+" > "+str(int(command.max_thread)))
         return False
     # 3. Get groups of command incorporation command id
     command_groups = ServerCommandGroup.fetchObjects(
-        {"commands": {"$elemMatch": {"$eq": command.name}}})
+        {"commands": {"$elemMatch": {"$eq": str(command._id)}}}, calendarName)
     # 4. Calculate limites for the group
     for group in command_groups:
         tots = 0
-        for commandName in group.commands:
-            tots += getNbOfLaunchedCommand(calendarName, worker, commandName)
+        for command_iid in group.commands:
+            tots += getNbOfLaunchedCommand(calendarName, worker, command_iid)
         if tots + 1 > int(group.max_thread):
-            #print("Can't launch "+command.name+" on worker cause group_max_thread "+str(tots + 1)+" > "+str(int(group.max_thread)))
+            logging.debug("Can't launch "+command.name+" on worker cause group_max_thread "+str(tots + 1)+" > "+str(int(group.max_thread)))
             return False
     return True
 
-def getNbOfLaunchedCommand(calendarName, worker, commandName):
+def getNbOfLaunchedCommand(calendarName, worker, command_iid):
     """
     Get the total number of running commands which have the given command name
 
     Args:
-        commandName: The command name to count running tools.
+        command_iid: The command iid to count running tools.
 
     Returns:
         Return the total of running tools with this command's name as an integer.
     """
     mongoInstance = MongoCalendar.getInstance()
-    t = mongoInstance.findInDb(calendarName, "tools", {"name": commandName, "scanner_ip": worker, "dated": {
+    t = mongoInstance.countInDb(calendarName, "tools", {"command_iid": str(command_iid), "scanner_ip": worker, "dated": {
                             "$ne": "None"}, "datef": "None"})
     if t is not None:
-        return t.count()
+        return t
     return 0

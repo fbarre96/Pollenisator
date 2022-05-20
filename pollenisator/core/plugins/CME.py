@@ -19,6 +19,9 @@ def getInfos(cme_file):
 
     File example:
 
+EMPTY :
+[1m[34mSMB[0m         10.10.11.152    445    DC01             [1m[34m[*][0m Windows 10.0 Build 17763 x64 (name:DC01) (domain:timelapse.htb) (signing:True) (SMBv1:False)
+
 POWNED EXEMPLE:
 \x1b[1m\x1b[34mCME\x1b[0m          10.10.10.254:445 HAGRID          \x1b[1m\x1b[34m[*]\x1b[0m Windows 6.3 Build 9600 (name:HAGRID) (domain:POUDLARD)
 \x1b[1m\x1b[34mCME\x1b[0m          10.10.10.254:445 HAGRID          \x1b[1m\x1b[32m[+]\x1b[0m POUDLARD\Administrateur:Algo_LAB_2012* \x1b[1m\x1b[33m(Pwn3d!)\x1b[0m
@@ -29,66 +32,123 @@ NOT POWNED:
 \x1b[1m\x1b[34mCME\x1b[0m          10.10.10.254:445 HAGRID          \x1b[1m\x1b[34m[*]\x1b[0m Windows 6.3 Build 9600 (name:HAGRID) (domain:POUDLARD)
 \x1b[1m\x1b[34m[*]\x1b[0m KTHXBYE!
 
+[1m[34mSMB[0m         10.10.11.152    445    DC01             [1m[34m[*][0m Windows 10.0 Build 17763 x64 (name:DC01) (domain:timelapse) (signing:True) (SMBv1:False)
+[1m[34mSMB[0m         10.10.11.152    445    DC01             [1m[35m[-][0m timelapse\admin:admin STATUS_ACCESS_DENIED 
+
 CONNECTED
 ^[[1m^[[34mCME^[[0m          10.0.0.86:445 ALGOSECURE-VM   ^[[1m^[[34m[*]^[[0m Windows 10.0 Build 18362 (name:ALGOSECURE-VM) (domain:ALGOSECURE-VM)
 ^[[1m^[[34mCME^[[0m          10.0.0.86:445 ALGOSECURE-VM   ^[[1m^[[32m[+]^[[0m ALGOSECURE-VM\algosecure:Alg123!*
 """
     retour = []
-    regex_not_powned = re.compile(
-        r"\S+CME\S+\s+(\S+):(\S+) (\S+)\s+\S+ ([^\(]+) \(name:([^\)]+)\) \(domain:([^\)]+)\)", re.MULTILINE)
-    regex_powned = re.compile(
-        r"\S+CME\S+\s+(\S+):(\S+) (\S+)\s+\S+ (\S+) \S+\(Pwn3d!\)", re.MULTILINE)
-    regex_connected_not_powned = re.compile(
-        r"\S+CME\S+\s+(\S+):(\S+) (\S+)\s+\S+\[\+\]\S+ (\S+)", re.MULTILINE)
+    regex_info = re.compile(r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+\S+\s+\S+\[\*\]\S+\s+([^\(]+)\(name:(.+)\) \(domain:(.+)\) \(signing:(True|False)\) \(SMBv1:(False|True\])\)$", re.MULTILINE)
+    regex_logon_failed = re.compile(
+        r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+\S+\s+\S+\[-\]\S+ ([^\\]+)\\([^:]+):.+ (STATUS_\S+)\s*$", re.MULTILINE)
+    regex_success = re.compile(
+        r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[\+\]\S+ ([^\\]+)\\([^:]+):(.*?)(?= \x1b)(.+)$", re.MULTILINE)
+    regex_module_lsassy = re.compile(r"^\S+LSASSY\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[33m([^\\]+)\\(\S+)\s+(\S+)(?=\x1b).+$")
+    regex_module_ntds = re.compile(r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[33m(.+)\x1b\S*$")
     notes = ""
     countFound = 0
     countPwn = 0
-    kthxbyeFound = False
+    countSuccess = 0
     cmeFound = False
+    lsassy = False
+    mode = ""
+    secrets = []
     for line in cme_file:
         if isinstance(line, bytes):
             line = line.decode("utf-8")
+        line=line.strip()
         # Search ip in file
-        if "\x1b[1m\x1b[34mCME\x1b[0m" in line:
+        if "\x1b[1m\x1b[34mSMB\x1b[0m" in line:
             cmeFound = True
-        if "KTHXBYE!" in line:
-            kthxbyeFound = True
-        toAdd = {}
-        not_powned_infos = re.search(regex_not_powned, line)
-        if not_powned_infos is not None:
-            toAdd["ip"] = not_powned_infos.group(1)
-            toAdd["port"] = not_powned_infos.group(2)
-            toAdd["hostname"] = not_powned_infos.group(3)
-            toAdd["OS"] = not_powned_infos.group(4)
-            toAdd["machine_name"] = not_powned_infos.group(5)
-            toAdd["domain"] = not_powned_infos.group(6)
-            countFound += 1
-        else:
-            powned_infos = re.search(regex_powned, line)
-            if powned_infos is not None:
-                toAdd["ip"] = powned_infos.group(1)
-                toAdd["port"] = powned_infos.group(2)
-                toAdd["hostname"] = powned_infos.group(3)
-                toAdd["creds"] = powned_infos.group(4)
-                toAdd["powned"] = True
-                countPwn += 1
+        if "Dumping LSA secrets" in line:
+            mode = "lsa"
+            continue
+        elif "Dumped"  in line and "LSA secrets" in line:
+            mode = ""
+            continue
+        elif "Dumping SAM hashes" in line:
+            mode = "sam"
+            continue
+        elif "Added " in line and " SAM hashes" in line:
+            mode = ""
+            continue
+        elif "Dumping the NTDS" in line:
+            mode = "ntds"
+            continue
+        elif "Dumped " in line and "NTDS hashes" in line:
+            mode = ""
+            continue
+        if mode == "":
+            toAdd = {}
+            if "LSASSY" in line and "Unable to dump lsass" not in line:
+                lsassy = True
+                res_lsassy = re.search(regex_module_lsassy, line)
+                if res_lsassy is not None:
+                    toAdd["type"] = "success"
+                    toAdd["ip"] = res_lsassy.group(1)
+                    toAdd["port"] = res_lsassy.group(2)
+                    toAdd["machine_name"] = res_lsassy.group(3)
+                    toAdd["domain"] = res_lsassy.group(4)
+                    toAdd["username"] = success_infos.group(5)
+                    password = success_infos.group(6)
+                    if len(password) == 32:
+                        try:
+                            toAdd["hashNT"] = success_infos.group(6)
+                        except:
+                            toAdd["password"] = success_infos.group(6)
+                    else:
+                        toAdd["password"] = success_infos.group(6)
             else:
-                connected_infos = re.search(regex_connected_not_powned, line)
-                if connected_infos is not None:
-                    toAdd["ip"] = connected_infos.group(1)
-                    toAdd["port"] = connected_infos.group(2)
-                    toAdd["hostname"] = connected_infos.group(3)
-                    toAdd["creds"] = connected_infos.group(4)
-                    toAdd["powned"] = False
-        if toAdd.keys():
-            retour.append(toAdd)
-    if not kthxbyeFound:
-        return None, None, None
+                res_infos = re.search(regex_info, line)
+                if res_infos is not None:
+                    toAdd["type"] = "info"
+                    toAdd["ip"] = res_infos.group(1)
+                    toAdd["port"] = res_infos.group(2)
+                    toAdd["OS"] = res_infos.group(3)
+                    toAdd["machine_name"] = res_infos.group(4)
+                    toAdd["domain"] = res_infos.group(5)
+                    toAdd["signing"] = res_infos.group(6)
+                    toAdd["SMBv1"] = res_infos.group(7)
+                    countFound += 1
+                else:
+                    success_infos = re.search(regex_success, line)
+                    if success_infos is not None:
+                        toAdd["type"] = "success"
+                        toAdd["ip"] = success_infos.group(1)
+                        toAdd["port"] = success_infos.group(2)
+                        toAdd["machine_name"] = success_infos.group(3)
+                        toAdd["domain"] = success_infos.group(4)
+                        toAdd["username"] = success_infos.group(5)
+                        toAdd["password"] = success_infos.group(6)
+                        pwned = "(Pwn3d!)" in success_infos.group(7)
+                        toAdd["powned"] = pwned
+                        if pwned:
+                            countPwn += 1
+                        else:
+                            countSuccess += 1
+                        
+            if toAdd.keys():
+                retour.append(toAdd)
+        
+        if mode == "lsa" or mode == "sam":
+            if toAdd.get("ip", None) is not None:
+                if "toAdd" in locals():
+                    toAdd["secrets"] = toAdd.get("secrets", []) + [module_infos.group(4)+"\\"+module_infos.group(5)+":"+module_infos.group(6)]
+            secrets.append(line)
+        elif mode == "ntds":
+            module_infos = re.search(regex_module_ntds, line)
+            if module_infos is None:
+                continue
+            if "toAdd" in locals():
+                toAdd["ntds"] = toAdd.get("ntds", []) + [module_infos.group(4)]
     if not cmeFound:
-        return None, None, None
-    notes = "Pwn3d count : " + \
-        str(countPwn)+"\nHost found : "+str(countFound) + "\n" + notes
-    return retour, countPwn, notes
+        return None, None, None, None, None, None
+    if lsassy:
+        notes = f"CME LSASSY Success"
+    notes = f"Pwn3d count : {countPwn}\nConnection success count : {countSuccess}\nHost found : {countFound}\nSecrets found : {len(secrets)}\n"+ ("\n".join(secrets)) + notes
+    return retour, countPwn, countSuccess, notes, secrets, lsassy
 
 
 def editScopeIPs(pentest, hostsInfos):
@@ -98,39 +158,67 @@ def editScopeIPs(pentest, hostsInfos):
         hostsInfos: the dictionnary with ips as keys and a list of dictionnary containing ports informations as value.
     """
     # Check if any ip has been found.
+    targets = {}
     if hostsInfos is not None:
         for infos in hostsInfos:
-            tags = []
-            
             infosToAdd = {}
-            OS = infos.get("OS", "")
-            if OS != "":
-                infosToAdd["OS"] = OS
-            creds = infos.get("creds", "")
-            if creds != "":
-                infosToAdd["creds"] = creds
-            powned = infos.get("powned", False)
-            if powned:
-                infosToAdd["powned"] = "True"
+            if infos["type"] == "info":
+                thisOS = infos.get("OS", "")
+                if thisOS != "":
+                    infosToAdd["OS"] = thisOS
+                machine_name = infos.get("machine_name", "")
+                if machine_name != "":
+                    infosToAdd["machine_name"] = machine_name
+                SMBv1 = infos.get("SMBv1", "")
+                if SMBv1 != "":
+                    infosToAdd["SMBv1"] = SMBv1
+                signing = infos.get("signing", "")
+                if signing != "":
+                    infosToAdd["signing"] = signing
+                domain = infos.get("domain", "")
+                if domain != "":
+                    infosToAdd["domain"] = domain
+            elif infos["type"] == "success":
+                powned = infos.get("powned", False)
+                creds = (infos.get("domain", ""), infos.get("username", ""), infos.get("password", infos.get("hashNT", "")))
+                infosToAdd["users"] = infosToAdd.get("users", []) + [creds]
+                if powned:
+                    infosToAdd["powned"] = powned
+                    infosToAdd["admins"] = infosToAdd.get("admins", []) + [creds]
+                secrets = infos.get("secrets", [])
+                if secrets:
+                    infosToAdd["secrets"] = infosToAdd.get("secrets", []) + secrets
+                
             ip_m = ServerIp().initialize(str(infos["ip"]))
             insert_ret = ip_m.addInDb()
             if not insert_ret["res"]:
                 ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
-            infosToAdd["hostname"] = list(set(ip_m.infos.get(
-                "hostname", []) + [infos["hostname"]]))
-            ip_m.notes = "hostname:" + \
-                infos["hostname"] + "\n"+infos.get("OS", "")
-            if infos.get("powned", False):
-                ip_m.addTag("P0wned!")
-            port_m = ServerPort().initialize(str(infos["ip"]), str(
-                infos["port"]), "tcp", "netbios-ssn")
+            ip_m.notes = "machine_name:" + \
+                infos["machine_name"] + "\n"+infos.get("OS", "")
+            if infos["type"] == "success":
+                if infos.get("powned", False):
+                    ip_m.addTag("pwned")
+            host = str(infos["ip"])
+            port = str(infos["port"])
+            proto = "tcp"
+            service = "netbios-ssn"
+            port_m = ServerPort().initialize(host, port, proto, service)
             insert_ret = port_m.addInDb()
-            if not insert_ret["res"]:
-                port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
+            port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
+            creds = infosToAdd.get("users", [])
+            admins = infosToAdd.get("admins", [])
+            port_m.infos["users"] = list(set(map(tuple, port_m.infos.get("users", []))).union(creds))
+            port_m.infos["admins"] = list(set(map(tuple, port_m.infos.get("admins", []))).union(admins))
+            if "users" in infosToAdd:
+                del infosToAdd["users"]
+            if "admins" in infosToAdd:
+                del infosToAdd["admins"]
             port_m.updateInfos(infosToAdd)
             if infos.get("powned", False):
-                port_m.addTag("P0wned!")
-
+                port_m.addTag("pwned")
+            targets[str(insert_ret["iid"])] = {
+                    "ip": host, "port": port, "proto": proto}
+    return targets
 
 class CME(Plugin):
     """Inherits Plugin
@@ -141,7 +229,7 @@ class CME(Plugin):
         Returns:
             string
         """
-        return " > "
+        return " | tee "
 
     def getFileOutputExt(self):
         """Returns the expected file extension for this command result file
@@ -176,11 +264,18 @@ class CME(Plugin):
         """
         notes = ""
         tags = []
-        hostsInfos, countPwnd, notes = getInfos(file_opened)
+        hostsInfos, countPwnd,  countSuccess, notes, secrets, lsassy = getInfos(file_opened)
         if countPwnd is not None:
             if int(countPwnd) > 0:
-                tags = ["P0wned!"]
+                tags = ["cme-pwned"]
+        if countSuccess is not None:
+            if int(countSuccess) > 0:
+                tags += ["cme-connection-success"]
+            if len(secrets) > 0:
+                tags += ["cme-secrets-dump"]
+            if lsassy:
+                tags += ["lsassy-success"]
         if hostsInfos is None:
             return None, None, None, None
-        editScopeIPs(pentest, hostsInfos)
-        return notes, tags, "wave", {"wave": None}
+        targets = editScopeIPs(pentest, hostsInfos)
+        return notes, tags, "ports", targets

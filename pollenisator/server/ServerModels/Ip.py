@@ -158,7 +158,7 @@ class ServerIp(Ip, ServerElement):
             return ip_in_db["_id"]
         return None
 
-    def addAllTool(self, command_name, wave_name, scope):
+    def addAllTool(self, command_iid, wave_name, scope):
         """
         Kind of recursive operation as it will call the same function in its children ports.
         Add the appropriate tools (level check and wave's commands check) for this ip.
@@ -173,11 +173,13 @@ class ServerIp(Ip, ServerElement):
         mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(self.pentest)
         command = mongoInstance.findInDb(self.pentest,
-                                         "commands", {"name": command_name}, False)
+                                         "commands", {"_id": ObjectId(command_iid)}, False)
+        if command is None:
+            return
         if command["lvl"] == "ip":
             # finally add tool
             newTool = ServerTool(self.pentest)
-            newTool.initialize(command_name, wave_name,
+            newTool.initialize(command_iid, wave_name, None,
                                "", self.ip, "", "", "ip")
             newTool.addInDb()
             return
@@ -185,7 +187,7 @@ class ServerIp(Ip, ServerElement):
         ports = mongoInstance.find("ports", {"ip": self.ip})
         for port in ports:
             p = ServerPort(self.pentest, port)
-            p.addAllTool(command_name, wave_name, scope)
+            p.addAllTool(command_iid, wave_name, scope)
 
     def addInDb(self):
         return insert(self.pentest, IpController(self).getData())
@@ -237,15 +239,15 @@ def insert(pentest, body):
         for wave in waves:
             waveName = wave["wave"]
             commands = wave["wave_commands"]
-            for commName in commands:
+            for comm_iid in commands:
                 # 2. finding the command only if lvl is port
                 comm = mongoInstance.findInDb(pentest, "commands",
-                                                {"name": commName, "lvl": "ip"}, False)
+                                                {"_id":ObjectId(comm_iid), "lvl": "ip"}, False)
                 if comm is not None:
                     # 3. checking if the added port fit into the command's allowed service
                     # 3.1 first, default the selected port as tcp if no protocole is defined.
                     tool_o = ServerTool(pentest)
-                    tool_o.initialize(comm["name"], waveName, "", ip_o.ip, "", "", "ip")
+                    tool_o.initialize(comm_iid, waveName, None, "", ip_o.ip, "", "", "ip")
                     tool_o.addInDb()
     return {"res":True, "iid":iid}
 
@@ -253,5 +255,6 @@ def insert(pentest, body):
 def update(pentest, ip_iid, body):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
-    return mongoInstance.update("ips", {"_id":ObjectId(ip_iid)}, {"$set":body}, False, True)
+    mongoInstance.update("ips", {"_id":ObjectId(ip_iid)}, {"$set":body}, False, True)
+    return True
 

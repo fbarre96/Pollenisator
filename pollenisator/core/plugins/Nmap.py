@@ -6,7 +6,7 @@ from pollenisator.server.ServerModels.Port import ServerPort
 from pollenisator.core.plugins.plugin import Plugin
 
 
-def getIpPortsNmap(pentest, nmapFile):
+def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
     """
     Read the given nmap .nmap file results and return a dictionnary with ips and a list of their open ports.
         Args:
@@ -44,10 +44,11 @@ def getIpPortsNmap(pentest, nmapFile):
             notes_ip = "ip:" + \
                 str(lastIp[1]) if lastIp[1] != "" and lastIp[1] is not None else ""
             ipCIDR_m = ServerIp(pentest).initialize(str(lastIp[0]), notes=notes_ip)
+            if not keep_only_open:#add directly
+                ipCIDR_m.addInDb()
             if lastIp[1].strip() != "" and lastIp[1] is not None:
                 ipDom_m = ServerIp(pentest).initialize(
                     str(lastIp[1]), notes="domain:"+str(lastIp[0]))
-                
             else:
                 ipDom_m = None
         if " open " in line:
@@ -119,12 +120,14 @@ class Nmap(Plugin):
         return (commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0])
 
 
-    def Parse(self, pentest, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
         Args:
             file_opened: the open file
-            _kwargs: not used
+            kwargs: 
+                "tool" -> ToolModel if file is associated with a tool
+                "cmdline" -> if cmdline was given , the command line runned to get this
         Returns:
             a tuple with 4 values (All set to None if Parsing wrong file): 
                 0. notes: notes to be inserted in tool giving direct info to pentester
@@ -133,7 +136,15 @@ class Nmap(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         tags = []
-        notes = getIpPortsNmap(pentest, file_opened)
+        cmdline = kwargs.get("cmdline", None)
+        tool_m = kwargs.get("tool", None)
+        keep_only_open = True
+        if cmdline is None and tool_m is not None:
+            cmdline = tool_m.infos.get("cmdline", None)
+        if cmdline is not None:
+            if " -sP " in cmdline:
+                keep_only_open = False
+        notes = getIpPortsNmap(pentest, file_opened, keep_only_open)
         if notes is None:
             return None, None, None, None
         return notes, tags, "scope", {}

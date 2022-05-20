@@ -5,7 +5,8 @@ import bcrypt
 from werkzeug.exceptions import Unauthorized
 from pollenisator.server.permission import permission
 from pollenisator.server.token import getTokenFor
-
+from pollenisator.server.mongo import doImportCommands
+from pollenisator.core.Components.Utils import getDefaultCommandsFile, getDefaultWorkerCommandsFile
 
 @permission("admin")
 def createUser(body):
@@ -121,8 +122,9 @@ def login(body):
             return getTokenFor(username)
     return "Authentication failure", 401
 
-def connectToPentest(pentest, **kwargs):
+def connectToPentest(pentest, body, **kwargs):
     username = kwargs["token_info"]["sub"]
+    addDefaultCommands = body.get("addDefaultCommands", False)
     mongoInstance = MongoCalendar.getInstance()
     if pentest not in mongoInstance.listCalendarNames():
         return "Pentest not found", 404
@@ -131,6 +133,15 @@ def connectToPentest(pentest, **kwargs):
     if "admin" in token.get("scope", []):
         return getTokenFor(username, pentest, True), 200
     else:
+        try:
+            if mongoInstance.countInDb("pollenisator", "commands", {"owner":"Worker"}) == 0:
+                with open(getDefaultWorkerCommandsFile()) as f:
+                    doImportCommands(f.read(), "Worker")
+            if addDefaultCommands:
+                with open(getDefaultCommandsFile()) as f:
+                    doImportCommands(f.read(), username)
+        except FileNotFoundError:
+            pass
         owner = mongoInstance.getPentestOwner(pentest)
         testers.append(owner)
         if username not in testers:

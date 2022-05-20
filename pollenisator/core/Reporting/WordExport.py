@@ -1,9 +1,12 @@
-from docx import Document
+import logging
 import os
 from docxtpl import DocxTemplate
+from docxtpl import InlineImage
 import jinja2
 from markdowntodocx.markdownconverter import convertMarkdownInFile
-    
+import re
+from docx.shared import Cm
+
 def translate(w):
     if isinstance(w, list):
         trads = []
@@ -31,14 +34,33 @@ def createReport(context, template, out_name, **kwargs):
     global cell_style
     global normal_style
     doc = DocxTemplate(template)
-    jinja_env = jinja2.Environment()
+    jinja_env = jinja2.Environment(autoescape=True)
     jinja_env.filters['translate'] = translate
     jinja_env.filters['getInitials'] = getInitials
+    for defect in context["defects"]:
+        proofs = defect.get("proofs", [])
+        proofs_remaining = [x for x in proofs]
+        if proofs:
+            for i, para in enumerate(defect.get("description_paragraphs", [])):
+                re_matches = re.search(r"\[Proof (\d+)\]", para.strip())
+                if re_matches is not None:
+                    ind = int(re_matches.group(1))
+                    if ind < len(proofs):
+                        defect["description_paragraphs"][i] = InlineImage(doc, proofs[ind], width=Cm(17))
+                        try:
+                            proofs_remaining.remove(proofs[ind])
+                        except ValueError:
+                            pass
+        for proof in proofs_remaining:
+            defect["description_paragraphs"].append(InlineImage(doc, proof, width=Cm(17)))
+        for instance in defect.get("instances", []):
+            for i,proof in enumerate(instance.get("proofs", [])):
+                instance["proofs"][i] = InlineImage(doc, proof)
     doc.render(context, jinja_env)
     dir_path = os.path.dirname(os.path.realpath(__file__))
     out_path = os.path.join(dir_path, "../../exports/", out_name+".docx")
     doc.save(out_path)
-    print("Converting Markdown ...")
+    logging.info("Converting Markdown ...")
     convertMarkdownInFile(out_path, out_path, {"Header":"Sous-défaut"})
-    print("Generated report at "+str(out_path))
+    logging.info("Generated report at "+str(out_path))
     return out_path
