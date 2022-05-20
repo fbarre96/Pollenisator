@@ -130,18 +130,19 @@ def connectToPentest(pentest, body, **kwargs):
         return "Pentest not found", 404
     testers = mongoInstance.getPentestUsers(pentest)
     token = kwargs.get("token_info", {})
+    try:
+        if mongoInstance.countInDb("pollenisator", "commands", {"owner":"Worker"}) == 0:
+            with open(getDefaultWorkerCommandsFile()) as f:
+                doImportCommands(f.read(), "Worker")
+        if addDefaultCommands:
+            with open(getDefaultCommandsFile()) as f:
+                doImportCommands(f.read(), username)
+    except FileNotFoundError:
+        pass
     if "admin" in token.get("scope", []):
         return getTokenFor(username, pentest, True), 200
     else:
-        try:
-            if mongoInstance.countInDb("pollenisator", "commands", {"owner":"Worker"}) == 0:
-                with open(getDefaultWorkerCommandsFile()) as f:
-                    doImportCommands(f.read(), "Worker")
-            if addDefaultCommands:
-                with open(getDefaultCommandsFile()) as f:
-                    doImportCommands(f.read(), username)
-        except FileNotFoundError:
-            pass
+        
         owner = mongoInstance.getPentestOwner(pentest)
         testers.append(owner)
         if username not in testers:
