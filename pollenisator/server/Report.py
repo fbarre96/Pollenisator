@@ -8,9 +8,10 @@ import pollenisator.core.Reporting.PowerpointExport as PowerpointExport
 from pollenisator.server.ServerModels.Defect import getGlobalDefects
 from pollenisator.server.FileManager import getProofPath
 from pollenisator.core.Components.mongo import MongoCalendar
-from pollenisator.core.Components.Utils import JSONEncoder
+from pollenisator.core.Components.Utils import JSONEncoder, loadServerConfig
 from pollenisator.server.permission import permission
 import re
+import requests
 from bson import ObjectId
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -125,6 +126,18 @@ def search(body):
     ret = []
     for x in res:
         ret.append(x)
+    config = loadServerConfig()
+    api_url = config.get('knowledge_api_url', '')
+    if api_url == "":
+        return ret
+    try:
+        resp = requests.get(api_url, params=body, timeout=3)
+    except Exception as e:
+        return "The knowledge database is unreachable", 503
+    if resp.status_code != 200:
+        return "The knowledge dabatase encountered an issue : "+resp.text, 503
+    answer = json.loads(resp.text)
+    ret += answer
     return ret
 
 
