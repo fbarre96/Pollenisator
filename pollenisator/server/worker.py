@@ -132,7 +132,7 @@ def startWorker(pentest, **kwargs):
     ret, msg = start_docker(False, docker_id)
     if ret:
         mongoInstance.updateInDb("pollenisator", "workers", {"pentest": pentest, "name":str(docker_id)}, {"$set":{"container_id":msg}}, False, False)
-        return docker_id
+        return str(docker_id)
     return msg, 403
 
 @permission("worker")
