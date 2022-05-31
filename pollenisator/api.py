@@ -67,7 +67,7 @@ def createWorker():
     salt = bcrypt.gensalt()
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.insertInDb("pollenisator", "users", {
-                             "username": "Worker", "hash": bcrypt.hashpw("", salt), "scope": ["worker"]})
+                             "username": "Worker", "hash": bcrypt.hashpw("", salt).encode(), "scope": ["worker"]})
 
 
 def createAdmin(username="", password=""):
