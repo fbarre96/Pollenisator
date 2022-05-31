@@ -333,7 +333,7 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     # for command in allcommands:
     #     command.indb = dbName
     #     insert_command(command.indb, CommandController(command).getData(), **kwargs)
-    commands = ServerCommand.getList({"owner":user, "$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}]})
+    commands = ServerCommand.getList({"owner":user, "$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}]}, targetdb=dbName)
     if not commands:
         commands = []
     wave_o = ServerWave().initialize(dbName, commands)
