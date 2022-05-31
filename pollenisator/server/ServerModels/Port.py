@@ -46,7 +46,7 @@ class ServerPort(Port, ServerElement):
             newTool = ServerTool(self.pentest)
             newTool.initialize(command_iid, wave_name, None, scope,
                                self.ip, self.port, self.proto, "port")
-            newTool.addInDb()
+            newTool.addInDb(check)
             return
         # retrieve wave's command
         wave = mongoInstance.find(
@@ -218,3 +218,4 @@ def addCustomTool(pentest, port_iid, body):
         mongoInstance.insert("waves", {"wave": 'Custom Tools', "wave_commands": list()})
     port_o = ServerPort(pentest, mongoInstance.find("ports", {"_id":ObjectId(port_iid)}, False))
     port_o.addAllTool(body["command_iid"], 'Custom Tools', '', check=False)
+    return "Success", 200

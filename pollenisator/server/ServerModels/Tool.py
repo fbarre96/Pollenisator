@@ -45,8 +45,8 @@ class ServerTool(Tool, ServerElement):
             self.status.append("OOS")
             update(pentest, self._id, {"status": self.status})
     
-    def addInDb(self):
-        return insert(self.pentest, ToolController(self).getData())
+    def addInDb(self, check=True):
+        return insert(self.pentest, ToolController(self).getData(), check=check)
 
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
@@ -301,7 +301,7 @@ def delete(pentest, tool_iid):
         return res.deleted_count
 
 @permission("pentester")
-def insert(pentest, body):
+def insert(pentest, body, **kwargs):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     if not mongoInstance.isUserConnected():
@@ -319,12 +319,13 @@ def insert(pentest, body):
     # Checking port /service tool
     parent = tool_o.getParentId()
     if tool_o.lvl == "port" and tool_o.command_iid is not None and tool_o.command_iid != "":
-        comm = mongoInstance.find("commands", {"_id":ObjectId(tool_o.command_iid)}, False)
-        port = mongoInstance.find("ports", {"_id":ObjectId(parent)}, False)
-        if comm:
-            allowed_ports_services = comm["ports"].split(",")
-            if not checkCommandService(allowed_ports_services, port["port"], port["proto"], port["service"]):
-                return "This tool parent does not match its command ports/services allowed list", 403
+        if kwargs.get("check", True):
+            comm = mongoInstance.find("commands", {"_id":ObjectId(tool_o.command_iid)}, False)
+            port = mongoInstance.find("ports", {"_id":ObjectId(parent)}, False)
+            if comm:
+                allowed_ports_services = comm["ports"].split(",")
+                if not checkCommandService(allowed_ports_services, port["port"], port["proto"], port["service"]):
+                    return "This tool parent does not match its command ports/services allowed list", 403
     # Inserting tool
     base["command_iid"] = body.get("command_iid", "")
     base["scanner_ip"] = body.get("scanner_ip", "None")
