@@ -2651,7 +2651,7 @@ paths:
             schema:
               type: object
               required:
-                - tool_name
+                - command_iid
               properties:
                 tool_name:
                   type: string

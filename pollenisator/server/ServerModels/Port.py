@@ -217,4 +217,4 @@ def addCustomTool(pentest, port_iid, body):
     if mongoInstance.find("waves", {"wave": 'Custom Tools'}, False) is None:
         mongoInstance.insert("waves", {"wave": 'Custom Tools', "wave_commands": list()})
     port_o = ServerPort(pentest, mongoInstance.find("ports", {"_id":ObjectId(port_iid)}, False))
-    port_o.addAllTool(body["tool_name"], 'Custom Tools', '', check=False)
+    port_o.addAllTool(body["command_iid"], 'Custom Tools', '', check=False)
