@@ -155,12 +155,12 @@ def craftContext(pentest, **kwargs):
     context["neutral_remarks"] = []
     remarks = mongoInstance.find("remarks", {}, True)
     for remark in remarks:
-        if remarks["type"].lower() == "positive":
-            context["positive_remarks"].append(remarks["title"])
-        elif remarks["type"].lower() == "negative":
-            context["negative_remarks"].append(remarks["title"])
-        elif remarks["type"].lower() == "neutral":
-            context["neutral_remarks"].append(remarks["title"])
+        if remark["type"].lower() == "positive":
+            context["positive_remarks"].append(remark["title"])
+        elif remark["type"].lower() == "negative":
+            context["negative_remarks"].append(remark["title"])
+        elif remark["type"].lower() == "neutral":
+            context["neutral_remarks"].append(remark["title"])
     context["colors"] = {
         "fix": {
             "Easy": "00B0F0",
