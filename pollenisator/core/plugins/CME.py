@@ -133,9 +133,10 @@ CONNECTED
                 retour.append(toAdd)
         
         if mode == "lsa" or mode == "sam":
+            module_infos = re.search(regex_module_ntds, line)
             if toAdd.get("ip", None) is not None:
                 if "toAdd" in locals():
-                    toAdd["secrets"] = toAdd.get("secrets", []) + [module_infos.group(4)+"\\"+module_infos.group(5)+":"+module_infos.group(6)]
+                    toAdd["secrets"] = toAdd.get("secrets", []) + [module_infos.group(4)]
             secrets.append(line)
         elif mode == "ntds":
             module_infos = re.search(regex_module_ntds, line)
