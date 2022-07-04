@@ -85,25 +85,28 @@ class dnsrecon(Plugin):
                 return None, None, None, None
         except:
             return None, None, None, None
-        for record in dnsrecon_content[1:]:
-            ip = record["address"]
-            name = record["name"]
-            infosToAdd = {"hostname": [name]}
-            ip_m = ServerIp().initialize(ip, infos=infosToAdd)
-            ip_m.addInDb()
-            infosToAdd = {"ip": [ip]}
-            ip_m = ServerIp().initialize(name, infos=infosToAdd)
-            insert_ret = ip_m.addInDb()
-            # failed, domain is out of scope
-            if not insert_ret["res"]:
-                notes += name+" exists but already added.\n"
-                ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
-                existing_ips = ip_m.infos.get("ip", [])
-                if not isinstance(existing_ips, list):
-                    existing_ips = [existing_ips]
-                infosToAdd = {"ip": list(set([ip] +existing_ips))}
-                ip_m.updateInfos(infosToAdd)
-            else:
-                countInserted += 1
-                notes += name+" inserted.\n"
+        for records in dnsrecon_content[1:]:
+            if not isinstance(records, list):
+                records = [records]
+            for record in records:
+                ip = record["address"]
+                name = record["name"]
+                infosToAdd = {"hostname": [name]}
+                ip_m = ServerIp().initialize(ip, infos=infosToAdd)
+                ip_m.addInDb()
+                infosToAdd = {"ip": [ip]}
+                ip_m = ServerIp().initialize(name, infos=infosToAdd)
+                insert_ret = ip_m.addInDb()
+                # failed, domain is out of scope
+                if not insert_ret["res"]:
+                    notes += name+" exists but already added.\n"
+                    ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
+                    existing_ips = ip_m.infos.get("ip", [])
+                    if not isinstance(existing_ips, list):
+                        existing_ips = [existing_ips]
+                    infosToAdd = {"ip": list(set([ip] +existing_ips))}
+                    ip_m.updateInfos(infosToAdd)
+                else:
+                    countInserted += 1
+                    notes += name+" inserted.\n"
         return notes, tags, "wave", {"wave": None}

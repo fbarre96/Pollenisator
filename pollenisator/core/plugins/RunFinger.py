@@ -19,7 +19,7 @@ def getInfos(runfinger_file):
 [SMB2]:['10.10.11.152', Os:'Windows 10/Server 2016/2019 (check build)', Build:'17763', Domain:'TIMELAPSE', Bootime: 'Unknown', Signing:'True', RDP:'False', SMB1:'False', MSSQL:'False']
 """
     retour = []
-    regex_info = re.compile(r"^\[SMB\d\]:\['(\S+)', Os:'([^']+)', Build:'(\d+)', Domain:'([^']*)', Bootime: '\S+', Signing:'(\S+)', RDP:'(\S+)', SMB1:'(\S+)', MSSQL:'(\S+)'\]$", re.MULTILINE)
+    regex_info = re.compile(r"^\[SMB\d\]:\['(\S+)', Os:'([^']+)', Build:'(\d+)', Domain:'([^']*)', Bootime: '[^']+', Signing:'(\S+)', RDP:'(\S+)', SMB1:'(\S+)', MSSQL:'(\S+)'\]$", re.MULTILINE)
     
     notes = ""
     countFound = 0
