@@ -112,6 +112,7 @@ def search(body):
     type = body.get("type", "")
     terms = body.get("terms", "")
     lang = body.get("language", "")
+    errors = []
     if type == "remark":
         coll = "remarks"
     elif type == "defect":
@@ -132,13 +133,17 @@ def search(body):
         return ret
     try:
         resp = requests.get(api_url, params=body, timeout=3)
+        if resp.status_code != 200:
+            errors += ["The knowledge dabatase encountered an issue : "+resp.text]
+            if not errors:
+                answer = json.loads(resp.text)
+                ret += answer
+    except json.JSONDecodeError as e:
+        errors += ["The knowledge database returned invalid json"]
     except Exception as e:
-        return "The knowledge database is unreachable", 503
-    if resp.status_code != 200:
-        return "The knowledge dabatase encountered an issue : "+resp.text, 503
-    answer = json.loads(resp.text)
-    ret += answer
-    return ret
+        errors += ["The knowledge database is unreachable"]
+    ret = {"errors": errors , "answers":ret}
+    return ret, 200
 
 
 def craftContext(pentest, **kwargs):

@@ -3956,72 +3956,79 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    description:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    items:
                       type: string
-                    ease:
-                      type: string
-                      enum: 
-                        - Easy
-                        - Moderate
-                        - Difficult
-                        - Arduous
-                    impact:
-                      type: string
-                      enum:
-                        - Minor
-                        - Important
-                        - Major
-                        - Critical
-                    perimeter:
-                      type: string
-                    risk:
-                      type: string
-                      enum:
-                        - Minor
-                        - Important
-                        - Major
-                        - Critical
-                    synthesis:
-                      type: string
-                    title:
-                      type: string
-                    description:
-                      type: string
-                    synthesis:
-                      type: string
-                    type:
-                      type: string
-                    language:
-                      type: string
-                    fixes:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          description:
-                            type: string
-                          execution:
-                            type: string
-                            enum:
-                              - Quick Win
-                              - Moderate
-                              - Mean
-                              - Hard
-                          gain:
-                            type: string
-                            enum:
-                              - Weak
-                              - Moderate
-                              - Mean
-                              - Strong
-                          synthesis:
-                            type: string
-                          title:
-                            type: string
+                  answers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        description:
+                          type: string
+                        ease:
+                          type: string
+                          enum: 
+                            - Easy
+                            - Moderate
+                            - Difficult
+                            - Arduous
+                        impact:
+                          type: string
+                          enum:
+                            - Minor
+                            - Important
+                            - Major
+                            - Critical
+                        perimeter:
+                          type: string
+                        risk:
+                          type: string
+                          enum:
+                            - Minor
+                            - Important
+                            - Major
+                            - Critical
+                        synthesis:
+                          type: string
+                        title:
+                          type: string
+                        description:
+                          type: string
+                        synthesis:
+                          type: string
+                        type:
+                          type: string
+                        language:
+                          type: string
+                        fixes:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              description:
+                                type: string
+                              execution:
+                                type: string
+                                enum:
+                                  - Quick Win
+                                  - Moderate
+                                  - Mean
+                                  - Hard
+                              gain:
+                                type: string
+                                enum:
+                                  - Weak
+                                  - Moderate
+                                  - Mean
+                                  - Strong
+                              synthesis:
+                                type: string
+                              title:
+                                type: string
 
         "503":
           description: Error knowledge database
