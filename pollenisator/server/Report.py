@@ -135,9 +135,9 @@ def search(body):
         resp = requests.get(api_url, params=body, timeout=3)
         if resp.status_code != 200:
             errors += ["The knowledge dabatase encountered an issue : "+resp.text]
-            if not errors:
-                answer = json.loads(resp.text)
-                ret += answer
+        if not errors:
+            answer = json.loads(resp.text)
+            ret += answer
     except json.JSONDecodeError as e:
         errors += ["The knowledge database returned invalid json"]
     except Exception as e:
