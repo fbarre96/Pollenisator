@@ -935,6 +935,14 @@ paths:
                 many:
                   type: boolean
                   default: false
+                skip:
+                  type: integer
+                  nullable: true
+                  default: null
+                limit:
+                  type: integer
+                  nullable: true
+                  default: null
       responses:
         "200":
           description: successful find command with parameters

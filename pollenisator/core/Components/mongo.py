@@ -351,13 +351,15 @@ class MongoCalendar:
         self.connect()
         return self.client[db][collection].count_documents(pipeline)
 
-    def findInDb(self, db, collection, pipeline=None, multi=True):
+    def findInDb(self, db, collection, pipeline=None, multi=True, skip=None, limit=None):
         """
         find something in the database.
         Args:
             collection: the collection to search for
             pipeline: the document caracteristics to search for, default to None which means no filtering.
             multi: a boolean defining if eventually many documents can be found at once. (If False, only zero or one document will be found). Default to True.
+            skip: skip a number of document in db
+            limit: limit the number of document returned
         Returns:
             Return the pymongo result of the find command for the command collection
         """
@@ -365,14 +367,14 @@ class MongoCalendar:
             pipeline = {}
         self.connect()
         dbMongo = self.client[db]
-        return self._find(dbMongo, collection, pipeline, multi)
+        return self._find(dbMongo, collection, pipeline, multi, skip, limit)
 
     def fetchNotifications(self, pentest, fromTime):
         date = datetime.datetime.strptime(fromTime, "%Y-%m-%d %H:%M:%S.%f")
         res = self.findInDb("pollenisator", "notifications", {"$or":[{"db":str(pentest)}, {"db":"pollenisator"}], "time":{"$gt":date}}, True)
         return res
 
-    def _find(self, db, collection, pipeline=None, multi=True):
+    def _find(self, db, collection, pipeline=None, multi=True, skip=None, limit=None):
         """
         Wrapper for the pymongo find and find_one.
 
@@ -381,7 +383,8 @@ class MongoCalendar:
             collection: the collection to search in
             pipeline: the document caracteristics to search for, default to None which means no filtering.
             multi: a boolean defining if eventually many documents can be found at once. (If False, only zero or one document will be found). Default to True.
-
+            skip: skip a number of document in db
+            limit: limit the number of document returned
         Returns:
             Return the pymongo result of the find or find_one function.
         """
@@ -391,6 +394,10 @@ class MongoCalendar:
         try:
             if multi:
                 res = db[collection].find(pipeline)
+                if isinstance(skip, int):
+                    res.skip(skip)
+                if isinstance(limit, int):
+                    res.limit(limit)
             else:
                 res = db[collection].find_one(pipeline)
         except TypeError as e:

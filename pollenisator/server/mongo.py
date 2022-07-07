@@ -80,7 +80,7 @@ def find(pentest, collection, body):
             return "Collection argument is not a valid pollenisator collection", 403
     elif pentest not in mongoInstance.listCalendarNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
-    res = mongoInstance.findInDb(pentest, collection, pipeline, body["many"])
+    res = mongoInstance.findInDb(pentest, collection, pipeline, body["many"], body.get("skip", None), body.get("limit", None))
     if isinstance(res, dict):
         return res
     elif res is None:
