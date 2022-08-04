@@ -18,7 +18,7 @@ def parse_crtsh_line(line):
     # Regex checks validity of line and returns DOMAIN ONLY
     regexCrtshLine = r"((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9])\.\s+\d{1,5}\s+IN\s+(CNAME|A)\s+((?:[0-9]{1,3}\.){3}[0-9]{1,3})"
     regexGroups = re.search(regexCrtshLine, line)
-    if(regexGroups != None):  # regex match
+    if(regexGroups is not None):  # regex match
         return regexGroups.group(1).strip(), regexGroups.group(2).strip(), regexGroups.group(3).strip()
     return None, None, None
 

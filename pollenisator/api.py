@@ -31,7 +31,6 @@ from pollenisator.core.Components.Utils import JSONEncoder, loadServerConfig
 from flask import request
 import sys
 import bcrypt
-import os
 import json
 from pollenisator.core.Components.mongo import MongoCalendar
 import connexion

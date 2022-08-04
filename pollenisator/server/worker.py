@@ -12,7 +12,6 @@ import pollenisator.core.Components.Utils as Utils
 import shutil
 import os
 import docker
-import logging
 try:
     import git
     git_available = True

@@ -103,7 +103,7 @@ every ip starting as 1.2    || ip:1\.2\..* class:ip"""
         words = toComplete.split()
         # EMPTY SEARCH BAR, return class choice
         if len(words) == 0:
-            ret = list(map(lambda x: "class:"+x, cls.classes.keys()))
+            ret = ["class:"+x for x in cls.classes.keys()]
             return ret
         ret = []
         # get word to complete, if a space just has been placed, we have a new word
@@ -128,12 +128,11 @@ every ip starting as 1.2    || ip:1\.2\..* class:ip"""
                     classes = cls.classes.keys()
             except IndexError:
                 classes = cls.classes.keys()
-            ret = list(map(lambda x: "class:"+x, classes))
+            ret = ["class:"+x for x in classes]
             return ret
         # No : found, suggests keyword
         if posValue == -1:
-            ret = list(map(lambda x: initialValue[:wordBeforePos]+" "+x, cls.getKeywordsSuggestion(
-                coll, word, list(map(lambda x: x.op, terms)))))
+            ret = [initialValue[:wordBeforePos]+" "+x for x in cls.getKeywordsSuggestion(coll, word, [y.op for y in terms])]
         return ret
 
     def __init__(self, query="", exactMatch=True):

@@ -19,7 +19,7 @@ def parse_reverse_python(result_socket):
     """
     regex = r"pythonReverseLookup//(?:[0-9]{1,3}\.){3}[0-9]{1,3}//\('(\S+)', [^\, ]+, \['((?:[0-9]{1,3}\.){3}[0-9]{1,3})'\]\)"
     domainSearch = re.search(regex, result_socket)
-    if(domainSearch != None):  # regex match
+    if(domainSearch is not None):  # regex match
         domain = domainSearch.group(1)
         ip = domainSearch.group(2)
         return domain, ip

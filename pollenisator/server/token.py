@@ -2,7 +2,6 @@ import logging
 from jose import JWTError, jwt
 from pollenisator.core.Components.mongo import MongoCalendar
 import datetime
-import datetime
 import uuid
 from werkzeug.exceptions import Unauthorized
 import six
