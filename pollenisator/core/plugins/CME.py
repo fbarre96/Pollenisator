@@ -40,7 +40,7 @@ CONNECTED
 ^[[1m^[[34mCME^[[0m          10.0.0.86:445 ALGOSECURE-VM   ^[[1m^[[32m[+]^[[0m ALGOSECURE-VM\algosecure:Alg123!*
 """
     retour = []
-    regex_info = re.compile(r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+\S+\s+\S+\[\*\]\S+\s+([^\(]+)\(name:(.+)\) \(domain:(.+)\) \(signing:(True|False)\) \(SMBv1:(False|True\])\)$", re.MULTILINE)
+    regex_info = re.compile(r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+\S+\s+\S+\[\*\]\S+\s+([^\(]+)\(name:(.+)\) \(domain:(.+)\) \(signing:(True|False)\) \(SMBv1:(False|True)\)$", re.MULTILINE)
     regex_logon_failed = re.compile(
         r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+\S+\s+\S+\[-\]\S+ ([^\\]+)\\([^:]+):.+ (STATUS_\S+)\s*$", re.MULTILINE)
     regex_success = re.compile(

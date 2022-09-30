@@ -46,18 +46,18 @@ components:
           schema:
             $ref: "#/components/schemas/DefectTemplate"
       required: true
-    binary_upfile:
-      content:
-        multipart/form-data:
-          schema:
-            type: object
-            properties:
-              upfile:
-                description: The file to upload
-                type: string
-                format: binary
-            required:
-              - upfile
+    # binary_upfile:
+    #   content:
+    #     multipart/form-data:
+    #       schema:
+    #         type: object
+    #         properties:
+    #           upfile:
+    #             description: The file to upload
+    #             type: string
+    #             format: binary
+    #         required:
+    #           - upfile
     pollenisator.server.mongo.createSettingData:
       content:
         application/json:
@@ -931,7 +931,7 @@ paths:
               properties:
                 pipeline:
                   type: string
-                  example: "{}"
+                  example: "{}" 
                 many:
                   type: boolean
                   default: false
@@ -1156,7 +1156,17 @@ paths:
         - Mongo
       summary: Import an existing database file
       requestBody:
-        $ref: "#/components/requestBodies/binary_upfile"
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                upfile:
+                  description: The file to upload
+                  type: string
+                  format: binary
+              required:
+                - upfile
       responses:
         "200":
           description: Successfully imported the file
@@ -1167,7 +1177,17 @@ paths:
         - Commands
       summary: Import an existing command database file
       requestBody:
-        $ref: "#/components/requestBodies/binary_upfile"
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                upfile:
+                  description: The file to upload
+                  type: string
+                  format: binary
+              required:
+                - upfile
       responses:
         "200":
           description: Successfully imported the file
@@ -1183,7 +1203,17 @@ paths:
         - Commands
       summary: Import an existing command database file
       requestBody:
-        $ref: "#/components/requestBodies/binary_upfile"
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                upfile:
+                  description: The file to upload
+                  type: string
+                  format: binary
+              required:
+                - upfile
       responses:
         "200":
           description: Successfully imported the file
@@ -1338,6 +1368,35 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                ips: 
+                  type: array
+                  items:
+                    type: string
+                ports:
+                  type: array
+                  items:
+                    type: string
+                scopes: 
+                  type: array
+                  items:
+                    type: string
+                tools:
+                  type: array
+                  items:
+                    type: string
+                defects: 
+                  type: array
+                  items:
+                    type: string
+                waves:
+                  type: array
+                  items:
+                    type: string
+                intervals:
+                  type: array
+                  items:
+                    type: string
               
       responses:
         "200":
@@ -1376,6 +1435,15 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                commands: 
+                  type: array
+                  items:
+                    type: string
+                group_commands:
+                  type: array
+                  items:
+                    type: string
       responses:
         "200":
           description: Successful bulk delete
@@ -2641,7 +2709,7 @@ paths:
       operationId: pollenisator.server.ServerModels.Port.addCustomTool
       tags:
         - Ports
-      summary: Add a tool manually to a port in the 'Custom Tools' wave
+      summary: Add a tool manually to a port in the Custom Tools wave
       parameters:
         - name: pentest
           in: path
@@ -2942,7 +3010,17 @@ paths:
           schema:
             type: string
       requestBody:
-        $ref: "#/components/requestBodies/binary_upfile"
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                upfile:
+                  description: The file to upload
+                  type: string
+                  format: binary
+              required:
+                - upfile
       responses:
         "200":
           description: Successfully uploaded file
@@ -3106,7 +3184,7 @@ paths:
                   type: string
                   format: binary
                 plugin:
-                  description: plugin name to use or "auto-detect"
+                  description: plugin name to use or auto-detect
                   type: string
                 default_target:
                   description: Default pentest object to affect to
@@ -3659,7 +3737,17 @@ paths:
           schema:
             type: string
       requestBody:
-        $ref: "#/components/requestBodies/binary_upfile"
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                upfile:
+                  description: The file to upload
+                  type: string
+                  format: binary
+              required:
+                - upfile
       responses:
         "200":
           description: An indication of success or failure for upload
@@ -3684,7 +3772,17 @@ paths:
         - Defect Template
       summary: Import Defect templates in pollenisator from json file
       requestBody:
-        $ref: "#/components/requestBodies/binary_upfile"
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                upfile:
+                  description: The file to upload
+                  type: string
+                  format: binary
+              required:
+                - upfile
       responses:
         "200":
           description: a indicator of success
@@ -3805,7 +3903,7 @@ paths:
           required: false
           schema:
             type: string
-            default: N/A
+            default: "N/A"
         - name: lang
           in: query
           description: lang of the template
@@ -4003,10 +4101,6 @@ paths:
                         synthesis:
                           type: string
                         title:
-                          type: string
-                        description:
-                          type: string
-                        synthesis:
                           type: string
                         type:
                           type: string

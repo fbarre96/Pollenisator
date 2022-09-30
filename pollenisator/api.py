@@ -56,8 +56,7 @@ CORS(flask_app)
 @app.route('/')
 def home():
     """
-    This function just responds to the browser ULR
-    localhost:5000/ with a string "Api working"
+    just check status
     """
     return "Api working"
 
@@ -116,11 +115,11 @@ def notify_clients(notif):
 def register(data):
     mongoInstance = MongoCalendar.getInstance()
     workerName = data.get("name")
-    socket = mongoInstance.findInDb("pollenisator","sockets", {"sid":request.sid}, False)
+    socket = mongoInstance.findInDb("pollenisator","sockets", {"user":workerName}, False)
     if socket is None:
         mongoInstance.insertInDb("pollenisator", "sockets", {"sid":request.sid, "user":workerName, "pentest":""}, notify=False)
     else:
-        mongoInstance.updateInDb("pollenisator", "sockets", {"sid":request.sid}, {"$set":{"user":workerName, "pentest":""}}, notify=False)
+        mongoInstance.updateInDb("pollenisator", "sockets", {"user":workerName}, {"$set":{"sid":request.sid, "pentest":""}}, notify=False)
     mongoInstance.registerWorker(workerName)
 
 @socketio.event
@@ -151,7 +150,7 @@ def disconnect():
         mongoInstance.deleteFromDb("pollenisator", "sockets", {"sid":sid}, False)
 
 
-def main():
+def init():
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.deleteFromDb("pollenisator", "sockets", {}, many=True, notify=False)
     any_user = mongoInstance.findInDb("pollenisator", "users", {}, False)
@@ -180,6 +179,10 @@ def main():
         ssl_context = "adhoc"
     else:
         ssl_context = None
+    return port
+
+def main():
+    port = init()
     try:
         socketio.run(flask_app, host='0.0.0.0', port=port,
                      debug=debug, use_reloader=False, )

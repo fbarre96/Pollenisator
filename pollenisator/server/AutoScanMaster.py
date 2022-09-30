@@ -1,8 +1,6 @@
 """Module for orchestrating an automatic scan. Must be run in a separate thread/process."""
 import logging
 import time
-import pstats
-import io
 from threading import Thread
 from datetime import datetime
 from bson.objectid import ObjectId
@@ -16,7 +14,6 @@ from pollenisator.server.ServerModels.Scope import ServerScope
 from pollenisator.server.ServerModels.Ip import ServerIp
 from pollenisator.server.permission import permission
 from pollenisator.server.token import encode_token
-
 
     
 @permission("pentester")
@@ -51,13 +48,17 @@ def autoScan(pentest, endoded_token):
     check = True
     try:
         while check:
-            launchableTools, waiting = findLaunchableTools(pentest)
-            launchableTools.sort(key=lambda tup: (tup["timedout"], int(tup["priority"])))
+            queue = [] # reinit queue each time as some tools may be finished / canceled / errored
+            launchableTools = findLaunchableTools(pentest)
+            launchableTools.sort(key=lambda tup: (int(tup["timedout"]), int(tup["priority"])))
             for launchableTool in launchableTools:
                 check = getAutoScanStatus(pentest)
                 if not check:
                     break
-                res, statuscode = launchTask(pentest, launchableTool["tool"].getId(), {"checks":True}, worker_token=endoded_token)
+                if str(launchableTool["tool"].getId()) not in queue:
+                    queue.append(str(launchableTool["tool"].getId()))
+                    res, statuscode = launchTask(pentest, launchableTool["tool"].getId(), {"checks":True}, worker_token=endoded_token)
+                
             check = getAutoScanStatus(pentest)
             time.sleep(3)
     except(KeyboardInterrupt, SystemExit):
@@ -101,18 +102,11 @@ def findLaunchableTools(pentest):
             * A dictionary of waiting tools with tool's names as keys and integer as value.
     """
     toolsLaunchable = []
-    waiting = {}
     time_compatible_waves_id = searchForAddressCompatibleWithTime(pentest)
-
     for wave_id in time_compatible_waves_id:
-
+        #get not done tools inside wave
         commandsLaunchableWave = getNotDoneTools(pentest, wave_id)
-        for tool in commandsLaunchableWave:
-            toolModel = ServerTool.fetchObject(pentest, {"_id": tool})
-            try:
-                waiting[str(toolModel)] += 1
-            except KeyError:
-                waiting[str(toolModel)] = 1
+        for toolId, toolModel in commandsLaunchableWave.items():
             if "error" in toolModel.status:
                 continue
             command = toolModel.getCommand()
@@ -122,7 +116,7 @@ def findLaunchableTools(pentest):
                 prio = int(command.get("priority", 0))
             toolsLaunchable.append(
                 {"tool": toolModel, "name": str(toolModel), "priority": prio, "timedout":"timedout" in toolModel.status})
-    return toolsLaunchable, waiting
+    return toolsLaunchable
 
 
 def searchForAddressCompatibleWithTime(pentest):
@@ -142,18 +136,22 @@ def searchForAddressCompatibleWithTime(pentest):
 def getNotDoneTools(pentest, waveName):
     """Returns a set of tool mongo ID that are not done yet.
     """
-    notDoneTools = set()
+    notDoneTools = dict()
+    # get not done tools that are not IP based (scope)
     tools = ServerTool.fetchObjects(pentest, {"wave": waveName, "ip": "", "dated": "None", "datef": "None"})
     for tool in tools:
-        notDoneTools.add(tool.getId())
+        notDoneTools[tool.getId()] = tool
+    # fetch scopes to get IPs in scope
     scopes = ServerScope.fetchObjects(pentest, {"wave": waveName})
     for scope in scopes:
         scopeId = scope.getId()
+        # get IPs in scope
         ips = ServerIp.getIpsInScope(pentest, scopeId)
         for ip in ips:
+            # fetch IP level and below (e.g port) tools
             tools = ServerTool.fetchObjects(pentest, {
                                         "wave": waveName, "ip": ip.ip, "dated": "None", "datef": "None"})
             for tool in tools:
-                notDoneTools.add(tool.getId())
+                notDoneTools[tool.getId()] = tool
     return notDoneTools
 

@@ -472,22 +472,39 @@ def launchTask(pentest, tool_iid, body, **kwargs):
         return "Tool not found", 404
     if command_o is None:
         return "Command associated not found", 404
-
+    
     checks = body["checks"]
+    if checks:
+        logging.info(f"launching task id with checks : {tool_iid} name: {launchableTool.name}")
+    else:
+        logging.info(f"launching task id without check : {tool_iid} name: {launchableTool.name}")
+    
     # Find a worker that can launch the tool without breaking limitations
     workers = [x["name"] for x in mongoInstance.getWorkers({"pentest":pentest})]
+    logging.info(f"Available workers are {str(workers)}")
     choosenWorker = ""
     if command_o.owner != "Worker":
+        logging.info(f"Owner is not Worker (user tool)")
         if command_o.owner in workers:
+            logging.info(f"test for space ...")
             if hasSpaceFor(command_o.owner, launchableTool, pentest):
+                logging.info(f"test for space OK...")
                 choosenWorker = command_o.owner
+            else:
+                choosenWorker = ""
+                logging.info(f"test for space KO...")
     else:
+        logging.info(f"Worker launch tool")
+        logging.info(f"test for space ...")
         for workerName in workers:
             if not checks:
+                logging.info(f"test for space SKIPPED...")
                 choosenWorker = workerName
             elif hasSpaceFor(workerName, launchableTool, pentest):
+                logging.info(f"test for space OK...")
                 choosenWorker = workerName
                 break
+    logging.info(f"Choosen worker is {str(choosenWorker)}")
     if choosenWorker == "":
         return "No worker available", 404
     workerName = choosenWorker
@@ -553,17 +570,20 @@ def hasSpaceFor(worker, launchableTool, calendarName):
         return False
     # 2. Calculate individual command limit for the server
     nb = getNbOfLaunchedCommand(calendarName, worker, command._id) + 1
+    logging.info(f"{command.name} will the {nb} launched on worker {worker}")
     if nb > int(command.max_thread):
         logging.debug("Can't launch "+command.name+" on worker cause command max_trhad "+str(nb)+" > "+str(int(command.max_thread)))
         return False
     # 3. Get groups of command incorporation command id
+    
     command_groups = ServerCommandGroup.fetchObjects(
         {"commands": {"$elemMatch": {"$eq": str(command._id)}}}, calendarName)
     # 4. Calculate limites for the group
     for group in command_groups:
         tots = 0
         for command_iid in group.commands:
-            tots += getNbOfLaunchedCommand(calendarName, worker, command_iid)
+            tots += getNbOfLaunchedCommand(calendarName, worker, str(command_iid))
+        logging.info(f"test {command.name} for worker {worker} in group {group.name} gives {tots + 1} and max size is {int(group.max_thread)}")
         if tots + 1 > int(group.max_thread):
             logging.debug("Can't launch "+command.name+" on worker cause group_max_thread "+str(tots + 1)+" > "+str(int(group.max_thread)))
             return False
