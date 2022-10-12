@@ -6,7 +6,7 @@ import os
 import pollenisator.core.Components.Utils as Utils
 import copy
 import six
-import pollenisator.server.Report as Report
+import pollenisator.server.modules.Report.Report as Report
 
 translation = None
 

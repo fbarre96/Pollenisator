@@ -176,6 +176,18 @@ def addToMyCommands(command_iid, **kwargs):
     res["indb"] = "pollenisator"
     return doInsert("pollenisator", res, user)
 
+@permission("user")
+def addToWorkerCommands(command_iid, **kwargs):
+    user = kwargs["token_info"]["sub"]
+    mongoInstance = MongoCalendar.getInstance()
+    res = mongoInstance.findInDb("pollenisator", "commands", {
+                                 "_id": ObjectId(command_iid)}, False)
+    if res is None:
+        return False
+    res["owner"] = "Worker"
+    res["indb"] = "pollenisator"
+    return doInsert("pollenisator", res, "Worker")
+
 
 def addUserCommandsToPentest(pentest, user):
     mongoInstance = MongoCalendar.getInstance()

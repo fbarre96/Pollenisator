@@ -8,7 +8,6 @@ from pollenisator.core.Controllers.ToolController import ToolController
 from pollenisator.server.ServerModels.Command import ServerCommand
 from pollenisator.server.ServerModels.CommandGroup import ServerCommandGroup
 from pollenisator.server.ServerModels.Element import ServerElement
-from pollenisator.server.FileManager import _upload
 from pollenisator.core.Components.Utils import JSONEncoder, checkCommandService, isNetworkIp, loadPlugin
 from datetime import datetime
 import os
@@ -162,6 +161,9 @@ class ServerTool(Tool, ServerElement):
             port_infos = port_db.get("infos", {})
             for info in port_infos:
                 command = command.replace("|port.infos."+str(info)+"|", str(port_infos[info]))
+        tool_infos = self.infos
+        for info in tool_infos:
+            command = command.replace("|tool.infos."+str(info)+"|", str(tool_infos[info]))
         if isinstance(command_o, str):
             return command
         return command_o.bin_path + " "+command
@@ -243,7 +245,7 @@ class ServerTool(Tool, ServerElement):
         if "running" in self.status:
             self.status.remove("running")
 
-    def markAsRunning(self, workerName):
+    def markAsRunning(self, workerName, group_id=None, group_name=None):
         """Set this tool status as running but keeps OOT or OOS.
         Sets the starting date to current time and ending date to "None"
         Args:
@@ -260,6 +262,8 @@ class ServerTool(Tool, ServerElement):
             newStatus.append("timedout")
         self.status = newStatus
         self.scanner_ip = workerName
+        self.infos["group_id"] = group_id
+        self.infos["group_name"] = group_name
         mongoInstance = MongoCalendar.getInstance()
         mongoInstance.updateInDb("pollenisator", "workers", {"name":workerName}, {"$push":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=True)
     
@@ -407,7 +411,7 @@ def listPlugins():
         return the list of plugins file names.
     """
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    path = os.path.join(dir_path, "../../core/plugins/")
+    path = os.path.join(dir_path, "../../plugins/")
     # Load plugins
     sys.path.insert(0, path)
     plugin_list = os.listdir(path)
@@ -417,14 +421,14 @@ def listPlugins():
     
 @permission("pentester")
 def importResult(pentest, tool_iid, upfile, body):
+    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance.connectToDb(pentest)
     #STORE FILE
-    res, status, filepath = _upload(pentest, tool_iid, "result", upfile)
+    res, status, filepath = mongoInstance.do_upload(pentest, tool_iid, "result", upfile)
     if status != 200:
         return res, status
     # Analyze
-    upfile.stream.seek(0)
-    mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
+    
     toolModel = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     if toolModel is None:
         return "Tool not found", 404
@@ -473,43 +477,27 @@ def launchTask(pentest, tool_iid, body, **kwargs):
     if command_o is None:
         return "Command associated not found", 404
     
-    checks = body["checks"]
-    if checks:
-        logging.info(f"launching task id with checks : {tool_iid} name: {launchableTool.name}")
-    else:
-        logging.info(f"launching task id without check : {tool_iid} name: {launchableTool.name}")
-    
     # Find a worker that can launch the tool without breaking limitations
     workers = [x["name"] for x in mongoInstance.getWorkers({"pentest":pentest})]
-    logging.info(f"Available workers are {str(workers)}")
+    logging.debug(f"Available workers are {str(workers)}")
     choosenWorker = ""
     if command_o.owner != "Worker":
-        logging.info(f"Owner is not Worker (user tool)")
+        logging.debug(f"Owner is not Worker (user tool)")
         if command_o.owner in workers:
-            logging.info(f"test for space ...")
-            if hasSpaceFor(command_o.owner, launchableTool, pentest):
-                logging.info(f"test for space OK...")
-                choosenWorker = command_o.owner
-            else:
-                choosenWorker = ""
-                logging.info(f"test for space KO...")
+            choosenWorker = command_o.owner
+        else:
+            choosenWorker = ""
     else:
-        logging.info(f"Worker launch tool")
-        logging.info(f"test for space ...")
+        logging.debug(f"Worker launch tool")
         for workerName in workers:
-            if not checks:
-                logging.info(f"test for space SKIPPED...")
-                choosenWorker = workerName
-            elif hasSpaceFor(workerName, launchableTool, pentest):
-                logging.info(f"test for space OK...")
-                choosenWorker = workerName
-                break
-    logging.info(f"Choosen worker is {str(choosenWorker)}")
+            choosenWorker = workerName
+           
+    logging.debug(f"Choosen worker is {str(choosenWorker)}")
     if choosenWorker == "":
         return "No worker available", 404
     workerName = choosenWorker
     launchableToolId = launchableTool.getId()
-    launchableTool.markAsRunning(workerName)
+    launchableTool.markAsRunning(workerName, body.get("group_id"), body.get("group_name"))
     update(pentest, tool_iid, ToolController(launchableTool).getData())
     # Mark the tool as running (scanner_ip is set and dated is set, datef is "None")
     # Use socket sid as room so that only this worker will receive this task
@@ -550,44 +538,6 @@ def stopTask(pentest, tool_iid, body):
         update(pentest, tool_iid, ToolController(stopableTool).getData())
     return "Success", 200
 
-
-def hasSpaceFor(worker, launchableTool, calendarName):
-    """
-    Check if this worker has space for the given tool. (this checks the command and every group of commands max_thred settings)
-
-    Args:
-        launchableTool: a tool documents fetched from database that has to be launched
-
-    Returns:
-        Return True if a command of the tool's type can be launched on this worker, False otherwise.
-    """
-    # 1. Find command with command id
-    command = ServerCommand.fetchObject({"_id": ObjectId(launchableTool.command_iid)}, calendarName)
-    if command is None:
-        raise ValueError("command "+str(launchableTool.command_iid)+" not found")
-    if str(command.safe) == "False":
-        logging.debug("Can't launch "+command.name+" on worker cause not safe")
-        return False
-    # 2. Calculate individual command limit for the server
-    nb = getNbOfLaunchedCommand(calendarName, worker, command._id) + 1
-    logging.info(f"{command.name} will the {nb} launched on worker {worker}")
-    if nb > int(command.max_thread):
-        logging.debug("Can't launch "+command.name+" on worker cause command max_trhad "+str(nb)+" > "+str(int(command.max_thread)))
-        return False
-    # 3. Get groups of command incorporation command id
-    
-    command_groups = ServerCommandGroup.fetchObjects(
-        {"commands": {"$elemMatch": {"$eq": str(command._id)}}}, calendarName)
-    # 4. Calculate limites for the group
-    for group in command_groups:
-        tots = 0
-        for command_iid in group.commands:
-            tots += getNbOfLaunchedCommand(calendarName, worker, str(command_iid))
-        logging.info(f"test {command.name} for worker {worker} in group {group.name} gives {tots + 1} and max size is {int(group.max_thread)}")
-        if tots + 1 > int(group.max_thread):
-            logging.debug("Can't launch "+command.name+" on worker cause group_max_thread "+str(tots + 1)+" > "+str(int(group.max_thread)))
-            return False
-    return True
 
 def getNbOfLaunchedCommand(calendarName, worker, command_iid):
     """

@@ -16,30 +16,25 @@ class Command(Element):
         """Constructor
         Args:
             valueFromDb: a dict holding values to load into the object. A mongo fetched command is optimal.
-                        possible keys with default values are : _id (None), parent (None), tags([]), infos({}), name(""), sleep_between("0"), priority("0),
-                        max_thread("1"), text(""), lvl("network"), ports(""), safe(True), types([]), indb="pollenisator", owner="",timeout="300"
+                        possible keys with default values are : _id (None), parent (None), tags([]), infos({}), name(""), 
+                         text(""), lvl("network"), ports(""), safe(True), types([]), indb="pollenisator", owner="",timeout="300"
         """
         if valuesFromDb is None:
             valuesFromDb = dict()
         super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None),  valuesFromDb.get(
             "tags", []), valuesFromDb.get("infos", {}))
-        self.initialize(valuesFromDb.get("name", ""), valuesFromDb.get("bin_path", ""), valuesFromDb.get("plugin", ""), valuesFromDb.get("sleep_between", 0),
-                        valuesFromDb.get("priority", 0), valuesFromDb.get(
-                            "max_thread", 1),
+        self.initialize(valuesFromDb.get("name", ""), valuesFromDb.get("bin_path", ""), valuesFromDb.get("plugin", ""), 
                         valuesFromDb.get("text", ""), valuesFromDb.get(
                             "lvl", "network"),
                         valuesFromDb.get("ports", ""),
                         bool(valuesFromDb.get("safe", True)), valuesFromDb.get("types", []), valuesFromDb.get("indb", "pollenisator"), valuesFromDb.get("owner", ""), valuesFromDb.get("timeout", 300), valuesFromDb.get("infos", {}))
 
-    def initialize(self, name, bin_path, plugin="Default", sleep_between=0, priority=0, max_thread=1, text="", lvl="network", ports="", safe=True, types=None, indb=False, owner="", timeout=300, infos=None):
+    def initialize(self, name, bin_path, plugin="Default", text="", lvl="network", ports="", safe=True, types=None, indb=False, owner="", timeout=300, infos=None):
         """Set values of command
         Args:
             name: the command name
             bin_path: local command, binary path or command line
             plugin: plugin that goes with this command
-            sleep_between: delay to wait between two call to this command. Default is 0
-            priority: priority of the command (0 is highest). Default is 0
-            max_thread: number of parallel execution possible of this command. Default is 1
             text: the command line options. Default is "".
             lvl: level of the command. Must be either "wave", "network", "domain", "ip", "port". Default is "network"
             ports: allowed proto/port, proto/service or port-range for this command
@@ -55,9 +50,6 @@ class Command(Element):
         self.name = name
         self.bin_path = bin_path
         self.plugin = plugin
-        self.sleep_between = sleep_between
-        self.priority = priority
-        self.max_thread = max_thread
         self.text = text
         self.lvl = lvl
         self.ports = ports

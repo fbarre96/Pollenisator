@@ -8,6 +8,7 @@ import pollenisator.core.Components.Utils as Utils
 import sys
 import json
 import logging
+from bson import ObjectId
 
 
 class MongoCalendar:
@@ -189,7 +190,7 @@ class MongoCalendar:
             "name": worker_name}, False, True)
 
     def registerWorker(self, worker_name):
-        from pollenisator.server.worker import doSetInclusion
+        from pollenisator.server.modules.Worker.worker import doSetInclusion
         try:
             if self.client is None:
                 self.connect()
@@ -837,3 +838,42 @@ class MongoCalendar:
         notify_clients({"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now()})
         # self.client["pollenisator"]["notifications"].insert_one(
         #     {"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now()})
+
+    def do_upload(self, pentest, attached_iid, filetype, upfile):
+        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance.connectToDb(pentest)
+        local_path = os.path.join(Utils.getMainDir(), "files")
+        try:
+            os.makedirs(local_path)
+        except FileExistsError:
+            pass
+        filepath = os.path.join(local_path, pentest, filetype, attached_iid)
+        if filetype == "result":
+            res = mongoInstance.find("tools", {"_id": ObjectId(attached_iid)}, False)
+            if res is None:
+                return "The given iid does not match an existing tool", 404, ""
+            else:
+                if os.path.isdir(filepath):
+                    files = os.listdir(filepath)
+                    for existing_file in files:
+                        os.remove(os.path.join(filepath, files[0]))
+        elif filetype == "proof":
+            res = mongoInstance.find("defects", {"_id": ObjectId(attached_iid)}, False)
+            if res is None:
+                return "The given iid does not match an existing defect", 404, ""
+        else:
+            return "Filetype is not proof nor result", 400, ""
+        
+        try:
+            os.makedirs(filepath)
+        except FileExistsError:
+            pass
+        name = upfile.filename.replace("/", "_")
+        filepath = os.path.join(filepath, name)
+        with open(filepath, "wb") as f:
+            f.write(upfile.stream.read())
+        upfile.stream.seek(0)
+        
+        if filetype == "proof":
+            mongoInstance.update("defects", {"_id": ObjectId(attached_iid)}, {"$push":{"proofs":name}})
+        return name + " was successfully uploaded", 200, filepath

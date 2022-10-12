@@ -4,6 +4,11 @@ from pollenisator.core.Models.Port import Port
 from pollenisator.core.Controllers.PortController import PortController
 from pollenisator.server.ServerModels.Tool import ServerTool, delete as tool_delete
 from pollenisator.server.ServerModels.Defect import delete as defect_delete
+from pollenisator.server.modules.ActiveDirectory.computers import (
+    insert as computer_insert,
+    update as computer_update,
+    Computer
+)
 from pollenisator.server.ServerModels.Element import ServerElement
 from pollenisator.core.Components.Utils import JSONEncoder, checkCommandService
 import json
@@ -140,6 +145,14 @@ def insert(pentest, body):
     parent = port_o.getParentId()
     ins_result = mongoInstance.insert("ports", body, parent)
     iid = ins_result.inserted_id
+    if int(port_o.port) == 445:
+        computer_insert(pentest, {"name":"", "ip":port_o.ip, "domain":"", "admins":[], "users":[], "infos":{"is_dc":False}})
+    elif int(port_o.port) == 88:
+        res = computer_insert(pentest, {"name":"", "ip":port_o.ip, "domain":"", "admins":[], "users":[], "infos":{"is_dc":True}})
+        if not res["res"]:
+            comp = Computer.fetchObject(pentest, {"_id":ObjectId(res["iid"])})
+            comp.infos.is_dc = True
+            comp.update()
     # adding the appropriate tools for this port.
     # 1. fetching the wave's commands
     waves = mongoInstance.find("waves", {})

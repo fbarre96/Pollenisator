@@ -2,9 +2,10 @@ from bson import ObjectId
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Models.Defect import Defect
 from pollenisator.core.Controllers.DefectController import DefectController
-from pollenisator.server.FileManager import getProofPath
 from pollenisator.server.ServerModels.Element import ServerElement
 from pollenisator.server.permission import permission
+from pollenisator.core.Components.Utils import getMainDir
+
 import os
 import json
 
@@ -77,6 +78,10 @@ class ServerDefect(Defect, ServerElement):
             return None
         return cls(pentest, d) 
 
+def getProofPath(pentest, defect_iid):
+    local_path = os.path.join(getMainDir(), "files")
+
+    return os.path.join(local_path, pentest, "proof", str(defect_iid))
 @permission("pentester")
 def delete(pentest, defect_iid):
     mongoInstance = MongoCalendar.getInstance()

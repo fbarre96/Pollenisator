@@ -3,4 +3,5 @@ recursive-include pollenisator/Templates *
 recursive-include pollenisator/config *
 recursive-include pollenisator/exports *.gz
 recursive-include pollenisator/server/logs *
+recursive-include pollenisator/server/modules *
 include pollenisator/server/api_specs/openapi.yaml

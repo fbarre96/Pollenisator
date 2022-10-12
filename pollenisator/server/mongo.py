@@ -15,7 +15,6 @@ from pollenisator.server.ServerModels.CommandGroup import addUserGroupCommandsTo
 from pollenisator.server.ServerModels.Wave import ServerWave, insert as insert_wave
 from pollenisator.server.ServerModels.Interval import ServerInterval, insert as insert_interval
 from pollenisator.server.ServerModels.Scope import insert as insert_scope
-from pollenisator.server.FileManager import deletePentestFiles
 from pollenisator.server.permission import permission
 mongoInstance = MongoCalendar.getInstance()
 
@@ -31,7 +30,7 @@ def status():
 
 def getVersion():
     # TODO : return connexion openapi version instead
-    return "1.3.0"
+    return "1.4.0"
 
 @permission("pentester")
 def update(pentest, collection, body):
@@ -283,6 +282,16 @@ def listPentests(**kwargs):
         return ret
     else:
         return []
+
+def deletePentestFiles(pentest):
+    mongoInstance = MongoCalendar.getInstance()
+    local_path = os.path.join(getMainDir(), "files")
+    proofspath = os.path.join(local_path, pentest, "proof")
+    if os.path.isdir(proofspath):
+        shutil.rmtree(proofspath)
+    resultspath = os.path.join(local_path, pentest, "result")
+    if os.path.isdir(resultspath):
+        shutil.rmtree(resultspath)
 
 @permission("user")
 def deletePentest(pentest, **kwargs):

@@ -1,5 +1,8 @@
 from pollenisator.core.Components.mongo import MongoCalendar
 from bson import ObjectId
+import pprint
+
+
 
 class ServerElement(object):
     
@@ -45,3 +48,9 @@ class ServerElement(object):
     
     def getId(self):
         return self._id
+
+    def __repr__(self):
+        """For `print` and `pprint`"""
+        return self.to_str()
+
+   

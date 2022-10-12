@@ -75,6 +75,7 @@ def decode_token(token):
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except JWTError as e:
+        print("ERROR token "+str(e))
         logging.info(f"Unauthorized, token is invalid : token ({token}) error ({e})")
         six.raise_from(Unauthorized, e)
 

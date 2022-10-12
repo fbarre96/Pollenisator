@@ -1,0 +1,218 @@
+paths:
+  /workers:
+    get:
+      operationId: pollenisator.server.modules.Worker.worker.listWorkers
+      tags:
+        - Worker
+      summary: Return workers documents from database
+      description: "Return workers documents from database Returns: Mongo result of
+        workers. Cursor of dictionnary"
+      parameters:
+        - name: pipeline
+          in: query
+          description: query workers with filters
+          required: false
+          schema:
+            type: string
+            default: "{}"
+            example: "{}"
+      responses:
+        "200":
+          description: Successful read worker list operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties:
+                    _id:
+                      type: string
+                    last_heartbeat:
+                      type: string
+                    name:
+                      type: string
+                    pentest:
+                      type: string
+                    registeredCommands:
+                      type: array
+                      items:
+                        type: string
+              examples:
+                list returned:
+                  value : '[
+                    {
+                      "_id": "60f686d8e15510a2957cb263",
+                      "last_heartbeat": "2021-07-20 10:18:35.269000",
+                      "name": "078cbd54-6c26-4ba9-b84d-fdb12f239af3@barre",
+                      "pentest": "",
+                      "registeredCommands": [
+                        "Nmap.tcp",
+                        "Nmap.top_udp",
+                        "Nmap.bdd",
+                        "Nmap.vpn",
+                        "Nmap.supervision",
+                        "Nmap.services",
+                        "Nmap.services.udp",
+                        "Nmap.services_scripts",
+                        "Nmap.all.tcp",
+                        "Nmap.ip.allTcp",
+                        "Nmap.ip.udp",
+                        "WhatWeb.http",
+                        "WhatWeb.https",
+                        "TestSSL",
+                        "Nikto",
+                        "digReverseLookUp",
+                        "pythonReverseLookUp",
+                        "Sublist3r",
+                        "Dirsearch.http",
+                        "Dirsearch.https",
+                        "Knockpy",
+                        "crtsh",
+                        "ssh_scan",
+                        "amap",
+                        "amap.udp",
+                        "http-methods",
+                        "smbmap",
+                        "smbmap_anon",
+                        "smbmap_greybox",
+                        "smb-enum-users",
+                        "nmap-script-vuln",
+                        "enum4linux",
+                        "ftp-anon",
+                        "Nmap.quick",
+                        "ike-scan",
+                        "Nmap.verify.tcp",
+                        "Nmap.verify.udp",
+                        "CME.recon",
+                        "CME.usecreds",
+                        "eternalblue",
+                        "bluekeep",
+                        "openrelay",
+                        "searchsploit",
+                        "dnsrecon",
+                        "CME_greybox"
+                      ]
+                    }
+                  ]'
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                pipeline invalid:
+                  value: 'Pipeline argument was not valid'
+  "/workers/{name}":
+    delete:
+      operationId: pollenisator.server.modules.Worker.worker.deleteWorker
+      tags:
+        - Worker
+      summary: delete workers from database
+      parameters:
+        - name: name
+          in: path
+          description: query workers with filters
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful delete worker operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  n:
+                    type: integer
+              examples:
+                deleted 2:
+                  value: '{"n":2}'
+                
+        "404":
+          description: Worker name not found
+          content:
+            application/json:
+              examples:
+                worker not found:
+                  value: '"Worker not found"'
+  
+  /workers/start/{pentest}:
+    get:
+      operationId: pollenisator.server.modules.Worker.worker.startWorker
+      tags:
+        - Worker
+      summary: start or get a worker for given pentest
+      description: start or get a worker for given pentest
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful worker unregister
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'docker id'
+  /workers/register:
+    post:
+      operationId: pollenisator.server.modules.Worker.worker.registerWorker
+      tags:
+        - Worker
+      summary: register the caller as worker
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - command_names
+              properties:
+                name:
+                  type: string
+                command_names:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Successful registered a worker
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
+
+  "/workers/{name}/unregister":
+    post:
+      operationId: pollenisator.server.modules.Worker.worker.unregister
+      tags:
+        - Worker
+      summary: Remvoe a worker from the lsit of workers
+      description: Set a worker unregistered
+      security: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful worker unregister
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
+        "404":
+          description: Worker not found
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Worker not found'

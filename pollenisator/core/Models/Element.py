@@ -37,3 +37,5 @@ class Element(object):
         """
         return str(self)
 
+    def getId(self):
+        return self._id

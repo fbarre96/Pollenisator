@@ -25,24 +25,50 @@ logging.getLogger('').addHandler(console)
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from getpass import getpass
-from pollenisator.server.worker import removeWorkers, unregister
 from pollenisator.server.token import verifyToken, decode_token
 from pollenisator.core.Components.Utils import JSONEncoder, loadServerConfig
 from flask import request
 import sys
 import bcrypt
 import json
+
+from bson import ObjectId
 from pollenisator.core.Components.mongo import MongoCalendar
+from pollenisator.server.modules.Worker.worker import doDeleteWorker, removeWorkers, unregister
 import connexion
+from pathlib import Path
+import ruamel.yaml
 
-
+def load_modules(app, main_file):
+    modules_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "./server/modules/")
+    # Load modules
+    yaml = ruamel.yaml.YAML()
+    with open(main_file) as fp:
+        specs = yaml.load(fp)
+        for path in Path(modules_path).rglob('*.yaml'):
+            print("LOADING MODULE "+str(path))
+            with open(path) as fp2:
+                module_specs = yaml.load(fp2)
+                if "components" in module_specs and "schemas" in module_specs["components"]:
+                    for i in module_specs["components"]["schemas"]:
+                        specs["components"]["schemas"].update({i:module_specs["components"]["schemas"][i]})
+                for i in module_specs["paths"]:
+                    specs["paths"].update({i:module_specs["paths"][i]})
+          
+        with open('/tmp/bundled.yaml', 'w') as fw:
+            yaml.dump(specs, fw)
+            app.add_api('/tmp/bundled.yaml')
+        
 logger = logging.getLogger(__name__)
 # Create the application instance
 server_folder = os.path.join(os.path.dirname(
     os.path.realpath(__file__)), "./server/api_specs/")
 app = connexion.App(__name__, specification_dir=server_folder, debug=debug)
 # Read the openapi.yaml file to configure the endpoints
-app.add_api('openapi.yaml')
+print("LOADING MAIN API")
+#app.add_api('openapi.yaml')
+load_modules(app, os.path.join(server_folder,"openapi.yaml"))
+
 flask_app = app.app
 socketio = SocketIO(logger=logger, engineio_logger=logger, cors_allowed_origins="*")
 

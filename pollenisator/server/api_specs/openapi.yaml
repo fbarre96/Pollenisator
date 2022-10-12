@@ -1,12 +1,13 @@
 openapi: 3.0.0
 info:
   description: Pollenisator index api file
-  version: 1.2.0
+  version: 1.3.0
   title: Swagger REST Article
 
 
 servers:
-- url: /api/v1
+- url: http://localhost:5000/api/v1
+
 components:
   securitySchemes:
     jwt:
@@ -46,6 +47,7 @@ components:
           schema:
             $ref: "#/components/schemas/DefectTemplate"
       required: true
+    
     # binary_upfile:
     #   content:
     #     multipart/form-data:
@@ -108,14 +110,6 @@ components:
           type: string
         lvl:
           type: string
-        priority:
-          type: integer
-          minimum: 0
-          maximum: 99
-        sleep_between:
-          type: integer
-        max_thread:
-          type: integer
         text:
           type: string
         ports:
@@ -134,8 +128,10 @@ components:
       properties:
         name:
           type: string
-        sleep_between:
+        priority:
           type: integer
+          minimum: 0
+          maximum: 99
         max_thread:
           type: integer
         indb:
@@ -227,68 +223,7 @@ components:
                 type: string
               title:
                 type: string
-    DefectTemplate:
-      properties:
-        title:
-          type: string
-        synthesis:
-          type: string
-        description:
-          type: string
-        ease:
-          type: string
-          enum:
-            - Easy
-            - Moderate
-            - Difficult
-            - Arduous
-            - N/A
-        impact:
-          type: string
-          enum:
-            - Minor
-            - Important
-            - Major
-            - Critical
-            - N/A
-        risk:
-          type: string
-          enum:
-            - Minor
-            - Important
-            - Major
-            - Critical
-            - N/A
-        type:
-          type: array
-          items:
-            type: string
-        language:
-          type: string
-        fixes:
-          type: array
-          items:
-            type: object
-            properties:
-              description:
-                type: string
-              execution:
-                type: string
-                enum:
-                  - Quick Win
-                  - Moderate
-                  - Hard
-              gain:
-                type: string
-                enum:
-                  - Weak
-                  - Moderate
-                  - Mean
-                  - Strong
-              synthesis:
-                type: string
-              title:
-                type: string
+    
     Intervals:
       properties:
         wave:
@@ -370,6 +305,68 @@ components:
           type: array
           items:
             type: string
+    DefectTemplate:
+      properties:
+        title:
+          type: string
+        synthesis:
+          type: string
+        description:
+          type: string
+        ease:
+          type: string
+          enum:
+            - Easy
+            - Moderate
+            - Difficult
+            - Arduous
+            - N/A
+        impact:
+          type: string
+          enum:
+            - Minor
+            - Important
+            - Major
+            - Critical
+            - N/A
+        risk:
+          type: string
+          enum:
+            - Minor
+            - Important
+            - Major
+            - Critical
+            - N/A
+        type:
+          type: array
+          items:
+            type: string
+        language:
+          type: string
+        fixes:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              execution:
+                type: string
+                enum:
+                  - Quick Win
+                  - Moderate
+                  - Hard
+              gain:
+                type: string
+                enum:
+                  - Weak
+                  - Moderate
+                  - Mean
+                  - Strong
+              synthesis:
+                type: string
+              title:
+                type: string
 
 security:
   - jwt: []
@@ -1798,267 +1795,6 @@ paths:
               examples:
                 Success:
                   value: 'Success'
-  /workers:
-    get:
-      operationId: pollenisator.server.worker.listWorkers
-      tags:
-        - Worker
-      summary: Return workers documents from database
-      description: "Return workers documents from database Returns: Mongo result of
-        workers. Cursor of dictionnary"
-      parameters:
-        - name: pipeline
-          in: query
-          description: query workers with filters
-          required: false
-          schema:
-            type: string
-            default: "{}"
-            example: "{}"
-      responses:
-        "200":
-          description: Successful read worker list operation
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  properties:
-                    _id:
-                      type: string
-                    last_heartbeat:
-                      type: string
-                    name:
-                      type: string
-                    pentest:
-                      type: string
-                    registeredCommands:
-                      type: array
-                      items:
-                        type: string
-              examples:
-                list returned:
-                  value : '[
-                    {
-                      "_id": "60f686d8e15510a2957cb263",
-                      "last_heartbeat": "2021-07-20 10:18:35.269000",
-                      "name": "078cbd54-6c26-4ba9-b84d-fdb12f239af3@barre",
-                      "pentest": "",
-                      "registeredCommands": [
-                        "Nmap.tcp",
-                        "Nmap.top_udp",
-                        "Nmap.bdd",
-                        "Nmap.vpn",
-                        "Nmap.supervision",
-                        "Nmap.services",
-                        "Nmap.services.udp",
-                        "Nmap.services_scripts",
-                        "Nmap.all.tcp",
-                        "Nmap.ip.allTcp",
-                        "Nmap.ip.udp",
-                        "WhatWeb.http",
-                        "WhatWeb.https",
-                        "TestSSL",
-                        "Nikto",
-                        "digReverseLookUp",
-                        "pythonReverseLookUp",
-                        "Sublist3r",
-                        "Dirsearch.http",
-                        "Dirsearch.https",
-                        "Knockpy",
-                        "crtsh",
-                        "ssh_scan",
-                        "amap",
-                        "amap.udp",
-                        "http-methods",
-                        "smbmap",
-                        "smbmap_anon",
-                        "smbmap_greybox",
-                        "smb-enum-users",
-                        "nmap-script-vuln",
-                        "enum4linux",
-                        "ftp-anon",
-                        "Nmap.quick",
-                        "ike-scan",
-                        "Nmap.verify.tcp",
-                        "Nmap.verify.udp",
-                        "CME.recon",
-                        "CME.usecreds",
-                        "eternalblue",
-                        "bluekeep",
-                        "openrelay",
-                        "searchsploit",
-                        "dnsrecon",
-                        "CME_greybox"
-                      ]
-                    }
-                  ]'
-        "400":
-          description: Invalid parameters
-          content:
-            application/json:
-              examples:
-                pipeline invalid:
-                  value: 'Pipeline argument was not valid'
-  "/workers/{name}":
-    delete:
-      operationId: pollenisator.server.worker.deleteWorker
-      tags:
-        - Worker
-      summary: delete workers from database
-      parameters:
-        - name: name
-          in: path
-          description: query workers with filters
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successful delete worker operation
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  n:
-                    type: integer
-              examples:
-                deleted 2:
-                  value: '{"n":2}'
-                
-        "404":
-          description: Worker name not found
-          content:
-            application/json:
-              examples:
-                worker not found:
-                  value: '"Worker not found"'
-  "/workers/{name}/setInclusion":
-    put:
-      operationId: pollenisator.server.worker.setInclusion
-      tags:
-        - Worker
-      summary: Set a worker exclusion from database
-      description: Set a worker exclusion from database
-      parameters:
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - db
-                - setInclusion
-              properties:
-                db:
-                  type: string
-                setInclusion:
-                  type: boolean
-      responses:
-        "200":
-          description: Successful update of worker inclusion in a pentest
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  n:
-                    type: integer
-                  nModifider:
-                    type: integer
-                  ok:
-                    type: integer
-                  updatedExisting:
-                    type: boolean
-              examples:
-                success:
-                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
-  /workers/start/{pentest}:
-    get:
-      operationId: pollenisator.server.worker.startWorker
-      tags:
-        - Worker
-      summary: start or get a worker for given pentest
-      description: start or get a worker for given pentest
-      parameters:
-        - name: pentest
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successful worker unregister
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: 'docker id'
-  /workers/register:
-    post:
-      operationId: pollenisator.server.worker.registerWorker
-      tags:
-        - Worker
-      summary: register the caller as worker
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - name
-                - command_names
-              properties:
-                name:
-                  type: string
-                command_names:
-                  type: array
-                  items:
-                    type: string
-      responses:
-        "200":
-          description: Successful registered a worker
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: 'true'
-
-  "/workers/{name}/unregister":
-    post:
-      operationId: pollenisator.server.worker.unregister
-      tags:
-        - Worker
-      summary: Remvoe a worker from the lsit of workers
-      description: Set a worker unregistered
-      security: []
-      parameters:
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successful worker unregister
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: 'true'
-        "404":
-          description: Worker not found
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: 'Worker not found'
 
   "/commands/find":
     post:
@@ -2147,6 +1883,27 @@ paths:
       tags:
         - Commands
       summary: "Mark this command as used by the current user"
+      parameters:
+        - name: command_iid
+          in: path
+          description: command iid to mark
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: command added success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: 'True'
+  "/commands/addToWorkerCommands/{command_iid}":
+    post:
+      operationId: pollenisator.server.ServerModels.Command.addToWorkerCommands
+      tags:
+        - Commands
+      summary: "Mark this command as used by the worker"
       parameters:
         - name: command_iid
           in: path
@@ -2990,223 +2747,7 @@ paths:
             application/json:
               schema:
                 type: integer
-  "/files/{pentest}/upload/proof/{defect_iid}":
-    post:
-      operationId: pollenisator.server.FileManager.upload
-      tags:
-        - FileManager
-      summary: Upload a file
-      parameters:
-        - name: pentest
-          in: path
-          description: pentest name
-          required: true
-          schema:
-            type: string
-        - name: defect_iid
-          in: path
-          description: file will be tied to given iid
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                upfile:
-                  description: The file to upload
-                  type: string
-                  format: binary
-              required:
-                - upfile
-      responses:
-        "200":
-          description: Successfully uploaded file
-          content:
-            application/json:
-              examples:
-                Successful:
-                  value: '"{filename} was successfully uploaded"'
-        "404":
-          description: defect not found
-          content:
-            application/json:
-              examples:
-                Unknown defect:
-                  value: '"The given iid does not match an existing defect"'
-  "/files/{pentest}/download/{filetype}/{attached_iid}":
-    get:
-      operationId: pollenisator.server.FileManager.listFiles
-      tags:
-        - FileManager
-      summary: Lists attached to given iid
-      parameters:
-        - name: pentest
-          in: path
-          description: pentest name
-          required: true
-          schema:
-            type: string
-        - name: attached_iid
-          in: path
-          description: file will be tied to given iid
-          required: true
-          schema:
-            type: string
-        - name: filetype
-          in: path
-          required: true
-          schema:
-            type: string
-            enum:
-              - result
-              - proof
-      responses:
-        "200":
-          description: Successfully listed files
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: string
-  "/files/{pentest}/download/{filetype}/{attached_iid}/{filename}":
-    get:
-      operationId: pollenisator.server.FileManager.download
-      tags:
-        - FileManager
-      summary: Download a file
-      parameters:
-        - name: pentest
-          in: path
-          description: pentest name
-          required: true
-          schema:
-            type: string
-        - name: attached_iid
-          in: path
-          description: file will be tied to given iid
-          required: true
-          schema:
-            type: string
-        - name: filetype
-          in: path
-          required: true
-          schema:
-            type: string
-            enum:
-              - result
-              - proof
-        - name: filename
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successfully downloaded file
-          content:
-            application/octet-steam:
-              schema:
-                type: string
-                format: binary
-                
-        "404":
-          description: File not found
-          content:
-            application/json:
-              examples:
-                file not found:
-                  value: '"File not found"'
-  "/files/{pentest}/{defect_iid}/{filename}":
-    delete:
-      operationId: pollenisator.server.FileManager.rmProof
-      tags:
-        - FileManager
-      summary: Remove a proof file
-      parameters:
-        - name: pentest
-          in: path
-          description: pentest name
-          required: true
-          schema:
-            type: string
-        - name: defect_iid
-          in: path
-          description: object iid which have the file to delete
-          required: true
-          schema:
-            type: string
-        - name: filename
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successfully deleted the file
-          content:
-            application/json:
-              examples:
-                Successful:
-                  value: '"Successfully deleted {filename}"'
-        "404":
-          description: File not found
-          content:
-            application/json:
-              examples:
-                file not found:
-                  value: '"File not found"'
-
-  "/files/{pentest}/import":
-    post:
-      operationId: pollenisator.server.FileManager.importExistingFile
-      tags:
-        - FileManager
-      summary: Import an existing tool file
-      parameters:
-        - name: pentest
-          in: path
-          description: pentest name
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                upfile:
-                  description: The file to upload
-                  type: string
-                  format: binary
-                plugin:
-                  description: plugin name to use or auto-detect
-                  type: string
-                default_target:
-                  description: Default pentest object to affect to
-                  type: string
-                  default: ""
-                cmdline:
-                  description: command line used if knowingly
-                  type: string
-                  default: ""
-              required:
-                - upfile
-                - plugin
-      responses:
-        "200":
-          description: Successfully imported file
-          content:
-            application/json:
-              examples:
-                successful import of nmap file:
-                  value: '{
-  "Nmap.py": 1
-}'
+  
   "/tools/{pentest}/craftCommandLine/{tool_iid}":
     get:
       operationId: pollenisator.server.ServerModels.Tool.craftCommandLine
@@ -3423,9 +2964,10 @@ paths:
             schema:
               type: object
               properties:
-                checks:
-                  type: boolean
-                  default: true
+                group_id:
+                  type: string
+                group_name:
+                  type: string
       responses:
         "200":
           description: Successfully launched task
@@ -3554,592 +3096,346 @@ paths:
               examples:
                 Success:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
-  "/autoscan/{pentest}/start":
+    
+  "/workers/{name}/setInclusion":
     post:
-      operationId: pollenisator.server.AutoScanMaster.startAutoScan
+      operationId: pollenisator.server.modules.Worker.worker.setInclusion
       tags:
-        - Auto scan
-      summary: Start an automatic scan
+        - Worker
+      summary: Set a worker exclusion from database
+      description: Set a worker exclusion from database
       parameters:
-        - name: pentest
-          in: path
-          description: pentest name
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successfully started auto scan
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: '"Success"'
-        "403":
-          description: Autoscan already running
-          content:
-            application/json:
-              examples:
-               Already running:
-                  value: '"An autoscan is already running"'
-        "404":
-          description: No worker available/found
-          content:
-            application/json:
-              examples:
-                No worker available:
-                  value: '"No worker registered for this pentest"'
-            
-  "/autoscan/{pentest}/status":
-    get:
-      operationId: pollenisator.server.AutoScanMaster.getAutoScanStatus
-      tags:
-        - Auto scan
-      summary: Returns status of automatic scan
-      parameters:
-        - name: pentest
-          in: path
-          description: pentest name
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successfully returned status of auto scan
-          content:
-            application/json:
-              schema:
-                type: boolean
-
-  "/autoscan/{pentest}/stop":
-    post:
-      operationId: pollenisator.server.AutoScanMaster.stopAutoScan
-      tags:
-        - Auto scan
-      summary: Stop an automatic scan
-      parameters:
-        - name: pentest
-          in: path
-          description: pentest name
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successfully stoped auto scan
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: '"Success"'
-  /report/langs:
-    get:
-      operationId: pollenisator.server.Report.getLangList
-      tags:
-        - Report
-      summary: Get a list of existings langs templates
-      responses:
-        "200":
-          description: A list of langs as string
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: '["en", "fr", ...]'
-  /report/{lang}/templates:
-    get:
-      operationId: pollenisator.server.Report.getTemplateList
-      tags:
-        - Report
-      summary: Get a lsit of report template
-      parameters:
-        - name: lang
-          in: path
-          description: template language
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: A list of templates as string
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: '["Mddel.docx", "Model2.pptx", ...]'
-        "400":
-          description: Invalid parameters
-          content:
-            application/json:
-              examples:
-                Lang invalid:
-                  value: '"There is no existing templates for this lang"'
-  /report/{lang}/templates/download:
-    get:
-      operationId: pollenisator.server.Report.downloadTemplate
-      tags:
-        - Report
-      summary: Download a report template
-      parameters:
-        - name: templateName
-          in: query
-          description: template name to download
-          required: true
-          schema:
-            type: string
-        - name: lang
-          in: path
-          description: template language
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: A template file docx or pptx
-          content:
-            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
-              schema:
-                type: string
-                format: binary
-            application/vnd.openxmlformats-officedocument.presentationml.document:
-              schema:
-                type: string
-                format: binary
-              
-        "400":
-          description: Invalid parameters
-          content:
-            application/json:
-              examples:
-                docx or pptx expected:
-                  value: '"A template is either a pptx or a docx document"'
-                no template:
-                  value: '"There is no existing templates for this lang"'
-        "404":
-          description: Not found
-          content:
-            application/json:
-              examples:
-                template not found:
-                  value: '"Template file not found"'
-
-  /report/{lang}/templates/upload:
-    post:
-      operationId: pollenisator.server.Report.uploadTemplate
-      tags:
-        - Report
-      summary: Upload a report template
-      parameters:
-        - name: lang
-          in: path
-          description: template language
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                upfile:
-                  description: The file to upload
-                  type: string
-                  format: binary
-              required:
-                - upfile
-      responses:
-        "200":
-          description: An indication of success or failure for upload
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: '"Success"'
-                Failure when writing:
-                  value: '"Failure"'
-        "400":
-          description: Invalid parameter
-          content:
-            application/json:
-              examples:
-                unexpected extension:
-                  value: '"Invalid extension for template, must be pptx or docx"'
-  "/report/DefectTemplates/import":
-    post:
-      operationId: pollenisator.server.ServerModels.Defect.importDefectTemplates
-      tags:
-        - Defect Template
-      summary: Import Defect templates in pollenisator from json file
-      requestBody:
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                upfile:
-                  description: The file to upload
-                  type: string
-                  format: binary
-              required:
-                - upfile
-      responses:
-        "200":
-          description: a indicator of success
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: "True"
-  "/report/DefectTemplates/insert":
-    post:
-      operationId: pollenisator.server.ServerModels.Defect.insertDefectTemplate
-      tags:
-        - Defect Template
-      summary: Creat a Defect template
-      requestBody:
-         $ref: "#/components/requestBodies/DefectTemplate"
-      responses:
-        "200":
-          description: a indicator of success
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: "True"
-  '/report/DefectTemplates/delete/{iid}':
-    delete:
-      operationId: pollenisator.server.ServerModels.Defect.deleteDefectTemplate
-      tags:
-        - Defect Template
-      summary: Delete a defect template
-      parameters:
-        - name: iid
+        - name: name
           in: path
           required: true
           schema:
             type: string
-      responses:
-        '200':
-          description: successfully deleted a template
-        '404':
-          description: not found
-
-  "/report/DefectTemplates/update/{iid}":
-    put:
-      operationId: pollenisator.server.ServerModels.Defect.updateDefectTemplate
-      tags:
-        - Defect Template
-      summary: Update Defect template in db
-      description: Update Defect template in db
-      parameters:
-        - name: iid
-          in: path
-          description: Defect template iid to edit
-          required: true
-          schema:
-            type: string
-      requestBody:
-        $ref: "#/components/requestBodies/DefectTemplate"
-              
-      responses:
-        "200":
-          description: successfully updated an item
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
-        '400':
-          description: Pipeline argument invalid
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: 'Pipeline|Update pipeline argument was not valid'
-        '403':
-          description: Unknown param value
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: 'Pentest|Collection argument is not a valid pollenisator collection'
-  
-              
-  "/report/{pentest}/generate":
-    get:
-      operationId: pollenisator.server.Report.generateReport
-      tags:
-        - Report
-      summary: Generate a report and returns it
-      parameters:
-        - name: pentest
-          in: path
-          description: pentest name
-          required: true
-          schema:
-            type: string
-        - name: templateName
-          in: query
-          description: template name to generate from
-          required: true
-          schema:
-            type: string
-        - name: contractName
-          in: query
-          description: template name to generate from
-          required: true
-          schema:
-            type: string
-        - name: clientName
-          in: query
-          description: template name to generate from
-          required: true
-          schema:
-            type: string
-        - name: mainRedactor
-          in: query
-          description: template name to generate from
-          required: false
-          schema:
-            type: string
-            default: "N/A"
-        - name: lang
-          in: query
-          description: lang of the template
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Return a generated report file
-          content:
-            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
-              schema:
-                type: string
-                format: binary
-            application/vnd.openxmlformats-officedocument.presentationml.document:
-              schema:
-                type: string
-                format: binary
-        "400":
-          description: Invalid parameter
-          content:
-            application/json:
-              examples:
-                Invalid extension:
-                  value: '"Invalid extension for template, must be pptx or docx"'
-                No template for lang:
-                  value: '"There is no existing templates for this lang"'
-        "404":
-          description: not found
-          content:
-            application/json:
-              examples:
-                Template not found:
-                  value: '"Template file not found"'
-  "/report/{pentest}/defects":
-    get:
-      operationId: pollenisator.server.ServerModels.Defect.getGlobalDefects
-      tags:
-        - Report
-      summary: Get the ordered list of global defect
-      parameters:
-        - name: pentest
-          in: path
-          description: pentest name
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: A list of defect ordered by index
-          content:
-            application/json:
-              examples:
-                Ordered defect list:
-                  value: '[
-  {
-    "_id": "ObjectId|60f194db1255fd087c769756",
-    "ease": "Moderate",
-    "impact": "Critical",
-    "index": "0",
-    "infos": {},
-    "ip": "",
-    "notes": "",
-    "port": "",
-    "proofs": [],
-    "proto": "",
-    "redactor": "N/A",
-    "risk": "Critical",
-    "tags": [],
-    "title": "XSS",
-    "synthesis": "An XSS or Cross-Site-Scripting attack is ..."
-    "description": "The XXX server is vulnerable to XSS in XXX form ...",
-    "language": "en",
-    "type": [
-      "Application"
-    ],
-    "fixes":[
-      {
-        "title":"Filter user input",
-        "synthesis": "..",
-        "description":"...",
-        "execution": "Easy"
-        "gain": "Strong"
-      },
-    ]
-  },
-]'
-  "/report/{pentest}/defects/move/{defect_id_to_move}/{target_id}":
-    post:
-      operationId: pollenisator.server.ServerModels.Defect.moveDefect
-      tags:
-        - Report
-      summary: Move one defect at the index of the other. Other index are impacted
-      parameters:
-        - name: pentest
-          in: path
-          description: pentest name
-          required: true
-          schema:
-            type: string
-        - name: defect_id_to_move
-          in: path
-          description: defect_id to move
-          required: true
-          schema:
-            type: string
-        - name: target_id
-          in: path
-          description: target_id to move to
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              examples:
-                Success destination index:
-                  value: '2'
-        "404":
-          description: Not found
-          content:
-            application/json:
-              examples:
-                not found moving defect:
-                  value: '"This global defect does not exist"'
-                not found destination defect:
-                  value: '"the target global defect does not exist"'
-
-  "/report/search":
-    post:
-      operationId: pollenisator.server.Report.search
-      tags:
-        - Report
-      summary: search a defect/remark in  templates
       requestBody:
         content:
           application/json:
             schema:
               type: object
               required:
-                - terms 
-                - type
+                - db
+                - setInclusion
               properties:
-                terms:
+                db:
                   type: string
-                type:
-                  type: string
-                  enum:
-                    - defect
-                    - remark
+                setInclusion:
+                  type: boolean
       responses:
         "200":
-          description: Success
+          description: Successful update of worker inclusion in a pentest
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  errors:
-                    type: array
-                    items:
-                      type: string
-                  answers:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        description:
-                          type: string
-                        ease:
-                          type: string
-                          enum: 
-                            - Easy
-                            - Moderate
-                            - Difficult
-                            - Arduous
-                        impact:
-                          type: string
-                          enum:
-                            - Minor
-                            - Important
-                            - Major
-                            - Critical
-                        perimeter:
-                          type: string
-                        risk:
-                          type: string
-                          enum:
-                            - Minor
-                            - Important
-                            - Major
-                            - Critical
-                        synthesis:
-                          type: string
-                        title:
-                          type: string
-                        type:
-                          type: string
-                        language:
-                          type: string
-                        fixes:
-                          type: array
-                          items:
-                            type: object
-                            properties:
-                              description:
-                                type: string
-                              execution:
-                                type: string
-                                enum:
-                                  - Quick Win
-                                  - Moderate
-                                  - Mean
-                                  - Hard
-                              gain:
-                                type: string
-                                enum:
-                                  - Weak
-                                  - Moderate
-                                  - Mean
-                                  - Strong
-                              synthesis:
-                                type: string
-                              title:
-                                type: string
-
-        "503":
-          description: Error knowledge database
-          content:
-            application/json:
+                  n:
+                    type: integer
+                  nModifider:
+                    type: integer
+                  ok:
+                    type: integer
+                  updatedExisting:
+                    type: boolean
               examples:
-                No knowledge database:
-                  value: '"There is no knowledge database implemented."'
-                Unreachable:
-                  value: '"The knowledge database is unreachable"'
-                Error from knowledge db:
-                  value: '"The knowledge dabatase encountered an issue : "{response_text}'
+                success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+  # # autoscan
+  # "/autoscan/{pentest}/start":
+  #   post:
+  #     operationId: pollenisator.server.modules.AutoScan.AutoScanMaster.startAutoScan
+  #     tags:
+  #       - Auto scan
+  #     summary: Start an automatic scan
+  #     parameters:
+  #       - name: pentest
+  #         in: path
+  #         description: pentest name
+  #         required: true
+  #         schema:
+  #           type: string
+  #     responses:
+  #       "200":
+  #         description: Successfully started auto scan
+  #         content:
+  #           application/json:
+  #             examples:
+  #               Success:
+  #                 value: '"Success"'
+  #       "403":
+  #         description: Autoscan already running
+  #         content:
+  #           application/json:
+  #             examples:
+  #              Already running:
+  #                 value: '"An autoscan is already running"'
+  #       "404":
+  #         description: No worker available/found
+  #         content:
+  #           application/json:
+  #             examples:
+  #               No worker available:
+  #                 value: '"No worker registered for this pentest"'
+            
+  # "/autoscan/{pentest}/status":
+  #   get:
+  #     operationId: pollenisator.server.modules.AutoScan.AutoScanMaster.getAutoScanStatus
+  #     tags:
+  #       - Auto scan
+  #     summary: Returns status of automatic scan
+  #     parameters:
+  #       - name: pentest
+  #         in: path
+  #         description: pentest name
+  #         required: true
+  #         schema:
+  #           type: string
+  #     responses:
+  #       "200":
+  #         description: Successfully returned status of auto scan
+  #         content:
+  #           application/json:
+  #             schema:
+  #               type: boolean
+
+  # "/autoscan/{pentest}/stop":
+  #   post:
+  #     operationId: pollenisator.server.modules.AutoScan.AutoScanMaster.stopAutoScan
+  #     tags:
+  #       - Auto scan
+  #     summary: Stop an automatic scan
+  #     parameters:
+  #       - name: pentest
+  #         in: path
+  #         description: pentest name
+  #         required: true
+  #         schema:
+  #           type: string
+  #     responses:
+  #       "200":
+  #         description: Successfully stoped auto scan
+  #         content:
+  #           application/json:
+  #             examples:
+  #               Success:
+  #                 value: '"Success"'
+  # #file manager
+  # "/files/{pentest}/upload/proof/{defect_iid}":
+  #   post:
+  #     operationId: pollenisator.server.modules.FileManager.FileManager.upload
+  #     tags:
+  #       - FileManager
+  #     summary: Upload a file
+  #     parameters:
+  #       - name: pentest
+  #         in: path
+  #         description: pentest name
+  #         required: true
+  #         schema:
+  #           type: string
+  #       - name: defect_iid
+  #         in: path
+  #         description: file will be tied to given iid
+  #         required: true
+  #         schema:
+  #           type: string
+  #     requestBody:
+  #       content:
+  #         multipart/form-data:
+  #           schema:
+  #             type: object
+  #             properties:
+  #               upfile:
+  #                 description: The file to upload
+  #                 type: string
+  #                 format: binary
+  #             required:
+  #               - upfile
+  #     responses:
+  #       "200":
+  #         description: Successfully uploaded file
+  #         content:
+  #           application/json:
+  #             examples:
+  #               Successful:
+  #                 value: '"{filename} was successfully uploaded"'
+  #       "404":
+  #         description: defect not found
+  #         content:
+  #           application/json:
+  #             examples:
+  #               Unknown defect:
+  #                 value: '"The given iid does not match an existing defect"'
+  # "/files/{pentest}/download/{filetype}/{attached_iid}":
+  #   get:
+  #     operationId: pollenisator.server.modules.FileManager.FileManager.listFiles
+  #     tags:
+  #       - FileManager
+  #     summary: Lists attached to given iid
+  #     parameters:
+  #       - name: pentest
+  #         in: path
+  #         description: pentest name
+  #         required: true
+  #         schema:
+  #           type: string
+  #       - name: attached_iid
+  #         in: path
+  #         description: file will be tied to given iid
+  #         required: true
+  #         schema:
+  #           type: string
+  #       - name: filetype
+  #         in: path
+  #         required: true
+  #         schema:
+  #           type: string
+  #           enum:
+  #             - result
+  #             - proof
+  #     responses:
+  #       "200":
+  #         description: Successfully listed files
+  #         content:
+  #           application/json:
+  #             schema:
+  #               type: array
+  #               items:
+  #                 type: string
+  # "/files/{pentest}/download/{filetype}/{attached_iid}/{filename}":
+  #   get:
+  #     operationId: pollenisator.server.modules.FileManager.FileManager.download
+  #     tags:
+  #       - FileManager
+  #     summary: Download a file
+  #     parameters:
+  #       - name: pentest
+  #         in: path
+  #         description: pentest name
+  #         required: true
+  #         schema:
+  #           type: string
+  #       - name: attached_iid
+  #         in: path
+  #         description: file will be tied to given iid
+  #         required: true
+  #         schema:
+  #           type: string
+  #       - name: filetype
+  #         in: path
+  #         required: true
+  #         schema:
+  #           type: string
+  #           enum:
+  #             - result
+  #             - proof
+  #       - name: filename
+  #         in: path
+  #         required: true
+  #         schema:
+  #           type: string
+  #     responses:
+  #       "200":
+  #         description: Successfully downloaded file
+  #         content:
+  #           application/octet-steam:
+  #             schema:
+  #               type: string
+  #               format: binary
+                
+  #       "404":
+  #         description: File not found
+  #         content:
+  #           application/json:
+  #             examples:
+  #               file not found:
+  #                 value: '"File not found"'
+  # "/files/{pentest}/{defect_iid}/{filename}":
+  #   delete:
+  #     operationId: pollenisator.server.modules.FileManager.FileManager.rmProof
+  #     tags:
+  #       - FileManager
+  #     summary: Remove a proof file
+  #     parameters:
+  #       - name: pentest
+  #         in: path
+  #         description: pentest name
+  #         required: true
+  #         schema:
+  #           type: string
+  #       - name: defect_iid
+  #         in: path
+  #         description: object iid which have the file to delete
+  #         required: true
+  #         schema:
+  #           type: string
+  #       - name: filename
+  #         in: path
+  #         required: true
+  #         schema:
+  #           type: string
+  #     responses:
+  #       "200":
+  #         description: Successfully deleted the file
+  #         content:
+  #           application/json:
+  #             examples:
+  #               Successful:
+  #                 value: '"Successfully deleted {filename}"'
+  #       "404":
+  #         description: File not found
+  #         content:
+  #           application/json:
+  #             examples:
+  #               file not found:
+  #                 value: '"File not found"'
+
+  # "/files/{pentest}/import":
+  #   post:
+  #     operationId: pollenisator.server.modules.FileManager.FileManager.importExistingFile
+  #     tags:
+  #       - FileManager
+  #     summary: Import an existing tool file
+  #     parameters:
+  #       - name: pentest
+  #         in: path
+  #         description: pentest name
+  #         required: true
+  #         schema:
+  #           type: string
+  #     requestBody:
+  #       content:
+  #         multipart/form-data:
+  #           schema:
+  #             type: object
+  #             properties:
+  #               upfile:
+  #                 description: The file to upload
+  #                 type: string
+  #                 format: binary
+  #               plugin:
+  #                 description: plugin name to use or auto-detect
+  #                 type: string
+  #               default_target:
+  #                 description: Default pentest object to affect to
+  #                 type: string
+  #                 default: ""
+  #               cmdline:
+  #                 description: command line used if knowingly
+  #                 type: string
+  #                 default: ""
+  #             required:
+  #               - upfile
+  #               - plugin
+  #     responses:
+  #       "200":
+  #         description: Successfully imported file
+  #         content:
+  #           application/json:
+  #             examples:
+  #               successful import of nmap file:
+  #                 value: '{
+  #                   "Nmap.py": 1
+  #                   }'

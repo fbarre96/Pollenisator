@@ -43,10 +43,10 @@ def loadPlugin(pluginName):
     Returns:
         return the module plugin loaded or default plugin if not found.
     """
-    from pollenisator.core.plugins.plugin import REGISTRY
+    from pollenisator.plugins.plugin import REGISTRY
     # Load plugins
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    path = os.path.join(dir_path, "../plugins/")
+    path = os.path.join(dir_path, "../../plugins/")
     # Load plugins
     sys.path.insert(0, path)
     try:
@@ -73,7 +73,7 @@ def listPlugin():
         return the list of plugins file names.
     """
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    path = os.path.join(dir_path, "../plugins/")
+    path = os.path.join(dir_path, "../../plugins/")
     # Load plugins
     sys.path.insert(0, path)
     plugin_list = os.listdir(path)
@@ -386,3 +386,5 @@ def checkCommandService(allowed_ports_services, port, proto, service):
                 int(port) <= int(endAllowedRange)):
             return True
     return False
+
+
