@@ -1,86 +1,158 @@
 {
   "command_groups": [
     {
-      "_id": "ObjectId|6257ef4ebb36517ae7e649be",
+      "_id": "ObjectId|63452ccc42a9ffc4451fdb76",
       "commands": [
-        "6257ef4ebb36517ae7e64994",
-        "6257ef4ebb36517ae7e64996",
-        "6257ef4ebb36517ae7e64997",
-        "6257ef4ebb36517ae7e64998",
-        "6257ef4ebb36517ae7e6499a",
-        "6257ef4ebb36517ae7e649aa",
-        "6257ef4ebb36517ae7e649ab",
-        "6257ef4ebb36517ae7e649b4",
-        "6257ef4ebb36517ae7e649bd",
-        "627b76d5597de7d8d729ae96",
-        "627b7dd4878da1ccea8fb606"
+        "6320357fd204dc4bd1e0bde9",
+        "6320357fd204dc4bd1e0bdec",
+        "6320357fd204dc4bd1e0bdf1",
+        "6346bd66e1de5542bf19c6ef"
       ],
+      "indb": "pollenisator",
       "max_thread": 4,
-      "name": "Nmaps",
-      "owner": "Fabien",
+      "name": "Fast host discovery",
+      "owner": "admin",
+      "priority": 0,
       "sleep_between": 0
     },
     {
-      "_id": "ObjectId|6257ef4ebb36517ae7e649bf",
+      "_id": "ObjectId|63452d0042a9ffc4451fdb77",
       "commands": [
-        "6257ef4ebb36517ae7e64994",
-        "6257ef4ebb36517ae7e64995",
-        "6257ef4ebb36517ae7e64996",
-        "6257ef4ebb36517ae7e64997",
-        "6257ef4ebb36517ae7e64998",
-        "6257ef4ebb36517ae7e64999",
-        "6257ef4ebb36517ae7e6499a",
-        "6257ef4ebb36517ae7e6499b",
-        "6257ef4ebb36517ae7e6499c",
-        "6257ef4ebb36517ae7e6499d",
-        "6257ef4ebb36517ae7e6499e",
-        "6257ef4ebb36517ae7e6499f",
-        "6257ef4ebb36517ae7e649a0",
-        "6257ef4ebb36517ae7e649a1",
-        "6257ef4ebb36517ae7e649a2",
-        "6257ef4ebb36517ae7e649a3",
-        "6257ef4ebb36517ae7e649a4",
-        "6257ef4ebb36517ae7e649a5",
-        "6257ef4ebb36517ae7e649a6",
-        "6257ef4ebb36517ae7e649a7",
-        "6257ef4ebb36517ae7e649a8",
-        "6257ef4ebb36517ae7e649a9",
-        "6257ef4ebb36517ae7e649aa",
-        "6257ef4ebb36517ae7e649ab",
-        "6257ef4ebb36517ae7e649ac",
-        "6257ef4ebb36517ae7e649ad",
-        "6257ef4ebb36517ae7e649ae",
-        "6257ef4ebb36517ae7e649af",
-        "6257ef4ebb36517ae7e649b0",
-        "6257ef4ebb36517ae7e649b1",
-        "6257ef4ebb36517ae7e649b2",
-        "6257ef4ebb36517ae7e649b3",
-        "6257ef4ebb36517ae7e649b4",
-        "6257ef4ebb36517ae7e649b5",
-        "6257ef4ebb36517ae7e649b6",
-        "6257ef4ebb36517ae7e649b7",
-        "6257ef4ebb36517ae7e649b8",
-        "6257ef4ebb36517ae7e649b9",
-        "6257ef4ebb36517ae7e649ba",
-        "6257ef4ebb36517ae7e649bb",
-        "6257ef4ebb36517ae7e649bc",
-        "6257ef4ebb36517ae7e649bd",
-        "6272708a2409841c5629ecd5",
-        "6272847dfa2bbd7750a9169c",
-        "627284fdfa2bbd7750a9169d",
-        "6272850cfa2bbd7750a9169e",
-        "627b76d5597de7d8d729ae96",
-        "627b7dd4878da1ccea8fb606"
+        "6320357fd204dc4bd1e0bdce",
+        "6320357fd204dc4bd1e0bde7",
+        "6320357fd204dc4bd1e0bdea",
+        "6320357fd204dc4bd1e0bdeb"
       ],
-      "max_thread": 10,
-      "name": "ALL",
-      "owner": "Fabien",
+      "indb": "pollenisator",
+      "max_thread": 4,
+      "name": "Exploit scanner",
+      "owner": "admin",
+      "priority": 2,
       "sleep_between": 0
+    },
+    {
+      "_id": "ObjectId|63452d3442a9ffc4451fdb78",
+      "commands": [
+        "6320357fd204dc4bd1e0bdf0"
+      ],
+      "indb": "pollenisator",
+      "max_thread": 4,
+      "name": "Fast service discovery",
+      "owner": "admin",
+      "sleep_between": 0
+    },
+    {
+      "_id": "ObjectId|63452d5542a9ffc4451fdb79",
+      "commands": [
+        "6320357fd204dc4bd1e0bdcf",
+        "6320357fd204dc4bd1e0bdd0"
+      ],
+      "indb": "pollenisator",
+      "max_thread": 4,
+      "name": "Slow extended service discovery",
+      "owner": "admin",
+      "priority": 99,
+      "sleep_between": 0
+    },
+    {
+      "_id": "ObjectId|63452d8b42a9ffc4451fdb7a",
+      "commands": [
+        "6320357fd204dc4bd1e0bdd4",
+        "6320357fd204dc4bd1e0bdd5",
+        "6320357fd204dc4bd1e0bde0",
+        "6320357fd204dc4bd1e0bde1"
+      ],
+      "indb": "pollenisator",
+      "max_thread": 4,
+      "name": "Host full service enumeration",
+      "owner": "admin",
+      "priority": 3,
+      "sleep_between": 0
+    },
+    {
+      "_id": "ObjectId|63452de542a9ffc4451fdb7b",
+      "commands": [
+        "6320357fd204dc4bd1e0bdd1",
+        "6320357fd204dc4bd1e0bdd2",
+        "6320357fd204dc4bd1e0bdd3",
+        "6320357fd204dc4bd1e0bdd6",
+        "6320357fd204dc4bd1e0bdd7",
+        "6320357fd204dc4bd1e0bdd8",
+        "6320357fd204dc4bd1e0bdd9",
+        "6320357fd204dc4bd1e0bde2",
+        "6320357fd204dc4bd1e0bde3",
+        "6320357fd204dc4bd1e0bde6",
+        "6320357fd204dc4bd1e0bde8",
+        "6320357fd204dc4bd1e0bdea",
+        "6320357fd204dc4bd1e0bded",
+        "6320357fd204dc4bd1e0bdee",
+        "6320357fd204dc4bd1e0bdef"
+      ],
+      "indb": "pollenisator",
+      "max_thread": 4,
+      "name": "Target service enumeration",
+      "owner": "admin",
+      "priority": 2,
+      "sleep_between": 0
+    },
+    {
+      "_id": "ObjectId|63452e0442a9ffc4451fdb7c",
+      "commands": [
+        "6320357fd204dc4bd1e0bdda",
+        "6320357fd204dc4bd1e0bddb",
+        "6320357fd204dc4bd1e0bddc"
+      ],
+      "indb": "pollenisator",
+      "max_thread": 3,
+      "name": "Discover domains",
+      "owner": "admin",
+      "sleep_between": 0
+    },
+    {
+      "_id": "ObjectId|63452e3a42a9ffc4451fdb7d",
+      "commands": [
+        "6320357fd204dc4bd1e0bddd",
+        "6320357fd204dc4bd1e0bdde",
+        "6320357fd204dc4bd1e0bddf"
+      ],
+      "indb": "pollenisator",
+      "max_thread": 2,
+      "name": "Enumerate unknown services",
+      "owner": "admin",
+      "priority": 98,
+      "sleep_between": 0
+    },
+    {
+      "_id": "ObjectId|634570f2a94b013014afc81c",
+      "commands": [
+        "63456f986c6f7c5cd78bbf57",
+        "634570e2a94b013014afc81b"
+      ],
+      "indb": "pollenisator",
+      "max_thread": 1,
+      "name": "Authenticated web",
+      "owner": "admin",
+      "priority": 0
+    },
+    {
+      "_id": "ObjectId|634590ff479983afbd728d38",
+      "commands": [
+        "634589e5ea20fc6c9cdffaab",
+        "634589f8ea20fc6c9cdffaac",
+        "63458a11ea20fc6c9cdffaad",
+        "63458a79ea20fc6c9cdffaae",
+        "63458ad2ea20fc6c9cdffaaf"
+      ],
+      "indb": "pollenisator",
+      "max_thread": 2,
+      "name": "Active Directory enumeration",
+      "owner": "admin",
+      "priority": 0
     }
   ],
   "commands": [
     {
-      "_id": "ObjectId|62874abb38445d337e02c639",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdce",
       "bin_path": "bluekeep",
       "indb": "pollenisator",
       "lvl": "port",
@@ -98,7 +170,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c63a",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdcf",
       "bin_path": "nmap",
       "indb": "pollenisator",
       "lvl": "network",
@@ -118,7 +190,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c63b",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdd0",
       "bin_path": "nmap",
       "indb": "pollenisator",
       "lvl": "network",
@@ -137,7 +209,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c63c",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdd1",
       "bin_path": "whatweb",
       "indb": "pollenisator",
       "lvl": "port",
@@ -156,7 +228,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c63d",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdd2",
       "bin_path": "testssl",
       "indb": "pollenisator",
       "lvl": "port",
@@ -176,7 +248,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c63e",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdd3",
       "bin_path": "nikto",
       "indb": "pollenisator",
       "lvl": "port",
@@ -196,7 +268,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c63f",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdd4",
       "bin_path": "dig",
       "indb": "pollenisator",
       "lvl": "ip",
@@ -216,7 +288,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c640",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdd5",
       "bin_path": "python",
       "indb": "pollenisator",
       "lvl": "ip",
@@ -236,7 +308,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c641",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdd6",
       "bin_path": "dirsearch",
       "indb": "pollenisator",
       "lvl": "port",
@@ -256,7 +328,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c642",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdd7",
       "bin_path": "dirsearch",
       "indb": "pollenisator",
       "lvl": "port",
@@ -276,7 +348,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c643",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdd8",
       "bin_path": "whatweb",
       "indb": "pollenisator",
       "lvl": "port",
@@ -296,7 +368,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c644",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdd9",
       "bin_path": "ssh_scan",
       "indb": "pollenisator",
       "lvl": "port",
@@ -316,7 +388,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c645",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdda",
       "bin_path": "crtsh.py",
       "indb": "pollenisator",
       "lvl": "domain",
@@ -335,7 +407,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c646",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bddb",
       "bin_path": "knockpy",
       "indb": "pollenisator",
       "lvl": "domain",
@@ -354,7 +426,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c647",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bddc",
       "bin_path": "sublist3r",
       "indb": "pollenisator",
       "lvl": "domain",
@@ -373,7 +445,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c648",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bddd",
       "bin_path": "nmap",
       "indb": "pollenisator",
       "lvl": "port",
@@ -393,7 +465,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c649",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdde",
       "bin_path": "nmap",
       "indb": "pollenisator",
       "lvl": "port",
@@ -413,7 +485,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c64a",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bddf",
       "bin_path": "nmap",
       "indb": "pollenisator",
       "lvl": "port",
@@ -433,7 +505,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c64b",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bde0",
       "bin_path": "nmap",
       "indb": "pollenisator",
       "lvl": "ip",
@@ -453,7 +525,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c64c",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bde1",
       "bin_path": "nmap",
       "indb": "pollenisator",
       "lvl": "ip",
@@ -472,7 +544,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c64d",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bde2",
       "bin_path": "nmap",
       "indb": "pollenisator",
       "lvl": "port",
@@ -492,7 +564,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c64e",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bde3",
       "bin_path": "nmap",
       "indb": "pollenisator",
       "lvl": "port",
@@ -512,7 +584,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c64f",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bde4",
       "bin_path": "smbmap",
       "indb": "pollenisator",
       "lvl": "port",
@@ -531,7 +603,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c650",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bde5",
       "bin_path": "nmap",
       "indb": "pollenisator",
       "lvl": "port",
@@ -550,7 +622,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c651",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bde6",
       "bin_path": "enum4linux",
       "indb": "pollenisator",
       "lvl": "port",
@@ -569,7 +641,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c652",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bde7",
       "bin_path": "nmap",
       "indb": "pollenisator",
       "lvl": "port",
@@ -588,7 +660,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c653",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bde8",
       "bin_path": "sudo ikescan",
       "indb": "pollenisator",
       "lvl": "port",
@@ -607,7 +679,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c654",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bde9",
       "bin_path": "cme",
       "indb": "pollenisator",
       "lvl": "network",
@@ -626,7 +698,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c655",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdea",
       "bin_path": "nmap",
       "indb": "pollenisator",
       "lvl": "port",
@@ -645,7 +717,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c656",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdeb",
       "bin_path": "searchsploit",
       "indb": "pollenisator",
       "lvl": "port",
@@ -664,7 +736,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c657",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdec",
       "bin_path": "dnsrecon",
       "indb": "pollenisator",
       "lvl": "network",
@@ -682,7 +754,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c658",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bded",
       "bin_path": "smbmap",
       "indb": "pollenisator",
       "lvl": "port",
@@ -700,7 +772,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c659",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdee",
       "bin_path": "nuclei",
       "indb": "pollenisator",
       "lvl": "port",
@@ -718,7 +790,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c65a",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdef",
       "bin_path": "nuclei",
       "indb": "pollenisator",
       "lvl": "port",
@@ -736,7 +808,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c65b",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdf0",
       "bin_path": "nmap",
       "indb": "pollenisator",
       "lvl": "network",
@@ -756,98 +828,7 @@
       ]
     },
     {
-      "_id": "ObjectId|62874abd38445d337e02c65c",
-      "bin_path": "dirsearch",
-      "indb": "pollenisator",
-      "lvl": "auth:cookie",
-      "max_thread": 3,
-      "name": "Dirsearch.https_auth",
-      "plugin": "Dirsearch",
-      "ports": "https,http/ssl,ssl/http,ssl/ssl,ssl/https,ssl/http",
-      "priority": 0,
-      "safe": true,
-      "sleep_between": 0,
-      "text": "-u https://|ip|:|port| --cookie='|port.infos.auth_cookie|'",
-      "timeout": 300,
-      "types": [
-        "Web"
-      ]
-    },
-    {
-      "_id": "ObjectId|62874abd38445d337e02c65d",
-      "bin_path": "dirsearch",
-      "indb": "pollenisator",
-      "lvl": "auth:cookie",
-      "max_thread": 3,
-      "name": "Dirsearch.http_auth",
-      "plugin": "Dirsearch",
-      "ports": "http",
-      "priority": 0,
-      "safe": true,
-      "sleep_between": 0,
-      "text": "-u http://|ip|:|port| --cookie='|port.infos.auth_cookie|'",
-      "timeout": 300,
-      "types": [
-        "Web",
-        "LAN"
-      ]
-    },
-    {
-      "_id": "ObjectId|62874abd38445d337e02c65e",
-      "bin_path": "nuclei",
-      "indb": "pollenisator",
-      "lvl": "auth:cookie",
-      "max_thread": 1,
-      "name": "nuclei.http_auth",
-      "plugin": "Nuclei",
-      "ports": "80,http",
-      "priority": 10,
-      "safe": true,
-      "sleep_between": 0,
-      "text": "-u http://|ip|:|port| -H 'Cookie: |port.infos.auth_cookie|'",
-      "timeout": 300,
-      "types": [
-        "Web"
-      ]
-    },
-    {
-      "_id": "ObjectId|62874abd38445d337e02c65f",
-      "bin_path": "nuclei",
-      "indb": "pollenisator",
-      "lvl": "auth:cookie",
-      "max_thread": 1,
-      "name": "nuclei.https_auth",
-      "plugin": "Nuclei",
-      "ports": "https,http/ssl,ssl/http,ssl/ssl,ssl/https,ssl/http,ssl/ssl",
-      "priority": 10,
-      "safe": true,
-      "sleep_between": 0,
-      "text": "-u https://|ip|:|port| -H 'Cookie: |port.infos.auth_cookie|'",
-      "timeout": 300,
-      "types": [
-        "Web"
-      ]
-    },
-    {
-      "_id": "ObjectId|62874abd38445d337e02c660",
-      "bin_path": "runfinger",
-      "indb": "pollenisator",
-      "lvl": "network",
-      "max_thread": 3,
-      "name": "Runfinger",
-      "plugin": "RunFinger",
-      "ports": "",
-      "priority": 0,
-      "safe": true,
-      "sleep_between": 0,
-      "text": "-i |scope|",
-      "timeout": 300,
-      "types": [
-        "LAN"
-      ]
-    },
-    {
-      "_id": "ObjectId|62874abd38445d337e02c661",
+      "_id": "ObjectId|6320357fd204dc4bd1e0bdf1",
       "bin_path": "nmap",
       "indb": "pollenisator",
       "lvl": "network",
@@ -862,6 +843,128 @@
       "timeout": 300,
       "types": [
         "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|63456f986c6f7c5cd78bbf57",
+      "bin_path": "dirsearch",
+      "indb": "pollenisator",
+      "lvl": "auth:cookie",
+      "name": "Dirsearch.https_auth",
+      "plugin": "Dirsearch",
+      "ports": "https,http/ssl,ssl/http,ssl/ssl,ssl/https,ssl/http",
+      "safe": true,
+      "text": "-u https://|ip|:|port| --cookie=|port.infos.auth_cookie|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|634570e2a94b013014afc81b",
+      "bin_path": "dirsearch",
+      "indb": "pollenisator",
+      "lvl": "auth:cookie",
+      "name": "Dirsearch.http_auth",
+      "plugin": "Dirsearch",
+      "ports": "http",
+      "safe": true,
+      "text": "-u http://|ip|:|port| --cookie=|port.infos.auth_cookie|",
+      "timeout": 300,
+      "types": [
+        "Web",
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|634589e5ea20fc6c9cdffaab",
+      "bin_path": "cme",
+      "indb": "pollenisator",
+      "lvl": "AD:onFirstAdminOnComputer",
+      "name": "CME lsa",
+      "plugin": "CME",
+      "ports": "445",
+      "safe": true,
+      "text": "smb |ip| -u |tool.infos.username| -p |tool.infos.password| -d |tool.infos.domain| --lsa",
+      "timeout": 300,
+      "types": [
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|634589f8ea20fc6c9cdffaac",
+      "bin_path": "cme",
+      "indb": "pollenisator",
+      "lvl": "AD:onFirstAdminOnComputer",
+      "name": "CME sam",
+      "plugin": "CME",
+      "ports": "445",
+      "safe": true,
+      "text": "smb |ip| -u |tool.infos.username| -p |tool.infos.password| -d |tool.infos.domain| --sam",
+      "timeout": 300,
+      "types": [
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|63458a11ea20fc6c9cdffaad",
+      "bin_path": "cme",
+      "indb": "pollenisator",
+      "lvl": "AD:onFirstAdminOnComputer",
+      "name": "CME lsassy",
+      "plugin": "CME",
+      "ports": "445",
+      "safe": true,
+      "text": "smb |ip| -u |tool.infos.username| -p |tool.infos.password| -d |tool.infos.domain| -M lsassy",
+      "timeout": 300,
+      "types": [
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|63458a79ea20fc6c9cdffaae",
+      "bin_path": "cme",
+      "indb": "pollenisator",
+      "lvl": "AD:onFirstAdminOnDC",
+      "name": "CME ntds",
+      "plugin": "CME",
+      "ports": "445",
+      "safe": true,
+      "text": "smb |ip| -u |tool.infos.username| -p |tool.infos.password| -d |tool.infos.domain| --ntds vss",
+      "timeout": 300,
+      "types": [
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|63458ad2ea20fc6c9cdffaaf",
+      "bin_path": "enum4linux",
+      "indb": "pollenisator",
+      "lvl": "AD:onFirstUserOnDC",
+      "name": "Enum4linux DC",
+      "plugin": "Enum4Linux",
+      "ports": "445",
+      "safe": true,
+      "text": "-a -u '|tool.infos.username|' -p '|tool.infos.password|' -w '|tool.infos.domain|' |ip|",
+      "timeout": 300,
+      "types": [
+        "LAN"
+      ]
+    },
+    {
+      "_id": "ObjectId|6346bd66e1de5542bf19c6ef",
+      "bin_path": "runfinger",
+      "indb": "pollenisator",
+      "lvl": "network",
+      "name": "Runfinger",
+      "plugin": "RunFinger",
+      "ports": "",
+      "safe": true,
+      "text": "-i |scope|",
+      "timeout": 300,
+      "types": [
         "LAN"
       ]
     }
