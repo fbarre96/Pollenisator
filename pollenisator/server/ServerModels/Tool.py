@@ -8,6 +8,8 @@ from pollenisator.core.Controllers.ToolController import ToolController
 from pollenisator.server.ServerModels.Command import ServerCommand
 from pollenisator.server.ServerModels.CommandGroup import ServerCommandGroup
 from pollenisator.server.ServerModels.Element import ServerElement
+from pollenisator.core.Components.SocketManager import SocketManager
+
 from pollenisator.core.Components.Utils import JSONEncoder, checkCommandService, isNetworkIp, loadPlugin
 from datetime import datetime
 import os
@@ -501,11 +503,11 @@ def launchTask(pentest, tool_iid, body, **kwargs):
     update(pentest, tool_iid, ToolController(launchableTool).getData())
     # Mark the tool as running (scanner_ip is set and dated is set, datef is "None")
     # Use socket sid as room so that only this worker will receive this task
-    from pollenisator.api import socketio
     socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":workerName}, False)
     if socket is None:
         return "Socket not found", 503
-    socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(launchableToolId)}, room=socket["sid"])
+    sm = SocketManager.getInstance()
+    sm.socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(launchableToolId)}, room=socket["sid"])
     return "Success ", 200
 
     
@@ -532,7 +534,8 @@ def stopTask(pentest, tool_iid, body):
         return "The worker running this tool is not running anymore", 404
     from pollenisator.api import socketio
     socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":saveScannerip}, False)
-    socketio.emit('stopCommand', {'pentest': pentest, "tool_iid":str(tool_iid)}, room=socket["sid"])
+    sm = SocketManager.getInstance()
+    sm.socketio.emit('stopCommand', {'pentest': pentest, "tool_iid":str(tool_iid)}, room=socket["sid"])
     if not forceReset:
         stopableTool.markAsNotDone()
         update(pentest, tool_iid, ToolController(stopableTool).getData())
