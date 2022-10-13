@@ -203,7 +203,7 @@ def update(pentest, port_iid, body):
     oldService = oldPort.service
     if oldService != port_o.service:
         mongoInstance.delete("tools", {
-                                "lvl": "port", "ip": port_o.ip, "port": port_o.port, "proto": port_o.proto}, many=True)
+                                "lvl": "port", "ip": oldPort.ip, "port": oldPort.port, "proto": oldPort.proto, "status":{"$ne":"done"}}, many=True)
         port_commands = mongoInstance.findInDb(
             pentest, "commands", {"lvl": "port"})
         for port_command in port_commands:
@@ -216,8 +216,8 @@ def update(pentest, port_iid, body):
                     "$eq": str(port_command["_id"]).strip()}}})
                 for wave in waves:
                     tool_m = ServerTool(pentest).initialize(port_command["_id"], wave["wave"], None, "",
-                                                port_o.ip, port_o.port, port_o.proto, "port")
-                    tool_m.addInDb()
+                                                oldPort.ip, oldPort.port, oldPort.proto, "port")
+                    tool_m.addInDb(check=False) # already checked and not updated yet so service would be wrong
     mongoInstance.update("ports", {"_id":ObjectId(port_iid)}, {"$set":body}, False, True)
     return True
     
