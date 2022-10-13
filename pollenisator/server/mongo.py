@@ -260,6 +260,10 @@ def bulk_delete_commands(body, **kwargs):
     if not isinstance(data, dict):
         return "body was not a valid dictionnary", 400
     deleted = 0
+    if "Worker" in data:
+        if data["Worker"]:
+            user = "Worker"
+            del data["Worker"]
     for obj_type in data:
         if obj_type != "commands" and obj_type != "group_commands":
             return "You can delete only commands and group_commands", 403
@@ -490,7 +494,7 @@ def importDb(upfile, **kwargs):
 
 def doImportCommands(data, user):
     try:
-        commands_and_groups = json.loads(data)
+        commands_and_groups = json.loads(data, cls=JSONDecoder)
     except:
         return "Invalid file format, json expected", 400
     if not isinstance(commands_and_groups, dict):
