@@ -1,13 +1,11 @@
 """Ip Model. Describes Hosts (not just IP now but domains too)"""
 
 from pollenisator.core.Models.Element import Element
-from bson.objectid import ObjectId
 from netaddr import IPNetwork, IPAddress
 from netaddr.core import AddrFormatError
 from pollenisator.core.Models.Port import Port
-from pollenisator.core.Models.Tool import Tool
-from pollenisator.core.Models.Defect import Defect
 from pollenisator.core.Components.Utils import isNetworkIp, performLookUp
+from pollenisator.core.Components.mongo import MongoCalendar
 import re
 
 
@@ -59,13 +57,25 @@ class Ip(Element):
         Returns:
             boolean: True if this ip/domain is in given scope. False otherwise.
         """
+        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance.connectToDb(self.pentest)
+        settings_scope_ip = mongoInstance.find("settings", {"key":"include_domains_with_ip_in_scope"}, False)
+        settings_all_domains = mongoInstance.find("settings", {"key":"include_all_domains"}, False)
+        settings_top_domain = mongoInstance.find("settings", {"key":"include_domains_with_topdomain_in_scope"}, False)
         if isNetworkIp(scope):
             if Ip.checkIpScope(scope, self.ip):
                 return True
-        elif Ip.isSubDomain(scope, self.ip):
+        elif settings_all_domains["value"]:
+            return True
+        elif Ip.isSubDomain(scope, self.ip) and settings_top_domain["value"]:
             return True
         elif self.ip == scope:
             return True
+        elif settings_scope_ip["value"]:
+            ip = performLookUp(self.ip)
+            if ip is not None and Ip.checkIpScope(scope, ip):
+                return True
+            
         return False
 
     def addPort(self, values):

@@ -242,9 +242,13 @@ def performLookUp(domain):
         Return the ip found from dns records, None if failed.
     """
     try:
-        return socket.getaddrinfo(domain, 80)
+        res = socket.getaddrinfo(domain, 80)
+        for output in res:
+            if output[0] ==  socket.AddressFamily.AF_INET:
+                return output[-1][0] 
     except socket.gaierror:
         return None
+    
 
 
 def loadCfg(cfgfile):

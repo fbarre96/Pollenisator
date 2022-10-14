@@ -1796,6 +1796,42 @@ paths:
                 Success:
                   value: 'Success'
 
+  /settings/updateTag/{pentest}:
+    put:
+      operationId: pollenisator.server.mongo.updatePentestTag
+      tags:
+        - Settings
+      summary: Update a tag color
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - color
+              properties:
+                name:
+                  type: string
+                color:
+                  type: string
+             
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Success'
+
   "/commands/find":
     post:
       operationId: pollenisator.server.ServerModels.Command.getCommands

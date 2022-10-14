@@ -1,16 +1,13 @@
-from distutils import command
-from json import tool
 import logging
 from bson import ObjectId
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Models.Tool import Tool
 from pollenisator.core.Controllers.ToolController import ToolController
 from pollenisator.server.ServerModels.Command import ServerCommand
-from pollenisator.server.ServerModels.CommandGroup import ServerCommandGroup
 from pollenisator.server.ServerModels.Element import ServerElement
 from pollenisator.core.Components.SocketManager import SocketManager
 
-from pollenisator.core.Components.Utils import JSONEncoder, checkCommandService, isNetworkIp, loadPlugin
+from pollenisator.core.Components.Utils import  checkCommandService, isNetworkIp, loadPlugin
 from datetime import datetime
 import os
 import sys
@@ -532,7 +529,6 @@ def stopTask(pentest, tool_iid, body):
         return "Tools running in localhost cannot be stopped through API", 405
     if saveScannerip not in workerNames:
         return "The worker running this tool is not running anymore", 404
-    from pollenisator.api import socketio
     socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":saveScannerip}, False)
     sm = SocketManager.getInstance()
     sm.socketio.emit('stopCommand', {'pentest': pentest, "tool_iid":str(tool_iid)}, room=socket["sid"])

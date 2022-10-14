@@ -436,27 +436,31 @@ def unregisterTag(body):
             mongoInstance.update("tools", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
     return True
 
+@permission("pentester")
+def updatePentestTag(pentest, body):
+    name = body["name"]
+    color = body["color"]
+    mongoInstance.connectToDb(pentest)
+    tags = mongoInstance.find("settings", {"key":"tags"}, False)
+    if tags is None:
+        return "Not found", 404
+    else:
+        tags = tags.get("value", {})
+        if name not in tags:
+            return  "Not found", 404
+        tags[name] = color
+        mongoInstance.update("settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
+
 @permission("user")
 def updateTag(body):
     name = body["name"]
     color = body["color"]
-    isGlobal = body.get("global", False)
-    if isGlobal:
-        tags = json.loads(mongoInstance.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=JSONDecoder)
-        if name not in tags:
-            return 404, "Not found"
-        tags[name] = color
-        mongoInstance.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=JSONEncoder)}}, many=False, notify=True)
-    else:
-        tags = mongoInstance.find("settings", {"key":"tags"}, False)
-        if tags is None:
-            return 404, "Not found"
-        else:
-            tags = tags.get("value", {})
-            if name not in tags:
-                return 404, "Not found"
-            tags[name] = color
-            mongoInstance.update("settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
+    tags = json.loads(mongoInstance.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=JSONDecoder)
+    if name not in tags:
+        return "Not found", 404
+    tags[name] = color
+    mongoInstance.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=JSONEncoder)}}, many=False, notify=True)
+
     return True
 
 @permission("pentester", "dbName")
