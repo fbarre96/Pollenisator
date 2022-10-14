@@ -30,7 +30,7 @@ def status():
 
 def getVersion():
     # TODO : return connexion openapi version instead
-    return "1.4.0"
+    return "1.5.0"
 
 @permission("pentester")
 def update(pentest, collection, body):
