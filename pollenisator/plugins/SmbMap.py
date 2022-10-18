@@ -88,7 +88,7 @@ class SmbMap(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         notes = ""
-        tags = ["smbmap-todo"]
+        tags = []
         targets = {}
         cmdline = kwargs.get("cmdline", None)
         tool_m = kwargs.get("tool", None)
@@ -163,4 +163,6 @@ class SmbMap(Plugin):
 
             if password == "":
                 tags += ["anon-share-found"]
+        if notes.strip() != "" and not tags:
+            tags = ["smbmap-todo"]
         return notes, tags, "port", targets

@@ -219,6 +219,7 @@ def delete(pentest, ip_iid):
         return 0
     else:
         return res.deleted_count
+
 @permission("pentester")
 def insert(pentest, body):
     mongoInstance = MongoCalendar.getInstance()
@@ -249,6 +250,7 @@ def insert(pentest, body):
                     tool_o = ServerTool(pentest)
                     tool_o.initialize(comm_iid, waveName, None, "", ip_o.ip, "", "", "ip")
                     tool_o.addInDb()
+    # NetworkDiscovery.handleNotif(pentest, "ips", iid, "insert")
     return {"res":True, "iid":iid}
 
 @permission("pentester")

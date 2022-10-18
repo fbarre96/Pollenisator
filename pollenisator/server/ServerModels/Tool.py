@@ -43,8 +43,8 @@ class ServerTool(Tool, ServerElement):
             self.status.append("OOS")
             update(pentest, self._id, {"status": self.status})
     
-    def addInDb(self, check=True):
-        return insert(self.pentest, ToolController(self).getData(), check=check)
+    def addInDb(self, check=True, base=None):
+        return do_insert(self.pentest, ToolController(self).getData(), check=check, base=base)
 
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
@@ -305,6 +305,11 @@ def delete(pentest, tool_iid):
 
 @permission("pentester")
 def insert(pentest, body, **kwargs):
+    if "base" in kwargs:
+        del kwargs["base"]
+    do_insert(pentest, body, **kwargs)
+
+def do_insert(pentest, body, **kwargs):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     if not mongoInstance.isUserConnected():
@@ -314,6 +319,9 @@ def insert(pentest, body, **kwargs):
     tool_o = ServerTool(pentest, body)
     # Checking unicity
     base = tool_o.getDbKey()
+    if kwargs.get("base") is not None:
+        for k,v in kwargs.get("base").items():
+            base[k] = v 
     existing = mongoInstance.find("tools", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}

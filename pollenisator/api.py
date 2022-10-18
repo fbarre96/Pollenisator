@@ -49,6 +49,8 @@ def load_modules(app, main_file):
             print("LOADING MODULE "+str(path))
             with open(path) as fp2:
                 module_specs = yaml.load(fp2)
+                if module_specs is None:
+                    continue
                 if "components" in module_specs and "schemas" in module_specs["components"]:
                     for i in module_specs["components"]["schemas"]:
                         specs["components"]["schemas"].update({i:module_specs["components"]["schemas"][i]})

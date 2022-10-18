@@ -402,6 +402,17 @@ paths:
               examples:
                 Version:
                   value: '1.1.0'      
+  /users/me:
+    get:
+      operationId: pollenisator.server.mongo.getUser
+      tags:
+        - Other
+      summary: Get current user
+      security: []
+      responses:
+        '200':
+          description: Successful read user
+          
   /issue:
     post:
       operationId: pollenisator.server.logger.report

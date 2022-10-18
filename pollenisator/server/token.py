@@ -78,6 +78,6 @@ def decode_token(token):
         print("ERROR token "+str(e))
         logging.info(f"Unauthorized, token is invalid : token ({token}) error ({e})")
         six.raise_from(Unauthorized, e)
-
+    
 def _current_timestamp():
     return datetime.datetime.now().timestamp()

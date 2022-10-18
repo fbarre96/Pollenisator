@@ -5,6 +5,7 @@ from pollenisator.server.ServerModels.Tool import delete as tool_delete
 from pollenisator.server.ServerModels.Tool import ServerTool
 from pollenisator.server.ServerModels.Ip import ServerIp
 from pollenisator.server.ServerModels.Element import ServerElement
+from pollenisator.core.Controllers.ScopeController import ScopeController
 from pollenisator.core.Components.Utils import JSONEncoder, isNetworkIp, performLookUp, isIp
 import json
 from pollenisator.server.permission import permission
@@ -35,6 +36,9 @@ class ServerScope(Scope, ServerElement):
         mongoInstance.connectToDb(self.pentest)
         res = mongoInstance.find("waves", {"wave": self.wave}, False)
         return res["_id"]
+
+    def addInDb(self):
+        return insert(self.pentest, ScopeController(self).getData())
 
     def addAllTool(self, command_iid):
         """

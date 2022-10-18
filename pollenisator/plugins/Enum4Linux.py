@@ -6,12 +6,13 @@ from pollenisator.server.ServerModels.Port import ServerPort
 from pollenisator.server.modules.ActiveDirectory.computers import Computer
 from pollenisator.server.modules.ActiveDirectory.users import insert as user_insert, User
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.core.Components.Utils import performLookUp
 import json
 
 def getInfos(enum4linux_file):
     parts = ["Starting enum4linux", "Target Information", "Enumerating Workgroup/Domain", "Session Check on", 
        "Users on", "Groups on", "enum4linux complete on"]
-    infos = {"domain_users":{}}
+    infos = {"domain_users":{}, "computers":{}}
     current_part = -1
     found_marker = False
     regex_user = re.compile(r"^index: 0x[\da-f]+ RID: 0x[\da-f]+ \S+: 0x[\da-f]+ Account: (.+)(?=\s+Name:)\s+Name:.+(?=Desc:)Desc: (.+)$")
@@ -57,7 +58,12 @@ def getInfos(enum4linux_file):
                 user_info["groups"] = set(user_info.get("groups", []))
                 user_info["groups"].add(str(group))
                 user_info["groups"] = list(user_info["groups"])
-                infos["domain_users"][domain+"\\"+member] = user_info
+                if member.endswith("$"):
+                    ip = performLookUp(member[:-1]+"."+domain, nameservers=[infos["ip"]])
+                    if ip is not None:
+                        infos["computers"][member] = {"ip":ip, "member":member, "domain":domain}
+                else:    
+                    infos["domain_users"][domain+"\\"+member] = user_info
         elif current_part == 6: #enum4linux complete
             return infos
     if found_marker:
@@ -91,7 +97,11 @@ def updateDatabase(pentest, enum_infos):
         password = ""
         user_m = User(pentest).initialize(pentest, None, domain, username, password, user_add_infos.get("groups",[]), user_add_infos.get("desc"))
         user_insert(pentest, user_m.getData())
-
+    for computer, computer_infos in enum_infos.get("computers", {}).items():
+        ip_m = ServerIp().initialize(str(computer_infos["ip"]))
+        insert_ret = ip_m.addInDb()
+        comp_m = Computer(pentest).initialize(pentest, None, computer, computer_infos["ip"], computer_infos["domain"])
+        comp_m.addInDb()
     if "users" in infosToAdd:
         del infosToAdd["users"]
     if "admins" in infosToAdd:

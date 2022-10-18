@@ -12,6 +12,7 @@ from netaddr import IPNetwork
 from netaddr.core import AddrFormatError
 from bson import ObjectId
 import logging
+import dns.resolver
 
 class JSONEncoder(json.JSONEncoder):
     def default(self, o):
@@ -231,7 +232,7 @@ def execute(command, timeout=None, printStdout=True):
         raise e
 
 
-def performLookUp(domain):
+def performLookUp(domain, nameservers=['8.8.8.8', '1.1.1.1']):
     """
     Uses the socket module to get an ip from a domain.
 
@@ -241,13 +242,20 @@ def performLookUp(domain):
     Returns:
         Return the ip found from dns records, None if failed.
     """
-    try:
-        res = socket.getaddrinfo(domain, 80)
-        for output in res:
-            if output[0] ==  socket.AddressFamily.AF_INET:
-                return output[-1][0] 
-    except socket.gaierror:
+    my_resolver = dns.resolver.Resolver()
+    my_resolver.timeout = 1
+    my_resolver.lifetime = 1
+    my_resolver.nameservers = nameservers
+    try: 
+        answer = my_resolver.query(domain, 'A')
+        if answer:
+            res = answer[0].to_text()
+            if res != "0.0.0.0":
+                return res
+    except dns.resolver.LifetimeTimeout:
         return None
+    return None
+
     
 
 

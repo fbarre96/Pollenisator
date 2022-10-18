@@ -32,6 +32,10 @@ def getVersion():
     # TODO : return connexion openapi version instead
     return "1.5.0"
 
+@permission("user")
+def getUser(pentest, **kwargs):
+    return kwargs["token_info"]["sub"]
+
 @permission("pentester")
 def update(pentest, collection, body):
     pipeline = body["pipeline"] if body["pipeline"] is not None else "{}"

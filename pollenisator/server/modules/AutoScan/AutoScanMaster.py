@@ -106,6 +106,7 @@ def findLaunchableTools(pentest):
     """
     toolsLaunchable = []
     time_compatible_waves_id = searchForAddressCompatibleWithTime(pentest)
+    mongoInstance = MongoCalendar.getInstance()
     for wave_id in time_compatible_waves_id:
         #get command groups by priority
         command_groups = list(ServerCommandGroup.fetchObjects({}, pentest))
@@ -117,19 +118,18 @@ def findLaunchableTools(pentest):
                 command_group.priority > first_command_group_launched_prio+ 1: # take only prio and prio+1
                 break
             launched = 0
-            if launched == command_group.max_thread:
-                logging.info(f"Can't launch anymore command of group {command_group.name}")
-                continue
-            atLeastOneTool = False
             commandsLaunchableWave = getNotDoneTools(pentest, wave_id, command_group.commands)
+            count_running_tools = mongoInstance.countInDb(pentest, "tools", {"command_iid":{"$in":command_group.commands},"status":"running"})
             for toolId, toolModel in commandsLaunchableWave.items():
+                if count_running_tools + launched >= command_group.max_thread:
+                    logging.info(f"Can't launch anymore command of group {command_group.name}")
+                    break
                 if "error" in toolModel.status:
                     continue
                 toolsLaunchable.append(
                     {"tool": toolModel, "name": str(toolModel), "group_id":command_group.getId(),"group_name":command_group.name,"priority":int(command_group.priority), "timedout":"timedout" in toolModel.status})
-                atLeastOneTool = True
-            if atLeastOneTool:
                 launched += 1
+            if launched > 0 or count_running_tools > 0 and first_command_group_launched_prio is None:
                 first_command_group_launched_prio = command_group.priority
     return toolsLaunchable
 

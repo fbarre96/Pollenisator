@@ -1,0 +1,142 @@
+openapi: 3.0.0
+info:
+  description: Pollenisator index api file
+  version: 1.2.0
+  title: Swagger REST Article
+
+paths:
+  '/NetworkDiscovery/getModuleInfo':
+    get:
+      summary: get module info
+      operationId: pollenisator.server.modules.NetworkDiscovery.NetworkDiscovery.getModuleInfo
+      responses:
+        '200':
+          description: OK
+      description: get module info
+  # '/NetworkDiscovery/{pentest}':
+  #   post:
+  #     summary: insert network
+  #     operationId: pollenisator.server.modules.NetworkDiscovery.NetworkDiscovery.insertNetwork
+  #     responses:
+  #       '200':
+  #         description: OK
+  #     description: Add an network
+  #     requestBody:
+  #       content:
+  #         application/json:
+  #           schema:
+  #             $ref: '#/components/schemas/Networks'
+  #       description: ''
+  #     tags:
+  #       - Network Discovery
+  #   parameters:
+  #     - schema:
+  #         type: string
+  #       name: pentest
+  #       in: path
+  #       required: true
+  #       description: pentest name
+  
+  # '/NetworkDiscovery/{pentest}/{network_iid}':
+  #   parameters:
+  #     - schema:
+  #         type: string
+  #       name: pentest
+  #       in: path
+  #       required: true
+  #     - schema:
+  #         type: string
+  #       name: network_iid
+  #       in: path
+  #       required: true
+  #   delete:
+  #     summary: delete network
+  #     operationId: pollenisator.server.modules.NetworkDiscovery.NetworkDiscovery.deleteNetwork
+  #     responses:
+  #       '200':
+  #         description: OK
+  #     description: Delete an NetworkDiscovery network
+  #     tags:
+  #       - Network Discovery
+
+  '/NetworkDiscovery/{pentest}/addRangeMatchingIps':
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+    post:
+      summary: add /24 ranges matching ips in database (10.0.0.1 in db --> add 10.0.0.0/24)
+      operationId: pollenisator.server.modules.NetworkDiscovery.NetworkDiscovery.addRangeMatchingIps
+      responses:
+        '200':
+          description: OK
+      description: add /24 ranges matching ips in database (10.0.0.1 in db --> add 10.0.0.0/24)
+      tags:
+        - Network Discovery
+
+  '/NetworkDiscovery/{pentest}/addRangeCloseToOthers':
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+    post:
+      summary: add ranges close to other networks (10.1.0.0/16 in db --> add 10.0.0.0/16 and 10.2.0.0/16)
+      operationId: pollenisator.server.modules.NetworkDiscovery.NetworkDiscovery.addRangeCloseToOthers
+      responses:
+        '200':
+          description: OK
+      description: add ranges close to other networks (10.1.0.0/16 in db --> add 10.0.0.0/16 and 10.2.0.0/16)
+      tags:
+        - Network Discovery
+  
+  '/NetworkDiscovery/{pentest}/addCommonRanges':
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+    post:
+      summary: add common ranges
+      operationId: pollenisator.server.modules.NetworkDiscovery.NetworkDiscovery.addCommonRanges
+      responses:
+        '200':
+          description: OK
+      description: add common ranges
+      tags:
+        - Network Discovery
+
+  '/NetworkDiscovery/{pentest}/addAllLANRanges':
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+    post:
+      summary: add all LAN ranges as /16
+      operationId: pollenisator.server.modules.NetworkDiscovery.NetworkDiscovery.addAllLANRanges
+      responses:
+        '200':
+          description: OK
+      description: add all LAN ranges as /16
+      tags:
+        - Network Discovery
+  
+# components:
+#   schemas:
+#     Networks:
+#       title: Network
+#       type: object
+#       properties:
+#         network:
+#           type: string
+#         hostCount:
+#           type: integer
+#       required:
+#         - network
+    
