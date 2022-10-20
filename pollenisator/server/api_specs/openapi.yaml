@@ -2535,6 +2535,8 @@ paths:
               properties:
                 tool_name:
                   type: string
+                command_iid:
+                  type: string
         required: true
       responses:
         "504":

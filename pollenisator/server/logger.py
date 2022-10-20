@@ -1,10 +1,13 @@
 import os
 from datetime import datetime
-
+from pollenisator.core.Components.Utils import getMainDir
 def report(body):
+    local_path = os.path.join(getMainDir(), "logs/clients/error.log")
+    try:
+        os.makedirs(local_path)
+    except OSError:
+        pass
     err = body.get("error", "")
     if err != "":
-        logs_folder = os.path.join(os.path.dirname(
-            os.path.realpath(__file__)), "./logs/clients/error.log")
-        with open(logs_folder, "a") as f:
+        with open(local_path, "a") as f:
             f.write(str(datetime.now())+": "+err)

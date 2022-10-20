@@ -32,12 +32,14 @@ import sys
 import bcrypt
 import json
 
-from bson import ObjectId
 from pollenisator.core.Components.mongo import MongoCalendar
-from pollenisator.server.modules.Worker.worker import doDeleteWorker, removeWorkers, unregister
+from pollenisator.server.modules.Worker.worker import removeWorkers, unregister
 import connexion
 from pathlib import Path
 import ruamel.yaml
+from ruamel.yaml.comments import CommentedSeq, CommentedMap
+from collections import OrderedDict
+
 
 def load_modules(app, main_file):
     modules_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "./server/modules/")
@@ -56,7 +58,7 @@ def load_modules(app, main_file):
                         specs["components"]["schemas"].update({i:module_specs["components"]["schemas"][i]})
                 for i in module_specs["paths"]:
                     specs["paths"].update({i:module_specs["paths"][i]})
-          
+      
         with open('/tmp/bundled.yaml', 'w') as fw:
             yaml.dump(specs, fw)
             app.add_api('/tmp/bundled.yaml')
@@ -66,7 +68,7 @@ def load_modules(app, main_file):
 server_folder = os.path.join(os.path.dirname(
     os.path.realpath(__file__)), "./server/api_specs/")
 app = connexion.App(__name__, specification_dir=server_folder, debug=debug)
-
+flask_app = app.app
 # Create a URL route in our application for "/"
 
 @app.route('/')
@@ -148,7 +150,7 @@ def init():
         ssl_context = None
     return port
 
-def main():
+def create_app():
     # Read the openapi.yaml file to configure the endpoints
     print("LOADING MAIN API")
     #app.add_api('openapi.yaml')
@@ -201,6 +203,14 @@ def main():
     # Tell your app object which encoder to use to create JSON from objects.
     flask_app.json_encoder = JSONEncoder
     CORS(flask_app)
+    return flask_app
+
+def main():
+    app = create_app()
+    run(flask_app)
+    
+def run(flask_app):
+    sm = SocketManager.getInstance()
     port = init()
     try:
         sm.socketio.run(flask_app, host='0.0.0.0', port=port,
@@ -209,7 +219,7 @@ def main():
         pass
     return sm.socketio
 
-
 # If we're running in stand alone mode, run the application
 if __name__ == '__main__':
     main()
+    

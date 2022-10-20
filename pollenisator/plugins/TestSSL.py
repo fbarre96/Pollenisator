@@ -4,7 +4,6 @@ import re
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.server.ServerModels.Ip import ServerIp
 from pollenisator.server.ServerModels.Port import ServerPort
-from pollenisator.server.ServerModels.Defect import ServerDefect
 
 def parseWarnings(pentest, file_opened):
     """
@@ -64,7 +63,6 @@ def parseWarnings(pentest, file_opened):
                 notes = "\n".join(missconfiguredHosts[ip][port])
                 p_o.addTag("SSL/TLS-flaws")
                 p_o.updateInfos({"compliant": "False"})
-                
         if firstLine:
             return None, None
     return str(len(missconfiguredHosts.keys()))+" misconfigured hosts found. Defects created.", targets

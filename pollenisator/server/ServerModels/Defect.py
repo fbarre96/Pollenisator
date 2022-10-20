@@ -185,6 +185,7 @@ def update(pentest, defect_iid, body):
     defect_o = ServerDefect.fetchObject(pentest, {"_id":ObjectId(defect_iid)})
     if defect_o is None:
         return "This defect does not exist", 404
+
     oldRisk = defect_o.risk
     if not defect_o.isAssigned():
         if body.get("risk", None) is not None and pentest != "pollenisator":
