@@ -34,9 +34,6 @@ def deleteCommandGroup(command_group_iid, **kwargs):
     group = mongoInstance.findInDb("pollenisator", "group_commands", {"_id": ObjectId(command_group_iid)}, False)
     if group is None:
         return "Not found", 404
-    if group["owner"] != "Worker":
-        if group["owner"] != user and group["owner"] != "":
-            return "Forbidden", 403
     return doDelete("pollenisator", group)
 
 @permission("pentester")
@@ -46,9 +43,6 @@ def delete(pentest, command_group_iid, **kwargs):
     group = mongoInstance.findInDb(pentest, "group_commands", {"_id": ObjectId(command_group_iid)}, False)
     if group is None:
         return "Not found", 404
-    if group["owner"] != "Worker":
-        if group["owner"] != user and group["owner"] != "":
-            return "Forbidden", 403
     return doDelete(pentest, group)
 
 def doDelete(pentest, group):
@@ -61,15 +55,14 @@ def doDelete(pentest, group):
         return res.deleted_count
 
 
-def doInsert(pentest, body, user):
+def doInsert(pentest, body):
     mongoInstance = MongoCalendar.getInstance()
     if "_id" in body:
         del body["_id"]
     existing = mongoInstance.findInDb(
-            body.get("indb", "pollenisator"), "group_commands", {"name": body["name"], "owner":user}, False)
+            body.get("indb", "pollenisator"), "group_commands", {"name": body["name"]}, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
-    body["owner"] = user
     ins_result = mongoInstance.insertInDb(body.get("indb", "pollenisator"), "group_commands", body, '', True)
     iid = ins_result.inserted_id
     return {"res":True, "iid":iid}
@@ -77,10 +70,7 @@ def doInsert(pentest, body, user):
 
 @permission("pentester")
 def insert(pentest, body, **kwargs):
-    user = kwargs["token_info"]["sub"]
-    if body.get("owner", "") == "Worker":
-        return doInsert(pentest, body, "Worker")
-    return doInsert(pentest, body, user)
+    return doInsert(pentest, body)
     
 
 @permission("user")
@@ -96,25 +86,20 @@ def getCommandGroups(body):
 
 @permission("pentester")
 def update(pentest, command_group_iid, body, **kwargs):
-    user = kwargs["token_info"]["sub"] if body.get("owner", "") != "Worker" else "Worker"
     mongoInstance = MongoCalendar.getInstance()
     group = CommandGroup(mongoInstance.find(
         "group_commands", {"_id": ObjectId(command_group_iid)}, False))
-    if group.owner != user  and group.owner != "" and group.owner != "Worker":
-        return "Forbidden", 403
-    if "owner" in body:
-        del body["owner"]
     if "_id" in body:
         del body["_id"]
     if "name" in body:
         del body["name"]
-    res = mongoInstance.updateInDb(group.indb, "group_commands", {"_id":ObjectId(command_group_iid), "owner":user}, {"$set":body}, False, True)
+    res = mongoInstance.updateInDb(group.indb, "group_commands", {"_id":ObjectId(command_group_iid),}, {"$set":body}, False, True)
     return True
 
 def addUserGroupCommandsToPentest(pentest, user):
     mongoInstance = MongoCalendar.getInstance()
     mygroupcommands = mongoInstance.findInDb(
-        "pollenisator", "group_commands", {"owner": user}, True)
+        "pollenisator", "group_commands", {}, True)
     for gr in mygroupcommands:
         mygr = gr
         new_comms = []
@@ -125,9 +110,11 @@ def addUserGroupCommandsToPentest(pentest, user):
                 "pollenisator", "commands", {"_id":ObjectId(original_comm_id)}, False)
             if original_comm:
                 copied_comm = mongoInstance.findInDb(
-                    pentest, "commands", {"name":original_comm["name"], "owner":original_comm["owner"]}, False)
+                    pentest, "commands", {"name":original_comm["name"]}, False)
+                if copied_comm is None:
+                    return False
                 new_comms.append(str(copied_comm["_id"]))
         mygr["commands"] = new_comms
         mygr["indb"] = pentest
-        res = doInsert(pentest, mygr, user)
+        res = doInsert(pentest, mygr)
     return True

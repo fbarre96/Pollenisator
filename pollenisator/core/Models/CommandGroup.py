@@ -16,21 +16,20 @@ class CommandGroup(Element):
         Args:
             valueFromDb: a dict holding values to load into the object. A mongo fetched command group is optimal.
                         possible keys with default values are : _id (None), parent (None), tags([]), infos({}),
-                        name(""), owner(""), priority("0"), commands([]), indb("pollenisator")
+                        name(""), priority("0"), commands([]), indb("pollenisator")
                         max_thread("1")
         """
         if valuesFromDb is None:
             valuesFromDb = {}
         super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None), valuesFromDb.get(
             "tags", []), valuesFromDb.get("infos", {}))
-        self.initialize(valuesFromDb.get("name", ""), valuesFromDb.get("owner", ""), valuesFromDb.get("priority", 0), valuesFromDb.get("commands", []),
+        self.initialize(valuesFromDb.get("name", ""), valuesFromDb.get("priority", 0), valuesFromDb.get("commands", []),
                         valuesFromDb.get("max_thread", 1), valuesFromDb.get("indb", "pollenisator"), valuesFromDb.get("infos", {}))
 
-    def initialize(self, name, owner, priority=0, commands=None, max_thread=1, indb="pollenisator", infos=None):
+    def initialize(self, name, priority=0, commands=None, max_thread=1, indb="pollenisator", infos=None):
         """Set values of command group
         Args:
             name: the command group name
-            owner: the user owner of this group
             priority: priority when autoscanning. Default is 0.
             commands: list of command names that are part of this group. Default is None and stores an empty array
             max_thread: number of parallel execution possible of this command. Default is 1.
@@ -41,7 +40,6 @@ class CommandGroup(Element):
         if commands is None:
             commands = []
         self.name = name
-        self.owner = owner
         self.indb = indb
         self.priority = int(priority)
         self.commands = commands

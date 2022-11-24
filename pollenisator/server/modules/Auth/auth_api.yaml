@@ -7,6 +7,8 @@ info:
 paths:
   '/auth/getModuleInfo':
     get:
+      tags:
+        - Authentication Info
       summary: get module info
       operationId: pollenisator.server.modules.Auth.auth.getModuleInfo
       responses:

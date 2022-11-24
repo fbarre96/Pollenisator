@@ -72,7 +72,7 @@ def getCommands(body):
 def doDelete(pentest, command):
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
-    mongoInstance.updateInDb("pollenisator", "group_commands", {"owner": command.owner}, {
+    mongoInstance.updateInDb("pollenisator", "group_commands", {}, {
         "$pull": {"commands": command._id}}, True, True)
     # Remove from all waves this command.
     if command.indb == "pollenisator":
@@ -107,8 +107,7 @@ def deleteCommand(command_iid, **kwargs):
     if c is None:
         return "Not found", 404
     command = Command(c)
-    if command.owner != user and command.owner != "" and command.owner != "Worker":
-        return "Forbidden", 403
+
     return doDelete("pollenisator", command)
 
 @permission("pentester")
@@ -121,21 +120,18 @@ def delete(pentest, command_iid, **kwargs):
     if c is None:
         return "Not found", 404
     command = Command(c)
-    if command.owner != "Worker":
-        if command.owner != user and command.owner != "":
-            return "Forbidden", 403
     return doDelete(pentest, command)
     
 
 def doInsert(pentest, body, user):
     mongoInstance = MongoCalendar.getInstance()
     existing = mongoInstance.findInDb(
-        body["indb"], "commands", {"owner": user, "name": body["name"]}, False)
+        body["indb"], "commands", {"name": body["name"]}, False)
     if existing is not None:
         return {"res": False, "iid": existing["_id"]}
     if "_id" in body:
         del body["_id"]
-    body["owner"] = user
+    body["owners"] = [user]
     ins_result = mongoInstance.insertInDb(
         body["indb"], "commands", body, '', True)
     iid = ins_result.inserted_id
@@ -144,21 +140,16 @@ def doInsert(pentest, body, user):
 @permission("pentester")
 def insert(pentest, body, **kwargs):
     user = kwargs["token_info"]["sub"]
-    if body.get("owner", "") == "Worker":
-        return doInsert(pentest, body, "Worker")
     return doInsert(pentest, body, user)
    
 
 @permission("pentester")
 def update(pentest, command_iid, body, **kwargs):
-    user = kwargs["token_info"]["sub"] if body.get("owner", "") != "Worker" else "Worker"
     mongoInstance = MongoCalendar.getInstance()
     command = Command(mongoInstance.find(
         "commands", {"_id": ObjectId(command_iid)}, False))
-    if command.owner != user  and command.owner != "" and command.owner != "Worker":
-        return "Forbidden", 403
-    if "owner" in body:
-        del body["owner"]
+    if "owners" in body:
+        del body["owners"]
     if "_id" in body:
         del body["_id"]
     mongoInstance.updateInDb(command.indb, "commands", {"_id": ObjectId(command_iid)}, {"$set": body}, False, True)
@@ -171,30 +162,29 @@ def addToMyCommands(command_iid, **kwargs):
     res = mongoInstance.findInDb("pollenisator", "commands", {
                                  "_id": ObjectId(command_iid)}, False)
     if res is None:
-        return False
-    res["owner"] = user
-    res["indb"] = "pollenisator"
-    return doInsert("pollenisator", res, user)
-
-@permission("user")
-def addToWorkerCommands(command_iid, **kwargs):
-    user = kwargs["token_info"]["sub"]
-    mongoInstance = MongoCalendar.getInstance()
-    res = mongoInstance.findInDb("pollenisator", "commands", {
-                                 "_id": ObjectId(command_iid)}, False)
-    if res is None:
-        return False
-    res["owner"] = "Worker"
-    res["indb"] = "pollenisator"
-    return doInsert("pollenisator", res, "Worker")
-
+        return "Not found", 404
+    mongoInstance.updateInDb("pollenisator", "commands", {
+                                 "_id": ObjectId(command_iid)}, {"$push":{"owners":user}})
+    res = "Updated"
+    return "OK"
 
 def addUserCommandsToPentest(pentest, user):
     mongoInstance = MongoCalendar.getInstance()
-    mycommands = mongoInstance.findInDb(
-        "pollenisator", "commands", {"owner": user}, True)
-    for command in mycommands:
+    worker = mongoInstance.findInDb(
+        "pollenisator", "workers", {"name": user}, False)
+    if worker is not None:
+        worker_commands = worker.get("known_commands", [])
+        commands = mongoInstance.findInDb(
+            "pollenisator", "commands", {"bin_path": {"$in":worker_commands}}, True)
+    else:
+        commands = mongoInstance.findInDb(
+            "pollenisator", "commands", {"owners": user}, True)
+    for command in commands:
         mycommand = command
+        mycommand["original_iid"] = str(command["_id"])
         mycommand["indb"] = pentest
         res = doInsert(pentest, mycommand, user)
+        if not res["res"]:
+            mongoInstance.updateInDb(pentest, "commands", {
+                                 "_id": ObjectId(res["iid"])}, {"$push":{"owners":user}})
     return True

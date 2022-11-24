@@ -40,6 +40,13 @@ import ruamel.yaml
 from ruamel.yaml.comments import CommentedSeq, CommentedMap
 from collections import OrderedDict
 
+# Create the application instance
+server_folder = os.path.join(os.path.dirname(
+    os.path.realpath(__file__)), "./server/api_specs/")
+app = connexion.App(__name__, specification_dir=server_folder, debug=debug)
+flask_app = app.app
+loaded = False
+# Create a URL route in our application for "/"
 
 def load_modules(app, main_file):
     modules_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "./server/modules/")
@@ -62,14 +69,11 @@ def load_modules(app, main_file):
         with open('/tmp/bundled.yaml', 'w') as fw:
             yaml.dump(specs, fw)
             app.add_api('/tmp/bundled.yaml')
+            global loaded
+            loaded = True
         
 
-# Create the application instance
-server_folder = os.path.join(os.path.dirname(
-    os.path.realpath(__file__)), "./server/api_specs/")
-app = connexion.App(__name__, specification_dir=server_folder, debug=debug)
-flask_app = app.app
-# Create a URL route in our application for "/"
+
 
 @app.route('/')
 def home():
@@ -152,13 +156,13 @@ def init():
 
 def create_app():
     # Read the openapi.yaml file to configure the endpoints
-    print("LOADING MAIN API")
-    #app.add_api('openapi.yaml')
-    load_modules(app, os.path.join(server_folder,"openapi.yaml"))
+    logging.info("LOADING MAIN API")
+    if not loaded:
+        load_modules(app, os.path.join(server_folder,"openapi.yaml"))
 
     flask_app = app.app
     sm = SocketManager.getInstance()
-
+    logging.info('Running')
     sm.socketio.init_app(flask_app, log_output=False, logger=False,
                     engineio_logger=False, async_mode=async_mode)
     
@@ -166,12 +170,14 @@ def create_app():
     def register(data):
         mongoInstance = MongoCalendar.getInstance()
         workerName = data.get("name")
+        binaries = data.get("binaries", [])
+        
         socket = mongoInstance.findInDb("pollenisator","sockets", {"user":workerName}, False)
         if socket is None:
             mongoInstance.insertInDb("pollenisator", "sockets", {"sid":request.sid, "user":workerName, "pentest":""}, notify=False)
         else:
             mongoInstance.updateInDb("pollenisator", "sockets", {"user":workerName}, {"$set":{"sid":request.sid, "pentest":""}}, notify=False)
-        mongoInstance.registerWorker(workerName)
+        mongoInstance.registerWorker(workerName, binaries)
 
     @sm.socketio.event
     def registerForNotifications(data):
@@ -206,6 +212,7 @@ def create_app():
     return flask_app
 
 def main():
+    logging.info('MAIN')
     app = create_app()
     run(flask_app)
     
@@ -219,7 +226,7 @@ def run(flask_app):
         pass
     return sm.socketio
 
+logging.info("Script name = "+str(__name__))
 # If we're running in stand alone mode, run the application
 if __name__ == '__main__':
     main()
-    

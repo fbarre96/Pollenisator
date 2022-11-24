@@ -3,6 +3,7 @@ import logging
 import uuid
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Controllers.ToolController import ToolController
+from pollenisator.core.Components.SocketManager import SocketManager
 from pollenisator.server.ServerModels.Command import addUserCommandsToPentest
 from pollenisator.server.ServerModels.CommandGroup import addUserGroupCommandsToPentest
 from pollenisator.server.ServerModels.Tool import ServerTool, update as tool_update
@@ -35,22 +36,26 @@ def listWorkers(pipeline=None):
         ret.append(w)
     return ret
 
-def doSetInclusion(name, user, pentest, setInclusion):
-    if name != user: # is Worker
-        addUserCommandsToPentest( pentest, "Worker")
-        addUserGroupCommandsToPentest( pentest, "Worker")
+def doSetInclusion(name, pentest, setInclusion):
+    if setInclusion:
+        addUserCommandsToPentest(pentest, name)
+        addUserGroupCommandsToPentest(pentest, name)
     return mongoInstance.setWorkerInclusion(name, pentest, setInclusion)
 
 @permission("pentester", "body.db")
 def setInclusion(name, body, **kwargs):
-    "Set a worker inclusion in a pentest"
-    user = kwargs["token_info"]["sub"]
-    return doSetInclusion(name, user, body["db"], body["setInclusion"])
+    "Set inclusion in a pentest"
+    return doSetInclusion(name, body["db"], body["setInclusion"])
+
 
 def doDeleteWorker(name):
     res = mongoInstance.findInDb("pollenisator","workers",{"name":name}, False)
     if res is None:
-        return None
+        return "Worker not found", 404
+    socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":name}, False)
+    if socket is not None:
+        sm = SocketManager.getInstance()
+        sm.socketio.emit('deleteWorker', {'name': name}, room=socket["sid"])
     if res.get("container_id") is not None:
         stop_docker(res["container_id"])
     return mongoInstance.deleteWorker(name)
@@ -75,9 +80,8 @@ def removeWorkers():
 @permission("user")
 def deleteWorker(name):
     res = doDeleteWorker(name)
-    if res is None:
-        return "Worker not found", 404
-    
+    if isinstance(res, tuple):
+        return res
     return {"n":int(res.deleted_count)}
 
 def stop_docker(docker_id):

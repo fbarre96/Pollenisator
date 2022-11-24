@@ -4,4 +4,5 @@ from pollenisator.server.permission import permission
 def getModuleInfo():
 
     return {"registerLvls": ["AD:onFirstUserOnDC", "AD:onFirstAdminOnDC",  "AD:onNewUserOnDC", "AD:onNewAdminOnDC", 
-                            "AD:onFirstUserOnComputer", "AD:onFirstAdminOnComputer", "AD:onNewUserOnComputer", "AD:onNewAdminOnComputer"]}
+                            "AD:onFirstUserOnComputer", "AD:onFirstAdminOnComputer", "AD:onNewUserOnComputer", "AD:onNewAdminOnComputer",
+                            "AD:onNewDomainDiscovered", "AD:onNewValidUser", "AD:onNewUserFound"]}

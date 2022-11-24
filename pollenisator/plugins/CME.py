@@ -44,7 +44,7 @@ CONNECTED
     retour = []
     regex_info = re.compile(r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+\S+\s+\S+\[\*\]\S+\s+([^\(]+)\(name:(.+)\) \(domain:(.+)\) \(signing:(True|False)\) \(SMBv1:(False|True)\)$", re.MULTILINE)
     regex_logon_failed = re.compile(
-        r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+\S+\s+\S+\[-\]\S+ ([^\\]+)\\([^:]+):.+ (STATUS_\S+)\s*$", re.MULTILINE)
+        r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[\-\]\S+ ([^\\]+)\\([^:]+):(.*?) STATUS_LOGON_FAILURE\s*$", re.MULTILINE)
     regex_success = re.compile(
         r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[\+\]\S+ ([^\\]+)\\([^:]+):(.*?)(?= \x1b)(.+)$", re.MULTILINE)
     regex_module_lsassy = re.compile(r"^\S+LSASSY\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[33m([^\\]+)\\(\S+)\s+(\S+)(?=\x1b).+$")
@@ -130,6 +130,16 @@ CONNECTED
                             countPwn += 1
                         else:
                             countSuccess += 1
+                    else:
+                        failure_infos = re.search(regex_logon_failed, line)
+                        if failure_infos is not None:
+                            toAdd["type"] = "failure"
+                            toAdd["ip"] = failure_infos.group(1)
+                            toAdd["port"] = failure_infos.group(2)
+                            toAdd["machine_name"] = failure_infos.group(3)
+                            toAdd["domain"] = failure_infos.group(4)
+                            toAdd["username"] = failure_infos.group(5)
+                            toAdd["password"] = failure_infos.group(6)
                         
             if toAdd.keys():
                 retour.append(toAdd)
@@ -183,7 +193,7 @@ def editScopeIPs(pentest, hostsInfos):
                 domain = infos.get("domain", "")
                 if domain != "":
                     infosToAdd["domain"] = domain
-            elif infos["type"] == "success":
+            elif infos["type"] == "success" or infos["type"] == "failure":
                 powned = infos.get("powned", False)
                 creds = (infos.get("domain", ""), infos.get("username", ""), infos.get("password", infos.get("hashNT", "")))
                 infosToAdd["users"] = infosToAdd.get("users", []) + [creds]
@@ -193,7 +203,7 @@ def editScopeIPs(pentest, hostsInfos):
                 secrets = infos.get("secrets", [])
                 if secrets:
                     infosToAdd["secrets"] = infosToAdd.get("secrets", []) + secrets
-                
+
             ip_m = ServerIp().initialize(str(infos["ip"]))
             insert_ret = ip_m.addInDb()
             if not insert_ret["res"]:

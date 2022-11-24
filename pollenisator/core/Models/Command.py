@@ -17,7 +17,7 @@ class Command(Element):
         Args:
             valueFromDb: a dict holding values to load into the object. A mongo fetched command is optimal.
                         possible keys with default values are : _id (None), parent (None), tags([]), infos({}), name(""), 
-                         text(""), lvl("network"), ports(""), safe(True), types([]), indb="pollenisator", owner="",timeout="300"
+                         text(""), lvl("network"), ports(""), safe(True), types([]), indb="pollenisator", owners="",timeout="300"
         """
         if valuesFromDb is None:
             valuesFromDb = dict()
@@ -27,9 +27,9 @@ class Command(Element):
                         valuesFromDb.get("text", ""), valuesFromDb.get(
                             "lvl", "network"),
                         valuesFromDb.get("ports", ""),
-                        bool(valuesFromDb.get("safe", True)), valuesFromDb.get("types", []), valuesFromDb.get("indb", "pollenisator"), valuesFromDb.get("owner", ""), valuesFromDb.get("timeout", 300), valuesFromDb.get("infos", {}))
+                        bool(valuesFromDb.get("safe", True)), valuesFromDb.get("types", []), valuesFromDb.get("indb", "pollenisator"), valuesFromDb.get("owners", []), valuesFromDb.get("timeout", 300), valuesFromDb.get("infos", {}))
 
-    def initialize(self, name, bin_path, plugin="Default", text="", lvl="network", ports="", safe=True, types=None, indb=False, owner="", timeout=300, infos=None):
+    def initialize(self, name, bin_path, plugin="Default", text="", lvl="network", ports="", safe=True, types=None, indb=False, owners=[], timeout=300, infos=None):
         """Set values of command
         Args:
             name: the command name
@@ -56,7 +56,7 @@ class Command(Element):
         self.safe = bool(safe)
         self.infos = infos if infos is not None else {}
         self.indb = indb
-        self.owner = owner
+        self.owners = owners
         self.timeout = timeout
         self.types = types if types is not None else []
         return self
@@ -68,11 +68,11 @@ class Command(Element):
         Returns:
             Returns the command's name string.
         """
-        return self.owner+":"+self.name
+        return self.name
 
     def getDbKey(self):
         """Return a dict from model to use as unique composed key.
         Returns:
             A dict (1 key :"name")
         """
-        return {"name": self.name, "owner":self.owner}
+        return {"name": self.name}

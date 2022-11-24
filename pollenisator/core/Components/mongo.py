@@ -93,6 +93,7 @@ class MongoCalendar:
             worker_hostname: the worker name to update."""
         res = self.deleteFromDb("pollenisator", "workers", {
             "name": worker_hostname}, False, True)
+        
         return res
 
 
@@ -189,7 +190,7 @@ class MongoCalendar:
         self.deleteFromDb("pollenisator", "workers", {
             "name": worker_name}, False, True)
 
-    def registerWorker(self, worker_name):
+    def registerWorker(self, worker_name, binaries):
         from pollenisator.server.modules.Worker.worker import doSetInclusion
         try:
             if self.client is None:
@@ -198,11 +199,11 @@ class MongoCalendar:
                     raise IOError("Failed to register Worker")
             res = self.findInDb("pollenisator", "workers", {"name": worker_name}, False)
             if res is None:
-                self.insertInDb("pollenisator", "workers", {"name": worker_name, "pentest": ""}, '', True)
+                self.insertInDb("pollenisator", "workers", {"name": worker_name, "pentest": "", "known_commands":binaries}, '', True)
             else:
-                self.updateInDb("pollenisator", "workers", {"name": worker_name, "last_heartbeat":datetime.datetime.now(), "pentest":""},
-                    {"$set":{"last_heartbeat":datetime.datetime.now()}}, notify=True)
-                doSetInclusion(worker_name, "Worker", res["pentest"], True)
+                self.updateInDb("pollenisator", "workers", {"name": worker_name},
+                    {"$set":{"last_heartbeat":datetime.datetime.now(), "known_commands":binaries,  "pentest":""}}, notify=True)
+                doSetInclusion(worker_name,  res["pentest"], True)
             logging.info("Registered worker "+str(worker_name))
             return True
         except IOError as e:
@@ -277,7 +278,7 @@ class MongoCalendar:
                         self.notify(dbName, collection, elem["_id"], "update")
         return res
 
-    def insert(self, collection, values, parent=''):
+    def insert(self, collection, values, parent='', notify=True):
         """
         Wrapper for the pymongo insert_one. Then notify observers.
 
@@ -291,7 +292,7 @@ class MongoCalendar:
         """
         if values.get("parent", None) is None:
             values["parent"] = parent
-        ret = self._insert(self.calendarName, collection, values, True, parent)
+        ret = self._insert(self.calendarName, collection, values, notify, parent)
         return ret
 
     def insertInDb(self, db, collection, values, _parent='', notify=False):

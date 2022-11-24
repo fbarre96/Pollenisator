@@ -9,6 +9,7 @@ from pollenisator.server.ServerModels.Defect import getGlobalDefects
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Components.Utils import JSONEncoder, loadServerConfig, getMainDir
 from pollenisator.server.permission import permission
+from multiprocessing import Process, Manager
 import re
 import requests
 from bson import ObjectId
@@ -77,6 +78,7 @@ def uploadTemplate(upfile, lang):
 def generateReport(pentest, templateName, clientName, contractName, mainRedactor, lang):
     if not templateName.endswith(".pptx") and not templateName.endswith(".docx"):
         return "Invalid extension for template, must be pptx or docx", 400
+    
     timestr = datetime.now().strftime("%Y%m%d-%H%M%S")
     ext = os.path.splitext(templateName)[-1]
     basename = clientName.strip() + "_"+contractName.strip()
@@ -95,16 +97,29 @@ def generateReport(pentest, templateName, clientName, contractName, mainRedactor
         lang_translation = json.loads(f.read())
     context = craftContext(pentest, mainRedac=mainRedactor,
                            client=clientName.strip(), contract=contractName.strip())
+    manager = Manager()
+    return_dict = manager.dict()
+    p = Process(target=_generateDoc, args=(ext, context, template_to_use_path, out_name, lang_translation, return_dict))
+    p.start()
+    p.join()
+    if return_dict["res"]:
+        return send_file(return_dict["msg"], attachment_filename=out_name+ext)
+    else:
+        return return_dict["msg"], 400
+    
+
+def _generateDoc(ext, context, template_to_use_path, out_name, translation, return_dict):
     if ext == ".docx":
         outfile = WordExport.createReport(
-            context, template_to_use_path, out_name, translation=lang_translation)
+            context, template_to_use_path, out_name, translation=translation)
     elif ext == ".pptx":
         outfile = PowerpointExport.createReport(
-            context, template_to_use_path, out_name, translation=lang_translation)
+            context, template_to_use_path, out_name, translation=translation)
     else:
-        return "Unknown template file extension", 400
-    return send_file(outfile, attachment_filename=out_name+ext)
-
+        return_dict["res"] = False
+        return_dict["msg"] = "Unknown template file extension"
+    return_dict["res"] = True
+    return_dict["msg"] = outfile
 
 @permission("user")
 def search(body):
@@ -143,7 +158,6 @@ def search(body):
         errors += ["The knowledge database is unreachable"]
     ret = {"errors": errors , "answers":ret}
     return ret, 200
-
 
 def craftContext(pentest, **kwargs):
     mongoInstance = MongoCalendar.getInstance()

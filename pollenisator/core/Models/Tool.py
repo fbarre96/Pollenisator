@@ -77,7 +77,7 @@ class Tool(Element):
         if name is None and self.command_iid != "":
             mongoInstance = MongoCalendar.getInstance()
             res = mongoInstance.findInDb(self.pentest, "commands", {"_id":ObjectId(command_iid)}, False)
-            name = res["owner"]+":"+res["name"]
+            name = res["name"]
         self.name = name
         self.wave = wave
         self.scope = scope
@@ -170,7 +170,9 @@ class Tool(Element):
         Returns:
             string
         """
-        if self.lvl == "network" or self.lvl == "domain":
+        if self.lvl == "wave":
+            return str(self)
+        elif self.lvl == "network" or self.lvl == "domain":
             return str(self.scope)+" "+str(self)
         elif self.lvl == "ip":
             return str(self.ip)+" "+str(self)

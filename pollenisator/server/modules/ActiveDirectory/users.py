@@ -1,11 +1,14 @@
 # coding: utf-8
 
 from __future__ import absolute_import
-
+import logging
 from bson import ObjectId
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.server.ServerModels.Element import ServerElement
 from pollenisator.server.permission import permission
+from pollenisator.server.ServerModels.Command import ServerCommand
+from pollenisator.server.ServerModels.Tool import ServerTool
+
 import pollenisator.server.modules.ActiveDirectory.computers as Computer
 
 class User(ServerElement):
@@ -15,9 +18,9 @@ class User(ServerElement):
         if valuesFromDb is None:
             valuesFromDb = {}
         self.initialize(pentest, valuesFromDb.get("_id"), valuesFromDb.get("domain"), valuesFromDb.get("username"), valuesFromDb.get("password"),
-            valuesFromDb.get("groups"), valuesFromDb.get("description"))
+            valuesFromDb.get("groups"), valuesFromDb.get("description"), valuesFromDb.get("infos", {}))
 
-    def initialize(self, pentest, _id, domain=None, username=None, password=None,groups=None, description=None):
+    def initialize(self, pentest, _id, domain=None, username=None, password=None,groups=None, description=None, infos=None):
         """User
         :param pentest: current pentest 
         :type pentest: str
@@ -41,6 +44,7 @@ class User(ServerElement):
         self.domain = domain if domain is not None else  ""
         self.groups = groups
         self.description = description
+        self.infos =  infos if infos is not None else {}
         mongoInstance = MongoCalendar.getInstance()
         if pentest != "":
             self.pentest = pentest
@@ -52,7 +56,7 @@ class User(ServerElement):
   
     def getData(self):
         return {"_id": self._id, "username":self.username, "password": self.password, "domain":self.domain,
-         "groups": self.groups, "description":self.description}
+         "groups": self.groups, "description":self.description, "infos":self.infos}
 
     
     @classmethod
@@ -91,6 +95,29 @@ class User(ServerElement):
 
     def addInDb(self):
         return insert(self.pentest, self.getData())
+
+    def addTool(self, lvl, info):
+        commands = ServerCommand.fetchObjects({"lvl":lvl}, targetdb=self.pentest)
+        user_o = info.get("user")
+        if user_o is None:
+            logging.error("User was not found when trying to add ActiveDirectory tool ")
+            return
+        username = user_o.username if user_o.username is not None else ""
+        password = user_o.password if user_o.password is not None else ""
+        domain = user_o.domain if user_o.domain is not None else ""
+        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance.connectToDb(self.pentest)
+        dc_computer = mongoInstance.find("ActiveDirectory", {"type":"computer", "domain":domain, "infos.is_dc":True}, False)
+        dc_ip = None if dc_computer is None else dc_computer.get("ip")
+        infos = {"username":username, "password":password, "domain":domain, "dc_ip":dc_ip}
+        if dc_ip is None:
+            return
+        wave_d = mongoInstance.find("waves", {"wave":{"$ne":"Imported"}}, False)
+        for command in commands:
+            newTool = ServerTool(self.pentest)
+            newTool.initialize(command.getId(), wave=wave_d["wave"],
+                              name=command.name+":"+str(username), lvl=lvl, infos=infos)
+            newTool.addInDb()
 
     @property
     def username(self):
@@ -263,6 +290,10 @@ def insert(pentest, body):
     
     ins_result = mongoInstance.insert(
         "ActiveDirectory", body, True)
+    if password.strip() != "":
+        user.addTool("AD:onNewValidUser", {"user":user})
+    else:
+        user.addTool("AD:onNewUserFound", {"user":user})
     iid = ins_result.inserted_id
     return {"res": True, "iid": iid}
 

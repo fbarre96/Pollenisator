@@ -114,6 +114,10 @@ components:
           type: string
         ports:
           type: string
+        owners:
+          type: array
+          items:
+            type: string
         safe:
           type: boolean
         types:
@@ -1097,26 +1101,7 @@ paths:
               examples:
                 Server issue:
                   value: 'Failed to export'
-  "/exportCommands/worker":
-    get:
-      operationId: pollenisator.server.mongo.exportCommandsForWorker
-      tags:
-        - Commands
-      summary: Return workers commands as json
-      responses:
-        "200":
-          description:  content
-          content:
-              application/json:
-                schema:
-                  type: string
-        '503':
-          description: Failed to create an export
-          content:
-            application/json:
-              examples:
-                Server issue:
-                  value: 'Failed to export'
+ 
   "/dumpDb/{dbName}":
     get:
       operationId: pollenisator.server.mongo.dumpDb
@@ -1204,32 +1189,7 @@ paths:
               examples:
                 Success:
                   value: 'true'
-  /importCommands/worker:
-    post:
-      operationId: pollenisator.server.mongo.importCommandsForWorker
-      tags:
-        - Commands
-      summary: Import an existing command database file
-      requestBody:
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                upfile:
-                  description: The file to upload
-                  type: string
-                  format: binary
-              required:
-                - upfile
-      responses:
-        "200":
-          description: Successfully imported the file
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: 'true'
+
   /copyDb:
     post:
       operationId: pollenisator.server.mongo.copyDb
@@ -1945,78 +1905,7 @@ paths:
               examples:
                 success:
                   value: 'True'
-  "/commands/addToWorkerCommands/{command_iid}":
-    post:
-      operationId: pollenisator.server.ServerModels.Command.addToWorkerCommands
-      tags:
-        - Commands
-      summary: "Mark this command as used by the worker"
-      parameters:
-        - name: command_iid
-          in: path
-          description: command iid to mark
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: command added success
-          content:
-            application/json:
-              examples:
-                success:
-                  value: 'True'
-
-  "/waves/addMyCommandsToWave/{pentest}/{wave_iid}":
-    post:
-      operationId: pollenisator.server.ServerModels.Wave.addMyCommandsToWave
-      tags:
-        - Wave
-      summary: "Update wave to use my commands "
-      parameters:
-        - name: pentest
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: wave_iid
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: update success
-          content:
-            application/json:
-              examples:
-                success:
-                  value: 'True'
-  "/waves/addWorkerCommandsToWave/{pentest}/{wave_iid}":
-    post:
-      operationId: pollenisator.server.ServerModels.Wave.addWorkerCommandsToWave
-      tags:
-        - Wave
-      summary: "Update wave to use my commands "
-      parameters:
-        - name: pentest
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: wave_iid
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: update success
-          content:
-            application/json:
-              examples:
-                success:
-                  value: 'True'
+  
   "/commands/{pentest}":
     post:
       operationId: pollenisator.server.ServerModels.Command.insert

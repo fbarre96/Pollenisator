@@ -8,6 +8,8 @@ paths:
   '/NetworkDiscovery/getModuleInfo':
     get:
       summary: get module info
+      tags:
+        - Network Discovery
       operationId: pollenisator.server.modules.NetworkDiscovery.NetworkDiscovery.getModuleInfo
       responses:
         '200':

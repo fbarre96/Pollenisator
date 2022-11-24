@@ -8,6 +8,8 @@ paths:
   '/ActiveDirectory/getModuleInfo':
     get:
       summary: get module info
+      tags:
+        - Active Directory
       operationId: pollenisator.server.modules.ActiveDirectory.ad.getModuleInfo
       responses:
         '200':

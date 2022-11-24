@@ -165,7 +165,7 @@ class ServerTool(Tool, ServerElement):
             command = command.replace("|tool.infos."+str(info)+"|", str(tool_infos[info]))
         if isinstance(command_o, str):
             return command
-        return command_o.bin_path + " "+command
+        return command
 
     def getPluginName(self):
         mongoInstance = MongoCalendar.getInstance()
@@ -488,17 +488,9 @@ def launchTask(pentest, tool_iid, body, **kwargs):
     workers = [x["name"] for x in mongoInstance.getWorkers({"pentest":pentest})]
     logging.debug(f"Available workers are {str(workers)}")
     choosenWorker = ""
-    if command_o.owner != "Worker":
-        logging.debug(f"Owner is not Worker (user tool)")
-        if command_o.owner in workers:
-            choosenWorker = command_o.owner
-        else:
-            choosenWorker = ""
-    else:
-        logging.debug(f"Worker launch tool")
-        for workerName in workers:
-            choosenWorker = workerName
-           
+    for owner in command_o.owners:
+        if owner in workers:
+            choosenWorker = owner
     logging.debug(f"Choosen worker is {str(choosenWorker)}")
     if choosenWorker == "":
         return "No worker available", 404

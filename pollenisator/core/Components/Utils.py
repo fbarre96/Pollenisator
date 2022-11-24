@@ -28,7 +28,12 @@ class JSONDecoder(json.JSONDecoder):
         
     def object_hook(self, dct):
         for k,v in dct.items():
-            if 'ObjectId|' in str(v):
+            if isinstance(v, list):
+                for i, item in enumerate(v):
+                    if str(item).startswith('ObjectId|'):
+                        v[i] = ObjectId(str(item).split('ObjectId|')[1])
+                dct[k] = v
+            elif str(v).startswith('ObjectId|'):
                 dct[k] = ObjectId(v.split('ObjectId|')[1])
         return dct
 

@@ -1,1 +1,1 @@
-gunicorn -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker --worker-class eventlet -w 5 pollenisator.api:app 
+gunicorn --worker-class eventlet -w 1 --threads 10 pollenisator.api:app 

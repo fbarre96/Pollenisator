@@ -98,6 +98,10 @@ class Computer(ServerElement):
 
     def update(self):
         return update(self.pentest, self._id, self.getData())
+    
+    def addInDb(self):
+        return insert(self.pentest, self.getData())
+
 
     @property
     def infos(self):
@@ -136,6 +140,7 @@ class Computer(ServerElement):
                     self.addTool("AD:onNewUserOnDC", {"user":self.users[-1]})
                 self.addTool("AD:onFirstUserOnComputer", {"user":self.users[-1]})
             self.addTool("AD:onNewUserOnComputer", {"user":self.users[-1]})
+            
         self.update()
 
     def add_admin(self, domain, username, password):
@@ -153,14 +158,17 @@ class Computer(ServerElement):
         
     def addTool(self, lvl, info):
         commands = ServerCommand.fetchObjects({"lvl":lvl}, targetdb=self.pentest)
-        user_o = User.fetchObject(self.pentest, {"_id":ObjectId(info.get("user"))})
-        if user_o is None:
-            logging.error("User was not found when trying to add ActiveDirectory tool ")
-            return
-        username = user_o.username if user_o.username is not None else ""
-        password = user_o.password if user_o.password is not None else ""
-        domain = user_o.domain if user_o.domain is not None else ""
-        infos = {"username":username, "password":password, "domain":domain}
+        if lvl == "AD:onNewDomainDiscovered":
+            infos = {"domain":info.get("domain")}
+        else:
+            user_o = User.fetchObject(self.pentest, {"_id":ObjectId(info.get("user"))})
+            if user_o is None:
+                logging.error("User was not found when trying to add ActiveDirectory tool ")
+                return
+            username = user_o.username if user_o.username is not None else ""
+            password = user_o.password if user_o.password is not None else ""
+            domain = user_o.domain if user_o.domain is not None else ""
+            infos = {"username":username, "password":password, "domain":domain}
         mongoInstance = MongoCalendar.getInstance()
         mongoInstance.connectToDb(self.pentest)
         wave_d = mongoInstance.find("waves", {"wave":{"$ne":"Imported"}}, False)
@@ -219,6 +227,12 @@ def update(pentest, computer_iid, body):  # noqa: E501
         del body["type"]
     if "_id" in body:
         del body["_id"]
+    domain = body.get("domain", None)
+    if domain is not None and domain != "":
+        existingDomain = mongoInstance.find(
+             "ActiveDirectory", {"type":"computer", "domain":domain}, False)
+        if existingDomain is None:
+            computer.addTool("AD:onNewDomainDiscovered", {"domain":domain})
     mongoInstance.update("ActiveDirectory", {"_id": ObjectId(computer_iid), "type":"computer"}, {"$set": body}, False, True)
     return True
 
@@ -245,8 +259,16 @@ def insert(pentest, body):  # noqa: E501
     if "_id" in body:
         del body["_id"]
     body["type"] = "computer"
+    domain = body.get("domain", None)
+    if domain is not None and domain != "":
+        existingDomain = mongoInstance.find(
+             "ActiveDirectory", {"type":"computer", "domain":domain}, False)
+        if existingDomain is None:
+            computer.addTool("AD:onNewDomainDiscovered", {"domain":domain})
     ins_result = mongoInstance.insert(
         "ActiveDirectory", body, True)
+    
+
     iid = ins_result.inserted_id
     return {"res": True, "iid": iid}
 

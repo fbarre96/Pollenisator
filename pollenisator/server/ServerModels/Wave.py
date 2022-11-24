@@ -115,7 +115,8 @@ def update(pentest, wave_iid, body):
 
 def addUserCommandsToWave(pentest, wave_iid, user):
     mongoInstance = MongoCalendar.getInstance()
-    mycommands = mongoInstance.findInDb(pentest, "commands", {"owner":user}, True)
+    
+    mycommands = mongoInstance.findInDb(pentest, "commands", {"owners":user}, True)
     comms = [command["_id"] for command in mycommands]
     wave = mongoInstance.findInDb(pentest, "waves", {"_id":ObjectId(wave_iid)}, False)
     if wave is None:
@@ -124,11 +125,3 @@ def addUserCommandsToWave(pentest, wave_iid, user):
     update(pentest, wave_iid, {"wave_commands": wave["wave_commands"]})
     return True
 
-@permission("pentester")
-def addMyCommandsToWave(pentest, wave_iid, **kwargs):
-    user = kwargs["token_info"]["sub"]
-    addUserCommandsToWave(pentest, wave_iid, user)
-
-@permission("pentester")
-def addWorkerCommandsToWave(pentest, wave_iid, **kwargs):
-    addUserCommandsToWave(pentest, wave_iid, "Worker")

@@ -131,9 +131,9 @@ def connectToPentest(pentest, body, **kwargs):
     testers = mongoInstance.getPentestUsers(pentest)
     token = kwargs.get("token_info", {})
     try:
-        if mongoInstance.countInDb("pollenisator", "commands", {"owner":"Worker"}) == 0:
+        if mongoInstance.countInDb("pollenisator", "commands", {}) == 0:
             with open(getDefaultWorkerCommandsFile()) as f:
-                doImportCommands(f.read(), "Worker")
+                doImportCommands(f.read(), username)
         if addDefaultCommands:
             with open(getDefaultCommandsFile()) as f:
                 doImportCommands(f.read(), username)
