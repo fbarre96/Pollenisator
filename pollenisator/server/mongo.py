@@ -274,7 +274,7 @@ def bulk_delete_commands(body, **kwargs):
             if not isinstance(obj_id, ObjectId):
                 if obj_id.startswith("ObjectId|"):
                     obj_id = ObjectId(obj_id.split("ObjectId|")[1])
-            res = mongoInstance.deleteFromDb("pollenisator", obj_type, {"_id": ObjectId(obj_id), "owner":user}, False, True)
+            res = mongoInstance.deleteFromDb("pollenisator", obj_type, {"_id": ObjectId(obj_id)}, False, True)
             if res is not None:
                 deleted += res.deleted_count
     return deleted
@@ -350,7 +350,7 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     # for command in allcommands:
     #     command.indb = dbName
     #     insert_command(command.indb, CommandController(command).getData(), **kwargs)
-    commands = ServerCommand.getList({"owners":user, "$or":[{"types": re.compile(pentest_type, re.IGNORECASE)}, {"types":"Commun"}]}, targetdb=dbName)
+    commands = ServerCommand.getList({"$or":[{"types": re.compile(pentest_type, re.IGNORECASE)}, {"types":"Commun"}]}, targetdb=dbName)
     if not commands:
         commands = []
     wave_o = ServerWave().initialize(dbName, commands)
