@@ -4,6 +4,7 @@ import os
 from bson import ObjectId
 from flask import send_file
 import tempfile
+import re
 import shutil
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Components.parser import Parser, ParseError, Term
@@ -349,7 +350,7 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     # for command in allcommands:
     #     command.indb = dbName
     #     insert_command(command.indb, CommandController(command).getData(), **kwargs)
-    commands = ServerCommand.getList({"owners":user, "$or":[{"types":{"$elemMatch":{"$eq":pentest_type}}}, {"types":{"$elemMatch":{"$eq":"Commun"}}}]}, targetdb=dbName)
+    commands = ServerCommand.getList({"owners":user, "$or":[{"types": re.compile(pentest_type, re.IGNORECASE)}, {"types":"Commun"}]}, targetdb=dbName)
     if not commands:
         commands = []
     wave_o = ServerWave().initialize(dbName, commands)
