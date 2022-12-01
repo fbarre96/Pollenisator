@@ -107,9 +107,9 @@ def generateReport(pentest, templateName, clientName, contractName, mainRedactor
     p.join()
     if return_dict["res"]:
         try:
-            return send_file(return_dict["msg"], download_name=out_name+ext)
-        except TypeError as e: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
             return send_file(return_dict["msg"], attachment_filename=out_name+ext)
+        except TypeError as e: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
+            return send_file(return_dict["msg"], download_name=out_name+ext)
 
         
     else:
