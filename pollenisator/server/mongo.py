@@ -485,8 +485,10 @@ def dumpDb(dbName, collection=""):
     path = mongoInstance.dumpDb(dbName, collection)
     if not os.path.isfile(path):
         return "Failed to export database", 503
-    return send_file(path, mimetype="application/gzip", attachment_filename=os.path.basename(path))
-
+    try:
+        return send_file(path, mimetype="application/gzip", attachment_filename=os.path.basename(path))
+    except TypeError as e: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
+        return send_file(path, mimetype="application/gzip", download_name=os.path.basename(path))
 @permission("user")
 def importDb(upfile, **kwargs):
     username = kwargs["token_info"]["sub"]

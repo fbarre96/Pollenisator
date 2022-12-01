@@ -55,7 +55,10 @@ def downloadTemplate(lang, templateName):
     template_to_download_path = os.path.join(template_path, lang+"/"+fileName)
     if not os.path.isfile(template_to_download_path):
         return "Template file not found", 404
-    return send_file(template_to_download_path, attachment_filename=fileName)
+    try:
+        return send_file(template_to_download_path, attachment_filename=fileName)
+    except TypeError as e: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
+        return send_file(template_to_download_path, download_name=fileName)
 
 
 @permission("user")
@@ -103,7 +106,12 @@ def generateReport(pentest, templateName, clientName, contractName, mainRedactor
     p.start()
     p.join()
     if return_dict["res"]:
-        return send_file(return_dict["msg"], attachment_filename=out_name+ext)
+        try:
+            return send_file(return_dict["msg"], download_name=out_name+ext)
+        except TypeError as e: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
+            return send_file(return_dict["msg"], attachment_filename=out_name+ext)
+
+        
     else:
         return return_dict["msg"], 400
     

@@ -142,7 +142,10 @@ def download(pentest, attached_iid, filetype, filename):
         filepath = os.path.join(local_path, pentest, filetype, attached_iid, filename.replace("/", "_"))
     if not os.path.isfile(filepath):
         return "File not found", 404
-    return send_file(filepath, attachment_filename=filename.replace("/", "_"))
+    try:
+        return send_file(filepath, attachment_filename=filename.replace("/", "_"))
+    except TypeError as e: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
+        return send_file(filepath, download_name=filename.replace("/", "_"))
 
 @permission("pentester")
 def rmProof(pentest, defect_iid, filename):
