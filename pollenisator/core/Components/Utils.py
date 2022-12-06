@@ -237,7 +237,7 @@ def execute(command, timeout=None, printStdout=True):
         raise e
 
 
-def performLookUp(domain, nameservers=['8.8.8.8', '1.1.1.1']):
+def performLookUp(domain, nameservers=None):
     """
     Uses the socket module to get an ip from a domain.
 
@@ -250,14 +250,14 @@ def performLookUp(domain, nameservers=['8.8.8.8', '1.1.1.1']):
     my_resolver = dns.resolver.Resolver()
     my_resolver.timeout = 1
     my_resolver.lifetime = 1
-    my_resolver.nameservers = nameservers
+    my_resolver.nameservers = nameservers if nameservers is not None else ['8.8.8.8', '1.1.1.1']
     try: 
         answer = my_resolver.query(domain, 'A')
         if answer:
             res = answer[0].to_text()
             if res != "0.0.0.0":
                 return res
-    except dns.resolver.LifetimeTimeout:
+    except:
         return None
     return None
 
