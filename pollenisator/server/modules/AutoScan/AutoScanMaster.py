@@ -71,10 +71,11 @@ def autoScan(pentest, endoded_token):
         logging.info("stop autoscan : Kill received...")
         mongoInstance.delete("autoscan", {}, True)
     except Exception as e:
-        print(e)
         import traceback
-        traceback.print_exc(e)
-        logging.debug(e)
+        tb = traceback.format_exc()
+        print(tb)
+        logging.exception(e)
+        logging.debug("autoscan :"+tb)
         logging.error(str(e))
 
 
