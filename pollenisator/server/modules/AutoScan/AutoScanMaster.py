@@ -30,6 +30,7 @@ def startAutoScan(pentest, **kwargs):
     encoded = encode_token(kwargs["token_info"])
     autoscan = Thread(target=autoScan, args=(pentest, encoded))
     try:
+        logging.debug("Autoscan : start")
         autoscan.start()
     except(KeyboardInterrupt, SystemExit):
         mongoInstance.delete("autoscan", {}, True)
@@ -48,20 +49,25 @@ def autoScan(pentest, endoded_token):
     check = True
     try:
         while check:
+            logging.debug("Autoscan : loop")
             queue = [] # reinit queue each time as some tools may be finished / canceled / errored
             launchableTools = findLaunchableTools(pentest)
+            logging.debug("Autoscan : launchable tools: "+str(len(launchableTools)))
             launchableTools.sort(key=lambda tup: (int(tup["timedout"]), int(tup["priority"])))
             for launchableTool in launchableTools:
+                logging.debug("Autoscan : loop")
                 check = getAutoScanStatus(pentest)
                 if not check:
                     break
                 if str(launchableTool["tool"].getId()) not in queue:
                     queue.append(str(launchableTool["tool"].getId()))
+                    logging.debug("Autoscan : launch task tools: "+str(launchableTool))
                     res, statuscode = launchTask(pentest, launchableTool["tool"].getId(), {"group_id":launchableTool["group_id"], "group_name":launchableTool["group_name"]}, worker_token=endoded_token)
                 
             check = getAutoScanStatus(pentest)
             time.sleep(3)
     except(KeyboardInterrupt, SystemExit):
+        logging.debug("Autoscan : EXIT by expected EXCEPTION (exit or interrupt)")
         logging.info("stop autoscan : Kill received...")
         mongoInstance.delete("autoscan", {}, True)
     except Exception as e:

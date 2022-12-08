@@ -474,14 +474,17 @@ def importResult(pentest, tool_iid, upfile, body):
 
 @permission("pentester")
 def launchTask(pentest, tool_iid, body, **kwargs):
+    logging.debug("launch task : "+str(tool_iid))
     worker_token = kwargs.get("worker_token") if kwargs.get("worker_token") else encode_token(kwargs.get("token_info"))
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     launchableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     command_o = ServerCommand.fetchObject({"_id": ObjectId(launchableTool.command_iid)}, pentest)
     if launchableTool is None:
+        logging.debug("Error in launch task : not found :"+str(tool_iid))
         return "Tool not found", 404
     if command_o is None:
+        logging.debug("Error in launch task : command for tool not found :"+str(tool_iid))
         return "Command associated not found", 404
     
     # Find a worker that can launch the tool without breaking limitations
@@ -491,9 +494,10 @@ def launchTask(pentest, tool_iid, body, **kwargs):
     for owner in command_o.owners:
         if owner in workers:
             choosenWorker = owner
-    logging.debug(f"Choosen worker is {str(choosenWorker)}")
     if choosenWorker == "":
+        logging.debug("Error in launch task : no worker available:"+str(tool_iid))
         return "No worker available", 404
+    logging.debug(f"Choosen worker is {str(choosenWorker)}")
     workerName = choosenWorker
     launchableToolId = launchableTool.getId()
     launchableTool.markAsRunning(workerName, body.get("group_id"), body.get("group_name"))
@@ -504,6 +508,7 @@ def launchTask(pentest, tool_iid, body, **kwargs):
     if socket is None:
         return "Socket not found", 503
     sm = SocketManager.getInstance()
+    logging.debug("Launch task : emit : "+str(socket["sid"])+" toolid:"+str(str(launchableToolId)))
     sm.socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(launchableToolId)}, room=socket["sid"])
     return "Success ", 200
 
