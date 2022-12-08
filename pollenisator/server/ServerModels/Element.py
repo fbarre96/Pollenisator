@@ -49,6 +49,9 @@ class ServerElement(object):
     def getId(self):
         return self._id
 
+    def __str__(self):
+        return str(self.__class__) +":"+str(self._id)
+
     def __repr__(self):
         """For `print` and `pprint`"""
         return self.to_str()

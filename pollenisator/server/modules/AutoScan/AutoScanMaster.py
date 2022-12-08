@@ -78,6 +78,7 @@ def autoScan(pentest, endoded_token):
 
 @permission("pentester")
 def stopAutoScan(pentest):
+    logging.debug("Autoscan : stop autoscan received ")
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.connectToDb(pentest)
     toolsRunning = []

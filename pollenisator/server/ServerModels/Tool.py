@@ -559,3 +559,4 @@ def getNbOfLaunchedCommand(calendarName, worker, command_iid):
     if t is not None:
         return t
     return 0
+
