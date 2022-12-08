@@ -61,7 +61,7 @@ def autoScan(pentest, endoded_token):
                     break
                 if str(launchableTool["tool"].getId()) not in queue:
                     queue.append(str(launchableTool["tool"].getId()))
-                    logging.debug("Autoscan : launch task tools: "+str(launchableTool))
+                    logging.debug("Autoscan : launch task tools: "+str(launchableTool["tool"].getId()))
                     res, statuscode = launchTask(pentest, launchableTool["tool"].getId(), {"group_id":launchableTool["group_id"], "group_name":launchableTool["group_name"]}, worker_token=endoded_token)
                 
             check = getAutoScanStatus(pentest)
