@@ -79,7 +79,7 @@ def editScopeIPs(pentest, hostsInfos):
             mssql = infos.get("mssql", "")
             if mssql != "":
                 infosToAdd["mssql"] = mssql
-            ip_m = ServerIp().initialize(str(infos["ip"]))
+            ip_m = ServerIp(pentest).initialize(str(infos["ip"]))
             insert_ret = ip_m.addInDb()
             if not insert_ret["res"]:
                 ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
@@ -87,7 +87,7 @@ def editScopeIPs(pentest, hostsInfos):
             port = str(445)
             proto = "tcp"
             service = "netbios-ssn"
-            port_m = ServerPort().initialize(host, port, proto, service)
+            port_m = ServerPort(pentest).initialize(host, port, proto, service)
             insert_ret = port_m.addInDb()
             port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
             port_m.updateInfos(infosToAdd)

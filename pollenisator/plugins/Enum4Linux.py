@@ -79,9 +79,9 @@ def updateDatabase(pentest, enum_infos):
     # Check if any ip has been found.
     if enum_infos is None:
         return
-    ip_m = ServerIp().initialize(str(enum_infos["ip"]))
+    ip_m = ServerIp(pentest).initialize(str(enum_infos["ip"]))
     insert_ret = ip_m.addInDb()
-    port_m = ServerPort().initialize(str(enum_infos["ip"]), "445", "tcp", "netbios-ssn")
+    port_m = ServerPort(pentest).initialize(str(enum_infos["ip"]), "445", "tcp", "netbios-ssn")
     insert_ret = port_m.addInDb()
     port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
     targets = {"enum4linux":{"ip": enum_infos["ip"], "port": "445", "proto": "tcp"}}
@@ -98,7 +98,7 @@ def updateDatabase(pentest, enum_infos):
         user_m = User(pentest).initialize(pentest, None, domain, username, password, user_add_infos.get("groups",[]), user_add_infos.get("desc"))
         user_insert(pentest, user_m.getData())
     for computer, computer_infos in enum_infos.get("computers", {}).items():
-        ip_m = ServerIp().initialize(str(computer_infos["ip"]))
+        ip_m = ServerIp(pentest).initialize(str(computer_infos["ip"]))
         insert_ret = ip_m.addInDb()
         comp_m = Computer(pentest).initialize(pentest, None, computer, computer_infos["ip"], computer_infos["domain"])
         comp_m.addInDb()

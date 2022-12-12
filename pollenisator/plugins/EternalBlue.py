@@ -56,7 +56,7 @@ class EternalBlue(Plugin):
             return None, None, None, None
         # Parsing
         ip = ip_group.group(1).strip()
-        ServerIp().initialize(ip).addInDb()
+        ServerIp(pentest).initialize(ip).addInDb()
         port_re = r"(\d+)\/(\S+)\s+open\s+microsoft-ds"
         res_search = re.search(port_re, notes)
         res_insert = None
@@ -66,7 +66,7 @@ class EternalBlue(Plugin):
         else:
             port = res_search.group(1)
             proto = res_search.group(2)
-            p_o = ServerPort()
+            p_o = ServerPort(pentest)
             p_o.initialize(ip, port, proto, "microsoft-ds")
             insert_res = p_o.addInDb()
             res_insert = insert_res["res"]

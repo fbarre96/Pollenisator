@@ -20,7 +20,6 @@ class ServerCommandGroup(CommandGroup):
             Returns a cursor to iterate on Command Group objects
         """
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(targetdb)
         results = mongoInstance.findInDb(targetdb, "group_commands", pipeline, True)
         if results is None:
             return None
@@ -87,7 +86,7 @@ def getCommandGroups(body):
 @permission("pentester")
 def update(pentest, command_group_iid, body, **kwargs):
     mongoInstance = MongoCalendar.getInstance()
-    group = CommandGroup(mongoInstance.find(
+    group = CommandGroup(mongoInstance.findInDb(pentest, 
         "group_commands", {"_id": ObjectId(command_group_iid)}, False))
     if "_id" in body:
         del body["_id"]

@@ -68,9 +68,8 @@ class User(ServerElement):
             Returns a cursor to iterate on model objects
         """
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(pentest)
         pipeline["type"] = "user"
-        ds = mongoInstance.find(cls.coll_name, pipeline, True)
+        ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
             return None
         for d in ds:
@@ -86,9 +85,8 @@ class User(ServerElement):
             Returns a cursor to iterate on model objects
         """
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(pentest)
         pipeline["type"] = "user"
-        d = mongoInstance.find(cls.coll_name, pipeline, False)
+        d = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
         if d is None:
             return None
         return cls(pentest, d)
@@ -106,13 +104,12 @@ class User(ServerElement):
         password = user_o.password if user_o.password is not None else ""
         domain = user_o.domain if user_o.domain is not None else ""
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(self.pentest)
-        dc_computer = mongoInstance.find("ActiveDirectory", {"type":"computer", "domain":domain, "infos.is_dc":True}, False)
+        dc_computer = mongoInstance.findInDb(self.pentest, "ActiveDirectory", {"type":"computer", "domain":domain, "infos.is_dc":True}, False)
         dc_ip = None if dc_computer is None else dc_computer.get("ip")
         infos = {"username":username, "password":password, "domain":domain, "dc_ip":dc_ip}
         if dc_ip is None:
             return
-        wave_d = mongoInstance.find("waves", {"wave":{"$ne":"Imported"}}, False)
+        wave_d = mongoInstance.findInDb(self.pentest, "waves", {"wave":{"$ne":"Imported"}}, False)
         for command in commands:
             newTool = ServerTool(self.pentest)
             newTool.initialize(command.getId(), wave=wave_d["wave"],
@@ -238,11 +235,10 @@ def delete(pentest, user_iid):
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
-    user_dic = mongoInstance.find("ActiveDirectory", {"_id":ObjectId(user_iid), "type":"user"}, False)
+    user_dic = mongoInstance.findInDb(pentest, "ActiveDirectory", {"_id":ObjectId(user_iid), "type":"user"}, False)
     if user_dic is None:
         return 0
-    computers = mongoInstance.find("ActiveDirectory",
+    computers = mongoInstance.findInDb(pentest, "ActiveDirectory",
                                 {"type":"computer", "$or": [ { "users": str(user_iid) }, { "admins": str(user_iid) } ] }, True)
     for computer in computers:
         if str(user_iid) in computer["users"]:
@@ -251,7 +247,7 @@ def delete(pentest, user_iid):
         if str(user_iid) in computer["admins"]:
             computer["admins"].remove(str(user_iid))
             Computer.update(pentest, computer["_id"], computer)
-    res = mongoInstance.delete("ActiveDirectory", {"_id": ObjectId(str(user_iid)), "type":"user"}, False)
+    res = mongoInstance.deleteFromDb(pentest, "ActiveDirectory", {"_id": ObjectId(str(user_iid)), "type":"user"}, False)
     if res is None:
         return 0
     else:
@@ -272,23 +268,22 @@ def insert(pentest, body):
     """
     user = User(pentest, body)
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     domain = user.domain if user.domain is not None else ""
     username = user.username if user.username is not None else ""
     password = user.password if user.password is not None else ""
-    existing = mongoInstance.find(
+    existing = mongoInstance.findInDb(pentest, 
         "ActiveDirectory", {"type":"user", "domain":domain, "username":username, "password":password}, False)
     if existing is not None:
         if existing["password"] != "":
             return {"res": False, "iid": existing["_id"]}
         else:
-            mongoInstance.update("ActiveDirectory", {"_id":ObjectId(existing["_id"])}, {"$set":{"password":password}})
+            mongoInstance.updateInDb(pentest, "ActiveDirectory", {"_id":ObjectId(existing["_id"])}, {"$set":{"password":password}})
             return {"res": False, "iid": existing["_id"]}
     if "_id" in body:
         del body["_id"]
     body["type"] = "user"
     
-    ins_result = mongoInstance.insert(
+    ins_result = mongoInstance.insertInDb(pentest, 
         "ActiveDirectory", body, True)
     if password.strip() != "":
         user.addTool("AD:onNewValidUser", {"user":user})
@@ -314,7 +309,6 @@ def update(pentest, user_iid, body):
     """
     user = User(pentest, body)
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     user_existing = User.fetchObject(pentest, {"_id": ObjectId(user_iid)})
     if user_existing.username != user.username  and user_existing.domain != user.domain:
         return "Forbidden", 403
@@ -322,5 +316,5 @@ def update(pentest, user_iid, body):
         del body["type"]
     if "_id" in body:
         del body["_id"]
-    mongoInstance.update("ActiveDirectory", {"_id": ObjectId(user_iid), "type":"user"}, {"$set": body}, False, True)
+    mongoInstance.updateInDb(pentest, "ActiveDirectory", {"_id": ObjectId(user_iid), "type":"user"}, {"$set": body}, False, True)
     return True

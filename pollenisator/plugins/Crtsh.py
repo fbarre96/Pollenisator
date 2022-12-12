@@ -73,7 +73,7 @@ class Crtsh(Plugin):
             if domain is not None:
                 # a domain has been found
                 infosToAdd = {"hostname": ip}
-                ip_m = ServerIp().initialize(domain, infos=infosToAdd)
+                ip_m = ServerIp(pentest).initialize(domain, infos=infosToAdd)
                 insert_ret = ip_m.addInDb()
                 # failed, domain is out of scope
                 if not insert_ret["res"]:

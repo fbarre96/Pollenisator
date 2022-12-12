@@ -67,7 +67,7 @@ class BlueKeep(Plugin):
                 return None, None, None, None
             # Parse
             ip = line.split(" ")[0].strip()
-            ServerIp().initialize(ip).addInDb()
+            ServerIp(pentest).initialize(ip).addInDb()
             p_o = ServerPort.fetchObject(pentest, {"ip": ip, "port": kwargs.get(
                 "port", None), "proto": kwargs.get("proto", None)})
             if p_o is not None:

@@ -19,21 +19,20 @@ from pollenisator.server.token import encode_token
 @permission("pentester")
 def startAutoScan(pentest, **kwargs):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
-    autoscanRunning = mongoInstance.find("autoscan", {"special":True}, False) is not None
+    autoscanRunning = mongoInstance.findInDb(pentest, "autoscan", {"special":True}, False) is not None
     if autoscanRunning:
         return "An auto scan is already running", 403
     workers = mongoInstance.getWorkers({"pentest":pentest})
     if workers is None:
         return "No worker registered for this pentest", 404
-    mongoInstance.insert("autoscan", {"start":datetime.now(), "special":True})
+    mongoInstance.insertInDb(pentest, "autoscan", {"start":datetime.now(), "special":True})
     encoded = encode_token(kwargs["token_info"])
     autoscan = Thread(target=autoScan, args=(pentest, encoded))
     try:
         logging.debug("Autoscan : start")
         autoscan.start()
     except(KeyboardInterrupt, SystemExit):
-        mongoInstance.delete("autoscan", {}, True)
+        mongoInstance.deleteFromDb(pentest, "autoscan", {}, True)
     return "Success"
 
 def autoScan(pentest, endoded_token):
@@ -45,7 +44,6 @@ def autoScan(pentest, endoded_token):
         pentest: The database to search tools in
     """
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     check = True
     try:
         while check:
@@ -69,7 +67,7 @@ def autoScan(pentest, endoded_token):
     except(KeyboardInterrupt, SystemExit):
         logging.debug("Autoscan : EXIT by expected EXCEPTION (exit or interrupt)")
         logging.info("stop autoscan : Kill received...")
-        mongoInstance.delete("autoscan", {}, True)
+        mongoInstance.deleteFromDb(pentest, "autoscan", {}, True)
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
@@ -85,14 +83,13 @@ def autoScan(pentest, endoded_token):
 def stopAutoScan(pentest):
     logging.debug("Autoscan : stop autoscan received ")
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     toolsRunning = []
     workers = mongoInstance.getWorkers({"pentest":pentest})
     for worker in workers:
-        tools = mongoInstance.find("tools", {"scanner_ip": worker["name"], "status":"running"}, True)
+        tools = mongoInstance.findInDb(pentest, "tools", {"scanner_ip": worker["name"], "status":"running"}, True)
         for tool in tools:
             toolsRunning.append(tool["_id"])
-    mongoInstance.delete("autoscan", {}, True)
+    mongoInstance.deleteFromDb(pentest, "autoscan", {}, True)
     for toolId in toolsRunning:
         res, msg = stopTask(pentest, toolId, {"forceReset":True})
     return "Success"
@@ -102,8 +99,7 @@ def getAutoScanStatus(pentest):
     #commandsRunning = mongoInstance.aggregate("tools", [{"$match": {"datef": "None", "dated": {
     #        "$ne": "None"}, "scanner_ip": {"$ne": "None"}}}, {"$group": {"_id": "$name", "count": {"$sum": 1}}}])
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
-    return mongoInstance.find("autoscan", {"special":True}, False) is not None
+    return mongoInstance.findInDb(pentest, "autoscan", {"special":True}, False) is not None
 
 
 def findLaunchableTools(pentest):

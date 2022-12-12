@@ -72,8 +72,8 @@ class Host(Plugin):
         if infos is None:
             return None, None, None, None
         for domain, ip in infos.items():
-            ServerIp().initialize(domain).addInDb()
-            ip_m = ServerIp().initialize(ip)
+            ServerIp(pentest).initialize(domain).addInDb()
+            ip_m = ServerIp(pentest).initialize(ip)
             insert_res = ip_m.addInDb()
             if not insert_res["res"]:
                 ip_m = ServerIp.fetchObject(pentest, {"_id": insert_res["iid"]})

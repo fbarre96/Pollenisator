@@ -23,7 +23,6 @@ class ServerCommand(Command, ServerElement):
         """
         mongoInstance = MongoCalendar.getInstance()
 
-        mongoInstance.connectToDb(targetdb)
         results = mongoInstance.findInDb(targetdb, "commands", pipeline, True)
         if results is None:
             return None
@@ -39,7 +38,6 @@ class ServerCommand(Command, ServerElement):
             Returns a Server Command
         """
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(targetdb)
         result = mongoInstance.findInDb(targetdb, "commands", pipeline, False)
         if result is None:
             return None
@@ -71,7 +69,6 @@ def getCommands(body):
 
 def doDelete(pentest, command):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     mongoInstance.updateInDb("pollenisator", "group_commands", {}, {
         "$pull": {"commands": command._id}}, True, True)
     # Remove from all waves this command.
@@ -114,8 +111,7 @@ def deleteCommand(command_iid, **kwargs):
 def delete(pentest, command_iid, **kwargs):
     user = kwargs["token_info"]["sub"]
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
-    c = mongoInstance.find(
+    c = mongoInstance.findInDb(pentest,
         "commands", {"_id": ObjectId(command_iid)}, False)
     if c is None:
         return "Not found", 404
@@ -146,7 +142,7 @@ def insert(pentest, body, **kwargs):
 @permission("pentester")
 def update(pentest, command_iid, body, **kwargs):
     mongoInstance = MongoCalendar.getInstance()
-    command = Command(mongoInstance.find(
+    command = Command(mongoInstance.findInDb(pentest,
         "commands", {"_id": ObjectId(command_iid)}, False))
     if "owners" in body:
         del body["owners"]

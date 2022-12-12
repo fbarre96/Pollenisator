@@ -103,8 +103,8 @@ class HttpMethods(Plugin):
             notes)
         if host == "":
             return None, None, None, None
-        ServerIp().initialize(host).addInDb()
-        p_o = ServerPort().initialize(host, port, proto, service)
+        ServerIp(pentest).initialize(host).addInDb()
+        p_o = ServerPort(pentest).initialize(host, port, proto, service)
         insert_res = p_o.addInDb()
         if not insert_res["res"]:
             p_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})

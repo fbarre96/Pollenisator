@@ -64,7 +64,7 @@ class Sublist3r(Plugin):
         tags = ["found-domains-info"]
         ret = parseContent(file_opened)
         for domain in ret:
-            insert_res = ServerIp().initialize(domain.strip()).addInDb()
+            insert_res = ServerIp(pentest).initialize(domain.strip()).addInDb()
             # failed, domain is out of wave, still noting thi
             if not insert_res["res"]:
                 notes += domain+" exists but already added.\n"

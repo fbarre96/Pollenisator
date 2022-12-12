@@ -99,7 +99,7 @@ class Nuclei(Plugin):
             for finding in findings:
                 if finding["info"]["severity"] in ["medium", "high", "critical"]:
                     tags = ["interesting-nuclei"]
-            ip_o = ServerIp().initialize(host, notes)
+            ip_o = ServerIp(pentest).initialize(host, notes)
             inserted = ip_o.addInDb()
             if not inserted["res"]:
                 ip_o = ServerIp.fetchObject(pentest, {"_id": inserted["iid"]})

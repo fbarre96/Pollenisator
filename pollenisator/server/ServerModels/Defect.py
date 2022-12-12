@@ -19,7 +19,6 @@ class ServerDefect(Defect, ServerElement):
             self.pentest = mongoInstance.calendarName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
-        mongoInstance.connectToDb(self.pentest)
 
 
     def addInDb(self):
@@ -36,11 +35,10 @@ class ServerDefect(Defect, ServerElement):
         if port is None:
             port = ""
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(self.pentest)
         if port == "":
-            obj = mongoInstance.find("ips", {"ip": self.ip}, False)
+            obj = mongoInstance.findInDb(self.pentest, "ips", {"ip": self.ip}, False)
         else:
-            obj = mongoInstance.find(
+            obj = mongoInstance.findInDb(self.pentest,
                 "ports", {"ip": self.ip, "port": self.port, "proto": self.proto}, False)
         if obj is None:
             return ""
@@ -55,8 +53,7 @@ class ServerDefect(Defect, ServerElement):
             Returns a cursor to iterate on model objects
         """
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(pentest)
-        ds = mongoInstance.find(cls.coll_name, pipeline, True)
+        ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
             return None
         for d in ds:
@@ -72,8 +69,7 @@ class ServerDefect(Defect, ServerElement):
             Returns a cursor to iterate on model objects
         """
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(pentest)
-        d = mongoInstance.find(cls.coll_name, pipeline, False)
+        d = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
         if d is None:
             return None
         return cls(pentest, d) 
@@ -85,7 +81,6 @@ def getProofPath(pentest, defect_iid):
 @permission("pentester")
 def delete(pentest, defect_iid):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     defect = ServerDefect(pentest, mongoInstance.findInDb(pentest, "defects", {"_id": ObjectId(defect_iid)}, False))
     if defect is None:
         return 0
@@ -115,7 +110,6 @@ def delete(pentest, defect_iid):
 @permission("pentester")
 def insert(pentest, body):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     defect_o = ServerDefect(pentest, body)
     base = defect_o.getDbKey()
     existing = mongoInstance.findInDb(pentest, "defects", base, False)
@@ -150,7 +144,7 @@ def insert(pentest, body):
             del body["synthesis"]
         if "fixes" in body:
             del body["fixes"]
-    ins_result = mongoInstance.insert("defects", body, parent)
+    ins_result = mongoInstance.insertInDb(pentest, "defects", body, parent)
     iid = ins_result.inserted_id
     defect_o._id = iid
 
@@ -181,7 +175,6 @@ def findInsertPosition(pentest, risk):
 @permission("pentester")
 def update(pentest, defect_iid, body):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     defect_o = ServerDefect.fetchObject(pentest, {"_id":ObjectId(defect_iid)})
     if defect_o is None:
         return "This defect does not exist", 404
@@ -197,7 +190,7 @@ def update(pentest, defect_iid, body):
                 moveDefect(pentest, defect_iid, defectTarget.getId())
             if "index" in body:
                 del body["index"]
-    res = mongoInstance.update("defects", {"_id":ObjectId(defect_iid)}, {"$set":body}, False, True)
+    res = mongoInstance.updateInDb(pentest, "defects", {"_id":ObjectId(defect_iid)}, {"$set":body}, False, True)
     return True
     
 @permission("pentester")

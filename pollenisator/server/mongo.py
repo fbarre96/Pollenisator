@@ -341,7 +341,7 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     """
     user = kwargs["token_info"]["sub"]
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(dbName)
+
     addUserCommandsToPentest(dbName, user)  
     addUserGroupCommandsToPentest(dbName, user)
     addCheckInstancesToPentest(dbName, pentest_type)
@@ -353,9 +353,9 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     commands = ServerCommand.getList({"$or":[{"types": re.compile(pentest_type, re.IGNORECASE)}, {"types":"Commun"}]}, targetdb=dbName)
     if not commands:
         commands = []
-    wave_o = ServerWave().initialize(dbName, commands)
+    wave_o = ServerWave(dbName).initialize(dbName, commands)
     result_wave = insert_wave(dbName, WaveController(wave_o).getData())
-    interval_o = ServerInterval().initialize(dbName, start_date, end_date)
+    interval_o = ServerInterval(dbName).initialize(dbName, start_date, end_date)
     insert_interval(dbName, IntervalController(interval_o).getData())
     scope = scope.replace("https://", "").replace("http://","")
     scope = scope.replace("\n", ",").split(",")
@@ -365,13 +365,13 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
                 insert_scope(dbName, {"wave":dbName, "scope":scope_item.strip()+"/32"})
             else:
                 insert_scope(dbName, {"wave":dbName, "scope":scope_item.strip()})
-    mongoInstance.insert("settings", {"key":"pentest_type", "value":pentest_type}, notify=False)
-    mongoInstance.insert("settings", {"key":"include_domains_with_ip_in_scope", "value": settings['Add domains whose IP are in scope'] == 1}, notify=False)
-    mongoInstance.insert("settings", {"key":"include_domains_with_topdomain_in_scope", "value":settings["Add domains who have a parent domain in scope"] == 1}, notify=False)
-    mongoInstance.insert("settings", {"key":"include_all_domains", "value":settings["Add all domains found"] == 1}, notify=False)
+    mongoInstance.insertInDb(dbName, "settings", {"key":"pentest_type", "value":pentest_type}, notify=False)
+    mongoInstance.insertInDb(dbName, "settings", {"key":"include_domains_with_ip_in_scope", "value": settings['Add domains whose IP are in scope'] == 1}, notify=False)
+    mongoInstance.insertInDb(dbName, "settings", {"key":"include_domains_with_topdomain_in_scope", "value":settings["Add domains who have a parent domain in scope"] == 1}, notify=False)
+    mongoInstance.insertInDb(dbName, "settings", {"key":"include_all_domains", "value":settings["Add all domains found"] == 1}, notify=False)
     pentester_list = list(map(lambda x: x.strip(), pentesters.replace("\n",",").split(",")))
     pentester_list.insert(0, owner)
-    mongoInstance.insert("settings", {"key":"pentesters", "value": pentester_list}, notify=False)
+    mongoInstance.insertInDb(dbName, "settings", {"key":"pentesters", "value": pentester_list}, notify=False)
 
 @permission("user")
 def getSettings():
@@ -407,18 +407,17 @@ def updateSetting(body):
 
 
 
-@permission("pentester")
-def registerTag(body):
+@permission("pentester", "body.pentest")
+def registerTag(pentest, body):
     name = body["name"]
     color = body["color"]
-    isGlobal = body.get("global", False)
-    return mongoInstance.doRegisterTag(name, color, isGlobal)
+    return mongoInstance.doRegisterTag(pentest, name, color)
 
-@permission("user")
+@permission("pentester", "body.pentest")
 def unregisterTag(body):
     name = body["name"]
-    isGlobal = body.get("global", False)
-    if isGlobal:
+    pentest = body.get("pentest", "pollenisator")
+    if pentest == "pollenisator":
         tags = json.loads(mongoInstance.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=JSONDecoder)
         val = tags.pop(name, None)
         if val is None:
@@ -433,19 +432,19 @@ def unregisterTag(body):
             val = tags.pop(name, None)
             if val is None:
                 return 404, "Not found"
-            mongoInstance.update("settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
-            mongoInstance.update("scopes", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
-            mongoInstance.update("ips", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
-            mongoInstance.update("ports", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
-            mongoInstance.update("tools", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
+            mongoInstance.updateInDb(pentest, "settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
+            mongoInstance.updateInDb(pentest, "scopes", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
+            mongoInstance.updateInDb(pentest, "ips", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
+            mongoInstance.updateInDb(pentest, "ports", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
+            mongoInstance.updateInDb(pentest, "tools", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
     return True
 
 @permission("pentester")
 def updatePentestTag(pentest, body):
     name = body["name"]
     color = body["color"]
-    mongoInstance.connectToDb(pentest)
-    tags = mongoInstance.find("settings", {"key":"tags"}, False)
+    
+    tags = mongoInstance.findInDb(pentest, "settings", {"key":"tags"}, False)
     if tags is None:
         return "Not found", 404
     else:
@@ -453,7 +452,7 @@ def updatePentestTag(pentest, body):
         if name not in tags:
             return  "Not found", 404
         tags[name] = color
-        mongoInstance.update("settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
+        mongoInstance.updateInDb(pentest, "settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
 
 @permission("user")
 def updateTag(body):
@@ -479,7 +478,7 @@ def dumpDb(dbName, collection=""):
     """
     if dbName != "pollenisator" and dbName not in mongoInstance.listCalendarNames():
         return "Database not found", 404
-    mongoInstance.connectToDb(dbName)
+
     if collection != "" and collection not in mongoInstance.db.collection_names():
         return "Collection not found in database provided", 404
     path = mongoInstance.dumpDb(dbName, collection)

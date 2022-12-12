@@ -71,9 +71,8 @@ class Computer(ServerElement):
             Returns a cursor to iterate on model objects
         """
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(pentest)
         pipeline["type"] = "computer"
-        ds = mongoInstance.find(cls.coll_name, pipeline, True)
+        ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
             return None
         for d in ds:
@@ -90,8 +89,7 @@ class Computer(ServerElement):
         """
         pipeline["type"] = "computer"
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(pentest)
-        d = mongoInstance.find(cls.coll_name, pipeline, False)
+        d = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
         if d is None:
             return None
         return cls(pentest, d)
@@ -170,8 +168,7 @@ class Computer(ServerElement):
             domain = user_o.domain if user_o.domain is not None else ""
             infos = {"username":username, "password":password, "domain":domain}
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(self.pentest)
-        wave_d = mongoInstance.find("waves", {"wave":{"$ne":"Imported"}}, False)
+        wave_d = mongoInstance.findInDb(self.pentest, "waves", {"wave":{"$ne":"Imported"}}, False)
         for command in commands:
             newTool = ServerTool(self.pentest)
             newTool.initialize(command.getId(), wave=wave_d["wave"],
@@ -192,11 +189,10 @@ def delete(pentest, computer_iid):  # noqa: E501
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
-    share_dic = mongoInstance.find("ActiveDirectory", {"_id":ObjectId(computer_iid), "type":"computer"}, False)
+    share_dic = mongoInstance.findInDb(pentest, "ActiveDirectory", {"_id":ObjectId(computer_iid), "type":"computer"}, False)
     if share_dic is None:
         return 0
-    res = mongoInstance.delete("ActiveDirectory", {"_id": ObjectId(computer_iid), "type":"computer"}, False)
+    res = mongoInstance.deleteFromDb(pentest, "ActiveDirectory", {"_id": ObjectId(computer_iid), "type":"computer"}, False)
     if res is None:
         return 0
     else:
@@ -219,7 +215,6 @@ def update(pentest, computer_iid, body):  # noqa: E501
     """
     computer = Computer(pentest, body) 
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     existing = Computer.fetchObject(pentest, {"_id": ObjectId(computer_iid)})
     if computer.ip != existing.ip:
         return "Forbidden", 403
@@ -229,11 +224,11 @@ def update(pentest, computer_iid, body):  # noqa: E501
         del body["_id"]
     domain = body.get("domain", None)
     if domain is not None and domain != "":
-        existingDomain = mongoInstance.find(
+        existingDomain = mongoInstance.findInDb(pentest, 
              "ActiveDirectory", {"type":"computer", "domain":domain}, False)
         if existingDomain is None:
             computer.addTool("AD:onNewDomainDiscovered", {"domain":domain})
-    mongoInstance.update("ActiveDirectory", {"_id": ObjectId(computer_iid), "type":"computer"}, {"$set": body}, False, True)
+    mongoInstance.updateInDb(pentest, "ActiveDirectory", {"_id": ObjectId(computer_iid), "type":"computer"}, {"$set": body}, False, True)
     return True
 
 @permission("pentester")
@@ -251,8 +246,7 @@ def insert(pentest, body):  # noqa: E501
     """
     computer = Computer(pentest, body)
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
-    existing = mongoInstance.find(
+    existing = mongoInstance.findInDb(pentest, 
         "ActiveDirectory", {"type":"computer", "ip":computer.ip}, False)
     if existing is not None:
         return {"res": False, "iid": existing["_id"]}
@@ -261,11 +255,11 @@ def insert(pentest, body):  # noqa: E501
     body["type"] = "computer"
     domain = body.get("domain", None)
     if domain is not None and domain != "":
-        existingDomain = mongoInstance.find(
+        existingDomain = mongoInstance.findInDb(pentest, 
              "ActiveDirectory", {"type":"computer", "domain":domain}, False)
         if existingDomain is None:
             computer.addTool("AD:onNewDomainDiscovered", {"domain":domain})
-    ins_result = mongoInstance.insert(
+    ins_result = mongoInstance.insertInDb(pentest, 
         "ActiveDirectory", body, True)
     
 
@@ -275,14 +269,13 @@ def insert(pentest, body):  # noqa: E501
 @permission("pentester")
 def getUsers(pentest, computer_iid):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     computer_m = Computer.fetchObject(pentest, {"_id":ObjectId(computer_iid)})
     if computer_m is None:
         return "Not found", 404
-    users = mongoInstance.find( "ActiveDirectory", { "type":"user", "_id" : { "$in" : [ObjectId(x) for x in computer_m.users ]} } , multi=True)
+    users = mongoInstance.findInDb(pentest, "ActiveDirectory", { "type":"user", "_id" : { "$in" : [ObjectId(x) for x in computer_m.users ]} } , multi=True)
     if users is None:
         users = []
-    admins = mongoInstance.find("ActiveDirectory", { "type":"user", "_id" : { "$in" : [ObjectId(x) for x in computer_m.admins ]} }, multi=True)
+    admins = mongoInstance.findInDb(pentest, "ActiveDirectory", { "type":"user", "_id" : { "$in" : [ObjectId(x) for x in computer_m.admins ]} }, multi=True)
     if admins is None:
         admins = []
     return {"users":list(users), "admins":list(admins)}

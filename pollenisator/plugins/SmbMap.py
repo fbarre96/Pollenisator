@@ -136,7 +136,7 @@ class SmbMap(Plugin):
             notes += "\n=====================Other files:=====================\n"+less_interesting_notes
         
         for ip, share_dict in shares.items():
-            ip_m = ServerIp().initialize(ip)
+            ip_m = ServerIp(pentest).initialize(ip)
             insert_ret = ip_m.addInDb()
             if not insert_ret["res"]:
                 ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
@@ -144,7 +144,7 @@ class SmbMap(Plugin):
             port = str(445)
             proto = "tcp"
             service = "netbios-ssn"
-            port_m = ServerPort().initialize(host, port, proto, service)
+            port_m = ServerPort(pentest).initialize(host, port, proto, service)
             insert_ret = port_m.addInDb()
             if not insert_ret["res"]:
                 port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})

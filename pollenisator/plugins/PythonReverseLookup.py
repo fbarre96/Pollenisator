@@ -70,8 +70,8 @@ class PythonReverseLookup(Plugin):
         domain, ip = parse_reverse_python(result_socket)
         if domain is None:
             return None, None, None, None
-        ServerIp().initialize(domain).addInDb()
-        ip_m = ServerIp().initialize(ip)
+        ServerIp(pentest).initialize(domain).addInDb()
+        ip_m = ServerIp(pentest).initialize(ip)
         insert_res = ip_m.addInDb()
         if not insert_res["res"]:
             ip_m = ServerIp.fetchObject(pentest, {"_id": insert_res["iid"]})

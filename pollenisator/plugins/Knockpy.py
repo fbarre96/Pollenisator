@@ -82,9 +82,9 @@ class Knockpy(Plugin):
             ip, domain = parse_knockpy_line(line)
             if ip is not None and domain is not None:
                 # a domain has been found
-                insert_res = ServerIp().initialize(domain).addInDb()
+                insert_res = ServerIp(pentest).initialize(domain).addInDb()
                 if insert_res["res"]:
-                    ServerIp().initialize(ip).addInDb()
+                    ServerIp(pentest).initialize(ip).addInDb()
                     notes += f"{domain} inserted ({ip})\n"
                     countFound += 1
                 # failed, domain is out of scope

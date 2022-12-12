@@ -49,7 +49,6 @@ def importExistingFile(pentest, upfile, body, **kwargs):
         if len(default_target_objects) != 6:
             return "Default target is badly crafted", 400
 
-    mongoInstance.connectToDb(pentest)
     md5File = md5(upfile.stream)
     upfile.stream.seek(0)
     name = upfile.filename.replace("/", "_")
@@ -91,7 +90,7 @@ def importExistingFile(pentest, upfile, body, **kwargs):
             targets["default"] = {"lvl":default_target_objects[0], "wave":default_target_objects[1],"scope":default_target_objects[2], "ip":default_target_objects[3], 
                                 "port":default_target_objects[4], "proto":default_target_objects[5]}
         for tag in tags:
-            res = mongoInstance.doRegisterTag(tag)
+            res = mongoInstance.doRegisterTag(pentest, tag)
 
         # ADD THE RESULTING TOOL TO AFFECTED
         for target in targets.values():
@@ -109,18 +108,17 @@ def importExistingFile(pentest, upfile, body, **kwargs):
                 ip = target.get("ip", None)
                 port = target.get("port", None)
                 proto = target.get("proto", None)
-            mongoInstance.connectToDb(pentest)
             if wave is None:
                 wave = "Imported"
-            if mongoInstance.find("waves", {"wave":wave}, False) is None:
-                mongoInstance.insert("waves", {"wave":wave, "wave_commands":[]})
-            tool_m = ServerTool().initialize("", wave, name=toolName, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
+            if mongoInstance.findInDb(pentest, "waves", {"wave":wave}, False) is None:
+                mongoInstance.insertInDb(pentest, "waves", {"wave":wave, "wave_commands":[]})
+            tool_m = ServerTool(pentest).initialize("", wave, name=toolName, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
                                         dated=date, datef=date, scanner_ip=user, status=["done"], notes=notes, tags=tags)
             ret = tool_m.addInDb()
             upfile.stream.seek(0)
             msg, status, filepath = mongoInstance.do_upload(pentest, str(ret["iid"]), "result", upfile)
             if status == 200:
-                mongoInstance.update("tools", {"_id":ObjectId(ret["iid"])}, {"$set":{"resultfile":  filepath, "plugin_used":plugin}})
+                mongoInstance.updateInDb(pentest, "tools", {"_id":ObjectId(ret["iid"])}, {"$set":{"resultfile":  filepath, "plugin_used":plugin}})
     return results
 
 @permission("pentester")
@@ -149,10 +147,9 @@ def download(pentest, attached_iid, filetype, filename):
 
 @permission("pentester")
 def rmProof(pentest, defect_iid, filename):
-    mongoInstance.connectToDb(pentest)
     filename = filename.replace("/", "_")
     filepath = os.path.join(local_path, pentest, "proof", defect_iid, filename)
-    mongoInstance.update("defects", {"_id": ObjectId(defect_iid)}, {"$pull":{"proofs":filename}})
+    mongoInstance.updateInDb(pentest, "defects", {"_id": ObjectId(defect_iid)}, {"$pull":{"proofs":filename}})
     if not os.path.isfile(filepath):
         return "File not found", 404
     os.remove(filepath)

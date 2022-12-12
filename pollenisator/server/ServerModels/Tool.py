@@ -25,7 +25,6 @@ class ServerTool(Tool, ServerElement):
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         super().__init__(*args, **kwargs)
-        mongoInstance.connectToDb(self.pentest)
 
     def setOutOfTime(self, pentest):
         """Set this tool as out of time (not matching any interval in wave)
@@ -49,16 +48,14 @@ class ServerTool(Tool, ServerElement):
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(pentest)
-        results = mongoInstance.find("tools", pipeline)
+        results = mongoInstance.findInDb(pentest, "tools", pipeline)
         for result in results:
             yield(cls(pentest, result))
 
     @classmethod
     def fetchObject(cls, pentest, pipeline):
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(pentest)
-        result = mongoInstance.find("tools", pipeline, False)
+        result = mongoInstance.findInDb(pentest, "tools", pipeline, False)
         return cls(pentest, result)
 
     def getCommand(self):
@@ -97,17 +94,16 @@ class ServerTool(Tool, ServerElement):
 
     def getParentId(self):
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(self.pentest)
         try:
             if self.lvl == "wave":
-                wave = mongoInstance.find("waves", {"wave": self.wave}, False)
+                wave = mongoInstance.findInDb(self.pentest, "waves", {"wave": self.wave}, False)
                 return wave["_id"]
             elif self.lvl == "network" or self.lvl == "domain":
-                return mongoInstance.find("scopes", {"wave": self.wave, "scope": self.scope}, False)["_id"]
+                return mongoInstance.findInDb(self.pentest, "scopes", {"wave": self.wave, "scope": self.scope}, False)["_id"]
             elif self.lvl == "ip":
-                return mongoInstance.find("ips", {"ip": self.ip}, False)["_id"]
+                return mongoInstance.findInDb(self.pentest, "ips", {"ip": self.ip}, False)["_id"]
             else:
-                return mongoInstance.find("ports", {"ip": self.ip, "port": self.port, "proto": self.proto}, False)["_id"]
+                return mongoInstance.findInDb(self.pentest, "ports", {"ip": self.ip, "port": self.port, "proto": self.proto}, False)["_id"]
         except TypeError:
             # None type returned:
             return None
@@ -144,7 +140,7 @@ class ServerTool(Tool, ServerElement):
                 command = command.replace("|parent_domain|", topdomain)
         if lvl == "ip":
             command = command.replace("|ip|", self.ip)
-            ip_db = mongoInstance.find("ips", {"ip":self.ip}, False)
+            ip_db = mongoInstance.findInDb(self.pentest, "ips", {"ip":self.ip}, False)
             if ip_db is None:
                 return ""
             ip_infos = ip_db.get("infos", {})
@@ -154,7 +150,7 @@ class ServerTool(Tool, ServerElement):
             command = command.replace("|ip|", self.ip)
             command = command.replace("|port|", self.port)
             command = command.replace("|port.proto|", self.proto)
-            port_db = mongoInstance.find("ports", {"port":self.port, "proto":self.proto, "ip":self.ip}, False)
+            port_db = mongoInstance.findInDb(self.pentest, "ports", {"port":self.port, "proto":self.proto, "ip":self.ip}, False)
             command = command.replace("|port.service|", port_db["service"])
             command = command.replace("|port.product|", port_db["product"])
             port_infos = port_db.get("infos", {})
@@ -294,10 +290,9 @@ def setStatus(pentest, tool_iid, body):
 @permission("pentester")
 def delete(pentest, tool_iid):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     if not mongoInstance.isUserConnected():
         return "Not connected", 503
-    res = mongoInstance.delete("tools", {"_id": ObjectId(tool_iid)}, False)
+    res = mongoInstance.deleteFromDb(pentest, "tools", {"_id": ObjectId(tool_iid)}, False)
     if res is None:
         return 0
     else:
@@ -311,7 +306,6 @@ def insert(pentest, body, **kwargs):
 
 def do_insert(pentest, body, **kwargs):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     if not mongoInstance.isUserConnected():
         return "Not connected", 503
     if body.get("name", "") == "None" or body.get("name", "") == "" or body.get("name", "") is None:
@@ -322,7 +316,7 @@ def do_insert(pentest, body, **kwargs):
     if kwargs.get("base") is not None:
         for k,v in kwargs.get("base").items():
             base[k] = v 
-    existing = mongoInstance.find("tools", base, False)
+    existing = mongoInstance.findInDb(pentest, "tools", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
     if "_id" in body:
@@ -331,8 +325,8 @@ def do_insert(pentest, body, **kwargs):
     parent = tool_o.getParentId()
     if tool_o.lvl == "port" and tool_o.command_iid is not None and tool_o.command_iid != "":
         if kwargs.get("check", True):
-            comm = mongoInstance.find("commands", {"_id":ObjectId(tool_o.command_iid)}, False)
-            port = mongoInstance.find("ports", {"_id":ObjectId(parent)}, False)
+            comm = mongoInstance.findInDb(pentest, "commands", {"_id":ObjectId(tool_o.command_iid)}, False)
+            port = mongoInstance.findInDb(pentest, "ports", {"_id":ObjectId(parent)}, False)
             if comm:
                 allowed_ports_services = comm["ports"].split(",")
                 if not checkCommandService(allowed_ports_services, port["port"], port["proto"], port["service"]):
@@ -347,7 +341,7 @@ def do_insert(pentest, body, **kwargs):
     base["notes"] = body.get("notes", "")
     base["tags"] = body.get("tags", [])
     base["infos"] = body.get("infos", {})
-    res_insert = mongoInstance.insert("tools", base, parent)
+    res_insert = mongoInstance.insertInDb(pentest, "tools", base, parent)
     ret = res_insert.inserted_id
     tool_o._id = ret
     # adding the appropriate tools for this scope.
@@ -356,11 +350,10 @@ def do_insert(pentest, body, **kwargs):
 @permission("pentester")
 def update(pentest, tool_iid, body):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     tags = body.get("tags", [])
     for tag in tags:
-        mongoInstance.doRegisterTag(tag)
-    res = mongoInstance.update("tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
+        mongoInstance.doRegisterTag(pentest, tag)
+    res = mongoInstance.updateInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
     return True
     
 @permission("pentester")
@@ -429,7 +422,6 @@ def listPlugins():
 @permission("pentester")
 def importResult(pentest, tool_iid, upfile, body):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     #STORE FILE
     res, status, filepath = mongoInstance.do_upload(pentest, tool_iid, "result", upfile)
     if status != 200:
@@ -477,7 +469,6 @@ def launchTask(pentest, tool_iid, body, **kwargs):
     logging.debug("launch task : "+str(tool_iid))
     worker_token = kwargs.get("worker_token") if kwargs.get("worker_token") else encode_token(kwargs.get("token_info"))
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     launchableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     command_o = ServerCommand.fetchObject({"_id": ObjectId(launchableTool.command_iid)}, pentest)
     if launchableTool is None:
@@ -516,7 +507,6 @@ def launchTask(pentest, tool_iid, body, **kwargs):
 @permission("pentester")
 def stopTask(pentest, tool_iid, body):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     stopableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     logging.info("Trying to stop task "+str(stopableTool))
     if stopableTool is None:

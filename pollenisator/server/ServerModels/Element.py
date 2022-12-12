@@ -31,9 +31,8 @@ class ServerElement(object):
                         i += 1
             tags.append(newTag)
             self.tags = tags
-            mongoInstance.connectToDb(self.pentest)
-            mongoInstance.doRegisterTag(newTag)
-            mongoInstance.update(self.__class__.coll_name, {"_id":ObjectId(self.getId())}, {"$set":{"tags":tags}})
+            mongoInstance.doRegisterTag(self.pentest, newTag)
+            mongoInstance.updateInDb(self.pentest, self.__class__.coll_name, {"_id":ObjectId(self.getId())}, {"$set":{"tags":tags}})
 
     def updateInfos(self, newInfos):
         """Change all infos stores in self.infos with the given new ones and update database.
@@ -44,7 +43,7 @@ class ServerElement(object):
             del newInfos[""]
         self.infos.update(newInfos)
         mongoInstance = MongoCalendar.getInstance()
-        ret = mongoInstance.update(self.__class__.coll_name, {"_id":ObjectId(self.getId())}, {"$set":{"infos":self.infos}})
+        ret = mongoInstance.updateInDb(self.pentest, self.__class__.coll_name, {"_id":ObjectId(self.getId())}, {"$set":{"infos":self.infos}})
     
     def getId(self):
         return self._id

@@ -1693,14 +1693,14 @@ paths:
               required:
                 - name
                 - color
+                - pentest
               properties:
                 name:
                   type: string
                 color:
                   type: string
-                global:
-                  type: boolean
-                  default: false
+                pentest:
+                  type: string
       responses:
         "200":
           description: Success
@@ -1722,12 +1722,12 @@ paths:
               type: object
               required:
                 - name
+                - pentest
               properties:
                 name:
                   type: string
-                global:
-                  type: boolean
-                  default: false
+                pentest:
+                  type: string
       responses:
         "200":
           description: Success

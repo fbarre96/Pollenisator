@@ -24,14 +24,12 @@ class ServerPort(Port, ServerElement):
             self.pentest = mongoInstance.calendarName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
-        mongoInstance.connectToDb(self.pentest)
         super().__init__(*args, **kwargs)
 
 
     def getParentId(self):
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(self.pentest)
-        return mongoInstance.find("ips", {"ip": self.ip}, False)["_id"]
+        return mongoInstance.findInDb(self.pentest, "ips", {"ip": self.ip}, False)["_id"]
 
     
 
@@ -46,7 +44,6 @@ class ServerPort(Port, ServerElement):
             check: A boolean to bypass checks. Force adding this command tool to this port if False. Default is True
         """
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(self.pentest)
         if not check:
             newTool = ServerTool(self.pentest)
             newTool.initialize(command_iid, wave_name, None, scope,
@@ -54,7 +51,7 @@ class ServerPort(Port, ServerElement):
             newTool.addInDb(check)
             return
         # retrieve wave's command
-        wave = mongoInstance.find(
+        wave = mongoInstance.findInDb(self.pentest, 
             "waves", {"wave": wave_name}, False)
         commands = wave["wave_commands"]
         if command_iid in commands:
@@ -81,8 +78,7 @@ class ServerPort(Port, ServerElement):
             Returns a cursor to iterate on model objects
         """
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(pentest)
-        ds = mongoInstance.find(cls.coll_name, pipeline, True)
+        ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
             return None
         for d in ds:
@@ -98,8 +94,7 @@ class ServerPort(Port, ServerElement):
             Returns a cursor to iterate on model objects
         """
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(pentest)
-        d = mongoInstance.find(cls.coll_name, pipeline, False)
+        d = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
         if d is None:
             return None
         return cls(pentest, d) 
@@ -113,18 +108,17 @@ class ServerPort(Port, ServerElement):
 @permission("pentester")
 def delete(pentest, port_iid):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
 
-    port_o = ServerPort(pentest, mongoInstance.find("ports", {"_id":ObjectId(port_iid)}, False))
-    tools = mongoInstance.find("tools", {"port": port_o.port, "proto": port_o.proto,
+    port_o = ServerPort(pentest, mongoInstance.findInDb(pentest, "ports", {"_id":ObjectId(port_iid)}, False))
+    tools = mongoInstance.findInDb(pentest, "tools", {"port": port_o.port, "proto": port_o.proto,
                                              "ip": port_o.ip}, True)
     for tool in tools:
         tool_delete(pentest, tool["_id"])
-    defects = mongoInstance.find("defects", {"port": port_o.port, "proto": port_o.proto,
+    defects = mongoInstance.findInDb(pentest, "defects", {"port": port_o.port, "proto": port_o.proto,
                                                 "ip": port_o.ip}, True)
     for defect in defects:
         defect_delete(pentest, defect["_id"])
-    res = mongoInstance.delete("ports", {"_id": ObjectId(port_iid)}, False)
+    res = mongoInstance.deleteFromDb(pentest, "ports", {"_id": ObjectId(port_iid)}, False)
     if res is None:
         return 0
     else:
@@ -133,17 +127,16 @@ def delete(pentest, port_iid):
 @permission("pentester")
 def insert(pentest, body):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     port_o = ServerPort(pentest, body)
     base = port_o.getDbKey()
-    existing = mongoInstance.find(
+    existing = mongoInstance.findInDb(pentest,
             "ports", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
     if "_id" in body:
         del body["_id"]
     parent = port_o.getParentId()
-    ins_result = mongoInstance.insert("ports", body, parent)
+    ins_result = mongoInstance.insertInDb(pentest, "ports", body, parent)
     iid = ins_result.inserted_id
     if int(port_o.port) == 445:
         computer_insert(pentest, {"name":"", "ip":port_o.ip, "domain":"", "admins":[], "users":[], "infos":{"is_dc":False}})
@@ -155,7 +148,7 @@ def insert(pentest, body):
             comp.update()
     # adding the appropriate tools for this port.
     # 1. fetching the wave's commands
-    waves = mongoInstance.find("waves", {})
+    waves = mongoInstance.findInDb(pentest,"waves", {})
     for wave in waves:
         waveName = wave["wave"]
         commands = wave["wave_commands"]
@@ -194,15 +187,14 @@ def insert(pentest, body):
 @permission("pentester")
 def update(pentest, port_iid, body):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     
-    oldPort = ServerPort(pentest, mongoInstance.find("ports", {"_id": ObjectId(port_iid)}, False))
+    oldPort = ServerPort(pentest, mongoInstance.findInDb(pentest, "ports", {"_id": ObjectId(port_iid)}, False))
     if oldPort is None:
         return
     port_o = ServerPort(pentest, body)
     oldService = oldPort.service
     if oldService != port_o.service:
-        mongoInstance.delete("tools", {
+        mongoInstance.deleteFromDb(pentest, "tools", {
                                 "lvl": "port", "ip": oldPort.ip, "port": oldPort.port, "proto": oldPort.proto, "status":{"$ne":"done"}}, many=True)
         port_commands = mongoInstance.findInDb(
             pentest, "commands", {"lvl": "port"})
@@ -212,23 +204,22 @@ def update(pentest, port_iid, body):
                 if not(elem.strip().startswith("tcp/") or elem.strip().startswith("udp/")):
                     allowed_services[i] = "tcp/"+str(elem)
             if port_o.proto+"/"+str(port_o.service) in allowed_services:
-                waves = mongoInstance.find("waves", {"wave_commands": {"$elemMatch": {
+                waves = mongoInstance.findInDb(pentest, "waves", {"wave_commands": {"$elemMatch": {
                     "$eq": str(port_command["_id"]).strip()}}})
                 for wave in waves:
                     tool_m = ServerTool(pentest).initialize(port_command["_id"], wave["wave"], None, "",
                                                 oldPort.ip, oldPort.port, oldPort.proto, "port")
                     tool_m.addInDb(check=False) # already checked and not updated yet so service would be wrong
-    mongoInstance.update("ports", {"_id":ObjectId(port_iid)}, {"$set":body}, False, True)
+    mongoInstance.updateInDb(pentest, "ports", {"_id":ObjectId(port_iid)}, {"$set":body}, False, True)
     return True
     
 @permission("pentester")
 def addCustomTool(pentest, port_iid, body):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     if not mongoInstance.isUserConnected():
         return "Not connected", 503
-    if mongoInstance.find("waves", {"wave": 'Custom Tools'}, False) is None:
-        mongoInstance.insert("waves", {"wave": 'Custom Tools', "wave_commands": list()})
-    port_o = ServerPort(pentest, mongoInstance.find("ports", {"_id":ObjectId(port_iid)}, False))
+    if mongoInstance.findInDb(pentest, "waves", {"wave": 'Custom Tools'}, False) is None:
+        mongoInstance.insertInDb(pentest, "waves", {"wave": 'Custom Tools', "wave_commands": list()})
+    port_o = ServerPort(pentest, mongoInstance.findInDb(pentest, "ports", {"_id":ObjectId(port_iid)}, False))
     port_o.addAllTool(body["command_iid"], 'Custom Tools', '', check=False)
     return "Success", 200

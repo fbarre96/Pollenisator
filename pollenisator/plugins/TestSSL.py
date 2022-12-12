@@ -38,10 +38,10 @@ def parseWarnings(pentest, file_opened):
             if "/" in ip:
                 domain = ip.split("/")[0]
                 ip = "/".join(ip.split("/")[1:])
-                ServerIp().initialize(domain).addInDb()
-                ServerPort().initialize(domain, port, "tcp", "ssl").addInDb()
-            ServerIp().initialize(ip).addInDb()
-            ServerPort().initialize(ip, port, "tcp", "ssl").addInDb()
+                ServerIp(pentest).initialize(domain).addInDb()
+                ServerPort(pentest).initialize(domain, port, "tcp", "ssl").addInDb()
+            ServerIp(pentest).initialize(ip).addInDb()
+            ServerPort(pentest).initialize(ip, port, "tcp", "ssl").addInDb()
             if notes not in ["OK", "INFO"]:
                 missconfiguredHosts[ip] = missconfiguredHosts.get(ip, {})
                 missconfiguredHosts[ip][port] = missconfiguredHosts[ip].get(port, [

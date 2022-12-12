@@ -58,10 +58,9 @@ class Ip(Element):
             boolean: True if this ip/domain is in given scope. False otherwise.
         """
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(self.pentest)
-        settings_scope_ip = mongoInstance.find("settings", {"key":"include_domains_with_ip_in_scope"}, False)
-        settings_all_domains = mongoInstance.find("settings", {"key":"include_all_domains"}, False)
-        settings_top_domain = mongoInstance.find("settings", {"key":"include_domains_with_topdomain_in_scope"}, False)
+        settings_scope_ip = mongoInstance.findInDb(self.pentest, "settings", {"key":"include_domains_with_ip_in_scope"}, False)
+        settings_all_domains = mongoInstance.findInDb(self.pentest,"settings", {"key":"include_all_domains"}, False)
+        settings_top_domain = mongoInstance.findInDb(self.pentest, "settings", {"key":"include_domains_with_topdomain_in_scope"}, False)
         if isNetworkIp(scope):
             if Ip.checkIpScope(scope, self.ip):
                 return True

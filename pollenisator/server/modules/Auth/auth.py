@@ -64,11 +64,10 @@ def insert(pentest, body):
     """
     auth = AuthInfo(pentest, body)
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     if "_id" in body:
         del body["_id"]
     
-    ins_result = mongoInstance.insert(
+    ins_result = mongoInstance.insertInDb(pentest,
         AuthInfo.coll_name, body, True)
     iid = ins_result.inserted_id
     return {"res": True, "iid": iid}
@@ -81,7 +80,7 @@ def link(pentest, auth_iid, object_iid):
     collection_found = None
     object_found = None
     for collection,lvl in lookup.items():
-        res = mongoInstance.find(collection, {"_id":ObjectId(object_iid)}, False)
+        res = mongoInstance.findInDb(pentest, collection, {"_id":ObjectId(object_iid)}, False)
         if res is not None:
             lvl_found = lvl
             object_found = res
@@ -89,7 +88,7 @@ def link(pentest, auth_iid, object_iid):
             break
     if lvl_found is None:
         return "Object to link must be an existing wave,scope,ip or port", 400
-    auth_d = mongoInstance.find(AuthInfo.coll_name, {"_id":ObjectId(auth_iid)}, False)
+    auth_d = mongoInstance.findInDb(pentest, AuthInfo.coll_name, {"_id":ObjectId(auth_iid)}, False)
     if auth_d is None:
         return f"Authentication info with iid {str(auth_iid)} was not found", 404
     if auth_d["type"].lower() == "cookie":
@@ -97,8 +96,8 @@ def link(pentest, auth_iid, object_iid):
     if auth_d["type"].lower() == "password":
         command_lvl = "auth:password"
     object_found["infos"]["auth_cookie"] = auth_d["name"]+"="+auth_d["value"]+";"
-    mongoInstance.update(collection_found, {"_id":ObjectId(object_found["_id"])}, {"$set":object_found})
-    commands = mongoInstance.find("commands", {"lvl":command_lvl}, multi=True)
+    mongoInstance.updateInDb(pentest, collection_found, {"_id":ObjectId(object_found["_id"])}, {"$set":object_found})
+    commands = mongoInstance.findInDb(pentest, "commands", {"lvl":command_lvl}, multi=True)
     if commands is None:
         return "No command found", 404
     for command in commands:

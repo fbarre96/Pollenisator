@@ -18,7 +18,6 @@ class ServerInterval(Interval, ServerElement):
             self.pentest = mongoInstance.calendarName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
-        mongoInstance.connectToDb(self.pentest)
             
     def setToolsInTime(self):
         """Get all OOT (Out of Time) tools in this wave and checks if this Interval makes them in time. 
@@ -37,8 +36,7 @@ class ServerInterval(Interval, ServerElement):
             Returns the parent wave's ObjectId _id".
         """
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(self.pentest)
-        return mongoInstance.find("waves", {"wave": self.wave}, False)["_id"]
+        return mongoInstance.findInDb(self.pentest, "waves", {"wave": self.wave}, False)["_id"]
 
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
@@ -50,8 +48,7 @@ class ServerInterval(Interval, ServerElement):
         """
         mongoInstance = MongoCalendar.getInstance()
 
-        mongoInstance.connectToDb(pentest)
-        ds = mongoInstance.find(cls.coll_name, pipeline, True)
+        ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
             return None
         for d in ds:
@@ -61,14 +58,13 @@ class ServerInterval(Interval, ServerElement):
 @permission("pentester")
 def delete(pentest, interval_iid):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
-    interval_o = ServerInterval(pentest, mongoInstance.find("intervals", {"_id": ObjectId(interval_iid)}, False))
-    res = mongoInstance.delete("intervals", {"_id": ObjectId(interval_iid)}, False)
-    parent_wave = mongoInstance.find("waves", {"wave": interval_o.wave}, False)
+    interval_o = ServerInterval(pentest, mongoInstance.findInDb(pentest, "intervals", {"_id": ObjectId(interval_iid)}, False))
+    res = mongoInstance.deleteFromDb(pentest, "intervals", {"_id": ObjectId(interval_iid)}, False)
+    parent_wave = mongoInstance.findInDb(pentest, "waves", {"wave": interval_o.wave}, False)
     if parent_wave is not None:
         mongoInstance.notify(pentest,
                                 "waves", parent_wave["_id"], "update", "")
-        other_intervals = mongoInstance.find("waves", {"wave": interval_o.wave})
+        other_intervals = mongoInstance.findInDb(pentest, "waves", {"wave": interval_o.wave})
         no_interval_in_time = True
         for other_interval in other_intervals:
             other_interval = ServerInterval(pentest, other_interval)
@@ -76,7 +72,7 @@ def delete(pentest, interval_iid):
                 no_interval_in_time = False
                 break
         if no_interval_in_time:
-            tools = mongoInstance.find("tools", {"wave": interval_o.wave})
+            tools = mongoInstance.findInDb(pentest, "tools", {"wave": interval_o.wave})
             for tool in tools:
                 tool = ServerTool(pentest, tool)
                 tool.setOutOfTime(pentest)
@@ -87,12 +83,11 @@ def delete(pentest, interval_iid):
 @permission("pentester")
 def insert(pentest, body):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     if "_id" in body:
         del body["_id"]
     interval_o = ServerInterval(pentest, body)
     parent = interval_o.getParentId()
-    ins_result = mongoInstance.insert("intervals", body, parent)
+    ins_result = mongoInstance.insertInDb(pentest, "intervals", body, parent)
     interval_o.setToolsInTime()
     iid = ins_result.inserted_id
     return {"res":True, "iid":iid}
@@ -100,8 +95,7 @@ def insert(pentest, body):
 @permission("pentester")
 def update(pentest, interval_iid, body):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
-    interval_o = ServerInterval(pentest, mongoInstance.find("intervals", {"_id": ObjectId(interval_iid)}, False))
+    interval_o = ServerInterval(pentest, mongoInstance.findInDb(pentest, "intervals", {"_id": ObjectId(interval_iid)}, False))
     interval_o.setToolsInTime()
-    mongoInstance.update("intervals", {"_id":ObjectId(interval_iid)}, {"$set":body}, False, True)
+    mongoInstance.updateInDb(pentest, "intervals", {"_id":ObjectId(interval_iid)}, {"$set":body}, False, True)
     return True

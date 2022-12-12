@@ -169,7 +169,6 @@ def search(body):
 
 def craftContext(pentest, **kwargs):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     context = {}
     for k, v in kwargs.items():
         context[k] = v
@@ -179,7 +178,7 @@ def craftContext(pentest, **kwargs):
     context["positive_remarks"] = []
     context["negative_remarks"] = []
     context["neutral_remarks"] = []
-    remarks = mongoInstance.find("remarks", {}, True)
+    remarks = mongoInstance.findInDb(pentest, "remarks", {}, True)
     for remark in remarks:
         if remark["type"].lower() == "positive":
             context["positive_remarks"].append(remark["description"])
@@ -198,7 +197,7 @@ def craftContext(pentest, **kwargs):
             "Strong": "002060",
         }
     }
-    scopes_list = [scope for scope in mongoInstance.find("scopes", {}, True)]
+    scopes_list = [scope for scope in mongoInstance.findInDb(pentest, "scopes", {}, True)]
     context["scopes"] = scopes_list
     pentesters = mongoInstance.getPentestUsers(pentest)
     context["pentesters"] = []
@@ -209,7 +208,7 @@ def craftContext(pentest, **kwargs):
     owner = mongoInstance.getPentestOwner(pentest)
     p = mongoInstance.getUserRecordFromUsername(owner)
     context["owner"] = p if p is not None else None
-    ports = mongoInstance.find("ports", {}, True)
+    ports = mongoInstance.findInDb(pentest, "ports", {}, True)
     ports = [port for port in ports]
     ports.sort(key=lambda x: (x["ip"],int(x["port"])))
     context["ports"] = ports
@@ -239,7 +238,7 @@ def craftContext(pentest, **kwargs):
             defect_completed["fixes"][i]["description_paragraphs"] = fix["description"].replace("\r","").split("\n\n")
         completed_fixes += defect_completed["fixes"]
         defect_id += 1
-        assignedDefects = mongoInstance.find("defects", {"global_defect":ObjectId(defect_completed["_id"])}, True)
+        assignedDefects = mongoInstance.findInDb(pentest, "defects", {"global_defect":ObjectId(defect_completed["_id"])}, True)
         defect_completed["instances"] = []
         for assignedDefect in assignedDefects:
             local_proofs = []

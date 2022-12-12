@@ -17,7 +17,6 @@ class CheckInstance(ServerElement):
             self.pentest = mongoInstance.calendarName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
-        mongoInstance.connectToDb(self.pentest)
         if valuesFromDb is None:
             valuesFromDb = {}
         if valuesFromDb is None:

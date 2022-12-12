@@ -92,10 +92,10 @@ class dnsrecon(Plugin):
                 ip = record["address"]
                 name = record["name"]
                 infosToAdd = {"hostname": [name]}
-                ip_m = ServerIp().initialize(ip, infos=infosToAdd)
+                ip_m = ServerIp(pentest).initialize(ip, infos=infosToAdd)
                 ip_m.addInDb()
                 infosToAdd = {"ip": [ip]}
-                ip_m = ServerIp().initialize(name, infos=infosToAdd)
+                ip_m = ServerIp(pentest).initialize(name, infos=infosToAdd)
                 insert_ret = ip_m.addInDb()
                 # failed, domain is out of scope
                 if not insert_ret["res"]:

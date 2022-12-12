@@ -62,8 +62,8 @@ class SSHScan(Plugin):
                 for ip in ips:
                     if ip.strip() == "":
                         continue
-                    ServerIp().initialize(ip).addInDb()
-                    port_o = ServerPort().initialize(ip, port, "tcp", "ssh")
+                    ServerIp(pentest).initialize(ip).addInDb()
+                    port_o = ServerPort(pentest).initialize(ip, port, "tcp", "ssh")
                     insert_res = port_o.addInDb()
                     if not insert_res["res"]:
                         port_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})

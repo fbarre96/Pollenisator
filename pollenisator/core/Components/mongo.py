@@ -176,6 +176,7 @@ class MongoCalendar:
             self.calendarName = calendarName
             if calendarName is not None:
                 self.db = self.client[calendarName]
+                
         except IOError as e:
             print("Failed to connect." + str(e))
             print("Please verify that the mongod service is running on host " +
@@ -228,7 +229,7 @@ class MongoCalendar:
         """
         return self._update(self.calendarName, collection, pipeline, updatePipeline, many=many, notify=notify, upsert=upsert)
 
-    def updateInDb(self, db, collection, pipeline, updatePipeline, many=False, notify=False, upsert=False):
+    def updateInDb(self, db, collection, pipeline, updatePipeline, many=False, notify=True, upsert=False):
         """
         update something in the database.
         Args:
@@ -295,7 +296,7 @@ class MongoCalendar:
         ret = self._insert(self.calendarName, collection, values, notify, parent)
         return ret
 
-    def insertInDb(self, db, collection, values, _parent='', notify=False):
+    def insertInDb(self, db, collection, values, _parent='', notify=True):
         """
         insert something in the database after ensuring connection.
         Args:
@@ -469,7 +470,7 @@ class MongoCalendar:
         """
         return self._delete(self.calendarName, collection, pipeline, many, True)
 
-    def deleteFromDb(self, db, collection, pipeline, many=False, notify=False):
+    def deleteFromDb(self, db, collection, pipeline, many=False, notify=True):
         """
         aggregate something in the database.
         Args:
@@ -782,21 +783,22 @@ class MongoCalendar:
         tags = self.getGlobalTags()
         return [tags, ["hidden"]]
 
-    def doRegisterTag(self, name, color="white", isGlobal=False):
+
+    def doRegisterTag(self, pentest, name, color="white"):
         if name in self.getRegisteredTags():
             return False
-        if isGlobal:
+        if pentest == "pollenisator":
             tags = json.loads(self.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=Utils.JSONDecoder)
             self.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=Utils.JSONEncoder)}}, many=False, notify=True)
         else:
-            tags = self.find("settings", {"key":"tags"}, False)
+            tags = self.findInDb(pentest, "settings", {"key":"tags"}, False)
             if tags is None:
-                self.insert("settings", {"key":"tags", "value":{name:color}})
+                self.insertInDb(pentest, "settings", {"key":"tags", "value":{name:color}})
             else:
                 tags = tags.get("value", {})
                 if name not in tags:
                     tags[name] = color
-                    self.update("settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
+                    self.updateInDb(pentest, "settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
         return True    
 
     # def importCommands(self, filename):
@@ -842,7 +844,6 @@ class MongoCalendar:
 
     def do_upload(self, pentest, attached_iid, filetype, upfile):
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(pentest)
         local_path = os.path.join(Utils.getMainDir(), "files")
         try:
             os.makedirs(local_path)
@@ -850,7 +851,7 @@ class MongoCalendar:
             pass
         filepath = os.path.join(local_path, pentest, filetype, attached_iid)
         if filetype == "result":
-            res = mongoInstance.find("tools", {"_id": ObjectId(attached_iid)}, False)
+            res = mongoInstance.findInDb(pentest, "tools", {"_id": ObjectId(attached_iid)}, False)
             if res is None:
                 return "The given iid does not match an existing tool", 404, ""
             else:
@@ -859,7 +860,7 @@ class MongoCalendar:
                     for existing_file in files:
                         os.remove(os.path.join(filepath, files[0]))
         elif filetype == "proof":
-            res = mongoInstance.find("defects", {"_id": ObjectId(attached_iid)}, False)
+            res = mongoInstance.findInDb(pentest, "defects", {"_id": ObjectId(attached_iid)}, False)
             if res is None:
                 return "The given iid does not match an existing defect", 404, ""
         else:
@@ -876,5 +877,5 @@ class MongoCalendar:
         upfile.stream.seek(0)
         
         if filetype == "proof":
-            mongoInstance.update("defects", {"_id": ObjectId(attached_iid)}, {"$push":{"proofs":name}})
+            mongoInstance.updateInDb(pentest, "defects", {"_id": ObjectId(attached_iid)}, {"$push":{"proofs":name}})
         return name + " was successfully uploaded", 200, filepath

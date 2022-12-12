@@ -21,20 +21,17 @@ class ServerScope(Scope, ServerElement):
             self.pentest = mongoInstance.calendarName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
-        mongoInstance.connectToDb(self.pentest)
 
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(pentest)
-        results = mongoInstance.find("scopes", pipeline)
+        results = mongoInstance.findInDb(pentest, "scopes", pipeline)
         for result in results:
             yield(cls(pentest, result))
 
     def getParentId(self):
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(self.pentest)
-        res = mongoInstance.find("waves", {"wave": self.wave}, False)
+        res = mongoInstance.findInDb(self.pentest, "waves", {"wave": self.wave}, False)
         return res["_id"]
 
     def addInDb(self):
@@ -47,7 +44,6 @@ class ServerScope(Scope, ServerElement):
             command_name: The command that we want to create all the tools for.
         """
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(self.pentest)
         command = mongoInstance.findInDb(self.pentest, "commands", {
                                          "_id": ObjectId(command_iid)}, False)
         if command is None:
@@ -76,8 +72,7 @@ class ServerScope(Scope, ServerElement):
             A list ip IP dictionnary from mongo db
         """
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(self.pentest)
-        ips = mongoInstance.find("ips", )
+        ips = mongoInstance.findInDb(self.pentest, "ips", )
         ips_fitting = []
         isdomain = self.isDomain()
         for ip in ips:
@@ -100,10 +95,9 @@ class ServerScope(Scope, ServerElement):
 @permission("pentester")
 def delete(pentest, scope_iid):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     # deleting tool with scope lvl
-    scope_o = ServerScope(pentest, mongoInstance.find("scopes", {"_id": ObjectId(scope_iid)}, False))
-    tools = mongoInstance.find("tools", {"scope": scope_o.scope, "wave": scope_o.wave, "$or": [
+    scope_o = ServerScope(pentest, mongoInstance.findInDb(pentest, "scopes", {"_id": ObjectId(scope_iid)}, False))
+    tools = mongoInstance.findInDb(pentest, "tools", {"scope": scope_o.scope, "wave": scope_o.wave, "$or": [
                                 {"lvl": "network"}, {"lvl": "domain"}]})
     for tool in tools:
         tool_delete(pentest, tool["_id"])
@@ -111,8 +105,8 @@ def delete(pentest, scope_iid):
     ips = ServerIp.getIpsInScope(pentest, scope_iid)
     for ip in ips:
         ip.removeScopeFitting(pentest, scope_iid)
-    res = mongoInstance.delete("scopes", {"_id": ObjectId(scope_iid)}, False)
-    parent_wave = mongoInstance.find("waves", {"wave": scope_o.wave}, False)
+    res = mongoInstance.deleteFromDb(pentest, "scopes", {"_id": ObjectId(scope_iid)}, False)
+    parent_wave = mongoInstance.findInDb(pentest, "waves", {"wave": scope_o.wave}, False)
     if parent_wave is None:
         return
     mongoInstance.notify(pentest,
@@ -126,27 +120,26 @@ def delete(pentest, scope_iid):
 @permission("pentester")
 def insert(pentest, body):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     scope_o = ServerScope(pentest, body)
     # Checking unicity
     base = scope_o.getDbKey()
-    existing = mongoInstance.find("scopes", base, False)
+    existing = mongoInstance.findInDb(pentest, "scopes", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
     if "_id" in body:
         del body["_id"]
     # Inserting scope
     parent = scope_o.getParentId()
-    res_insert = mongoInstance.insert("scopes", base, parent)
+    res_insert = mongoInstance.insertInDb(pentest, "scopes", base, parent)
     ret = res_insert.inserted_id
     scope_o._id = ret
     # adding the appropriate tools for this scope.
-    wave = mongoInstance.find("waves", {"wave": scope_o.wave}, False)
+    wave = mongoInstance.findInDb(pentest, "waves", {"wave": scope_o.wave}, False)
     commands = wave["wave_commands"]
     for comm_iid in commands:
         scope_o.addAllTool(comm_iid)
     # Testing this scope against every ips
-    ips = mongoInstance.find("ips", {})
+    ips = mongoInstance.findInDb(pentest, "ips", {})
     for ip in ips:
         ip_o = ServerIp(pentest, ip)
         if scope_o._id not in ip_o.in_scopes:
@@ -157,6 +150,5 @@ def insert(pentest, body):
 @permission("pentester")
 def update(pentest, scope_iid, body):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
-    mongoInstance.update("scopes", {"_id":ObjectId(scope_iid)}, {"$set":body}, False, True)
+    mongoInstance.updateInDb(pentest, "scopes", {"_id":ObjectId(scope_iid)}, {"$set":body}, False, True)
     return True

@@ -204,7 +204,7 @@ def editScopeIPs(pentest, hostsInfos):
                 if secrets:
                     infosToAdd["secrets"] = infosToAdd.get("secrets", []) + secrets
 
-            ip_m = ServerIp().initialize(str(infos["ip"]))
+            ip_m = ServerIp(pentest).initialize(str(infos["ip"]))
             insert_ret = ip_m.addInDb()
             if not insert_ret["res"]:
                 ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
@@ -217,7 +217,7 @@ def editScopeIPs(pentest, hostsInfos):
             port = str(infos["port"])
             proto = "tcp"
             service = "netbios-ssn"
-            port_m = ServerPort().initialize(host, port, proto, service)
+            port_m = ServerPort(pentest).initialize(host, port, proto, service)
             insert_ret = port_m.addInDb()
             port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
 

@@ -25,7 +25,6 @@ class ServerIp(Ip, ServerElement):
             self.pentest = mongoInstance.calendarName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
-        mongoInstance.connectToDb(self.pentest)
         super().__init__(*args, **kwargs)
 
 
@@ -54,8 +53,7 @@ class ServerIp(Ip, ServerElement):
         """
         ret = []
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(self.pentest)
-        scopes = mongoInstance.find("scopes", {})
+        scopes = mongoInstance.findInDb(self.pentest, "scopes", {})
         if scopes is None:
             return ret
         for scope in scopes:
@@ -72,8 +70,7 @@ class ServerIp(Ip, ServerElement):
             Returns a cursor to iterate on model objects
         """
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(pentest)
-        ds = mongoInstance.find(cls.coll_name, pipeline, True)
+        ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
             return None
         for d in ds:
@@ -89,8 +86,7 @@ class ServerIp(Ip, ServerElement):
             Returns a cursor to iterate on model objects
         """
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(pentest)
-        ds = mongoInstance.find(cls.coll_name, pipeline, False)
+        ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
         if ds is None:
             return None
         return cls(pentest, ds) 
@@ -104,8 +100,7 @@ class ServerIp(Ip, ServerElement):
             a mongo cursor of IP objects matching the given scopeId
         """
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(pentest)
-        ips = mongoInstance.find("ips", {"in_scopes": {"$elemMatch": {"$eq": str(scopeId)}}})
+        ips = mongoInstance.findInDb(pentest, "ips", {"in_scopes": {"$elemMatch": {"$eq": str(scopeId)}}})
         for ip in ips:
             yield ServerIp(pentest, ip)
     
@@ -149,8 +144,7 @@ class ServerIp(Ip, ServerElement):
         ip_real = performLookUp(self.ip)
         if ip_real is not None:
             mongoInstance = MongoCalendar.getInstance()
-            mongoInstance.connectToDb(self.pentest)
-            ip_in_db = mongoInstance.find("ips", {"ip": ip_real}, False)
+            ip_in_db = mongoInstance.findInDb(self.pentest, "ips", {"ip": ip_real}, False)
             if ip_in_db is None:
                 return None
             self.parent = ip_in_db["_id"]
@@ -171,7 +165,6 @@ class ServerIp(Ip, ServerElement):
         """
         # retrieve the command level
         mongoInstance = MongoCalendar.getInstance()
-        mongoInstance.connectToDb(self.pentest)
         command = mongoInstance.findInDb(self.pentest,
                                          "commands", {"_id": ObjectId(command_iid)}, False)
         if command is None:
@@ -184,7 +177,7 @@ class ServerIp(Ip, ServerElement):
             newTool.addInDb()
             return
         # Do the same thing for all children ports.
-        ports = mongoInstance.find("ports", {"ip": self.ip})
+        ports = mongoInstance.findInDb(self.pentest, "ports", {"ip": self.ip})
         for port in ports:
             p = ServerPort(self.pentest, port)
             p.addAllTool(command_iid, wave_name, scope)
@@ -198,23 +191,22 @@ class ServerIp(Ip, ServerElement):
 @permission("pentester")
 def delete(pentest, ip_iid):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
-    ip_dic = mongoInstance.find("ips", {"_id":ObjectId(ip_iid)}, False)
+    ip_dic = mongoInstance.findInDb(pentest, "ips", {"_id":ObjectId(ip_iid)}, False)
     if ip_dic is None:
         return 0
-    tools = mongoInstance.find("tools",
+    tools = mongoInstance.findInDb(pentest, "tools",
                                 {"ip": ip_dic["ip"]}, True)
     for tool in tools:
         tool_delete(pentest, tool["_id"])
-    defects = mongoInstance.find("defects",
+    defects = mongoInstance.findInDb(pentest, "defects",
                                     {"ip": ip_dic["ip"], "$or": [{"port": {"$exists": False}}, {"port": None}]}, True)
     for defect in defects:
         defect_delete(pentest, defect["_id"])
-    ports = mongoInstance.find("ports",
+    ports = mongoInstance.findInDb(pentest, "ports",
                                 {"ip": ip_dic["ip"]}, True)
     for port in ports:
         port_delete(pentest, port["_id"])
-    res = mongoInstance.delete("ips", {"_id": ObjectId(ip_iid)}, False)
+    res = mongoInstance.deleteFromDb(pentest, "ips", {"_id": ObjectId(ip_iid)}, False)
     if res is None:
         return 0
     else:
@@ -223,20 +215,19 @@ def delete(pentest, ip_iid):
 @permission("pentester")
 def insert(pentest, body):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
     ip_o = ServerIp(pentest, body)
     base = ip_o.getDbKey()
-    existing = mongoInstance.find(
+    existing = mongoInstance.findInDb(pentest, 
             "ips", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
     if "_id" in body:
         del body["_id"]
     parent = ip_o.getParentId()
-    ins_result = mongoInstance.insert("ips", body, parent)
+    ins_result = mongoInstance.insertInDb(pentest, "ips", body, parent)
     iid = ins_result.inserted_id
     if ip_o.in_scopes:
-        waves = mongoInstance.find("waves", {})
+        waves = mongoInstance.findInDb(pentest, "waves", {})
         for wave in waves:
             waveName = wave["wave"]
             commands = wave["wave_commands"]
@@ -256,7 +247,6 @@ def insert(pentest, body):
 @permission("pentester")
 def update(pentest, ip_iid, body):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.connectToDb(pentest)
-    mongoInstance.update("ips", {"_id":ObjectId(ip_iid)}, {"$set":body}, False, True)
+    mongoInstance.updateInDb(pentest, "ips", {"_id":ObjectId(ip_iid)}, {"$set":body}, False, True)
     return True
 

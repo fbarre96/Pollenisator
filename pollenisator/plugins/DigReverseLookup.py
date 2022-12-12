@@ -70,8 +70,8 @@ class DigReverseLookup(Plugin):
             return None, None, None, None
         if domain is not None:
             # Add a domain as a scope in db
-            ServerIp().initialize(domain).addInDb()
-            ip_m = ServerIp().initialize(ip)
+            ServerIp(pentest).initialize(domain).addInDb()
+            ip_m = ServerIp(pentest).initialize(ip)
             insert_ret = ip_m.addInDb()
             if not insert_ret["res"]:
                 ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})

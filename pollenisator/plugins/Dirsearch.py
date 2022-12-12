@@ -123,9 +123,9 @@ class Dirsearch(Plugin):
                 return None, None, None, None
             targets = {}
             for host in hosts:
-                ServerIp().initialize(host).addInDb()
+                ServerIp(pentest).initialize(host).addInDb()
                 for port in hosts[host]:
-                    port_o = ServerPort()
+                    port_o = ServerPort(pentest)
                     port_o.initialize(host, port, "tcp",
                                       hosts[host][port]["service"])
                     insert_ret = port_o.addInDb()

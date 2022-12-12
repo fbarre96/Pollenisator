@@ -84,8 +84,8 @@ class Nikto(Plugin):
         host, port, service, infos = parse_nikto_plain_text(notes)
         if host:
             if port:
-                ServerIp().initialize(host).addInDb()
-                p_o = ServerPort().initialize(host, port, "tcp", service)
+                ServerIp(pentest).initialize(host).addInDb()
+                p_o = ServerPort(pentest).initialize(host, port, "tcp", service)
                 insert_res = p_o.addInDb()
                 if not insert_res["res"]:
                     p_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})
