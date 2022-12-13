@@ -496,7 +496,6 @@ def importDb(upfile, **kwargs):
     with open(tmpfile, "wb") as f:
         f.write(upfile.stream.read())
     success = mongoInstance.importDatabase(username, tmpfile)
-    logging.debug("DEBUG : "+str(dirpath))
     shutil.rmtree(dirpath)
     return success
 

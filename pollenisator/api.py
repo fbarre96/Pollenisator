@@ -16,7 +16,7 @@ logging.basicConfig(filename='error.log', level=logging.INFO,
                     format='[%(asctime)s][%(levelname)s] - %(funcName)s: %(message)s')
 
 console = logging.StreamHandler()
-console.setLevel(logging.INFO)
+console.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
 console.setFormatter(formatter)
 # add the handler to the root logger

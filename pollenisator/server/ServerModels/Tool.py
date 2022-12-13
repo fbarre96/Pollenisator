@@ -480,7 +480,7 @@ def launchTask(pentest, tool_iid, body, **kwargs):
     
     # Find a worker that can launch the tool without breaking limitations
     workers = [x["name"] for x in mongoInstance.getWorkers({"pentest":pentest})]
-    logging.debug(f"Available workers are {str(workers)}")
+    logging.debug(f"Available workers are {str(workers)}, (tool id {tool_iid})")
     choosenWorker = ""
     for owner in command_o.owners:
         if owner in workers:
@@ -488,18 +488,21 @@ def launchTask(pentest, tool_iid, body, **kwargs):
     if choosenWorker == "":
         logging.debug("Error in launch task : no worker available:"+str(tool_iid))
         return "No worker available", 404
-    logging.debug(f"Choosen worker is {str(choosenWorker)}")
+    logging.debug(f"Choosen worker for tool_iid {tool_iid} is {str(choosenWorker)}")
     workerName = choosenWorker
+    socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":workerName}, False)
+    if socket is None:
+        logging.debug(f"Error in launching {tool_iid} : socket not found to contact {workerName}")
+        return "Socket not found", 503
     launchableToolId = launchableTool.getId()
     launchableTool.markAsRunning(workerName, body.get("group_id"), body.get("group_name"))
+    logging.debug(f"Mark as running tool_iid {tool_iid}")
     update(pentest, tool_iid, ToolController(launchableTool).getData())
     # Mark the tool as running (scanner_ip is set and dated is set, datef is "None")
     # Use socket sid as room so that only this worker will receive this task
-    socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":workerName}, False)
-    if socket is None:
-        return "Socket not found", 503
+    
     sm = SocketManager.getInstance()
-    logging.debug("Launch task : emit : "+str(socket["sid"])+" toolid:"+str(str(launchableToolId)))
+    logging.debug(f"Launch task to worker {workerName} : emit  {str(socket['sid'])} toolid:{str(launchableToolId)})")
     sm.socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(launchableToolId)}, room=socket["sid"])
     return "Success ", 200
 
