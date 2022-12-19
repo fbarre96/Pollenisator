@@ -121,7 +121,7 @@ def generateReport(pentest, templateName, clientName, contractName, mainRedactor
     p = Process(target=_generateDoc, args=(ext, context, template_to_use_path, out_name, lang_translation, return_dict))
     p.start()
     p.join()
-    if return_dict["res"]:
+    if return_dict["res"] == True:
         try:
             return send_file(return_dict["msg"], attachment_filename=out_name+ext)
         except TypeError as e: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
@@ -134,20 +134,21 @@ def generateReport(pentest, templateName, clientName, contractName, mainRedactor
 
 def _generateDoc(ext, context, template_to_use_path, out_name, translation, return_dict):
     if ext == ".docx":
-        res, outfile = WordExport.createReport(
+        res, msg = WordExport.createReport(
             context, template_to_use_path, out_name, translation=translation)
         return_dict["res"] = res
-        return_dict["msg"] = outfile
+        return_dict["msg"] = msg
+        return
 
     elif ext == ".pptx":
         outfile = PowerpointExport.createReport(
             context, template_to_use_path, out_name, translation=translation)
+        return_dict["res"] = True
+        return_dict["msg"] = outfile
     else:
         return_dict["res"] = False
         return_dict["msg"] = "Unknown template file extension"
-    return_dict["res"] = True
-    return_dict["msg"] = outfile
-
+    
 @permission("user")
 def search(body):
     type = body.get("type", "")
