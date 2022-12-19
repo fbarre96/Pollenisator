@@ -9,18 +9,10 @@ else:
     async_mode = "eventlet"
     
 # ENABLE LOGGING EARLY ON
-import logging
+from pollenisator.core.Components.logger_config import logger
 
 from pollenisator.server.permission import permission
-logging.basicConfig(filename='error.log', level=logging.INFO,
-                    format='[%(asctime)s][%(levelname)s] - %(funcName)s: %(message)s')
 
-console = logging.StreamHandler()
-console.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
-console.setFormatter(formatter)
-# add the handler to the root logger
-logging.getLogger('').addHandler(console)
 
 from flask_cors import CORS
 from getpass import getpass
@@ -156,13 +148,13 @@ def init():
 
 def create_app():
     # Read the openapi.yaml file to configure the endpoints
-    logging.info("LOADING MAIN API")
+    logger.info("LOADING MAIN API")
     if not loaded:
         load_modules(app, os.path.join(server_folder,"openapi.yaml"))
 
     flask_app = app.app
     sm = SocketManager.getInstance()
-    logging.info('Running')
+    logger.info('Running')
     sm.socketio.init_app(flask_app, log_output=False, logger=False,
                     engineio_logger=False, async_mode=async_mode)
     
@@ -212,7 +204,7 @@ def create_app():
     return flask_app
 
 def main():
-    logging.info('MAIN')
+    logger.info('MAIN')
     app = create_app()
     run(flask_app)
     
@@ -226,7 +218,7 @@ def run(flask_app):
         pass
     return sm.socketio
 
-logging.info("Script name = "+str(__name__))
+logger.info("Script name = "+str(__name__))
 # If we're running in stand alone mode, run the application
 if __name__ == '__main__':
     main()

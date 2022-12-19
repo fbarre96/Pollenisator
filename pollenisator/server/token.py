@@ -1,4 +1,4 @@
-import logging
+from pollenisator.core.Components.logger_config import logger
 from jose import JWTError, jwt
 from pollenisator.core.Components.mongo import MongoCalendar
 import datetime
@@ -76,7 +76,7 @@ def decode_token(token):
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except JWTError as e:
         print("ERROR token "+str(e))
-        logging.info(f"Unauthorized, token is invalid : token ({token}) error ({e})")
+        logger.info(f"Unauthorized, token is invalid : token ({token}) error ({e})")
         six.raise_from(Unauthorized, e)
     
 def _current_timestamp():

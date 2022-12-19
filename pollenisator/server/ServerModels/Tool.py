@@ -1,4 +1,4 @@
-import logging
+from pollenisator.core.Components.logger_config import logger
 from bson import ObjectId
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Models.Tool import Tool
@@ -466,43 +466,43 @@ def importResult(pentest, tool_iid, upfile, body):
 
 @permission("pentester")
 def launchTask(pentest, tool_iid, body, **kwargs):
-    logging.debug("launch task : "+str(tool_iid))
+    logger.debug("launch task : "+str(tool_iid))
     worker_token = kwargs.get("worker_token") if kwargs.get("worker_token") else encode_token(kwargs.get("token_info"))
     mongoInstance = MongoCalendar.getInstance()
     launchableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     command_o = ServerCommand.fetchObject({"_id": ObjectId(launchableTool.command_iid)}, pentest)
     if launchableTool is None:
-        logging.debug("Error in launch task : not found :"+str(tool_iid))
+        logger.debug("Error in launch task : not found :"+str(tool_iid))
         return "Tool not found", 404
     if command_o is None:
-        logging.debug("Error in launch task : command for tool not found :"+str(tool_iid))
+        logger.debug("Error in launch task : command for tool not found :"+str(tool_iid))
         return "Command associated not found", 404
     
     # Find a worker that can launch the tool without breaking limitations
     workers = [x["name"] for x in mongoInstance.getWorkers({"pentest":pentest})]
-    logging.debug(f"Available workers are {str(workers)}, (tool id {tool_iid})")
+    logger.debug(f"Available workers are {str(workers)}, (tool id {tool_iid})")
     choosenWorker = ""
     for owner in command_o.owners:
         if owner in workers:
             choosenWorker = owner
     if choosenWorker == "":
-        logging.debug("Error in launch task : no worker available:"+str(tool_iid))
+        logger.debug("Error in launch task : no worker available:"+str(tool_iid))
         return "No worker available", 404
-    logging.debug(f"Choosen worker for tool_iid {tool_iid} is {str(choosenWorker)}")
+    logger.debug(f"Choosen worker for tool_iid {tool_iid} is {str(choosenWorker)}")
     workerName = choosenWorker
     socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":workerName}, False)
     if socket is None:
-        logging.debug(f"Error in launching {tool_iid} : socket not found to contact {workerName}")
+        logger.debug(f"Error in launching {tool_iid} : socket not found to contact {workerName}")
         return "Socket not found", 503
     launchableToolId = launchableTool.getId()
     launchableTool.markAsRunning(workerName, body.get("group_id"), body.get("group_name"))
-    logging.debug(f"Mark as running tool_iid {tool_iid}")
+    logger.debug(f"Mark as running tool_iid {tool_iid}")
     update(pentest, tool_iid, ToolController(launchableTool).getData())
     # Mark the tool as running (scanner_ip is set and dated is set, datef is "None")
     # Use socket sid as room so that only this worker will receive this task
     
     sm = SocketManager.getInstance()
-    logging.debug(f"Launch task to worker {workerName} : emit  {str(socket['sid'])} toolid:{str(launchableToolId)})")
+    logger.debug(f"Launch task to worker {workerName} : emit  {str(socket['sid'])} toolid:{str(launchableToolId)})")
     sm.socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(launchableToolId)}, room=socket["sid"])
     return "Success ", 200
 
@@ -511,7 +511,7 @@ def launchTask(pentest, tool_iid, body, **kwargs):
 def stopTask(pentest, tool_iid, body):
     mongoInstance = MongoCalendar.getInstance()
     stopableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
-    logging.info("Trying to stop task "+str(stopableTool))
+    logger.info("Trying to stop task "+str(stopableTool))
     if stopableTool is None:
         return "Tool not found", 404
     workers = mongoInstance.getWorkers({})

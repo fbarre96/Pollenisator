@@ -1,4 +1,4 @@
-import logging
+from pollenisator.core.Components.logger_config import logger
 import os
 import json
 from datetime import datetime
@@ -13,22 +13,10 @@ from multiprocessing import Process, Manager
 import re
 import requests
 from bson import ObjectId
-import logging
+from pollenisator.core.Components.logger_config import logger
 import sys
 
-logging.basicConfig(filename='error.log', encoding='utf-8', level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-handler = logging.StreamHandler(stream=sys.stdout)
-logger.addHandler(handler)
 
-def handle_exception(exc_type, exc_value, exc_traceback):
-    if issubclass(exc_type, KeyboardInterrupt):
-        sys.__excepthook__(exc_type, exc_value, exc_traceback)
-        return
-
-    logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
-
-sys.excepthook = handle_exception
 
 main_dir = getMainDir()
 template_path = os.path.normpath(os.path.join(main_dir, "./Templates/"))
@@ -253,7 +241,7 @@ def craftContext(pentest, **kwargs):
         elif len(defect_completed["fixes"]) == 1:
             defect_completed["fixes"][0]["id"] = str(defect_id)
         else:
-            logging.warning("Warning: defect in polymathee with no fix")
+            logger.warning("Warning: defect in polymathee with no fix")
         for i, fix in enumerate(defect_completed["fixes"]):
             defect_completed["fixes"][i]["description_paragraphs"] = fix["description"].replace("\r","").split("\n\n")
         completed_fixes += defect_completed["fixes"]

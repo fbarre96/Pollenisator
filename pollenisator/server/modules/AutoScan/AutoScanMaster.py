@@ -1,5 +1,5 @@
 """Module for orchestrating an automatic scan. Must be run in a separate thread/process."""
-import logging
+from pollenisator.core.Components.logger_config import logger
 import time
 from threading import Thread
 from datetime import datetime
@@ -29,7 +29,7 @@ def startAutoScan(pentest, **kwargs):
     encoded = encode_token(kwargs["token_info"])
     autoscan = Thread(target=autoScan, args=(pentest, encoded))
     try:
-        logging.debug("Autoscan : start")
+        logger.debug("Autoscan : start")
         autoscan.start()
     except(KeyboardInterrupt, SystemExit):
         mongoInstance.deleteFromDb(pentest, "autoscan", {}, True)
@@ -47,41 +47,41 @@ def autoScan(pentest, endoded_token):
     check = True
     try:
         while check:
-            logging.debug("Autoscan : loop")
+            logger.debug("Autoscan : loop")
             queue = [] # reinit queue each time as some tools may be finished / canceled / errored
             launchableTools = findLaunchableTools(pentest)
-            logging.debug("Autoscan : launchable tools: "+str(len(launchableTools)))
+            logger.debug("Autoscan : launchable tools: "+str(len(launchableTools)))
             launchableTools.sort(key=lambda tup: (int(tup["timedout"]), int(tup["priority"])))
             for launchableTool in launchableTools:
-                logging.debug("Autoscan : loop")
+                logger.debug("Autoscan : loop")
                 check = getAutoScanStatus(pentest)
                 if not check:
                     break
                 if str(launchableTool["tool"].getId()) not in queue:
                     queue.append(str(launchableTool["tool"].getId()))
-                    logging.debug("Autoscan : launch task tools: "+str(launchableTool["tool"].getId()))
+                    logger.debug("Autoscan : launch task tools: "+str(launchableTool["tool"].getId()))
                     res, statuscode = launchTask(pentest, launchableTool["tool"].getId(), {"group_id":launchableTool["group_id"], "group_name":launchableTool["group_name"]}, worker_token=endoded_token)
                 
             check = getAutoScanStatus(pentest)
             time.sleep(3)
     except(KeyboardInterrupt, SystemExit):
-        logging.debug("Autoscan : EXIT by expected EXCEPTION (exit or interrupt)")
-        logging.info("stop autoscan : Kill received...")
+        logger.debug("Autoscan : EXIT by expected EXCEPTION (exit or interrupt)")
+        logger.info("stop autoscan : Kill received...")
         mongoInstance.deleteFromDb(pentest, "autoscan", {}, True)
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
         print(tb)
-        logging.exception(e)
-        logging.debug("autoscan :"+tb)
-        logging.error(str(e))
+        logger.exception(e)
+        logger.debug("autoscan :"+tb)
+        logger.error(str(e))
 
 
 
 
 @permission("pentester")
 def stopAutoScan(pentest):
-    logging.debug("Autoscan : stop autoscan received ")
+    logger.debug("Autoscan : stop autoscan received ")
     mongoInstance = MongoCalendar.getInstance()
     toolsRunning = []
     workers = mongoInstance.getWorkers({"pentest":pentest})
@@ -130,7 +130,7 @@ def findLaunchableTools(pentest):
             count_running_tools = mongoInstance.countInDb(pentest, "tools", {"command_iid":{"$in":command_group.commands},"status":"running"})
             for toolId, toolModel in commandsLaunchableWave.items():
                 if count_running_tools + launched >= command_group.max_thread:
-                    logging.info(f"Can't launch anymore command of group {command_group.name}")
+                    logger.info(f"Can't launch anymore command of group {command_group.name}")
                     break
                 if "error" in toolModel.status:
                     continue

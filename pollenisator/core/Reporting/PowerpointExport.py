@@ -1,4 +1,4 @@
-import logging
+from pollenisator.core.Components.logger_config import logger
 from pptx import Presentation
 from pptx.shapes.autoshape import Shape
 from pptx.chart.data import CategoryChartData
@@ -356,14 +356,14 @@ def createReport(context, template, out_name, **kwargs):
     replaceTextInDocument(document, "var_nb_d_important", str(nb_important))
     replaceTextInDocument(document, "var_nb_d_minor", str(nb_minor))
     addSerieToChart(document, 0, 'Criticity', (nb_critical,nb_major,nb_important,nb_minor))
-    logging.info("Write each defect ...")
+    logger.info("Write each defect ...")
     write_each_defect(document, context["defects"])
     replaceTextInDocument(document, "var_nb_d_total", str(len(context["defects"])))
     replaceTextInDocument(document, "var_nb_fix", str(len(context["fixes"])))
-    logging.info("Write each remark ...")
+    logger.info("Write each remark ...")
     write_each_remark(document, context["positive_remarks"], context["neutral_remarks"], context["negative_remarks"])
     dir_path = os.path.dirname(os.path.realpath(__file__))
     out_path = os.path.join(dir_path, "../../exports/", out_name+".pptx")
     document.save(out_path)
-    logging.info("Generated report at "+str(out_path))
+    logger.info("Generated report at "+str(out_path))
     return out_path

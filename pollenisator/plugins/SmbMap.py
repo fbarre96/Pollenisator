@@ -7,7 +7,7 @@ from pollenisator.server.modules.ActiveDirectory.computers import Computer
 from pollenisator.server.modules.ActiveDirectory.shares import Share
 
 import shlex
-import logging
+from pollenisator.core.Components.logger_config import logger
 
 
 def smbmap_format(row):

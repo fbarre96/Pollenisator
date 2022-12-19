@@ -1,4 +1,4 @@
-import logging
+from pollenisator.core.Components.logger_config import logger
 import os
 from docxtpl import DocxTemplate
 from docxtpl import InlineImage
@@ -60,9 +60,9 @@ def createReport(context, template, out_name, **kwargs):
     dir_path = os.path.dirname(os.path.realpath(__file__))
     out_path = os.path.join(dir_path, "../../exports/", out_name+".docx")
     doc.save(out_path)
-    logging.info("Converting Markdown ...")
+    logger.info("Converting Markdown ...")
     result, msg = convertMarkdownInFile(out_path, out_path, {"Header":"Sous-défaut"})
     if not result:
         return False, "Error in Markdown conversion : "+str(msg)
-    logging.info("Generated report at "+str(out_path))
+    logger.info("Generated report at "+str(out_path))
     return True, out_path

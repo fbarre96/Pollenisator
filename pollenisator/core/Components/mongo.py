@@ -7,7 +7,7 @@ from pymongo.errors import ServerSelectionTimeoutError, OperationFailure
 import pollenisator.core.Components.Utils as Utils
 import sys
 import json
-import logging
+from pollenisator.core.Components.logger_config import logger
 from bson import ObjectId
 
 
@@ -205,7 +205,7 @@ class MongoCalendar:
                 self.updateInDb("pollenisator", "workers", {"name": worker_name},
                     {"$set":{"last_heartbeat":datetime.datetime.now(), "known_commands":binaries,  "pentest":""}}, notify=True)
                 doSetInclusion(worker_name,  res["pentest"], True)
-            logging.info("Registered worker "+str(worker_name))
+            logger.info("Registered worker "+str(worker_name))
             return True
         except IOError as e:
             print("Failed to connect." + str(e))
@@ -404,7 +404,7 @@ class MongoCalendar:
             else:
                 res = db[collection].find_one(pipeline)
         except TypeError as e:
-            logging.error("ERROR TypeError : "+str(e))
+            logger.error("ERROR TypeError : "+str(e))
             return None
         return res
 
@@ -632,7 +632,7 @@ class MongoCalendar:
         authorized, msg = self.validateCalendarName(saveAsName.strip().lower())
         # check for forbidden names
         if not authorized:
-            logging.warn("LOG : add database attempt failed:"+str(msg))
+            logger.warn("LOG : add database attempt failed:"+str(msg))
             return False, msg
         # check if already exists
         self.connectToDb("pollenisator")

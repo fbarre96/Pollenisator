@@ -1,4 +1,4 @@
-import logging
+from pollenisator.core.Components.logger_config import logger
 import inspect
 
 from pollenisator.server.token import checkTokenValidity
@@ -27,7 +27,7 @@ def permission(*dec_args, **dec_kwargs):
                 token_info["scope"] = token_scope
             # Check scope inside token
             if scope not in token_scope:
-                logging.debug(f"FORBIDDEN : {scope} not in {token_info}")
+                logger.debug(f"FORBIDDEN : {scope} not in {token_info}")
                 return f"Forbidden : {scope} is required", 403
             if (scope == "pentester" or scope == "owner") and "worker" not in token_scope:
                 if "." in arg_name:
@@ -41,7 +41,7 @@ def permission(*dec_args, **dec_kwargs):
                         arg_value = args[arg_value_i]
                 if arg_value not in token_scope:
                     if "admin" not in token_scope:
-                        logging.debug(f"{arg_value} is not in the token scope {token_info}")
+                        logger.debug(f"{arg_value} is not in the token scope {token_info}")
                         return f"Forbidden : you do not have access to {arg_value}", 403
             if scope == "worker":
                 if arg_name == "pentest":
@@ -49,7 +49,7 @@ def permission(*dec_args, **dec_kwargs):
                 ind = args_spec.args.index(arg_name)
                 arg_value = args[ind]
                 if arg_value not in token_scope:
-                    logging.debug(f"{arg_value} for workers is not in the token scope {token_info}")
+                    logger.debug(f"{arg_value} for workers is not in the token scope {token_info}")
                     return f"Forbidden : scope required worker and name {arg_value}", 403
             
             args_recalc = []
@@ -64,10 +64,10 @@ def permission(*dec_args, **dec_kwargs):
                 args_recalc.append(value)
             expect_kw = args_spec.varkw is not None
             if expect_kw:
-                logging.debug("Calling function with args "+str(args_recalc)+" , "+str(kwargs))
+                logger.debug("Calling function with args "+str(args_recalc)+" , "+str(kwargs))
                 result = function(*args_recalc, **kwargs)
             else:
-                logging.debug("Calling function with args "+str(args_recalc))
+                logger.debug("Calling function with args "+str(args_recalc))
                 result = function(*args_recalc)
             return result
             

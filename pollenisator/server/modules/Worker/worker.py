@@ -1,5 +1,5 @@
 import json
-import logging
+from pollenisator.core.Components.logger_config import logger
 import uuid
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Controllers.ToolController import ToolController
@@ -107,7 +107,7 @@ def start_docker(force_reinstall, docker_id):
         log_generator = clientAPI.pull("algosecure/pollenisator-worker",stream=True,decode=True)
         for byte_log in log_generator:
             log_line = byte_log["status"].strip()
-            logging.info(log_line)
+            logger.info(log_line)
     except docker.errors.APIError as e:
         return False, "Pull docker error:\n"+str(e)
     image = client.images.list("algosecure/pollenisator-worker")
@@ -120,7 +120,7 @@ def start_docker(force_reinstall, docker_id):
                     environment={"POLLENISATOR_WORKER_NAME":str(docker_id)},
                     detach=True)
     if container.logs() != b"":
-        logging.warning(container.logs())
+        logger.warning(container.logs())
     return True, str(container.id)
 
 @permission("pentester")

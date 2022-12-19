@@ -1,5 +1,5 @@
 import os
-import logging
+from pollenisator.core.Components.logger_config import logger
 from flask_socketio import SocketIO
 
 class SocketManager:
@@ -30,7 +30,6 @@ class SocketManager:
         if SocketManager.__instances.get(pid, None) is not None:
             raise Exception("This class is a singleton!")
         else:
-            logger = logging.getLogger(__name__)
             self.socketio = SocketIO(logger=logger, engineio_logger=logger, cors_allowed_origins="*")
             SocketManager.__instances[pid] = self
 

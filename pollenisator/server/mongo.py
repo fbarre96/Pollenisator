@@ -1,5 +1,5 @@
 import json
-import logging
+from pollenisator.core.Components.logger_config import logger
 import os
 from bson import ObjectId
 from flask import send_file
@@ -111,7 +111,7 @@ def search(pentest, s):
         # Searching
         collections = []
         builtPipeline = _evaluateCondition(collections, condition_list)
-        logging.debug(f"DEBUG : coll={collections} pipeline={builtPipeline}")
+        logger.debug(f"DEBUG : coll={collections} pipeline={builtPipeline}")
         if len(collections) == 0:
             collections = searchable_collections
         list_of_objects = {}

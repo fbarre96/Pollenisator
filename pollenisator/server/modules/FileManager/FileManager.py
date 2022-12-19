@@ -4,7 +4,7 @@ import shutil
 from bson import ObjectId
 from flask import send_file
 import hashlib
-import logging
+from pollenisator.core.Components.logger_config import logger
 from datetime import datetime
 from pollenisator.core.Components.Utils import listPlugin, loadPlugin
 from pollenisator.core.Components.mongo import MongoCalendar
@@ -74,13 +74,13 @@ def importExistingFile(pentest, upfile, body, **kwargs):
         # SET PLUGIN 
         mod = loadPlugin(plugin)
         try:
-            logging.info("PLUGIN for cmdline "+str(cmdline))
+            logger.info("PLUGIN for cmdline "+str(cmdline))
             notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline)
             results[plugin] = results.get(
                 plugin, 0) + 1
         except Exception as e:
             error_msg = e
-            logging.error("Plugin exception : "+str(e))
+            logger.error("Plugin exception : "+str(e))
             notes = tags = lvl = targets = None
     if error_msg:
         return str(error_msg)

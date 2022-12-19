@@ -11,7 +11,7 @@ import shutil
 from netaddr import IPNetwork
 from netaddr.core import AddrFormatError
 from bson import ObjectId
-import logging
+from pollenisator.core.Components.logger_config import logger
 import dns.resolver
 
 class JSONEncoder(json.JSONEncoder):
@@ -222,7 +222,7 @@ def execute(command, timeout=None, printStdout=True):
                 if str(stderr) != "":
                     print(str(stderr))
         except Exception as e:
-            logging.error(f"ERROR in command execution of command {command}: {e}")
+            logger.error(f"ERROR in command execution of command {command}: {e}")
             proc.kill()
             return -1
         finally:
@@ -313,7 +313,7 @@ def loadServerConfig():
                 (f"Permission denied when trying to create a config file\n Please create the file {os.path.normpath(config_file)} (you can use the serverSample.cfg as a base)")
                 sys.exit(0)
         else:
-            logging.waring(f"Config file not found inside {os.path.normpath(config_file)}, please create one based on the provided serverSample.cfg inside the same directory.")
+            logger.waring(f"Config file not found inside {os.path.normpath(config_file)}, please create one based on the provided serverSample.cfg inside the same directory.")
             sys.exit(0)
     return loadCfg(config_file)
 

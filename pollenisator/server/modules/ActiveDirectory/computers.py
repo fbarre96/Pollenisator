@@ -3,7 +3,7 @@
 from __future__ import absolute_import
 from bson import ObjectId
 from pollenisator.core.Components.mongo import MongoCalendar
-import logging
+from pollenisator.core.Components.logger_config import logger
 from pollenisator.server.ServerModels.Element import ServerElement
 from pollenisator.server.ServerModels.Command import ServerCommand
 from pollenisator.server.ServerModels.Tool import ServerTool
@@ -161,7 +161,7 @@ class Computer(ServerElement):
         else:
             user_o = User.fetchObject(self.pentest, {"_id":ObjectId(info.get("user"))})
             if user_o is None:
-                logging.error("User was not found when trying to add ActiveDirectory tool ")
+                logger.error("User was not found when trying to add ActiveDirectory tool ")
                 return
             username = user_o.username if user_o.username is not None else ""
             password = user_o.password if user_o.password is not None else ""
