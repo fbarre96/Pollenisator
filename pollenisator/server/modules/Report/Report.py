@@ -133,11 +133,12 @@ def generateReport(pentest, templateName, clientName, contractName, mainRedactor
     
 
 def _generateDoc(ext, context, template_to_use_path, out_name, translation, return_dict):
-
-    
     if ext == ".docx":
-        outfile = WordExport.createReport(
+        res, outfile = WordExport.createReport(
             context, template_to_use_path, out_name, translation=translation)
+        return_dict["res"] = res
+        return_dict["msg"] = outfile
+
     elif ext == ".pptx":
         outfile = PowerpointExport.createReport(
             context, template_to_use_path, out_name, translation=translation)
