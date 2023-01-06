@@ -91,10 +91,10 @@ class MongoCalendar:
         """
         if setInclusion:
             self.updateInDb("pollenisator", "workers", {"name": name}, {
-                            "": {"pentest": db}}, False, True)
+                            "$set": {"pentest": db}}, False, True)
         else:
             self.updateInDb("pollenisator", "workers", {"name": name}, {
-                            "": {"pentest": ""}}, False, True)
+                            "$set": {"pentest": ""}}, False, True)
         return True
     
 
