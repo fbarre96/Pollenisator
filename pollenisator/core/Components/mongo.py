@@ -223,7 +223,7 @@ class MongoCalendar:
                 self.insertInDb("pollenisator", "workers", {"name": worker_name, "pentest": "", "known_commands":binaries}, '', True)
             else:
                 self.updateInDb("pollenisator", "workers", {"name": worker_name},
-                    {"":{"last_heartbeat":datetime.datetime.now(), "known_commands":binaries,  "pentest":""}}, notify=True)
+                    {"$set":{"last_heartbeat":datetime.datetime.now(), "known_commands":binaries,  "pentest":""}}, notify=True)
                 doSetInclusion(worker_name,  res["pentest"], True)
             logger.info("Registered worker "+str(worker_name))
             return True
@@ -415,7 +415,7 @@ class MongoCalendar:
             list: A list of dictionaries representing the notifications.
         """
         date = datetime.datetime.strptime(fromTime, "%Y-%m-%d %H:%M:%S.%f")
-        res = self.findInDb("pollenisator", "notifications", {"":[{"db":str(pentest)}, {"db":"pollenisator"}], "time":{"":date}}, True)
+        res = self.findInDb("pollenisator", "notifications", {"$or":[{"db":str(pentest)}, {"db":"pollenisator"}], "time":{"$gt":date}}, True)
         return res
     
 
