@@ -5,6 +5,7 @@ from datetime import datetime
 from flask import send_file
 import pollenisator.core.Reporting.WordExport as WordExport
 import pollenisator.core.Reporting.PowerpointExport as PowerpointExport
+import pollenisator.core.Reporting.ExcelExport as ExcelExport
 from pollenisator.server.ServerModels.Defect import getGlobalDefects
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Components.Utils import JSONEncoder, loadServerConfig, getMainDir
@@ -51,8 +52,8 @@ def getTemplateList(lang):
 def downloadTemplate(lang, templateName):
     global template_path
     fileName = os.path.basename(templateName)
-    if not fileName.endswith(".pptx") and not fileName.endswith(".docx"):
-        return "A template is either a pptx or a docx document", 400
+    if not fileName.endswith(".pptx") and not fileName.endswith(".docx") and not fileName.endswith(".xlsx"):
+        return "A template is either a pptx, xlsx or a docx document", 400
     lang = os.path.basename(lang)
     if not validate_lang(lang):
         return "There is no existing templates for this lang", 400
@@ -69,8 +70,8 @@ def downloadTemplate(lang, templateName):
 def uploadTemplate(upfile, lang):
     global template_path
     fileName = upfile.filename.replace("/", "_")
-    if not fileName.endswith(".pptx") and not fileName.endswith(".docx"):
-        return "Invalid extension for template, must be pptx or docx", 400
+    if not fileName.endswith(".pptx") and not fileName.endswith(".docx") and not fileName.endswith(".xlsx"):
+        return "Invalid extension for template, must be pptx, xlsx or docx", 400
     lang = os.path.basename(lang)
     folder_to_upload_path = os.path.join(template_path, lang+"/")
     os.makedirs(folder_to_upload_path)
@@ -83,8 +84,8 @@ def uploadTemplate(upfile, lang):
 
 @permission("user")
 def generateReport(pentest, templateName, clientName, contractName, mainRedactor, lang):
-    if not templateName.endswith(".pptx") and not templateName.endswith(".docx"):
-        return "Invalid extension for template, must be pptx or docx", 400
+    if not templateName.endswith(".pptx") and not templateName.endswith(".docx") and not templateName.endswith(".xlsx"):
+        return "Invalid extension for template, must be pptx, xlsx or docx", 400
     
     timestr = datetime.now().strftime("%Y%m%d-%H%M%S")
     ext = os.path.splitext(templateName)[-1]
@@ -130,6 +131,11 @@ def _generateDoc(ext, context, template_to_use_path, out_name, translation, retu
 
     elif ext == ".pptx":
         outfile = PowerpointExport.createReport(
+            context, template_to_use_path, out_name, translation=translation)
+        return_dict["res"] = True
+        return_dict["msg"] = outfile
+    elif ext == ".xlsx":
+        outfile = ExcelExport.createReport(
             context, template_to_use_path, out_name, translation=translation)
         return_dict["res"] = True
         return_dict["msg"] = outfile

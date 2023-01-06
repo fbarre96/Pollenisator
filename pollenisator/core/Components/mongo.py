@@ -79,13 +79,24 @@ class MongoCalendar:
         return self.findInDb("pollenisator", "workers", {"name":name}, False)
 
     def setWorkerInclusion(self, name, db, setInclusion):
+        """Set the inclusion status of a worker in a pentest.
+    
+        Args:
+            name (str): The name of the worker.
+            db (str): The ID of the pentest.
+            setInclusion (bool): A flag indicating whether the worker should be included in the pentest (True) or excluded (False).
+    
+        Returns:
+            bool: Always returns True.
+        """
         if setInclusion:
             self.updateInDb("pollenisator", "workers", {"name": name}, {
-                            "$set": {"pentest": db}}, False, True)
+                            "": {"pentest": db}}, False, True)
         else:
             self.updateInDb("pollenisator", "workers", {"name": name}, {
-                            "$set": {"pentest": ""}}, False, True)
+                            "": {"pentest": ""}}, False, True)
         return True
+    
 
     def deleteWorker(self, worker_hostname):
         """Remove given worker.
@@ -192,6 +203,15 @@ class MongoCalendar:
             "name": worker_name}, False, True)
 
     def registerWorker(self, worker_name, binaries):
+        """Register a worker in the database.
+    
+        Args:
+            worker_name (str): The name of the worker.
+            binaries (list): A list of strings representing the known commands of the worker.
+    
+        Returns:
+            bool: True if the worker was successfully registered, False otherwise.
+        """
         from pollenisator.server.modules.Worker.worker import doSetInclusion
         try:
             if self.client is None:
@@ -203,7 +223,7 @@ class MongoCalendar:
                 self.insertInDb("pollenisator", "workers", {"name": worker_name, "pentest": "", "known_commands":binaries}, '', True)
             else:
                 self.updateInDb("pollenisator", "workers", {"name": worker_name},
-                    {"$set":{"last_heartbeat":datetime.datetime.now(), "known_commands":binaries,  "pentest":""}}, notify=True)
+                    {"":{"last_heartbeat":datetime.datetime.now(), "known_commands":binaries,  "pentest":""}}, notify=True)
                 doSetInclusion(worker_name,  res["pentest"], True)
             logger.info("Registered worker "+str(worker_name))
             return True
@@ -213,6 +233,7 @@ class MongoCalendar:
                   self.host + " and has a user mongAdmin with the correct password.")
             self.client = None
             return False
+    
 
     def update(self, collection, pipeline, updatePipeline, many=False, notify=True, upsert=False):
         """
@@ -349,10 +370,21 @@ class MongoCalendar:
         return self._find(self.db, collection, pipeline, multi)
 
     def countInDb(self, db, collection, pipeline=None):
+        """Count the number of documents in a collection that match a pipeline.
+    
+        Args:
+            db (str): The name of the database.
+            collection (str): The name of the collection.
+            pipeline (dict, optional): A pipeline specifying the filters to apply to the collection. Defaults to an empty dictionary.
+    
+        Returns:
+            int: The number of documents in the collection that match the pipeline.
+        """
         if pipeline is None:
             pipeline = {}
         self.connect()
         return self.client[db][collection].count_documents(pipeline)
+    
 
     def findInDb(self, db, collection, pipeline=None, multi=True, skip=None, limit=None):
         """
@@ -373,9 +405,19 @@ class MongoCalendar:
         return self._find(dbMongo, collection, pipeline, multi, skip, limit)
 
     def fetchNotifications(self, pentest, fromTime):
+        """Fetch notifications from a specific time for a specific pentest.
+    
+        Args:
+            pentest (str): The ID of the pentest.
+            fromTime (str): A string representing the start time for the notifications, in the format "YYYY-MM-DD HH:MM:SS.ffffff".
+    
+        Returns:
+            list: A list of dictionaries representing the notifications.
+        """
         date = datetime.datetime.strptime(fromTime, "%Y-%m-%d %H:%M:%S.%f")
-        res = self.findInDb("pollenisator", "notifications", {"$or":[{"db":str(pentest)}, {"db":"pollenisator"}], "time":{"$gt":date}}, True)
+        res = self.findInDb("pollenisator", "notifications", {"":[{"db":str(pentest)}, {"db":"pollenisator"}], "time":{"":date}}, True)
         return res
+    
 
     def _find(self, db, collection, pipeline=None, multi=True, skip=None, limit=None):
         """

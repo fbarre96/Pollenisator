@@ -1,4 +1,5 @@
 """Module for orchestrating an automatic scan. Must be run in a separate thread/process."""
+from pollenisator.core.Components.SocketManager import SocketManager
 from pollenisator.core.Components.logger_config import logger
 import time
 from threading import Thread
@@ -48,6 +49,7 @@ def autoScan(pentest, endoded_token):
     try:
         while check:
             logger.debug("Autoscan : loop")
+            #check_on_running_tools(pentest)
             queue = [] # reinit queue each time as some tools may be finished / canceled / errored
             launchableTools = findLaunchableTools(pentest)
             logger.debug("Autoscan : launchable tools: "+str(len(launchableTools)))
@@ -123,7 +125,7 @@ def findLaunchableTools(pentest):
         first_command_group_launched_prio = None
         for command_group in command_groups:
             if first_command_group_launched_prio is not None and \
-                command_group.priority > first_command_group_launched_prio+ 1: # take only prio and prio+1
+                command_group.priority > first_command_group_launched_prio+ 2: # take only prio and prio+1
                 break
             launched = 0
             commandsLaunchableWave = getNotDoneTools(pentest, wave_id, command_group.commands)
@@ -141,6 +143,19 @@ def findLaunchableTools(pentest):
                 first_command_group_launched_prio = command_group.priority
     return toolsLaunchable
 
+# def check_on_running_tools(pentest):
+#     #TODO
+#     mongoInstance = MongoCalendar.getInstance()
+#     workers = [x["name"] for x in mongoInstance.getWorkers({"pentest":pentest})]
+#     for worker in workers:
+#         socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":worker}, False)
+#         if socket is None:
+#             logger.debug(f"Socket for worker {worker} was not found, reseting")
+#             #running_worker_tools = ServerTool.fetchObjects(pentest, {"scanner_ip":worker, "status":"running"})
+             
+#             sm = SocketManager.getInstance()
+#             sm.socketio.emit('getRunningTools', {"pentest":pentest}, room=socket["sid"])
+    
 
 def searchForAddressCompatibleWithTime(pentest):
     """

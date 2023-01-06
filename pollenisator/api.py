@@ -16,6 +16,7 @@ from pollenisator.server.permission import permission
 
 from flask_cors import CORS
 from getpass import getpass
+from bson import ObjectId
 from pollenisator.server.token import verifyToken, decode_token
 from pollenisator.core.Components.Utils import JSONEncoder, loadServerConfig
 from pollenisator.core.Components.SocketManager import SocketManager
@@ -41,6 +42,13 @@ loaded = False
 # Create a URL route in our application for "/"
 
 def load_modules(app, main_file):
+    """Loads all YAML files in the modules folder and merges them into one file.
+
+    Args:
+        app: The Connexion app object.
+        main_file: The path to the main YAML file.
+    """
+
     modules_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "./server/modules/")
     # Load modules
     yaml = ruamel.yaml.YAML()
@@ -69,20 +77,25 @@ def load_modules(app, main_file):
 
 @app.route('/')
 def home():
-    """
-    just check status
+    """Returns a simple message to indicate that the API is working.
     """
     return "Api working"
 
 
-def createWorker():
-    salt = bcrypt.gensalt()
-    mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.insertInDb("pollenisator", "users", {
-                             "username": "Worker", "hash": bcrypt.hashpw("".encode(), salt), "scope": ["worker"]})
+# def createWorker():
+#     salt = bcrypt.gensalt()
+#     mongoInstance = MongoCalendar.getInstance()
+#     mongoInstance.insertInDb("pollenisator", "users", {
+#                              "username": "Worker", "hash": bcrypt.hashpw("".encode(), salt), "scope": ["worker"]})
 
 
 def createAdmin(username="", password=""):
+    """Prompts the user to enter a username and password and creates a new admin account with those credentials.
+
+    Args:
+        username: The desired username.
+        password: The desired password.
+    """
     print("The user database is empty, create an admin now")
     if username.strip() == "":
         username = input("username: ")
@@ -116,6 +129,8 @@ def notify_clients(notif):
 
 
 def init():
+    """Initialize empty databases or remaining tmp data from last run
+    """
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.deleteFromDb("pollenisator", "sockets", {}, many=True, notify=False)
     any_user = mongoInstance.findInDb("pollenisator", "users", {}, False)
@@ -135,7 +150,7 @@ def init():
             createAdmin("admin", "admin")
         else:
             createAdmin()
-        createWorker()
+        #createWorker()
     removeWorkers()
     conf = loadServerConfig()
     port = int(conf.get("api_port", 5000))
@@ -147,6 +162,8 @@ def init():
     return port
 
 def create_app():
+    """Loads all API ymal modules and init the App with SocketIO + Connexion + Flask
+    """
     # Read the openapi.yaml file to configure the endpoints
     logger.info("LOADING MAIN API")
     if not loaded:
@@ -160,6 +177,11 @@ def create_app():
     
     @sm.socketio.event
     def register(data):
+        """Registers a worker and associates it with a socket.
+
+        Args:
+            data: A dictionary containing the worker's name and list of supported binaries.
+        """
         mongoInstance = MongoCalendar.getInstance()
         workerName = data.get("name")
         binaries = data.get("binaries", [])
@@ -173,6 +195,16 @@ def create_app():
 
     @sm.socketio.event
     def registerForNotifications(data):
+        """Register the socket for notifications for a specific pentest.
+
+            Args:
+                data (dict): A dictionary containing the following keys:
+                    - "token" (str): The auth token.
+                    - "pentest" (str): The ID of the pentest for which the socket wants to receive notifications.
+
+            Returns:
+                None
+        """
         sid = request.sid
         token = str(data.get("token", ""))
         pentest = str(data.get("pentest", ""))
@@ -186,10 +218,42 @@ def create_app():
                     mongoInstance.insertInDb("pollenisator", "sockets", {"sid":sid, "pentest":pentest}, False)
                 else:
                     mongoInstance.updateInDb("pollenisator", "sockets", {"sid":sid}, {"$set":{"pentest":pentest}}, notify=False)
-            
+    
+    @sm.socketio.event
+    def keepalive(data):
+        """Keep the worker alive and update the running tasks.
+
+        Args:
+            data (dict): A dictionary containing the following keys:
+                - "running_tasks" (list): A list of strings representing the IDs of the tools that are currently running.
+                - "name" (str): The name of the worker.
+
+        Returns:
+            None
+        """
+        running_tasks = data.get("running_tasks", [])
+        workerName = data.get("name")
+        mongoInstance = MongoCalendar.getInstance()        
+        worker = mongoInstance.findInDb("pollenisator","workers", {"name":workerName}, False)
+        if worker is None:
+            sm.socketio.emit("deleteWorker", room=request.sid)
+            return
+        pentest = worker.get("pentest", "")
+        for tool_iid in running_tasks:
+            tool_d = mongoInstance.findInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, False)
+            if tool_d is None:
+                sm.socketio.emit("stopCommand", {"tool_iid":str(tool_iid), "pentest":pentest}, room=request.sid)
+            else:
+                if "running" not in tool_d["status"] and "done" not in tool_d["status"]:
+                    sm.socketio.emit("stopCommand", {"tool_iid":str(tool_iid), "pentest":pentest}, room=request.sid)
 
     @sm.socketio.event
     def disconnect():
+        """Disconnect the socket and unregister it.
+
+        Returns:
+            None
+        """
         sid = request.sid
         todel = None
         mongoInstance = MongoCalendar.getInstance()
@@ -198,17 +262,20 @@ def create_app():
             unregister(todel)
             mongoInstance.deleteFromDb("pollenisator", "sockets", {"sid":sid}, False)
 
-    # Tell your app object which encoder to use to create JSON from objects.
     flask_app.json_encoder = JSONEncoder
     CORS(flask_app)
     return flask_app
 
 def main():
+    """Create the app and run it
+    """
     logger.info('MAIN')
     app = create_app()
     run(flask_app)
     
 def run(flask_app):
+    """Starts the API server.
+    """
     sm = SocketManager.getInstance()
     port = init()
     try:
@@ -218,7 +285,6 @@ def run(flask_app):
         pass
     return sm.socketio
 
-logger.info("Script name = "+str(__name__))
 # If we're running in stand alone mode, run the application
 if __name__ == '__main__':
     main()

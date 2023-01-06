@@ -21,3 +21,4 @@ markdowntodocx
 docker
 GitPython
 ruamel.yaml
+xlsxtpl

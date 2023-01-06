@@ -62,7 +62,7 @@ paths:
             type: string
       responses:
         "200":
-          description: A template file docx or pptx
+          description: A template file docx, pptx or xlsx
           content:
             application/vnd.openxmlformats-officedocument.wordprocessingml.document:
               schema:
@@ -72,14 +72,18 @@ paths:
               schema:
                 type: string
                 format: binary
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
               
         "400":
           description: Invalid parameters
           content:
             application/json:
               examples:
-                docx or pptx expected:
-                  value: '"A template is either a pptx or a docx document"'
+                docx, xlsx or pptx expected:
+                  value: '"A template is either a pptx, xlsx or a docx document"'
                 no template:
                   value: '"There is no existing templates for this lang"'
         "404":
@@ -131,7 +135,7 @@ paths:
             application/json:
               examples:
                 unexpected extension:
-                  value: '"Invalid extension for template, must be pptx or docx"'
+                  value: '"Invalid extension for template, must be xlsx, pptx or docx"'
   "/report/DefectTemplates/import":
     post:
       operationId: pollenisator.server.ServerModels.Defect.importDefectTemplates
@@ -295,7 +299,7 @@ paths:
             application/json:
               examples:
                 Invalid extension:
-                  value: '"Invalid extension for template, must be pptx or docx"'
+                  value: '"Invalid extension for template, must be xlsx, pptx or docx"'
                 No template for lang:
                   value: '"There is no existing templates for this lang"'
         "404":

@@ -37,17 +37,27 @@ def getTokenFor(username, pentest="", owner=False):
     return token
 
 def generateNewToken(user_record, new_scopes):
+    # Get the current timestamp
     timestamp = _current_timestamp()
+
+    # Construct the payload for the new token
     payload = {
-        "iat": int(timestamp),
-        "exp": int(timestamp + JWT_LIFETIME_SECONDS),
-        "sub": str(user_record["username"]),
-        "scope": new_scopes,
+        "iat": int(timestamp),  # Issued at time (in seconds since epoch)
+        "exp": int(timestamp + JWT_LIFETIME_SECONDS),  # Expiry time (in seconds since epoch)
+        "sub": str(user_record["username"]),  # Subject (username) of the token
+        "scope": new_scopes,  # List of scopes the token is authorized for
     }
+
+    # Encode the payload as a JWT
     jwt_encoded = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+    # Update the user record in the database with the new token
     mongoInstance = MongoCalendar.getInstance()
     mongoInstance.updateInDb("pollenisator", "users", {"_id":user_record["_id"]}, {"$set":{"token":jwt_encoded}})
+
+    # Return the encoded JWT
     return jwt_encoded
+
 
 def verifyToken(access_token):
     try:

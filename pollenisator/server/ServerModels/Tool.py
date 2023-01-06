@@ -11,8 +11,10 @@ from pollenisator.core.Components.Utils import  checkCommandService, isNetworkIp
 from datetime import datetime
 import os
 import sys
+import time
 from pollenisator.server.permission import permission
 from pollenisator.server.token import encode_token
+import socketio
 
 class ServerTool(Tool, ServerElement):
 
@@ -495,17 +497,63 @@ def launchTask(pentest, tool_iid, body, **kwargs):
         logger.debug(f"Error in launching {tool_iid} : socket not found to contact {workerName}")
         return "Socket not found", 503
     launchableToolId = launchableTool.getId()
-    launchableTool.markAsRunning(workerName, body.get("group_id"), body.get("group_name"))
-    logger.debug(f"Mark as running tool_iid {tool_iid}")
-    update(pentest, tool_iid, ToolController(launchableTool).getData())
+    # launchableTool.markAsRunning(workerName, body.get("group_id"), body.get("group_name"))
+    # logger.debug(f"Mark as running tool_iid {tool_iid}")
+    # update(pentest, tool_iid, ToolController(launchableTool).getData())
     # Mark the tool as running (scanner_ip is set and dated is set, datef is "None")
     # Use socket sid as room so that only this worker will receive this task
     
     sm = SocketManager.getInstance()
     logger.debug(f"Launch task to worker {workerName} : emit  {str(socket['sid'])} toolid:{str(launchableToolId)})")
-    sm.socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(launchableToolId)}, room=socket["sid"])
+    sm.socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(launchableToolId), "infos":{"group_id":str(body.get("group_id")), "group_name":body.get("group_name")}}, room=socket["sid"])
+    
     return "Success ", 200
 
+@permission("pentester")
+def getProgress(pentest, tool_iid):
+    mongoInstance = MongoCalendar.getInstance()
+    tool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
+    logger.info("Trying to get progress of task "+str(tool))
+    if tool is None:
+        return "Tool not found", 404
+    if "done" in tool.status:
+        return True
+    elif "running"  not in tool.status:
+        return "Tool is not running", 400
+    workers = mongoInstance.getWorkers({})
+    workerNames = [worker["name"] for worker in workers]
+    saveScannerip = tool.scanner_ip
+    if saveScannerip == "":
+        return "Empty worker field", 400
+    if saveScannerip == "localhost":
+        return "Tools running in localhost cannot be stopped through API", 405
+    if saveScannerip not in workerNames:
+        return "The worker running this tool is not running anymore", 404
+    socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":saveScannerip}, False)
+    sm = SocketManager.getInstance()
+    sm.socketio.emit('getProgress', {'pentest': pentest, "tool_iid":str(tool_iid)}, room=socket["sid"])
+    global response
+    response = ""
+    @sm.socketio.event
+    def getProgressResult(data):
+        global response
+        response = data
+        if response["result"] is None:
+            response["result"] = b""
+    start_time = time.time()
+    while time.time() - start_time < 3:
+        if len(response) == 0 or response is None:
+            time.sleep(0.1)
+        else:
+            break
+    if len(response) == 0 or response is None:
+        return "Could not get worker progress", 404
+
+    
+    logger.info('Received response:' +str(response))
+    if isinstance(response["result"], str):
+        return response["result"], 200
+    return response["result"].decode(), 200
     
 @permission("pentester")
 def stopTask(pentest, tool_iid, body):
@@ -528,6 +576,8 @@ def stopTask(pentest, tool_iid, body):
     if saveScannerip not in workerNames:
         return "The worker running this tool is not running anymore", 404
     socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":saveScannerip}, False)
+    if socket is None:
+        return "The worker running this tool is not running anymore", 404
     sm = SocketManager.getInstance()
     sm.socketio.emit('stopCommand', {'pentest': pentest, "tool_iid":str(tool_iid)}, room=socket["sid"])
     if not forceReset:

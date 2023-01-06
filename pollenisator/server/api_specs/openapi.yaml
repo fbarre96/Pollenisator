@@ -2983,6 +2983,52 @@ paths:
                 localhost tool:
                   value: '"Tools running in localhost cannot be stopped through API"'
 
+  "/tools/{pentest}/getProgress/{tool_iid}":
+    get:
+      operationId: pollenisator.server.ServerModels.Tool.getProgress
+      tags:
+        - Tools
+      summary: Try to get progress of a tool
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: tool_iid
+          in: path
+          description: tool id to stop
+          required: true
+          schema:
+            type: string
+      
+      responses:
+        "200":
+          description: Successfully get progress of the tool
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"string containing current output of terminal"'
+        "400":
+          description: Invalid parameter
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"which parameter is invalid"'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              examples:
+                Tool not found:
+                  value: '"Tool not found"'
+                Worker not running anymore:
+                  value: '"The worker running this tool is not running anymore"'
+        
+
   "/tools/{pentest}/{tool_iid}/changeStatus":
     post:
       operationId: pollenisator.server.ServerModels.Tool.setStatus
