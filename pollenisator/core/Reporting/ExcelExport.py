@@ -1,4 +1,3 @@
-from tkinter import Image
 from pollenisator.core.Components.logger_config import logger
 from xlsxtpl.writerx import BookWriter
 from PIL import Image
