@@ -19,7 +19,10 @@ def getInfos(enum4linux_file):
     regex_group = re.compile(r"^Group '([^']+)' \(RID: \d+\) has member: ([^\\]+)\\(.+)$")
     for line in enum4linux_file:
         if isinstance(line, bytes):
-            line = line.decode("utf-8")
+            try:
+                line = line.decode("utf-8")
+            except UnicodeDecodeError:
+                return None
         for i,part in enumerate(parts):
             if part in line:
                 current_part = i
@@ -79,9 +82,9 @@ def updateDatabase(pentest, enum_infos):
     # Check if any ip has been found.
     if enum_infos is None:
         return
-    ip_m = ServerIp(pentest).initialize(str(enum_infos["ip"]))
+    ip_m = ServerIp(pentest).initialize(str(enum_infos["ip"]), infos={"plugin":Enum4Linux.get_name()})
     insert_ret = ip_m.addInDb()
-    port_m = ServerPort(pentest).initialize(str(enum_infos["ip"]), "445", "tcp", "netbios-ssn")
+    port_m = ServerPort(pentest).initialize(str(enum_infos["ip"]), "445", "tcp", "netbios-ssn", infos={"plugin":Enum4Linux.get_name()})
     insert_ret = port_m.addInDb()
     port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
     targets = {"enum4linux":{"ip": enum_infos["ip"], "port": "445", "proto": "tcp"}}
@@ -98,9 +101,9 @@ def updateDatabase(pentest, enum_infos):
         user_m = User(pentest).initialize(pentest, None, domain, username, password, user_add_infos.get("groups",[]), user_add_infos.get("desc"))
         user_insert(pentest, user_m.getData())
     for computer, computer_infos in enum_infos.get("computers", {}).items():
-        ip_m = ServerIp(pentest).initialize(str(computer_infos["ip"]))
+        ip_m = ServerIp(pentest).initialize(str(computer_infos["ip"]), infos={"plugin":Enum4Linux.get_name()})
         insert_ret = ip_m.addInDb()
-        comp_m = Computer(pentest).initialize(pentest, None, computer, computer_infos["ip"], computer_infos["domain"])
+        comp_m = Computer(pentest).initialize(pentest, None, computer, computer_infos["ip"], computer_infos["domain"], infos={"plugin":Enum4Linux.get_name()})
         comp_m.addInDb()
     if "users" in infosToAdd:
         del infosToAdd["users"]

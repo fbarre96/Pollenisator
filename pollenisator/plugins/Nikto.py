@@ -76,7 +76,10 @@ class Nikto(Plugin):
         """
         tags = ["nikto-todo"]
         targets = {}
-        notes = file_opened.read().decode("utf-8")
+        try:
+            notes = file_opened.read().decode("utf-8")
+        except UnicodeDecodeError:
+            return None, None, None, None
         if notes == "":
             return None, None, None, None
         if not notes.startswith("- Nikto v"):
@@ -84,8 +87,8 @@ class Nikto(Plugin):
         host, port, service, infos = parse_nikto_plain_text(notes)
         if host:
             if port:
-                ServerIp(pentest).initialize(host).addInDb()
-                p_o = ServerPort(pentest).initialize(host, port, "tcp", service)
+                ServerIp(pentest).initialize(host, infos={"plugin":Nikto.get_name()}).addInDb()
+                p_o = ServerPort(pentest).initialize(host, port, "tcp", service, infos={"plugin":Nikto.get_name()})
                 insert_res = p_o.addInDb()
                 if not insert_res["res"]:
                     p_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})

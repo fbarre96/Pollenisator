@@ -26,7 +26,10 @@ def getInfos(runfinger_file):
     countFound = 0
     for line in runfinger_file:
         if isinstance(line, bytes):
-            line = line.decode("utf-8")
+            try:
+                line = line.decode("utf-8")
+            except UnicodeDecodeError:
+                return None, None
         # Search ip in file
         if line.strip() == "":
             continue
@@ -79,7 +82,7 @@ def editScopeIPs(pentest, hostsInfos):
             mssql = infos.get("mssql", "")
             if mssql != "":
                 infosToAdd["mssql"] = mssql
-            ip_m = ServerIp(pentest).initialize(str(infos["ip"]))
+            ip_m = ServerIp(pentest).initialize(str(infos["ip"]), infos={"plugin":RunFinger.get_name()})
             insert_ret = ip_m.addInDb()
             if not insert_ret["res"]:
                 ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
@@ -87,7 +90,7 @@ def editScopeIPs(pentest, hostsInfos):
             port = str(445)
             proto = "tcp"
             service = "netbios-ssn"
-            port_m = ServerPort(pentest).initialize(host, port, proto, service)
+            port_m = ServerPort(pentest).initialize(host, port, proto, service, infos={"plugin":RunFinger.get_name()})
             insert_ret = port_m.addInDb()
             port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
             port_m.updateInfos(infosToAdd)

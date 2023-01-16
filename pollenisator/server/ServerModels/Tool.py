@@ -148,16 +148,20 @@ class ServerTool(Tool, ServerElement):
             ip_infos = ip_db.get("infos", {})
             for info in ip_infos:
                 command = command.replace("|ip.infos."+str(info)+"|", command)
-        if lvl == "port":
+        if hasattr(self, "ip") and getattr(self, "ip", "") != "":
             command = command.replace("|ip|", self.ip)
+        if hasattr(self, "port") and getattr(self, "port", "") != "":
             command = command.replace("|port|", self.port)
+        if hasattr(self, "proto") and getattr(self, "proto", "") != "":
             command = command.replace("|port.proto|", self.proto)
+        if hasattr(self, "port") and hasattr(self, "ip"):
             port_db = mongoInstance.findInDb(self.pentest, "ports", {"port":self.port, "proto":self.proto, "ip":self.ip}, False)
-            command = command.replace("|port.service|", port_db["service"])
-            command = command.replace("|port.product|", port_db["product"])
-            port_infos = port_db.get("infos", {})
-            for info in port_infos:
-                command = command.replace("|port.infos."+str(info)+"|", str(port_infos[info]))
+            if port_db is not None:
+                command = command.replace("|port.service|", port_db.get("service", ""))
+                command = command.replace("|port.product|", port_db.get("product",""))
+                port_infos = port_db.get("infos", {})
+                for info in port_infos:
+                    command = command.replace("|port.infos."+str(info)+"|", str(port_infos[info]))
         tool_infos = self.infos
         for info in tool_infos:
             command = command.replace("|tool.infos."+str(info)+"|", str(tool_infos[info]))
@@ -434,10 +438,12 @@ def importResult(pentest, tool_iid, upfile, body):
     if toolModel is None:
         return "Tool not found", 404
     mod = toolModel.getPlugin()
+    ext = os.path.splitext(upfile.filename)[-1]
     if mod is not None:
         try:
             # Check return code by plugin (can be always true if the return code is inconsistent)
-            notes, tags, _, _ = mod.Parse(pentest, upfile, tool=toolModel)
+            
+            notes, tags, _, _ = mod.Parse(pentest, upfile, tool=toolModel, ext=ext, filename=upfile.filename)
             if notes is None:
                 notes = "No results found by plugin."
             if tags is None:

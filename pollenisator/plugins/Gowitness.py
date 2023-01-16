@@ -48,14 +48,14 @@ class Gowitness(Plugin):
             The command completed with the tool output file option and filename absolute path.
         """
         # zip all
-        return f"{command} --db-path {outputDir}/gowitness.sqlite3 --screenshot-path {outputDir}/screenshots && zip" + self.getFileOutputArg()+outputDir+toolname+ f" {outputDir}/gowitness.sqlite3 {outputDir}/screenshots"
+        return f"{command} --db-path {outputDir}.sqlite3 --screenshot-path {outputDir} && zip" + self.getFileOutputArg()+outputDir+toolname+ f" {outputDir}.sqlite3 {outputDir}"
 
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:
             string
         """
-        return " -r "
+        return " -rj "
 
     def getFileOutputExt(self):
         """Returns the expected file extension for this command result file
@@ -74,7 +74,7 @@ class Gowitness(Plugin):
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
 
-    def Parse(self, pentest, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -87,6 +87,8 @@ class Gowitness(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
+        if kwargs.get("ext", "").lower() != self.getFileOutputExt():
+            return None, None, None, None
         tags = []
         targets = {}
         notes = file_opened.read(2).decode("utf-8")

@@ -3,7 +3,6 @@
 from pollenisator.server.ServerModels.Ip import ServerIp
 from pollenisator.plugins.plugin import Plugin
 
-
 def parse_reverse_dig(result_dig):
     """
     Parse the results of a reverse lookup by dig
@@ -65,19 +64,22 @@ class DigReverseLookup(Plugin):
         notes = ""
         tags = []
         targets = {}
-        ip, domain = parse_reverse_dig(file_opened.read().decode("utf-8"))
+        try:
+            ip, domain = parse_reverse_dig(file_opened.read().decode("utf-8"))
+        except UnicodeDecodeError:
+            return None, None, None, None
         if ip is None:
             return None, None, None, None
         if domain is not None:
             # Add a domain as a scope in db
-            ServerIp(pentest).initialize(domain).addInDb()
-            ip_m = ServerIp(pentest).initialize(ip)
+            ServerIp(pentest).initialize(domain, infos={"plugin":DigReverseLookup.get_name()}).addInDb()
+            ip_m = ServerIp(pentest).initialize(ip, infos={"plugin":DigReverseLookup.get_name()})
             insert_ret = ip_m.addInDb()
             if not insert_ret["res"]:
                 ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
             hostnames = ip_m.infos.get("hostname", [])
             hostnames = list(set(hostnames + [domain]))
-            ip_m.updateInfos({"hostname": hostnames})
+            ip_m.updateInfos({"hostname": hostnames, "plugin":DigReverseLookup.get_name()})
             ip_m.notes = "reversed dig give this domain : "+domain+"\n"+ip_m.notes
             notes += "Domain found :"+domain+"\n"
             targets["ip"] = {"ip": ip}

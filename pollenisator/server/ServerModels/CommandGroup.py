@@ -111,7 +111,7 @@ def addUserGroupCommandsToPentest(pentest, user):
                 copied_comm = mongoInstance.findInDb(
                     pentest, "commands", {"name":original_comm["name"]}, False)
                 if copied_comm is None:
-                    return False
+                    continue
                 new_comms.append(str(copied_comm["_id"]))
         mygr["commands"] = new_comms
         mygr["indb"] = pentest

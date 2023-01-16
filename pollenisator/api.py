@@ -20,6 +20,7 @@ from bson import ObjectId
 from pollenisator.server.token import verifyToken, decode_token
 from pollenisator.core.Components.Utils import JSONEncoder, loadServerConfig
 from pollenisator.core.Components.SocketManager import SocketManager
+from pollenisator.server.modules.Worker.worker import doSetInclusion
 from flask import request
 import sys
 import bcrypt
@@ -152,6 +153,7 @@ def init():
             createAdmin()
         #createWorker()
     removeWorkers()
+    mongoInstance.resetRunningTools()
     conf = loadServerConfig()
     port = int(conf.get("api_port", 5000))
     https = conf.get("https", "false").lower() == "true"
@@ -160,6 +162,7 @@ def init():
     else:
         ssl_context = None
     return port
+
 
 def create_app():
     """Loads all API ymal modules and init the App with SocketIO + Connexion + Flask

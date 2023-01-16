@@ -31,7 +31,7 @@ class SSHScan(Plugin):
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
 
-    def Parse(self, pentest, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -44,6 +44,8 @@ class SSHScan(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
+        if kwargs.get("ext", "").lower() != self.getFileOutputExt():
+            return None, None, None, None
         notes = ""
         tags = []
         content = file_opened.read().decode("utf-8")
@@ -62,8 +64,8 @@ class SSHScan(Plugin):
                 for ip in ips:
                     if ip.strip() == "":
                         continue
-                    ServerIp(pentest).initialize(ip).addInDb()
-                    port_o = ServerPort(pentest).initialize(ip, port, "tcp", "ssh")
+                    ServerIp(pentest).initialize(ip, infos={"plugin":SSHScan.get_name()}).addInDb()
+                    port_o = ServerPort(pentest).initialize(ip, port, "tcp", "ssh", infos={"plugin":SSHScan.get_name()})
                     insert_res = port_o.addInDb()
                     if not insert_res["res"]:
                         port_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})

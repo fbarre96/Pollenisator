@@ -74,7 +74,10 @@ class Knockpy(Plugin):
         markerFound = False
         countFound = 0
         for line in file_opened:
-            line = line.decode("utf-8")
+            try:
+                line = line.decode("utf-8")
+            except UnicodeDecodeError:
+                return None, None, None, None
             if marker == line.replace(" ","").strip():
                 markerFound = True
             if not markerFound:
@@ -82,9 +85,9 @@ class Knockpy(Plugin):
             ip, domain = parse_knockpy_line(line)
             if ip is not None and domain is not None:
                 # a domain has been found
-                insert_res = ServerIp(pentest).initialize(domain).addInDb()
+                insert_res = ServerIp(pentest).initialize(domain, infos={"plugin":Knockpy.get_name()}).addInDb()
                 if insert_res["res"]:
-                    ServerIp(pentest).initialize(ip).addInDb()
+                    ServerIp(pentest).initialize(ip, infos={"plugin":Knockpy.get_name()}).addInDb()
                     notes += f"{domain} inserted ({ip})\n"
                     countFound += 1
                 # failed, domain is out of scope

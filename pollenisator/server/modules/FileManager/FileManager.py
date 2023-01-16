@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import connexion
 from bson import ObjectId
 from flask import send_file
 import hashlib
@@ -56,6 +57,7 @@ def importExistingFile(pentest, upfile, body, **kwargs):
         0] + md5File[:6]
     results = {}
     error_msg = None
+    ext = os.path.splitext(upfile.filename)[-1]
     if plugin == "auto-detect":
         # AUTO DETECT
         foundPlugin = "Ignored"
@@ -64,7 +66,7 @@ def importExistingFile(pentest, upfile, body, **kwargs):
                 break
             mod = loadPlugin(pluginName)
             if mod.autoDetectEnabled():
-                notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline)
+                notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline, ext=ext, filename=upfile.filename)
                 upfile.stream.seek(0)
                 if notes is not None and tags is not None:
                     foundPlugin = pluginName
@@ -75,7 +77,7 @@ def importExistingFile(pentest, upfile, body, **kwargs):
         mod = loadPlugin(plugin)
         try:
             logger.info("PLUGIN for cmdline "+str(cmdline))
-            notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline)
+            notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline, ext=ext,filename=upfile.filename)
             results[plugin] = results.get(
                 plugin, 0) + 1
         except Exception as e:

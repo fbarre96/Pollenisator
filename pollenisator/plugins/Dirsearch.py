@@ -4,6 +4,7 @@ from pollenisator.plugins.plugin import Plugin
 from pollenisator.server.ServerModels.Ip import ServerIp
 from pollenisator.server.ServerModels.Port import ServerPort
 import re
+import os
 
 
 def parse_dirsearch_file(notes):
@@ -113,7 +114,10 @@ class Dirsearch(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         tags = ["todo-dirsearch"]
-        data = file_opened.read().decode("utf-8")
+        try:
+            data = file_opened.read().decode("utf-8")
+        except UnicodeDecodeError:
+            return None, None, None, None
         notes = ""
         if data.strip() == "":
             return None, None, None, None
@@ -123,11 +127,11 @@ class Dirsearch(Plugin):
                 return None, None, None, None
             targets = {}
             for host in hosts:
-                ServerIp(pentest).initialize(host).addInDb()
+                ServerIp(pentest).initialize(host, infos={"plugin":Dirsearch.get_name()}).addInDb()
                 for port in hosts[host]:
                     port_o = ServerPort(pentest)
                     port_o.initialize(host, port, "tcp",
-                                      hosts[host][port]["service"])
+                                      hosts[host][port]["service"], infos={"plugin":Dirsearch.get_name()})
                     insert_ret = port_o.addInDb()
                     if not insert_ret["res"]:
                         port_o = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})

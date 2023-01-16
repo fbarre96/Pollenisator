@@ -43,7 +43,7 @@ class SearchSploit(Plugin):
         command = command.replace("\"\"", "None")
         return command
 
-    def Parse(self, pentest, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -57,6 +57,8 @@ class SearchSploit(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         tags = []
+        if kwargs.get("ext", "").lower() != self.getFileOutputExt():
+            return None, None, None, None
         notes = file_opened.read().decode("utf-8")
         try:
             jsonFile = json.loads(notes)

@@ -7,7 +7,6 @@ from pollenisator.server.modules.ActiveDirectory.computers import Computer
 
 from pollenisator.plugins.plugin import Plugin
 
-
 def getInfos(cme_file):
     r"""Read the given cme output file results and return a dictionnary with ips and a list of their open ports and infos.
         Args:
@@ -59,7 +58,10 @@ CONNECTED
     secrets = []
     for line in cme_file:
         if isinstance(line, bytes):
-            line = line.decode("utf-8")
+            try:
+                line = line.decode("utf-8")
+            except UnicodeDecodeError:
+                return None, None, None, None, None, None
         line=line.strip()
         # Search ip in file
         if "\x1b[1m\x1b[34mSMB\x1b[0m" in line:
@@ -130,16 +132,16 @@ CONNECTED
                             countPwn += 1
                         else:
                             countSuccess += 1
-                    else:
-                        failure_infos = re.search(regex_logon_failed, line)
-                        if failure_infos is not None:
-                            toAdd["type"] = "failure"
-                            toAdd["ip"] = failure_infos.group(1)
-                            toAdd["port"] = failure_infos.group(2)
-                            toAdd["machine_name"] = failure_infos.group(3)
-                            toAdd["domain"] = failure_infos.group(4)
-                            toAdd["username"] = failure_infos.group(5)
-                            toAdd["password"] = failure_infos.group(6)
+                    # else:
+                    #     failure_infos = re.search(regex_logon_failed, line)
+                    #     if failure_infos is not None:
+                    #         toAdd["type"] = "failure"
+                    #         toAdd["ip"] = failure_infos.group(1)
+                    #         toAdd["port"] = failure_infos.group(2)
+                    #         toAdd["machine_name"] = failure_infos.group(3)
+                    #         toAdd["domain"] = failure_infos.group(4)
+                    #         toAdd["username"] = failure_infos.group(5)
+                    #         toAdd["password"] = failure_infos.group(6)
                         
             if toAdd.keys():
                 retour.append(toAdd)
@@ -204,7 +206,7 @@ def editScopeIPs(pentest, hostsInfos):
                 if secrets:
                     infosToAdd["secrets"] = infosToAdd.get("secrets", []) + secrets
 
-            ip_m = ServerIp(pentest).initialize(str(infos["ip"]))
+            ip_m = ServerIp(pentest).initialize(str(infos["ip"]), infos={"plugin":CME.get_name()})
             insert_ret = ip_m.addInDb()
             if not insert_ret["res"]:
                 ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
@@ -217,7 +219,7 @@ def editScopeIPs(pentest, hostsInfos):
             port = str(infos["port"])
             proto = "tcp"
             service = "netbios-ssn"
-            port_m = ServerPort(pentest).initialize(host, port, proto, service)
+            port_m = ServerPort(pentest).initialize(host, port, proto, service, infos={"plugin":CME.get_name()})
             insert_ret = port_m.addInDb()
             port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
 
@@ -235,6 +237,7 @@ def editScopeIPs(pentest, hostsInfos):
                 computer_m.domain = infos.get("domain")
                 d = computer_m.getData()
                 comp_info = d["infos"]
+                comp_info["plugin"] = CME.get_name()
                 comp_info.update(infosToAdd)
                 computer_m = Computer(pentest, d)
                 computer_m.update()

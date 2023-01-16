@@ -31,7 +31,7 @@ class dnsrecon(Plugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip()
 
-    def Parse(self, pentest, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
         Example:
@@ -67,12 +67,16 @@ class dnsrecon(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
+        if kwargs.get("ext", "").lower() != self.getFileOutputExt():
+            return None, None, None, None
         notes = ""
         tags = []
         countInserted = 0
         try:
             dnsrecon_content = json.loads(file_opened.read().decode("utf-8"))
         except json.decoder.JSONDecodeError:
+            return None, None, None, None
+        except UnicodeDecodeError:
             return None, None, None, None
         try:
             if isinstance(dnsrecon_content, list) and len(dnsrecon_content) == 0:
@@ -91,10 +95,10 @@ class dnsrecon(Plugin):
             for record in records:
                 ip = record["address"]
                 name = record["name"]
-                infosToAdd = {"hostname": [name]}
+                infosToAdd = {"hostname": [name], "plugin":dnsrecon.get_name()}
                 ip_m = ServerIp(pentest).initialize(ip, infos=infosToAdd)
                 ip_m.addInDb()
-                infosToAdd = {"ip": [ip]}
+                infosToAdd = {"ip": [ip], "plugin":dnsrecon.get_name()}
                 ip_m = ServerIp(pentest).initialize(name, infos=infosToAdd)
                 insert_ret = ip_m.addInDb()
                 # failed, domain is out of scope

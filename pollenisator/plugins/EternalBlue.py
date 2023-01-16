@@ -46,7 +46,10 @@ class EternalBlue(Plugin):
         """
         targets = {}
         tags = []
-        notes = file_opened.read().decode("utf-8")
+        try:
+            notes = file_opened.read().decode("utf-8")
+        except UnicodeDecodeError:
+            return None, None, None, None
         regex_ip = r"Nmap scan report for (\S+)"
         ip_group = re.search(regex_ip, notes)
         if ip_group is None:
@@ -56,7 +59,7 @@ class EternalBlue(Plugin):
             return None, None, None, None
         # Parsing
         ip = ip_group.group(1).strip()
-        ServerIp(pentest).initialize(ip).addInDb()
+        ServerIp(pentest).initialize(ip, infos={"plugin":EternalBlue.get_name()}).addInDb()
         port_re = r"(\d+)\/(\S+)\s+open\s+microsoft-ds"
         res_search = re.search(port_re, notes)
         res_insert = None
@@ -67,7 +70,7 @@ class EternalBlue(Plugin):
             port = res_search.group(1)
             proto = res_search.group(2)
             p_o = ServerPort(pentest)
-            p_o.initialize(ip, port, proto, "microsoft-ds")
+            p_o.initialize(ip, port, proto, "microsoft-ds", infos={"plugin":EternalBlue.get_name()})
             insert_res = p_o.addInDb()
             res_insert = insert_res["res"]
             targets[str(p_o.getId())] = {

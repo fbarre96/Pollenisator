@@ -7,7 +7,10 @@ import re
 def parseContent(file_opened):
     ret = set()
     for line in file_opened:
-        line = line.decode("utf-8")
+        try:
+            line = line.decode("utf-8")
+        except UnicodeDecodeError:
+            return None
         domainGroup = re.search(
             r"((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9])", line.strip())
         if domainGroup is not None:
@@ -63,8 +66,10 @@ class Sublist3r(Plugin):
         notes = ""
         tags = ["found-domains-info"]
         ret = parseContent(file_opened)
+        if ret is None:
+            return None, None, None, None
         for domain in ret:
-            insert_res = ServerIp(pentest).initialize(domain.strip()).addInDb()
+            insert_res = ServerIp(pentest).initialize(domain.strip(), infos={"plugin":Sublist3r.get_name()}).addInDb()
             # failed, domain is out of wave, still noting thi
             if not insert_res["res"]:
                 notes += domain+" exists but already added.\n"

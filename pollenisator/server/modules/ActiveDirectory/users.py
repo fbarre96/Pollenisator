@@ -268,8 +268,8 @@ def insert(pentest, body):
     """
     user = User(pentest, body)
     mongoInstance = MongoCalendar.getInstance()
-    domain = user.domain if user.domain is not None else ""
-    username = user.username if user.username is not None else ""
+    domain = user.domain.lower() if user.domain is not None else ""
+    username = user.username.lower() if user.username is not None else ""
     password = user.password if user.password is not None else ""
     existing = mongoInstance.findInDb(pentest, 
         "ActiveDirectory", {"type":"user", "domain":domain, "username":username, "password":password}, False)
@@ -308,6 +308,8 @@ def update(pentest, user_iid, body):
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     user = User(pentest, body)
+    user.username = user.username.lower()
+    user.domain = user.domain.lower()
     mongoInstance = MongoCalendar.getInstance()
     user_existing = User.fetchObject(pentest, {"_id": ObjectId(user_iid)})
     if user_existing.username != user.username  and user_existing.domain != user.domain:

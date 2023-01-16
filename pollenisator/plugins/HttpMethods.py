@@ -94,7 +94,10 @@ class HttpMethods(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
-        notes = file_opened.read().decode("utf-8")
+        try:
+            notes = file_opened.read().decode("utf-8")
+        except UnicodeDecodeError:
+            return None, None, None, None
         targets = {}
         tags = []
         if "| http-methods:" not in notes:
@@ -103,8 +106,8 @@ class HttpMethods(Plugin):
             notes)
         if host == "":
             return None, None, None, None
-        ServerIp(pentest).initialize(host).addInDb()
-        p_o = ServerPort(pentest).initialize(host, port, proto, service)
+        ServerIp(pentest).initialize(host, infos={"plugin":HttpMethods.get_name()}).addInDb()
+        p_o = ServerPort(pentest).initialize(host, port, proto, service, infos={"plugin":HttpMethods.get_name()})
         insert_res = p_o.addInDb()
         if not insert_res["res"]:
             p_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})

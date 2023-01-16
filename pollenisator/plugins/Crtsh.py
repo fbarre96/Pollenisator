@@ -5,7 +5,6 @@ import re
 from pollenisator.server.ServerModels.Ip import ServerIp
 from pollenisator.plugins.plugin import Plugin
 
-
 def parse_crtsh_line(line):
     """
     Parse one line of crtsh result file
@@ -68,11 +67,14 @@ class Crtsh(Plugin):
         tags = []
         countInserted = 0
         for line in file_opened:
-            line = line.decode("utf-8")
+            try:
+                line = line.decode("utf-8")
+            except UnicodeDecodeError:
+                return None, None, None, None
             domain, _record_type, ip = parse_crtsh_line(line)
             if domain is not None:
                 # a domain has been found
-                infosToAdd = {"hostname": ip}
+                infosToAdd = {"hostname": ip, "plugin":Crtsh.get_name()}
                 ip_m = ServerIp(pentest).initialize(domain, infos=infosToAdd)
                 insert_ret = ip_m.addInDb()
                 # failed, domain is out of scope

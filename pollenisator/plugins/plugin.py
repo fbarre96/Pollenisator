@@ -31,6 +31,10 @@ class Plugin(metaclass=MetaPlugin):
         """
         return self.__class__.autoDetect
 
+    @classmethod
+    def get_name(cls):
+        return cls.__name__
+
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:

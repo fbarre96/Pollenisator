@@ -38,10 +38,10 @@ def parseWarnings(pentest, file_opened):
             if "/" in ip:
                 domain = ip.split("/")[0]
                 ip = "/".join(ip.split("/")[1:])
-                ServerIp(pentest).initialize(domain).addInDb()
-                ServerPort(pentest).initialize(domain, port, "tcp", "ssl").addInDb()
-            ServerIp(pentest).initialize(ip).addInDb()
-            ServerPort(pentest).initialize(ip, port, "tcp", "ssl").addInDb()
+                ServerIp(pentest).initialize(domain, infos={"plugin":TestSSL.get_name()}).addInDb()
+                ServerPort(pentest).initialize(domain, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name()}).addInDb()
+            ServerIp(pentest).initialize(ip, infos={"plugin":TestSSL.get_name()}).addInDb()
+            ServerPort(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name()}).addInDb()
             if notes not in ["OK", "INFO"]:
                 missconfiguredHosts[ip] = missconfiguredHosts.get(ip, {})
                 missconfiguredHosts[ip][port] = missconfiguredHosts[ip].get(port, [
@@ -109,7 +109,7 @@ class TestSSL(Plugin):
             return " ".join(args[:-1]) + self.getFileOutputArg()+outputDir+toolname + " "+args[-1]
         return command
 
-    def Parse(self, pentest, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -122,6 +122,8 @@ class TestSSL(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
+        if kwargs.get("ext", "").lower() != self.getFileOutputExt():
+            return None, None, None, None
         notes, targets = parseWarnings(pentest, file_opened)
         if notes is None:
             return None, None, None, None

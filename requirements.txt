@@ -17,7 +17,7 @@ python-jose>=3.3.0
 flask_socketio
 flask-cors
 docxtpl
-markdowntodocx
+markdowntodocx>=0.1.3.2
 docker
 GitPython
 ruamel.yaml

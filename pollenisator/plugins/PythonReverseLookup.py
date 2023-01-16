@@ -66,12 +66,15 @@ class PythonReverseLookup(Plugin):
         notes = ""
         tags = []
         targets = {}
-        result_socket = file_opened.read().decode("utf-8")
+        try:
+            result_socket = file_opened.read().decode("utf-8")
+        except UnicodeDecodeError:
+            return None, None, None, None
         domain, ip = parse_reverse_python(result_socket)
         if domain is None:
             return None, None, None, None
-        ServerIp(pentest).initialize(domain).addInDb()
-        ip_m = ServerIp(pentest).initialize(ip)
+        ServerIp(pentest).initialize(domain, infos={"plugin":PythonReverseLookup.get_name()}).addInDb()
+        ip_m = ServerIp(pentest).initialize(ip, infos={"plugin":PythonReverseLookup.get_name()})
         insert_res = ip_m.addInDb()
         if not insert_res["res"]:
             ip_m = ServerIp.fetchObject(pentest, {"_id": insert_res["iid"]})

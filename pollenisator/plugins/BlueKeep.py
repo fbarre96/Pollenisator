@@ -2,8 +2,6 @@
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.server.ServerModels.Ip import ServerIp
 from pollenisator.server.ServerModels.Port import ServerPort
-from pollenisator.server.ServerModels.Defect import ServerDefect
-
 
 class BlueKeep(Plugin):
     """Inherits Plugin
@@ -57,7 +55,10 @@ class BlueKeep(Plugin):
         targets = {}
         for line in file_opened:
             # Auto Detect
-            line = line.decode("utf-8")
+            try:
+                line = line.decode("utf-8")
+            except UnicodeDecodeError:
+                return None, None, None, None
             infos = line.split(" - ")
             if len(infos) < 3:
                 return None, None, None, None
@@ -67,7 +68,7 @@ class BlueKeep(Plugin):
                 return None, None, None, None
             # Parse
             ip = line.split(" ")[0].strip()
-            ServerIp(pentest).initialize(ip).addInDb()
+            ServerIp(pentest).initialize(ip, infos={"plugin":BlueKeep.get_name()}).addInDb()
             p_o = ServerPort.fetchObject(pentest, {"ip": ip, "port": kwargs.get(
                 "port", None), "proto": kwargs.get("proto", None)})
             if p_o is not None:

@@ -202,6 +202,12 @@ class MongoCalendar:
         self.deleteFromDb("pollenisator", "workers", {
             "name": worker_name}, False, True)
 
+    def resetRunningTools(self):
+        dbs = self.listCalendarNames()
+        for db in dbs:
+            self.updateInDb(db, "tools", {"datef": "None", "scanner_ip": {"$ne": "None"}}, {"$set":{"dated":"None", "datef":"None", "scanner_ip":"None"}, "$pull":{"status":"running"}})
+            self.updateInDb(db, "tools", {"datef": "None", "dated": {"$ne": "None"}}, {"$set":{"dated":"None", "datef":"None", "scanner_ip":"None"}, "$pull":{"status":"running"}})
+    
     def registerWorker(self, worker_name, binaries):
         """Register a worker in the database.
     

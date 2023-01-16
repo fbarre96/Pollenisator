@@ -43,12 +43,12 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
                 2) if ip.group(2) is not None else ""]
             notes_ip = "ip:" + \
                 str(lastIp[1]) if lastIp[1] != "" and lastIp[1] is not None else ""
-            ipCIDR_m = ServerIp(pentest).initialize(str(lastIp[0]), notes=notes_ip)
+            ipCIDR_m = ServerIp(pentest).initialize(str(lastIp[0]), notes=notes_ip, infos={"plugin":Nmap.get_name()})
             if not keep_only_open:#add directly
                 ipCIDR_m.addInDb()
             if lastIp[1].strip() != "" and lastIp[1] is not None:
                 ipDom_m = ServerIp(pentest).initialize(
-                    str(lastIp[1]), notes="domain:"+str(lastIp[0]))
+                    str(lastIp[1]), notes="domain:"+str(lastIp[0]), infos={"plugin":Nmap.get_name()})
             else:
                 ipDom_m = None
         if " open " in line:
@@ -82,7 +82,7 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
                 for ipFound in validIps:
                     if ip == "":
                         continue
-                    port_o = ServerPort(pentest).initialize(ipFound, port_number, proto, service, product)
+                    port_o = ServerPort(pentest).initialize(ipFound, port_number, proto, service, product, infos={"plugin":Nmap.get_name()})
                     insert_res = port_o.addInDb()
                     if not insert_res["res"]:
                         port_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})
@@ -135,6 +135,8 @@ class Nmap(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
+        if kwargs.get("ext", "").lower() != self.getFileOutputExt():
+            return None, None, None, None
         tags = []
         cmdline = kwargs.get("cmdline", None)
         tool_m = kwargs.get("tool", None)

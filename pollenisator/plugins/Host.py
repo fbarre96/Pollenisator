@@ -65,15 +65,18 @@ class Host(Plugin):
         """
         tags = ["host-todo"]
         targets = {}
-        notes = file_opened.read().decode("utf-8")
+        try:
+            notes = file_opened.read().decode("utf-8")
+        except UnicodeDecodeError:
+            return None, None, None, None
         if notes == "":
             return None, None, None, None
         infos = parse_host_plain_text(notes)
         if infos is None:
             return None, None, None, None
         for domain, ip in infos.items():
-            ServerIp(pentest).initialize(domain).addInDb()
-            ip_m = ServerIp(pentest).initialize(ip)
+            ServerIp(pentest).initialize(domain, infos={"plugin":Host.get_name()}).addInDb()
+            ip_m = ServerIp(pentest).initialize(ip, infos={"plugin":Host.get_name()})
             insert_res = ip_m.addInDb()
             if not insert_res["res"]:
                 ip_m = ServerIp.fetchObject(pentest, {"_id": insert_res["iid"]})
@@ -92,7 +95,7 @@ class Host(Plugin):
                 # host "domain name" gave an answer, probably domain controller
                 computer_dc = Computer.fetchObject(pentest, {"ip":ip, "domain":domain})
                 if computer_dc is None:
-                    Computer(pentest).initialize(pentest, None, name="", ip=ip, domain=domain, infos={"is_dc":True}).addInDb()
+                    Computer(pentest).initialize(pentest, None, name="", ip=ip, domain=domain, infos={"is_dc":True, "plugin":Host.get_name()}).addInDb()
                 else:
                     computer_dc.infos.is_dc = True
                     computer_dc.update()

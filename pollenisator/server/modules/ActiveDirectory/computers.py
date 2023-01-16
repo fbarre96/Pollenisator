@@ -130,7 +130,7 @@ class Computer(ServerElement):
     def add_user(self, domain, username, password):
         user_m = User().initialize(self.pentest, None, domain, username, password)
         res = user_m.addInDb()
-        if str(res["iid"]) not in self.users:
+        if str(res["iid"]) not in self.users and password.strip() != "":
             self.users.append(str(res["iid"]))
             if len(self.users) == 1:
                 if self.infos.is_dc:
@@ -223,11 +223,20 @@ def update(pentest, computer_iid, body):  # noqa: E501
     if "_id" in body:
         del body["_id"]
     domain = body.get("domain", None)
+    if domain is not None:
+        domain = domain.lower()
+        body["domain"] = domain
     if domain is not None and domain != "":
         existingDomain = mongoInstance.findInDb(pentest, 
              "ActiveDirectory", {"type":"computer", "domain":domain}, False)
         if existingDomain is None:
             computer.addTool("AD:onNewDomainDiscovered", {"domain":domain})
+    if existing.infos.is_dc != computer.infos.is_dc:
+        if existing.users:
+            existing.addTool("AD:onFirstUserOnDC", {"user":existing.users[-1]})
+        for user in existing.users:
+            existing.addTool("AD:onNewUserOnDC", {"user":user[-1]})
+
     mongoInstance.updateInDb(pentest, "ActiveDirectory", {"_id": ObjectId(computer_iid), "type":"computer"}, {"$set": body}, False, True)
     return True
 
@@ -254,11 +263,14 @@ def insert(pentest, body):  # noqa: E501
         del body["_id"]
     body["type"] = "computer"
     domain = body.get("domain", None)
+    if domain is not None:
+        domain = domain.lower()
+        body["domain"] = domain
     if domain is not None and domain != "":
         existingDomain = mongoInstance.findInDb(pentest, 
-             "ActiveDirectory", {"type":"computer", "domain":domain}, False)
+             "ActiveDirectory", {"type":"computer", "domain":domain.lower()}, False)
         if existingDomain is None:
-            computer.addTool("AD:onNewDomainDiscovered", {"domain":domain})
+            computer.addTool("AD:onNewDomainDiscovered", {"domain":domain.lower()})
     ins_result = mongoInstance.insertInDb(pentest, 
         "ActiveDirectory", body, True)
     

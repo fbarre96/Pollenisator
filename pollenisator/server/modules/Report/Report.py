@@ -135,10 +135,10 @@ def _generateDoc(ext, context, template_to_use_path, out_name, translation, retu
         return_dict["res"] = True
         return_dict["msg"] = outfile
     elif ext == ".xlsx":
-        outfile = ExcelExport.createReport(
+        res, msg = outfile = ExcelExport.createReport(
             context, template_to_use_path, out_name, translation=translation)
-        return_dict["res"] = True
-        return_dict["msg"] = outfile
+        return_dict["res"] = res
+        return_dict["msg"] = msg
     else:
         return_dict["res"] = False
         return_dict["msg"] = "Unknown template file extension"

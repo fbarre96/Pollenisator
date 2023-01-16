@@ -70,7 +70,7 @@ class Nuclei(Plugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
-    def Parse(self, pentest, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -83,6 +83,8 @@ class Nuclei(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
+        if kwargs.get("ext", "").lower() != self.getFileOutputExt():
+            return None, None, None, None
         parsed_by_hosts = parse(file_opened)
         if parsed_by_hosts is None:
             return None, None, None, None
@@ -99,7 +101,7 @@ class Nuclei(Plugin):
             for finding in findings:
                 if finding["info"]["severity"] in ["medium", "high", "critical"]:
                     tags = ["interesting-nuclei"]
-            ip_o = ServerIp(pentest).initialize(host, notes)
+            ip_o = ServerIp(pentest).initialize(host, notes, infos={"plugin":Nuclei.get_name()})
             inserted = ip_o.addInDb()
             if not inserted["res"]:
                 ip_o = ServerIp.fetchObject(pentest, {"_id": inserted["iid"]})

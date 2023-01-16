@@ -60,7 +60,7 @@ class WhatWeb(Plugin):
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
 
-    def Parse(self, pentest, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
         Args:
@@ -73,6 +73,8 @@ class WhatWeb(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
+        if kwargs.get("ext", "").lower() != self.getFileOutputExt():
+            return None, None, None, None
         tags = []
         targets = {}
         notes = file_opened.read().decode("utf-8")
@@ -106,8 +108,8 @@ class WhatWeb(Plugin):
             else:
                 host = host_port
                 port = "443" if "https://" in website["target"] else "80"
-            ServerIp(pentest).initialize(host).addInDb()
-            p_o = ServerPort(pentest).initialize(host, port, "tcp", service)
+            ServerIp(pentest).initialize(host, infos={"plugin":WhatWeb.get_name()}).addInDb()
+            p_o = ServerPort(pentest).initialize(host, port, "tcp", service, infos={"plugin":WhatWeb.get_name()})
             insert_res = p_o.addInDb()
             if not insert_res["res"]:
                 p_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})

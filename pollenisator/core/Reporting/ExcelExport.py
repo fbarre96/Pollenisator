@@ -52,9 +52,14 @@ def createReport(context, template, out_name, **kwargs):
         for instance in defect.get("instances", []):
             for i,proof in enumerate(instance.get("proofs", [])):
                 instance["proofs"][i] = Image.open(proof)
-    writer.render_book(payloads=[context])
+    
+    context["sheet_name"] = "Worksheet 1"
+    payloads = [context]
+    writer.render_sheets(payloads=payloads)
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    out_path = os.path.join(dir_path, "../../exports/", out_name+".docx")
+    out_path = os.path.join(dir_path, "../../exports/", out_name+".xlsx")
     writer.save(out_path)
+    writer.close()
+ 
     logger.info("Generated report at "+str(out_path))
     return True, out_path
