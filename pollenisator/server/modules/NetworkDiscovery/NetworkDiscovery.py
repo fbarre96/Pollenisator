@@ -2,7 +2,7 @@ from pollenisator.server.permission import permission
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.server.ServerModels.Command import ServerCommand
 from pollenisator.server.ServerModels.Scope import ServerScope
-from pollenisator.server.ServerModels.Tool import ServerTool, delete as tool_delete
+#from pollenisator.server.ServerModels.Tool import ServerTool, delete as tool_delete
 from bson import ObjectId   
 import ipaddress
 from netaddr import IPNetwork

@@ -173,7 +173,7 @@ class ServerTool(Tool, ServerElement):
         mongoInstance = MongoCalendar.getInstance()
         if self.plugin_used != "":
             return self.plugin_used
-        command_o = mongoInstance.findInDb(self.pentest,"commands",{"_id":ObjectId(self.command_iid)}, False)
+        command_o = mongoInstance.findInDb(self.pentest,"commands",{"original_iid": str(self.command_iid)}, False)
         if command_o and "plugin" in command_o.keys():
             return command_o["plugin"]
         return None
@@ -246,7 +246,7 @@ class ServerTool(Tool, ServerElement):
         if "running" in self.status:
             self.status.remove("running")
 
-    def markAsRunning(self, workerName, group_id=None, group_name=None):
+    def markAsRunning(self, workerName):
         """Set this tool status as running but keeps OOT or OOS.
         Sets the starting date to current time and ending date to "None"
         Args:
@@ -263,8 +263,6 @@ class ServerTool(Tool, ServerElement):
             newStatus.append("timedout")
         self.status = newStatus
         self.scanner_ip = workerName
-        self.infos["group_id"] = group_id
-        self.infos["group_name"] = group_name
         mongoInstance = MongoCalendar.getInstance()
         mongoInstance.updateInDb("pollenisator", "workers", {"name":workerName}, {"$push":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=True)
     
@@ -339,6 +337,7 @@ def do_insert(pentest, body, **kwargs):
                     return "This tool parent does not match its command ports/services allowed list", 403
     # Inserting tool
     base["command_iid"] = body.get("command_iid", "")
+    base["check_iid"] = body.get("check_iid", "")
     base["scanner_ip"] = body.get("scanner_ip", "None")
     base["dated"] = body.get("dated", "None")
     base["datef"] = body.get("datef", "None")
@@ -359,7 +358,11 @@ def update(pentest, tool_iid, body):
     tags = body.get("tags", [])
     for tag in tags:
         mongoInstance.doRegisterTag(pentest, tag)
+    orig = mongoInstance.findInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, False)
     res = mongoInstance.updateInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
+    from pollenisator.server.modules.Cheatsheet.checkinstance import CheckInstance
+    check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(orig.get("check_iid"))})
+    check.updateInfos()
     return True
     
 @permission("pentester")
@@ -370,7 +373,7 @@ def craftCommandLine(pentest, tool_iid):
         return "Tool does not exist : "+str(tool_iid), 404
     # GET COMMAND OBJECT FOR THE TOOL
     if toolModel.text == "":
-        command_o = ServerCommand.fetchObject({"_id": ObjectId(toolModel.command_iid)}, pentest)
+        command_o = ServerCommand.fetchObject({"original_iid": str(toolModel.command_iid)}, pentest)
         if command_o is None:
             return "Associated command was not found", 404
     else:
@@ -473,12 +476,12 @@ def importResult(pentest, tool_iid, upfile, body):
     return "Success"
 
 @permission("pentester")
-def launchTask(pentest, tool_iid, body, **kwargs):
+def launchTask(pentest, tool_iid, **kwargs):
     logger.debug("launch task : "+str(tool_iid))
     worker_token = kwargs.get("worker_token") if kwargs.get("worker_token") else encode_token(kwargs.get("token_info"))
     mongoInstance = MongoCalendar.getInstance()
     launchableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
-    command_o = ServerCommand.fetchObject({"_id": ObjectId(launchableTool.command_iid)}, pentest)
+    command_o = ServerCommand.fetchObject({"original_iid": str(launchableTool.command_iid)}, pentest)
     if launchableTool is None:
         logger.debug("Error in launch task : not found :"+str(tool_iid))
         return "Tool not found", 404
@@ -511,7 +514,7 @@ def launchTask(pentest, tool_iid, body, **kwargs):
     
     sm = SocketManager.getInstance()
     logger.debug(f"Launch task to worker {workerName} : emit  {str(socket['sid'])} toolid:{str(launchableToolId)})")
-    sm.socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(launchableToolId), "infos":{"group_id":str(body.get("group_id")), "group_name":body.get("group_name")}}, room=socket["sid"])
+    sm.socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(launchableToolId)}, room=socket["sid"])
     
     return "Success ", 200
 

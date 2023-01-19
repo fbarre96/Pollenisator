@@ -34,7 +34,7 @@ class Tool(Element):
         self.resultfile = ""
         self.plugin_used = ""
         self.status = []
-        self.initialize(str(valuesFromDb.get("command_iid", "")), valuesFromDb.get("wave", ""),
+        self.initialize(str(valuesFromDb.get("command_iid", "")), str(valuesFromDb.get("check_iid", "")), valuesFromDb.get("wave", ""),
                         valuesFromDb.get("name", None),
                         valuesFromDb.get(
                             "scope", ""), valuesFromDb.get("ip", ""),
@@ -47,12 +47,13 @@ class Tool(Element):
                         valuesFromDb.get(
                             "scanner_ip", "None"), valuesFromDb.get("status", []), valuesFromDb.get("notes", ""), valuesFromDb.get("resultfile", ""), valuesFromDb.get("plugin_used", ""), valuesFromDb.get("tags", []), valuesFromDb.get("infos", {}))
 
-    def initialize(self, command_iid, wave="", name=None, scope="", ip="", port="", proto="tcp", lvl="", text="",
+    def initialize(self, command_iid, check_iid=None, wave="", name=None, scope="", ip="", port="", proto="tcp", lvl="", text="",
                    dated="None", datef="None", scanner_ip="None", status=None, notes="", resultfile="", plugin_used="", tags=None, infos=None):
         
         """Set values of tool
         Args:
-            command_iid: name of the tool (should match a command iid)
+            command_iid: iid of the command 
+            check_iid: the checkInstance iid if associated with one
             wave: the target wave name of this tool (only if lvl is "wave"). Default  ""
             name: tool name, if None it will be crafted
             scope: the scope string of the target scope of this tool (only if lvl is "network"). Default  ""
@@ -76,8 +77,9 @@ class Tool(Element):
         self.command_iid = str(command_iid)
         if name is None and self.command_iid != "":
             mongoInstance = MongoCalendar.getInstance()
-            res = mongoInstance.findInDb(self.pentest, "commands", {"_id":ObjectId(command_iid)}, False)
+            res = mongoInstance.findInDb(self.pentest, "commands", {"original_iid":str(command_iid)}, False)
             name = res["name"]
+        self.check_iid = str(check_iid) if check_iid is not None else None
         self.name = name
         self.wave = wave
         self.scope = scope
@@ -228,7 +230,7 @@ class Tool(Element):
             A dict (7 keys :"wave", "scope", "ip", "port", "proto", "name", "lvl")
         """
         base = {"wave": self.wave, "scope": "", "ip": "", "port": "",
-                "proto": "", "name": self.name, "lvl": self.lvl}
+                "proto": "", "name": self.name, "lvl": self.lvl, "check_iid":self.check_iid}
         if self.lvl == "wave":
             return base
         if self.lvl in ("domain", "network"):

@@ -4,6 +4,8 @@ from pollenisator.core.Models.Wave import Wave
 from pollenisator.server.ServerModels.Tool import ServerTool
 from pollenisator.server.ServerModels.Scope import ServerScope
 from pollenisator.server.ServerModels.Element import ServerElement
+from pollenisator.server.modules.Cheatsheet.cheatsheet import CheckItem
+from pollenisator.server.modules.Cheatsheet.checkinstance import CheckInstance, delete as checkinstance_delete
 from pollenisator.core.Components.Utils import JSONEncoder
 import json
 from pollenisator.server.permission import permission
@@ -21,28 +23,17 @@ class ServerWave(Wave, ServerElement):
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
 
-    def addAllTool(self, command_iid):
+
+    def addAllChecks(self):
         """
-        Kind of recursive operation as it will call the same function in its children ports.
-        Add the appropriate tools (level check and wave's commands check) for this wave.
-        Also add for all registered scopes the appropriate tools.
-        Args:
-            command_iid: The command that we want to create all the tools for.
+        Add the appropriate checks (level check and wave's commands check) for this scope.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        command = mongoInstance.findInDb(self.pentest, "commands", {
-                                         "_id": ObjectId(command_iid)}, False)
-        if command is None:
+        # query mongo db commands collection for all commands having lvl == network or domain
+        checkitems = CheckItem.fetchObjects({"lvl": {"$in": ["wave"]}})
+        if checkitems is None:
             return
-        if command["lvl"] == "wave":
-            newTool = ServerTool(self.pentest)
-            newTool.initialize(command_iid, self.wave, None, "", "", "", "", "wave")
-            newTool.addInDb()
-            return
-        scopes = mongoInstance.findInDb(self.pentest, "scopes", {"wave": self.wave})
-        for scope in scopes:
-            h = ServerScope(self.pentest, scope)
-            h.addAllTool(command_iid)
+        for check in checkitems:
+            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "waves")
 
     def removeAllTool(self, command_name):
         """
@@ -64,7 +55,12 @@ def delete(pentest, wave_iid):
     wave_o = ServerWave(pentest, mongoInstance.findInDb(pentest, "waves", {"_id": ObjectId(wave_iid)}, False))
     mongoInstance.deleteFromDb(pentest, "tools", {"wave": wave_o.wave}, True)
     mongoInstance.deleteFromDb(pentest, "intervals", {"wave": wave_o.wave}, True)
+    checks = mongoInstance.findInDb(pentest, "cheatsheet",
+                                {"target_iid": str(wave_iid)}, True)
+    for check in checks:
+        checkinstance_delete(pentest, check["_id"])
     res = mongoInstance.deleteFromDb(pentest, "waves", {"_id": ObjectId(wave_iid)}, False)
+    
     if res is None:
         return 0
     else:
@@ -84,8 +80,7 @@ def insert(pentest, body):
     res_insert = mongoInstance.insertInDb(pentest, "waves", {"wave": wave_o.wave, "wave_commands": list(wave_o.wave_commands)})
     ret = res_insert.inserted_id
     wave_o._id = ret
-    for comm_iid in wave_o.wave_commands:
-        wave_o.addAllTool(comm_iid)
+    wave_o.addAllChecks()
     return {"res":True, "iid":ret}
 
 @permission("pentester")
@@ -95,17 +90,7 @@ def update(pentest, wave_iid, body):
     oldCommands = oldWave_o.wave_commands
     wave_commands = body["wave_commands"]
     mongoInstance.updateInDb(pentest, "waves", {"_id":ObjectId(wave_iid)}, {"$set":body}, False, True)
-    # If the wave_commands are changed, we have to add and delete corresponding tools.
-    for command_iid in oldCommands:
-        # The previously present command name is not authorized anymore.
-        if command_iid not in wave_commands:
-            # So delete all of its tool (only if not done) from this wave
-            oldWave_o.removeAllTool(command_iid)
-    for command_iid in wave_commands:
-        # The command authorized is not found, we have to add its new tools.
-        if command_iid not in oldCommands:
-            # So add all of this command's tool to this wave.
-            oldWave_o.addAllTool(command_iid)
+    
 
 def addUserCommandsToWave(pentest, wave_iid, user):
     mongoInstance = MongoCalendar.getInstance()

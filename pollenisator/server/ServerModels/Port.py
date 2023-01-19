@@ -12,6 +12,8 @@ from pollenisator.server.modules.ActiveDirectory.computers import (
 from pollenisator.server.ServerModels.Element import ServerElement
 from pollenisator.core.Components.Utils import JSONEncoder, checkCommandService
 import json
+from pollenisator.server.modules.Cheatsheet.cheatsheet import CheckItem
+from pollenisator.server.modules.Cheatsheet.checkinstance import CheckInstance, delete as checkinstance_delete
 from pollenisator.server.permission import permission
 
 class ServerPort(Port, ServerElement):
@@ -31,44 +33,20 @@ class ServerPort(Port, ServerElement):
         mongoInstance = MongoCalendar.getInstance()
         return mongoInstance.findInDb(self.pentest, "ips", {"ip": self.ip}, False)["_id"]
 
-    
-
-    def addAllTool(self, command_iid, wave_name, scope, check=True):
+    def addAllChecks(self):
         """
-        Add the appropriate tools (level check and wave's commands check) for this port.
-
-        Args:
-            command_iid: The command that we want to create all the tools for.
-            wave_name: name of the was to fetch allowed commands from
-            scope: a scope matching this tool (should only be used by network level tools)
-            check: A boolean to bypass checks. Force adding this command tool to this port if False. Default is True
+        Add the appropriate checks (level check and wave's commands check) for this scope.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        if not check:
-            newTool = ServerTool(self.pentest)
-            newTool.initialize(command_iid, wave_name, None, scope,
-                               self.ip, self.port, self.proto, "port")
-            newTool.addInDb(check)
+        # query mongo db commands collection for all commands having lvl == network or domain
+        checkitems = CheckItem.fetchObjects({"lvl": {"$in": ["port"]}})
+        if checkitems is None:
             return
-        # retrieve wave's command
-        wave = mongoInstance.findInDb(self.pentest, 
-            "waves", {"wave": wave_name}, False)
-        commands = wave["wave_commands"]
-        if command_iid in commands:
-            index = commands.index(command_iid)
-            # retrieve the command level
-            command = mongoInstance.findInDb(self.pentest,
-                                            "commands", {"_id": ObjectId(command_iid)}, False)
-            if command["lvl"] == "port":
-                # 3. checking if the added port fit into the command's allowed service
-                # 3.1 first, default the selected port as tcp if no protocole is defined.
-                allowed_ports_services = command["ports"].split(",")
-                if checkCommandService(allowed_ports_services, self.port, self.proto, self.service):
-                    newTool = ServerTool(self.pentest)
-                    newTool.initialize(
-                        command_iid, wave_name, None, scope, self.ip, self.port, self.proto, "port")
-                    newTool.addInDb()
+        for check in checkitems:
+            allowed_ports_services = check.ports.split(",")
+            if checkCommandService(allowed_ports_services, self.port, self.proto, self.service):
+                CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "ports")
 
+    
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
         """Fetch many commands from database and return a Cursor to iterate over model objects
@@ -114,6 +92,10 @@ def delete(pentest, port_iid):
                                              "ip": port_o.ip}, True)
     for tool in tools:
         tool_delete(pentest, tool["_id"])
+    checks = mongoInstance.findInDb(pentest, "cheatsheet",
+                                {"target_iid": str(port_iid)}, True)
+    for check in checks:
+        checkinstance_delete(pentest, check["_id"])
     defects = mongoInstance.findInDb(pentest, "defects", {"port": port_o.port, "proto": port_o.proto,
                                                 "ip": port_o.ip}, True)
     for defect in defects:
@@ -138,6 +120,7 @@ def insert(pentest, body):
     parent = port_o.getParentId()
     ins_result = mongoInstance.insertInDb(pentest, "ports", body, parent)
     iid = ins_result.inserted_id
+    port_o._id = iid
     if int(port_o.port) == 445:
         computer_insert(pentest, {"name":"", "ip":port_o.ip, "domain":"", "admins":[], "users":[], "infos":{"is_dc":False}})
     elif int(port_o.port) == 88:
@@ -146,42 +129,7 @@ def insert(pentest, body):
             comp = Computer.fetchObject(pentest, {"_id":ObjectId(res["iid"])})
             comp.infos.is_dc = True
             comp.update()
-    # adding the appropriate tools for this port.
-    # 1. fetching the wave's commands
-    waves = mongoInstance.findInDb(pentest,"waves", {})
-    for wave in waves:
-        waveName = wave["wave"]
-        commands = wave["wave_commands"]
-        for comm_iid in commands:
-            # 2. finding the command only if lvl is port
-            comm = mongoInstance.findInDb(pentest, "commands",
-                                            {"_id": ObjectId(comm_iid), "lvl": "port"}, False)
-            if comm is not None:
-                # 3. checking if the added port fit into the command's allowed service
-                # 3.1 first, default the selected port as tcp if no protocole is defined.
-                allowed_ports_services = comm["ports"].split(",")
-                for i, elem in enumerate(allowed_ports_services):
-                    if not(elem.strip().startswith("tcp/") or elem.strip().startswith("udp/")):
-                        allowed_ports_services[i] = "tcp/"+str(elem.strip())
-                for allowed in allowed_ports_services:
-                    protoRange = "udp" if allowed.startswith("udp/") else "tcp"
-                    maybeRange = str(allowed)[4:].split("-")
-                    startAllowedRange = -1
-                    endAllowedRange = -1
-                    if len(maybeRange) == 2:
-                        try:
-                            startAllowedRange = int(maybeRange[0])
-                            endAllowedRange = int(maybeRange[1])
-                        except ValueError:
-                            pass
-                    if (port_o.proto+"/"+port_o.port == allowed) or \
-                    (port_o.proto+"/"+port_o.service == allowed) or \
-                    (port_o.proto == protoRange and int(port_o.port) >= int(startAllowedRange) and int(port_o.port) <= int(endAllowedRange)):
-                        # finally add tool
-                        newTool = ServerTool(pentest)
-                        newTool.initialize(
-                            comm["_id"], waveName, None, "", port_o.ip, port_o.port, port_o.proto, "port")
-                        newTool.addInDb()
+    port_o.addAllChecks()
     return {"res":True, "iid":iid}
 
 @permission("pentester")
@@ -213,13 +161,13 @@ def update(pentest, port_iid, body):
     mongoInstance.updateInDb(pentest, "ports", {"_id":ObjectId(port_iid)}, {"$set":body}, False, True)
     return True
     
-@permission("pentester")
-def addCustomTool(pentest, port_iid, body):
-    mongoInstance = MongoCalendar.getInstance()
-    if not mongoInstance.isUserConnected():
-        return "Not connected", 503
-    if mongoInstance.findInDb(pentest, "waves", {"wave": 'Custom Tools'}, False) is None:
-        mongoInstance.insertInDb(pentest, "waves", {"wave": 'Custom Tools', "wave_commands": list()})
-    port_o = ServerPort(pentest, mongoInstance.findInDb(pentest, "ports", {"_id":ObjectId(port_iid)}, False))
-    port_o.addAllTool(body["command_iid"], 'Custom Tools', '', check=False)
-    return "Success", 200
+# @permission("pentester")
+# def addCustomTool(pentest, port_iid, body):
+#     mongoInstance = MongoCalendar.getInstance()
+#     if not mongoInstance.isUserConnected():
+#         return "Not connected", 503
+#     if mongoInstance.findInDb(pentest, "waves", {"wave": 'Custom Tools'}, False) is None:
+#         mongoInstance.insertInDb(pentest, "waves", {"wave": 'Custom Tools', "wave_commands": list()})
+#     port_o = ServerPort(pentest, mongoInstance.findInDb(pentest, "ports", {"_id":ObjectId(port_iid)}, False))
+#     port_o.addAllTool(body["command_iid"], 'Custom Tools', '', check=False)
+#     return "Success", 200

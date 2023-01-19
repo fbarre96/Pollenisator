@@ -55,7 +55,7 @@ class ToolController(ControllerElement):
         """
         if self.model is None:
             return None
-        return {"command_iid": self.model.command_iid,
+        return {"command_iid": self.model.command_iid, "check_iid": self.model.check_iid, 
                 "name": self.model.name, "wave": self.model.wave, "scope": self.model.scope,
                 "ip": self.model.ip, "port": self.model.port, "proto": self.model.proto,
                 "lvl": self.model.lvl, "text": self.model.text, "dated": self.model.dated,

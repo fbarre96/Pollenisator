@@ -11,9 +11,7 @@ from pollenisator.core.Components.parser import Parser, ParseError, Term
 from pollenisator.core.Components.Utils import JSONDecoder, getMainDir, isIp, JSONEncoder
 from pollenisator.core.Controllers.WaveController import WaveController
 from pollenisator.core.Controllers.IntervalController import IntervalController
-from pollenisator.server.modules.Cheatsheet.checkinstance import addCheckInstancesToPentest
 from pollenisator.server.ServerModels.Command import ServerCommand, addUserCommandsToPentest, doInsert as command_insert
-from pollenisator.server.ServerModels.CommandGroup import addUserGroupCommandsToPentest, doInsert as command_group_insert
 from pollenisator.server.ServerModels.Wave import ServerWave, insert as insert_wave
 from pollenisator.server.ServerModels.Interval import ServerInterval, insert as insert_interval
 from pollenisator.server.ServerModels.Scope import insert as insert_scope
@@ -21,7 +19,7 @@ from pollenisator.server.permission import permission
 mongoInstance = MongoCalendar.getInstance()
 
 searchable_collections = ["waves","scopes","ips","ports","tools","defects"]
-validCollections = ["group_commands", "cheatsheet", "commands", "settings"]
+validCollections = [ "cheatsheet", "commands", "settings"]
 operato_trans = {
     "||regex||":"$regex", "==":"$eq", "!=": "$ne", ">":"$gt", "<":"$lt", ">=":"$gte", "<=":"$lte", "in":"$in", "not in":"$nin"
     }
@@ -268,8 +266,8 @@ def bulk_delete_commands(body, **kwargs):
         return "body was not a valid dictionnary", 400
     deleted = 0
     for obj_type in data:
-        if obj_type != "commands" and obj_type != "group_commands":
-            return "You can delete only commands and group_commands", 403
+        if obj_type != "commands":
+            return "You can delete only commands", 403
         for obj_id in data[obj_type]:
             if not isinstance(obj_id, ObjectId):
                 if obj_id.startswith("ObjectId|"):
@@ -343,14 +341,13 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
     mongoInstance = MongoCalendar.getInstance()
 
     addUserCommandsToPentest(dbName, user)  
-    addUserGroupCommandsToPentest(dbName, user)
-    addCheckInstancesToPentest(dbName, pentest_type)
+    #addCheckInstancesToPentest(dbName, pentest_type)
     # Duplicate all commands in local database
     # allcommands = ServerCommand.fetchObjects({})
     # for command in allcommands:
     #     command.indb = dbName
     #     insert_command(command.indb, CommandController(command).getData(), **kwargs)
-    commands = ServerCommand.getList({"$or":[{"types": re.compile(pentest_type, re.IGNORECASE)}, {"types":"Commun"}]}, targetdb=dbName)
+    commands = ServerCommand.getList({}, targetdb=dbName)
     if not commands:
         commands = []
     wave_o = ServerWave(dbName).initialize(dbName, commands)
@@ -502,20 +499,18 @@ def importDb(upfile, **kwargs):
 
 def doImportCommands(data, user):
     try:
-        commands_and_groups = json.loads(data, cls=JSONDecoder)
+        commands = json.loads(data, cls=JSONDecoder)
     except:
         return "Invalid file format, json expected", 400
-    if not isinstance(commands_and_groups, dict):
+    if not isinstance(commands, dict):
         return "Invalid file format, object expected", 400
-    if "commands" not in commands_and_groups.keys():
+    if "commands" not in commands.keys():
         return "Invalid file format, object expected property: commands", 400
-    if "command_groups" not in commands_and_groups.keys():
-        return "Invalid file format, object expected property: command_groups", 400
-    if not isinstance(commands_and_groups["commands"], list) or not isinstance(commands_and_groups["command_groups"], list) :
-        return "Invalid file format, commands and command_groups properties must be lists", 400
+    if not isinstance(commands["commands"], list):
+        return "Invalid file format, commands  properties must be lists", 400
     matchings = {}
     failed = []
-    for command in commands_and_groups["commands"]:
+    for command in commands["commands"]:
         save_id = str(command["_id"])
         del command["_id"]
         command["owners"] = command.get("owners", []) + [user]
@@ -524,14 +519,7 @@ def doImportCommands(data, user):
             matchings[save_id] = str(obj_ins["iid"])
         else:
             failed.append(command)
-    for group in commands_and_groups["command_groups"]:
-        del group["_id"]
-        old_ids = group["commands"]
-        new_ids = [matchings.get(str(old_id)) for old_id in old_ids if matchings.get(str(old_id)) is not None]
-        group["commands"] = new_ids
-        obj_ins = command_group_insert("pollenisator", group)
-        if not obj_ins["res"]:
-            failed.append(group)
+   
     return failed
 
     
@@ -543,7 +531,7 @@ def importCommands(upfile, **kwargs):
     
 def doExportCommands():
     mongoInstance = MongoCalendar.getInstance()
-    res = {"commands":[], "command_groups":[]}
+    res = {"commands":[]}
     commands = mongoInstance.findInDb("pollenisator", "commands", {}, True)
     for command in commands:
         c = command
@@ -551,10 +539,7 @@ def doExportCommands():
         if "users" in c:
             del c["users"]
         res["commands"].append(c)
-    g_commands = mongoInstance.findInDb("pollenisator", "group_commands", {}, True)
-    for g_command in g_commands:
-        g = g_command
-        res["command_groups"].append(g)
+   
     return res
 
 @permission("user")

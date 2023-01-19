@@ -69,8 +69,7 @@ def getCommands(body):
 
 def doDelete(pentest, command):
     mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.updateInDb("pollenisator", "group_commands", {}, {
-        "$pull": {"commands": command._id}}, True, True)
+    #TODO : delete from checks
     # Remove from all waves this command.
     if command.indb == "pollenisator":
         calendars = mongoInstance.listCalendarNames()
@@ -153,6 +152,7 @@ def update(pentest, command_iid, body, **kwargs):
 
 @permission("user")
 def addToMyCommands(command_iid, **kwargs):
+    """Add a command to the user's commands list."""
     user = kwargs["token_info"]["sub"]
     mongoInstance = MongoCalendar.getInstance()
     res = mongoInstance.findInDb("pollenisator", "commands", {
@@ -165,6 +165,7 @@ def addToMyCommands(command_iid, **kwargs):
     return "OK"
 
 def addUserCommandsToPentest(pentest, user):
+    """Add all commands owned by user to pentest database."""
     mongoInstance = MongoCalendar.getInstance()
     worker = mongoInstance.findInDb(
         "pollenisator", "workers", {"name": user}, False)
@@ -184,3 +185,4 @@ def addUserCommandsToPentest(pentest, user):
             mongoInstance.updateInDb(pentest, "commands", {
                                  "_id": ObjectId(res["iid"])}, {"$push":{"owners":user}})
     return True
+   

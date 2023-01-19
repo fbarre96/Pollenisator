@@ -74,6 +74,7 @@ def insert(pentest, body):
 
 @permission("pentester")
 def link(pentest, auth_iid, object_iid):
+    #TODO swap to add checks
     mongoInstance = MongoCalendar.getInstance()
     lookup = { "scopes":"network", "ips":"ip","ports":"port","waves":"wave"}
     lvl_found = None

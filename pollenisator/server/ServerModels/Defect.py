@@ -196,16 +196,11 @@ def update(pentest, defect_iid, body):
 @permission("pentester")
 def getGlobalDefects(pentest):
     defects = ServerDefect.fetchObjects(pentest, {"ip": ""})
-    d_list = {}
     if defects is None:
         return []
-    for defect in defects:
-        d_list[int(defect.index)] = defect
-    keys_ordered = sorted(list(d_list.keys()))
     defects_ordered = []
-    for i in range(len(keys_ordered)):
-        defect_o = d_list[keys_ordered[i]]
-        defects_ordered.append(DefectController(defect_o).getData())
+    for defect in defects:
+        defects_ordered.append(DefectController(defect).getData())
     return defects_ordered
     
 @permission("pentester")

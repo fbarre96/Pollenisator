@@ -294,16 +294,16 @@ class MongoCalendar:
             elems = db[collection].find(pipeline)
             if notify:
                 for elem in elems:
-                    self.notify(dbName, collection, elem["_id"], "update")
+                    self.send_notify(dbName, collection, elem["_id"], "update")
         else:
             res = db[collection].update_one(pipeline, updatePipeline, upsert=upsert)
             if upsert and res.upserted_id is not None:
-                self.notify(dbName, collection, res.upserted_id, "insert")
+                self.send_notify(dbName, collection, res.upserted_id, "insert")
             else:
                 elem = db[collection].find_one(pipeline)
                 if elem is not None:
                     if notify:
-                        self.notify(dbName, collection, elem["_id"], "update")
+                        self.send_notify(dbName, collection, elem["_id"], "update")
         return res
 
     def insert(self, collection, values, parent='', notify=True):
@@ -355,7 +355,7 @@ class MongoCalendar:
         db = self.client[dbName]
         res = db[collection].insert_one(values)
         if notify:
-            self.notify(dbName, collection,
+            self.send_notify(dbName, collection,
                         res.inserted_id, "insert", parentId)
         return res
 
@@ -553,13 +553,13 @@ class MongoCalendar:
             elems = db[collection].find(pipeline)
             if notify:
                 for elem in elems:
-                    self.notify(dbName, collection, elem["_id"], "delete")
+                    self.send_notify(dbName, collection, elem["_id"], "delete")
             res = db[collection].delete_many(pipeline)
         else:
             elem = db[collection].find_one(pipeline)
             if elem is not None:
                 if notify:
-                    self.notify(dbName, collection, elem["_id"], "delete")
+                    self.send_notify(dbName, collection, elem["_id"], "delete")
                 res = db[collection].delete_one(pipeline)
         return res
 
@@ -875,7 +875,7 @@ class MongoCalendar:
     #     execute(cmd, None, False)
     #     return True
 
-    def notify(self, db, collection, iid, action, parentId=""):
+    def send_notify(self, db, collection, iid, action, parentId=""):
         """
         Notify all observers of the modified record from database.
         Uses the observer's notify implementation. This implementation must take the same args as this.
@@ -887,6 +887,7 @@ class MongoCalendar:
         """
         from pollenisator.api import notify_clients
         notify_clients({"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now()})
+        
         # self.client["pollenisator"]["notifications"].insert_one(
         #     {"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now()})
 

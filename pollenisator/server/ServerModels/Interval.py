@@ -62,7 +62,7 @@ def delete(pentest, interval_iid):
     res = mongoInstance.deleteFromDb(pentest, "intervals", {"_id": ObjectId(interval_iid)}, False)
     parent_wave = mongoInstance.findInDb(pentest, "waves", {"wave": interval_o.wave}, False)
     if parent_wave is not None:
-        mongoInstance.notify(pentest,
+        mongoInstance.send_notify(pentest,
                                 "waves", parent_wave["_id"], "update", "")
         other_intervals = mongoInstance.findInDb(pentest, "waves", {"wave": interval_o.wave})
         no_interval_in_time = True

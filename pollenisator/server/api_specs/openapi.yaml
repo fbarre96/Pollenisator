@@ -79,12 +79,7 @@ components:
           schema:
             $ref: "#/components/schemas/Commands"
       required: true
-    CommandGroups:
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/CommandGroups"
-      required: true
+   
     Intervals:
       content:
         application/json:
@@ -108,11 +103,7 @@ components:
       properties:
         name:
           type: string
-        lvl:
-          type: string
         text:
-          type: string
-        ports:
           type: string
         owners:
           type: array
@@ -128,22 +119,7 @@ components:
           type: string
         timeout:
           type: integer
-    CommandGroups:
-      properties:
-        name:
-          type: string
-        priority:
-          type: integer
-          minimum: 0
-          maximum: 99
-        max_thread:
-          type: integer
-        indb:
-          type: string
-        commands:
-          type: array
-          items:
-            type: string
+
     Defects:
       properties:
         ip:
@@ -282,6 +258,10 @@ components:
           type: string
     Tools:
       properties:
+        command_iid:
+          type: string
+        check_iid:
+          type: string
         wave:
           type: string
         scope:
@@ -388,9 +368,8 @@ paths:
           description: Successful read status operation
           content:
             application/json:
-              examples:
-                Status:
-                  value: 'true'
+              schema:
+                type: boolean
   /version:
     get:
       operationId: pollenisator.server.mongo.getVersion
@@ -1021,8 +1000,8 @@ paths:
           content:
             application/json:
               examples:
-                toto tata:
-                  value: '"Unexpected token Token(''STRING'', ''toto'') at line 1, column 4."'
+                Failure:
+                  value: "Unexpected token Token('STRING', 'toto') at line 1, column 4."
         '403':
           description: Unknown pentest value given
           content:
@@ -1395,9 +1374,8 @@ paths:
       operationId: pollenisator.server.mongo.bulk_delete_commands
       tags:
         - Commands
-        - CommandGroup
-      summary: Delete many commmands and group of commands in db
-      description: Delete many commmands and group of commands in db
+      summary: Delete many commmands in db
+      description: Delete many commmands in db
       requestBody:
         content:
           application/json:
@@ -1408,10 +1386,7 @@ paths:
                   type: array
                   items:
                     type: string
-                group_commands:
-                  type: array
-                  items:
-                    type: string
+              
       responses:
         "200":
           description: Successful bulk delete
@@ -1433,7 +1408,7 @@ paths:
             application/json:
               examples:
                 invalid collection in body:
-                  value: 'You can delete only commands and group_commands'
+                  value: 'You can delete only commands'
   /pentests:
     get:
       operationId: pollenisator.server.mongo.listPentests
@@ -1855,35 +1830,7 @@ paths:
               examples:
                 pipeline is not a dict:
                   value: '"Pipeline argument was not a valid dictionnary"'
-  "/group_commands/delete/{command_group_iid}":
-    delete:
-      operationId: pollenisator.server.ServerModels.CommandGroup.deleteCommandGroup
-      tags:
-        - Mongo
-      summary: Delete something in db
-      description: Delete something in db
-      parameters:
-        - name: command_group_iid
-          in: path
-          description: group command iid to delete
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successful delete command group
-          content:
-            application/json:
-              examples:
-                Deleted count:
-                  value: '1'
-        '400':
-          description: Invalid parameters
-          content:
-            application/json:
-              examples:
-                pipeline is not a dict:
-                  value: '"Pipeline argument was not a valid dictionnary"'
+  
   "/commands/addToMyCommands/{command_iid}":
     post:
       operationId: pollenisator.server.ServerModels.Command.addToMyCommands
@@ -1984,107 +1931,7 @@ paths:
             application/json:
               schema:
                 type: integer
-  "/group_commands/find":
-    post:
-      operationId: pollenisator.server.ServerModels.CommandGroup.getCommandGroups
-      tags:
-        - CommandGroup
-      summary: "Return all existing"
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                pipeline:
-                  type: string
-                  example: "{}"
-      responses:
-        "200":
-          description: successful find command with parameters
-          content:
-            application/json:
-              examples:
-                success:
-                  value: '[{"_id": "60a3aaa129926f9ad7197919", "name":"Nmaps", "owner":"user1", commands:["5f9150fbed75193ef71ba47f"]}]'
-  "/group_commands/{pentest}/{command_group_iid}":
-    delete:
-      operationId: pollenisator.server.ServerModels.CommandGroup.delete
-      tags:
-        - CommandGroup
-      summary: Delete a group of command
-      parameters:
-        - name: pentest
-          in: path
-          description: pentest name
-          required: true
-          schema:
-            type: string
-        - name: command_group_iid
-          in: path
-          description: group of command iid to delete
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Get a delete count
-          content:
-            application/json:
-              schema:
-                type: integer
-  "/group_commands/{pentest}":
-    post:
-      operationId: pollenisator.server.ServerModels.CommandGroup.insert
-      tags:
-        - CommandGroup
-      summary: Insert a group of command or return the conflicting existing one
-      parameters:
-        - name: pentest
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        $ref: "#/components/requestBodies/CommandGroups"
-      responses:
-        "200":
-          description: command group insertion success or already existing object
-          content:
-            application/json:
-              examples:
-                Success:
-                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
-                Already exist:
-                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
-  "/group_commands/update/{pentest}/{command_group_iid}":
-    put:
-      operationId: pollenisator.server.ServerModels.CommandGroup.update
-      tags:
-        - CommandGroup
-      summary: "Update a group of command "
-      parameters:
-        - name: pentest
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: command_group_iid
-          in: path
-          description: group of command iid to delete
-          required: true
-          schema:
-            type: string
-      requestBody:
-        $ref: "#/components/requestBodies/CommandGroups"
-      responses:
-        "200":
-          description: command group update success
-          content:
-            application/json:
-              examples:
-                success:
-                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+  
   "/defects/{pentest}":
     post:
       operationId: pollenisator.server.ServerModels.Defect.insert
@@ -2397,46 +2244,46 @@ paths:
             application/json:
               schema:
                 type: integer
-  "/ports/{pentest}/{port_iid}/addCustomTool/":
-    post:
-      operationId: pollenisator.server.ServerModels.Port.addCustomTool
-      tags:
-        - Ports
-      summary: Add a tool manually to a port in the Custom Tools wave
-      parameters:
-        - name: pentest
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: port_iid
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - command_iid
-              properties:
-                tool_name:
-                  type: string
-                command_iid:
-                  type: string
-        required: true
-      responses:
-        "504":
-          description: Empty response is good
-        "503":
-          description: Not connected
-          content:
-            application/json:
-              examples:
-                Not connected:
-                  value: '"Not connected"'
+  # "/ports/{pentest}/{port_iid}/addCustomTool/":
+  #   post:
+  #     operationId: pollenisator.server.ServerModels.Port.addCustomTool
+  #     tags:
+  #       - Ports
+  #     summary: Add a tool manually to a port in the Custom Tools wave
+  #     parameters:
+  #       - name: pentest
+  #         in: path
+  #         required: true
+  #         schema:
+  #           type: string
+  #       - name: port_iid
+  #         in: path
+  #         required: true
+  #         schema:
+  #           type: string
+  #     requestBody:
+  #       content:
+  #         application/json:
+  #           schema:
+  #             type: object
+  #             required:
+  #               - command_iid
+  #             properties:
+  #               tool_name:
+  #                 type: string
+  #               command_iid:
+  #                 type: string
+  #       required: true
+  #     responses:
+  #       "504":
+  #         description: Empty response is good
+  #       "503":
+  #         description: Not connected
+  #         content:
+  #           application/json:
+  #             examples:
+  #               Not connected:
+  #                 value: '"Not connected"'
   "/scopes/{pentest}":
     post:
       operationId: pollenisator.server.ServerModels.Scope.insert
@@ -2896,16 +2743,16 @@ paths:
           required: true
           schema:
             type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                group_id:
-                  type: string
-                group_name:
-                  type: string
+      # requestBody:
+      #   content:
+      #     application/json:
+      #       schema:
+      #         type: object
+      #         properties:
+      #           group_id:
+      #             type: string
+      #           group_name:
+      #             type: string
       responses:
         "200":
           description: Successfully launched task

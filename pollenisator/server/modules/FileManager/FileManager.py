@@ -114,7 +114,7 @@ def importExistingFile(pentest, upfile, body, **kwargs):
                 wave = "Imported"
             if mongoInstance.findInDb(pentest, "waves", {"wave":wave}, False) is None:
                 mongoInstance.insertInDb(pentest, "waves", {"wave":wave, "wave_commands":[]})
-            tool_m = ServerTool(pentest).initialize("", wave, name=toolName, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
+            tool_m = ServerTool(pentest).initialize("", None, wave, name=toolName, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
                                         dated=date, datef=date, scanner_ip=user, status=["done"], notes=notes, tags=tags)
             ret = tool_m.addInDb()
             upfile.stream.seek(0)

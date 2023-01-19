@@ -5,6 +5,8 @@ from pollenisator.core.Components.logger_config import logger
 from bson import ObjectId
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.server.ServerModels.Element import ServerElement
+from pollenisator.server.modules.Cheatsheet.cheatsheet import CheckItem
+from pollenisator.server.modules.Cheatsheet.checkinstance import CheckInstance
 from pollenisator.server.permission import permission
 from pollenisator.server.ServerModels.Command import ServerCommand
 from pollenisator.server.ServerModels.Tool import ServerTool
@@ -94,8 +96,8 @@ class User(ServerElement):
     def addInDb(self):
         return insert(self.pentest, self.getData())
 
-    def addTool(self, lvl, info):
-        commands = ServerCommand.fetchObjects({"lvl":lvl}, targetdb=self.pentest)
+    def addCheck(self, lvl, info):
+        checks = CheckItem.fetchObjects({"lvl":lvl})
         user_o = info.get("user")
         if user_o is None:
             logger.error("User was not found when trying to add ActiveDirectory tool ")
@@ -109,12 +111,8 @@ class User(ServerElement):
         infos = {"username":username, "password":password, "domain":domain, "dc_ip":dc_ip}
         if dc_ip is None:
             return
-        wave_d = mongoInstance.findInDb(self.pentest, "waves", {"wave":{"$ne":"Imported"}}, False)
-        for command in commands:
-            newTool = ServerTool(self.pentest)
-            newTool.initialize(command.getId(), wave=wave_d["wave"],
-                              name=command.name+":"+str(username), lvl=lvl, infos=infos)
-            newTool.addInDb()
+        for check in checks:
+            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "ActiveDirectory", infos=infos)
 
     @property
     def username(self):
@@ -286,9 +284,9 @@ def insert(pentest, body):
     ins_result = mongoInstance.insertInDb(pentest, 
         "ActiveDirectory", body, True)
     if password.strip() != "":
-        user.addTool("AD:onNewValidUser", {"user":user})
+        user.addCheck("AD:onNewValidUser", {"user":user})
     else:
-        user.addTool("AD:onNewUserFound", {"user":user})
+        user.addCheck("AD:onNewUserFound", {"user":user})
     iid = ins_result.inserted_id
     return {"res": True, "iid": iid}
 

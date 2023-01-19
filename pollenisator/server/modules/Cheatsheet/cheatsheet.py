@@ -17,18 +17,24 @@ class CheckItem(ServerElement):
             valuesFromDb = {}
         if valuesFromDb is None:
             valuesFromDb = {}
-        self.initialize(pentest, valuesFromDb.get("_id"), valuesFromDb.get("title"),  valuesFromDb.get("pentest_types"), valuesFromDb.get("description"), valuesFromDb.get("category"),
+        self.initialize(pentest, valuesFromDb.get("_id"), valuesFromDb.get("title"),  valuesFromDb.get("pentest_types"), 
+                        valuesFromDb.get("lvl"), valuesFromDb.get("ports"), valuesFromDb.get("priority"), valuesFromDb.get("max_thread"), valuesFromDb.get("description"), valuesFromDb.get("category"),
             valuesFromDb.get("check_type"), valuesFromDb.get("step"), valuesFromDb.get("parent"), 
             valuesFromDb.get("commands"), valuesFromDb.get(""), valuesFromDb.get("defects"), valuesFromDb.get("infos"))
+        
 
-    def initialize(self, pentest, _id, title, pentest_types=None, description="", category="", check_type="manual", step=1, parent=None, commands=None, script=None, defects=None, infos=None):
+    def initialize(self, pentest, _id, title, pentest_types=None, lvl="", ports="", priority=0, max_thread=1, description="", category="", check_type="manual", step=1, parent=None, commands=None, script=None, defects=None, infos=None):
 
         self._id = _id
         self.type = "checkitem"
         self.title = title
+        self.ports = ports
+        self.lvl = lvl
         self.description = description
         self.category = category
         self.check_type = check_type
+        self.priority = priority
+        self.max_thread = max_thread
         self.step = step
         self.parent = parent
         self.commands = [] if commands is None else commands
@@ -78,12 +84,15 @@ class CheckItem(ServerElement):
         return cls("pollenisator", d)
   
     def getData(self):
-        return {"_id": self._id, "type":self.type, "title":self.title,"pentest_types":self.pentest_types, "description": self.description, "category":self.category,
+        return {"_id": self._id, "type":self.type, "title":self.title,"pentest_types":self.pentest_types, "lvl":self.lvl, "ports":self.ports,
+                "priority":self.priority, "max_thread":self.max_thread, "description": self.description, "category":self.category,
                 "check_type":self.check_type, "step":self.step, "parent":self.parent,
                 "commands":self.commands, "script":self.script, "defects":self.defects, "infos":self.infos}
 
     def addInDb(self):
         return doInsert(self.pentest, self.getData())
+
+    
 
 
 
@@ -92,6 +101,15 @@ def getModuleInfo():
     return {"registerLvls": []}
 
 def doInsert(pentest, data):
+    """Insert a checkitem into the database.
+
+    Args:
+        pentest: The pentest name.
+        data: The data to insert.
+
+    Return:
+        A dictionary with the result of the insertion.
+    """
     if "_id" in data:
         del data["_id"]
     if data.get("parent") is not None:
@@ -148,17 +166,20 @@ def delete(iid):
 
 @permission("user")
 def update(iid, body):
-    checkitem = CheckItem("pollenisator", body)
-    mongoInstance = MongoCalendar.getInstance()
+    # Check if the checkitem to update exists
     existing = CheckItem.fetchObject({"_id": ObjectId(iid)})
     if existing is None:
         return "Not found", 404
+    # Check if the title of the checkitem to update is the same as the one provided in the body
+    checkitem = CheckItem("pollenisator", body)
     if checkitem.title != existing.title:
         return "Forbidden", 403
+    # Remove the type and _id from the body because they can't be updated
     if "type" in body:
         del body["type"]
     if "_id" in body:
         del body["_id"]
-    
+    # Update the checkitem
+    mongoInstance = MongoCalendar.getInstance()
     mongoInstance.updateInDb("pollenisator", CheckItem.coll_name, {"_id": ObjectId(iid), "type":"checkitem"}, {"$set": body}, False, True)
     return True

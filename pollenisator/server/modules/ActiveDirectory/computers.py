@@ -7,8 +7,10 @@ from pollenisator.core.Components.logger_config import logger
 from pollenisator.server.ServerModels.Element import ServerElement
 from pollenisator.server.ServerModels.Command import ServerCommand
 from pollenisator.server.ServerModels.Tool import ServerTool
+from pollenisator.server.modules.Cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.modules.ActiveDirectory.computer_infos import ComputerInfos
 from pollenisator.server.modules.ActiveDirectory.users import User
+from pollenisator.server.modules.Cheatsheet.checkinstance import CheckInstance
 from pollenisator.server.permission import permission
 
 class Computer(ServerElement):
@@ -122,9 +124,9 @@ class Computer(ServerElement):
         #keeping clarity with explicit checks
         if self.infos.get("is_dc", False) == False and infos.get("is_dc", False) == True:
             if len(self.users) > 0:
-                self.addTool("AD:onFirstUserOnDC", {"user":self.users[0]})
+                self.addCheck("AD:onFirstUserOnDC", {"user":self.users[0]})
             if len(self.admins) > 0:
-                self.addTool("AD:onFirstAdminOnDC", {"user":self.admins[0]})
+                self.addCheck("AD:onFirstAdminOnDC", {"user":self.admins[0]})
         self._infos = infos
 
     def add_user(self, domain, username, password):
@@ -134,10 +136,10 @@ class Computer(ServerElement):
             self.users.append(str(res["iid"]))
             if len(self.users) == 1:
                 if self.infos.is_dc:
-                    self.addTool("AD:onFirstUserOnDC", {"user":self.users[-1]})
-                    self.addTool("AD:onNewUserOnDC", {"user":self.users[-1]})
-                self.addTool("AD:onFirstUserOnComputer", {"user":self.users[-1]})
-            self.addTool("AD:onNewUserOnComputer", {"user":self.users[-1]})
+                    self.addCheck("AD:onFirstUserOnDC", {"user":self.users[-1]})
+                    self.addCheck("AD:onNewUserOnDC", {"user":self.users[-1]})
+                self.addCheck("AD:onFirstUserOnComputer", {"user":self.users[-1]})
+            self.addCheck("AD:onNewUserOnComputer", {"user":self.users[-1]})
             
         self.update()
 
@@ -148,14 +150,14 @@ class Computer(ServerElement):
             self.admins.append(str(res["iid"]))
             if len(self.admins) == 1:
                 if self.infos.is_dc:
-                    self.addTool("AD:onFirstAdminOnDC", {"user":self.admins[-1]})
-                    self.addTool("AD:onNewAdminOnDC", {"user":self.admins[-1]})
-                self.addTool("AD:onFirstAdminOnComputer", {"user":self.admins[-1]})
-            self.addTool("AD:onNewAdminOnComputer", {"user":self.admins[-1]})
+                    self.addCheck("AD:onFirstAdminOnDC", {"user":self.admins[-1]})
+                    self.addCheck("AD:onNewAdminOnDC", {"user":self.admins[-1]})
+                self.addCheck("AD:onFirstAdminOnComputer", {"user":self.admins[-1]})
+            self.addCheck("AD:onNewAdminOnComputer", {"user":self.admins[-1]})
         self.update()
         
-    def addTool(self, lvl, info):
-        commands = ServerCommand.fetchObjects({"lvl":lvl}, targetdb=self.pentest)
+    def addCheck(self, lvl, info):
+        checks = CheckItem.fetchObjects({"lvl":lvl})
         if lvl == "AD:onNewDomainDiscovered":
             infos = {"domain":info.get("domain")}
         else:
@@ -167,13 +169,8 @@ class Computer(ServerElement):
             password = user_o.password if user_o.password is not None else ""
             domain = user_o.domain if user_o.domain is not None else ""
             infos = {"username":username, "password":password, "domain":domain}
-        mongoInstance = MongoCalendar.getInstance()
-        wave_d = mongoInstance.findInDb(self.pentest, "waves", {"wave":{"$ne":"Imported"}}, False)
-        for command in commands:
-            newTool = ServerTool(self.pentest)
-            newTool.initialize(command.getId(), wave=wave_d["wave"],
-                            ip=self.ip, port="445", proto="tcp", lvl=lvl, infos=infos)
-            newTool.addInDb()
+        for check in checks:
+            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "ActiveDirectory", infos=infos)
 
 @permission("pentester")
 def delete(pentest, computer_iid):  # noqa: E501
@@ -230,12 +227,12 @@ def update(pentest, computer_iid, body):  # noqa: E501
         existingDomain = mongoInstance.findInDb(pentest, 
              "ActiveDirectory", {"type":"computer", "domain":domain}, False)
         if existingDomain is None:
-            computer.addTool("AD:onNewDomainDiscovered", {"domain":domain})
+            computer.addCheck("AD:onNewDomainDiscovered", {"domain":domain})
     if existing.infos.is_dc != computer.infos.is_dc:
         if existing.users:
-            existing.addTool("AD:onFirstUserOnDC", {"user":existing.users[-1]})
+            existing.addCheck("AD:onFirstUserOnDC", {"user":existing.users[-1]})
         for user in existing.users:
-            existing.addTool("AD:onNewUserOnDC", {"user":user[-1]})
+            existing.addCheck("AD:onNewUserOnDC", {"user":user[-1]})
 
     mongoInstance.updateInDb(pentest, "ActiveDirectory", {"_id": ObjectId(computer_iid), "type":"computer"}, {"$set": body}, False, True)
     return True
@@ -270,7 +267,7 @@ def insert(pentest, body):  # noqa: E501
         existingDomain = mongoInstance.findInDb(pentest, 
              "ActiveDirectory", {"type":"computer", "domain":domain.lower()}, False)
         if existingDomain is None:
-            computer.addTool("AD:onNewDomainDiscovered", {"domain":domain.lower()})
+            computer.addCheck("AD:onNewDomainDiscovered", {"domain":domain.lower()})
     ins_result = mongoInstance.insertInDb(pentest, 
         "ActiveDirectory", body, True)
     

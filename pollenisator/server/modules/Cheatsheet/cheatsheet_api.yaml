@@ -141,6 +141,10 @@ components:
       properties:
         check_iid:
           type: string
+        target_iid:
+          type: string
+        target_type:
+          type: string
         status:
           type: string
         notes:
@@ -154,6 +158,16 @@ components:
       properties:
         title:
           type: string
+        lvl:
+          type: string
+        ports:
+          type: string
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 99
+        max_thread:
+          type: integer
         description:
           type: string
         check_type:

@@ -1,8 +1,8 @@
 from bson import ObjectId
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Models.Scope import Scope
-from pollenisator.server.ServerModels.Tool import delete as tool_delete
-from pollenisator.server.ServerModels.Tool import ServerTool
+from pollenisator.server.modules.Cheatsheet.checkinstance import CheckInstance, delete as checkinstance_delete
+from pollenisator.server.modules.Cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.ServerModels.Ip import ServerIp
 from pollenisator.server.ServerModels.Element import ServerElement
 from pollenisator.core.Controllers.ScopeController import ScopeController
@@ -37,34 +37,19 @@ class ServerScope(Scope, ServerElement):
     def addInDb(self):
         return insert(self.pentest, ScopeController(self).getData())
 
-    def addAllTool(self, command_iid):
+    def addAllChecks(self):
         """
-        Add the appropriate tools (level check and wave's commands check) for this scope.
-        Args:
-            command_name: The command that we want to create all the tools for.
+        Add the appropriate checks (level check and wave's commands check) for this scope.
         """
-        mongoInstance = MongoCalendar.getInstance()
-        command = mongoInstance.findInDb(self.pentest, "commands", {
-                                         "_id": ObjectId(command_iid)}, False)
-        if command is None:
+        # query mongo db commands collection for all commands having lvl == network or domain
+        checkitems = CheckItem.fetchObjects({"lvl": {"$in": ["network", "domain"]}})
+        if checkitems is None:
             return
-        if command["lvl"] == "network":
-            newTool = ServerTool(self.pentest)
-            newTool.initialize(
-                command_iid, self.wave, None, self.scope, "", "", "", "network")
-            newTool.addInDb()
-            return
-        if command["lvl"] == "domain":
-            if not isNetworkIp(self.scope):
-                newTool = ServerTool(self.pentest)
-                newTool.initialize(
-                    command_iid, self.wave, None, self.scope, "", "", "", "domain")
-                newTool.addInDb()
-            return
-        ips = self.getIpsFitting()
-        for ip in ips:
-            i = ServerIp(self.pentest, ip)
-            i.addAllTool(command_iid, self.wave, self.scope)
+        for check in checkitems:
+            if check.lvl == "network" and isNetworkIp(self.scope):
+                CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "scopes")
+            elif check.lvl == "domain" and not isNetworkIp(self.scope):
+                CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "scopes")
 
     def getIpsFitting(self):
         """Returns a list of ip mongo dict fitting this scope
@@ -95,21 +80,21 @@ class ServerScope(Scope, ServerElement):
 @permission("pentester")
 def delete(pentest, scope_iid):
     mongoInstance = MongoCalendar.getInstance()
-    # deleting tool with scope lvl
+    # deleting checks with scope lvl
     scope_o = ServerScope(pentest, mongoInstance.findInDb(pentest, "scopes", {"_id": ObjectId(scope_iid)}, False))
-    tools = mongoInstance.findInDb(pentest, "tools", {"scope": scope_o.scope, "wave": scope_o.wave, "$or": [
-                                {"lvl": "network"}, {"lvl": "domain"}]})
-    for tool in tools:
-        tool_delete(pentest, tool["_id"])
+    checks = mongoInstance.findInDb(pentest, "cheatsheet", {"target_iid": str(scope_iid), "target_type": "scopes"})
+    for check in checks:
+        checkinstance_delete(pentest, check["_id"])
     # Deleting this scope against every ips
     ips = ServerIp.getIpsInScope(pentest, scope_iid)
     for ip in ips:
         ip.removeScopeFitting(pentest, scope_iid)
     res = mongoInstance.deleteFromDb(pentest, "scopes", {"_id": ObjectId(scope_iid)}, False)
+    
     parent_wave = mongoInstance.findInDb(pentest, "waves", {"wave": scope_o.wave}, False)
     if parent_wave is None:
         return
-    mongoInstance.notify(pentest,
+    mongoInstance.send_notify(pentest,
                             "waves", parent_wave["_id"], "update", "")
     # Finally delete the selected element
     if res is None:
@@ -133,11 +118,8 @@ def insert(pentest, body):
     res_insert = mongoInstance.insertInDb(pentest, "scopes", base, parent)
     ret = res_insert.inserted_id
     scope_o._id = ret
-    # adding the appropriate tools for this scope.
-    wave = mongoInstance.findInDb(pentest, "waves", {"wave": scope_o.wave}, False)
-    commands = wave["wave_commands"]
-    for comm_iid in commands:
-        scope_o.addAllTool(comm_iid)
+    # adding the appropriate checks for this scope.
+    scope_o.addAllChecks()
     # Testing this scope against every ips
     ips = mongoInstance.findInDb(pentest, "ips", {})
     for ip in ips:

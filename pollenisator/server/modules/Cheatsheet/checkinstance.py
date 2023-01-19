@@ -6,9 +6,11 @@ from pollenisator.server.ServerModels.Command import ServerCommand
 from pollenisator.server.modules.Cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.permission import permission
 
+
 class CheckInstance(ServerElement):
     coll_name = 'cheatsheet'
 
+    
     def __init__(self, pentest, valuesFromDb=None):
         mongoInstance = MongoCalendar.getInstance()
         if pentest != "":
@@ -16,18 +18,23 @@ class CheckInstance(ServerElement):
         elif mongoInstance.calendarName != "":
             self.pentest = mongoInstance.calendarName
         else:
-            raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
+            raise ValueError(
+                "An empty pentest name was given and the database is not set in mongo instance.")
         if valuesFromDb is None:
             valuesFromDb = {}
         if valuesFromDb is None:
             valuesFromDb = {}
-        self.initialize(pentest, valuesFromDb.get("_id"), valuesFromDb.get("check_iid"), valuesFromDb.get("parent", None), valuesFromDb.get("status", ""), valuesFromDb.get("notes", ""))
+        self.initialize(pentest, valuesFromDb.get("_id"), valuesFromDb.get("check_iid"), valuesFromDb.get("target_iid"), valuesFromDb.get(
+            "target_type"), valuesFromDb.get("parent", None), valuesFromDb.get("status", ""), valuesFromDb.get("notes", ""))
+        
 
-    def initialize(self, pentest, _id, check_iid, parent, status, notes):
+    def initialize(self, pentest, _id, check_iid, target_iid, target_type, parent, status, notes):
         self._id = _id
         self.parent = parent
         self.type = "checkinstance"
         self.check_iid = check_iid
+        self.target_iid = target_iid
+        self.target_type = target_type
         self.status = status
         self.notes = notes
         mongoInstance = MongoCalendar.getInstance()
@@ -36,7 +43,8 @@ class CheckInstance(ServerElement):
         elif mongoInstance.calendarName != "":
             self.pentest = mongoInstance.calendarName
         else:
-            raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
+            raise ValueError(
+                "An empty pentest name was given and the database is not set in mongo instance.")
         return self
 
     @classmethod
@@ -54,8 +62,8 @@ class CheckInstance(ServerElement):
             return None
         for d in ds:
             # disabling this error as it is an abstract function
-            yield cls(pentest,d)  #  pylint: disable=no-value-for-parameter
-    
+            yield cls(pentest, d)  #  pylint: disable=no-value-for-parameter
+
     @classmethod
     def fetchObject(cls, pentest, pipeline):
         """Fetch many commands from database and return a Cursor to iterate over model objects
@@ -70,42 +78,105 @@ class CheckInstance(ServerElement):
         if d is None:
             return None
         return cls(pentest, d)
-  
-    def getData(self):
-        return {"_id": self._id, "type":self.type, "check_iid": self.check_iid, "parent":self.parent, "status":self.status, "notes":self.notes}
 
-    def addInDb(self):
-        return doInsert(self.pentest, self.getData())
+    def getData(self):
+        return {"_id": self._id, "type": self.type, "check_iid": self.check_iid, "target_iid": self.target_iid, "target_type": self.target_type, "parent": self.parent, "status": self.status, "notes": self.notes}
+
+    def addInDb(self, checkItem=None, toolInfos={}):
+        return doInsert(self.pentest, self.getData(), checkItem, toolInfos)
 
     @classmethod
-    def createFromCheckItem(cls, pentest, checkItem):
+    def createFromCheckItem(cls, pentest, checkItem, target_iid, target_type, infos={}):
         parent = None
         if checkItem.parent is not None:
-            check_instance_parent = cls.fetchObject(pentest, {"check_iid":str(checkItem.parent)})
+            check_instance_parent = cls.fetchObject(
+                pentest, {"check_iid": str(checkItem.parent)})
             parent = str(check_instance_parent.getId())
-        checkinstance = CheckInstance(pentest).initialize(pentest, None, str(checkItem._id), parent, "", "")
-        return checkinstance.addInDb()
+        checkinstance = CheckInstance(pentest).initialize(pentest, None, str(
+            checkItem._id), str(target_iid), target_type, parent, "", "")
+        return checkinstance.addInDb(checkItem=checkItem, toolInfos=infos)
 
+    def update(self):
+        return update(self.pentest, self._id, self.getData())
+    
+    
+    def updateInfos(self):
+        # TODO, change to match new design
+        check_item = CheckItem.fetchObject({"_id": ObjectId(self.check_iid)})
+        if check_item is None:
+            return "Check item parent not found"
+        data = self.getData()
+        check_item_data = check_item.getData()
+        data["check_item"] = check_item_data
+        data["tools_status"] = {}
+        data["tools_not_done"] = {}
+        all_complete = True
+        at_least_one = False
+        total = 0
+        done = 0
+        tools_to_add = ServerTool.fetchObjects(self.pentest, {"check_iid": str(self._id)})
+        if tools_to_add is not None:
+            for tool in tools_to_add:
+                if "done" in tool.getStatus():
+                    done += 1
+                    at_least_one = True
+                elif "running" in tool.getStatus():
+                    at_least_one = True
+                else:
+                    data["tools_not_done"][str(
+                        tool.getId())] = tool.getDetailedString()
+                total += 1
 
-def doInsert(pentest, data):
+        if done != total:
+            all_complete = False
+        if len(check_item.commands) > 0:
+            if at_least_one and all_complete:
+                data["status"] = "done"
+            elif at_least_one and not all_complete:
+                data["status"] = "running"
+            else:
+                data["status"] = "not done"
+        else:
+            data["status"] = ""
+        if data["status"] != "" and self.status == "":
+            self.status = data["status"]
+            self.update()
+
+def doInsert(pentest, data, checkItem=None, toolInfos=None):
     if "_id" in data:
         del data["_id"]
     mongoInstance = MongoCalendar.getInstance()
     data["type"] = "checkinstance"
-    existing = CheckInstance.fetchObject(pentest, {"check_iid":str(data["check_iid"])})
+    existing = CheckInstance.fetchObject(pentest, {"check_iid": str(data["check_iid"]), "target_iid": data.get(
+        "target_iid", ""), "target_type": data.get("target_type", "")})
     if existing is not None:
-        return {"res":False, "iid":existing.getId()}
+        return {"res": False, "iid": existing.getId()}
     ins_result = mongoInstance.insertInDb(
         pentest, CheckInstance.coll_name, data, True)
     iid = ins_result.inserted_id
-    return {"res": True, "iid": iid}
+    if checkItem is None or str(checkItem._id) != str(data["check_iid"]):
+        checkItem = CheckItem.fetchObject(
+            {"_id": ObjectId(str(data["check_iid"]))})
+    target = mongoInstance.findInDb(pentest, data["target_type"], {
+                                    "_id": ObjectId(str(data["target_iid"]))}, False)
+    if target is None:
+        return "Invalid target not found", 404
+    if checkItem is None:
+        return "Check Item not found", 404
+    for command in checkItem.commands:
+        ServerTool(pentest).initialize(str(command), str(iid), target.get("wave", ""), None, target.get("scope", ""), target.get("ip", ""), target.get("port", ""),
+                                       target.get("proto", ""), checkItem.lvl, infos=toolInfos).addInDb()
 
-def addCheckInstancesToPentest(pentest, pentest_type):
-    mongoInstance = MongoCalendar.getInstance()
-    checkItems = CheckItem.fetchObjects({"pentest_types":pentest_type})
-    for checkItem in checkItems:
-        CheckInstance.createFromCheckItem(pentest, checkItem)
-    return True
+    return {"res": True, "iid": iid}
+    
+
+# def addCheckInstancesToPentest(pentest, pentest_type):
+#     mongoInstance = MongoCalendar.getInstance()
+#     checkItems = CheckItem.fetchObjects({"pentest_types":pentest_type})
+#     for checkItem in checkItems:
+#         CheckInstance.createFromCheckItem(pentest, checkItem)
+#     return True
+
 
 @permission("pentester")
 def insert(pentest, body):
@@ -121,6 +192,7 @@ def insert(pentest, body):
     data = checkinstance.getData()
     return doInsert(pentest, data)
 
+
 @permission("pentester")
 def delete(pentest, iid):
     """delete cheatsheet item
@@ -128,15 +200,18 @@ def delete(pentest, iid):
     mongoInstance = MongoCalendar.getInstance()
     if pentest == "pollenisator":
         return "Forbidden", 403
-    existing = CheckInstance.fetchObject(pentest, {"_id":ObjectId(iid)})
+    existing = CheckInstance.fetchObject(pentest, {"_id": ObjectId(iid)})
     if existing is None:
         return "Not found", 404
+    # delete tools
+    mongoInstance.deleteFromDb(
+        pentest, 'tools', {"check_iid": ObjectId(iid)}, many=True, notify=True)
 
-    res = mongoInstance.deleteFromDb(pentest, CheckInstance.coll_name, {"_id":ObjectId(iid)}, many=False, notify=True)
+    res = mongoInstance.deleteFromDb(pentest, CheckInstance.coll_name, {
+                                     "_id": ObjectId(iid)}, many=False, notify=True)
     if res is None:
         return 0
     return res.deleted_count
-
 
 
 @permission("pentester")
@@ -156,12 +231,17 @@ def update(pentest, iid, body):
         del body["check_iid"]
     if "_id" in body:
         del body["_id"]
-    
-    mongoInstance.updateInDb(pentest, CheckInstance.coll_name, {"_id": ObjectId(iid), "type":"checkinstance"}, {"$set": body}, False, True)
+
+    mongoInstance.updateInDb(pentest, CheckInstance.coll_name, {"_id": ObjectId(
+        iid), "type": "checkinstance"}, {"$set": body}, False, True)
     return True
+
+
+
 
 @permission("pentester")
 def getInformations(pentest, iid):
+    # TODO, change to match new design
     inst = CheckInstance.fetchObject(pentest, {"_id": ObjectId(iid)})
     if inst is None:
         return "Not found", 404
@@ -175,26 +255,24 @@ def getInformations(pentest, iid):
     data["tools_not_done"] = {}
     all_complete = True
     at_least_one = False
-        
-    for command in check_item.commands:
-        command_m = ServerCommand.fetchObject({"original_iid": str(command)}, targetdb=pentest)
-        
-        total = 0  
-        done = 0
-        tools_to_add = ServerTool.fetchObjects(pentest, {"command_iid": str(command_m.getId())})
-        if tools_to_add is not None:
-            for tool in tools_to_add:
-                if "done" in tool.getStatus():
-                    done += 1
-                    at_least_one = True
-                else:
-                    data["tools_not_done"][str(tool.getId())]= tool.getDetailedString()
-                total += 1
+    total = 0
+    done = 0
+    tools_to_add = ServerTool.fetchObjects(pentest, {"check_iid": str(iid)})
+    if tools_to_add is not None:
+        for tool in tools_to_add:
+            if "done" in tool.getStatus():
+                done += 1
+                at_least_one = True
+            elif "running" in tool.getStatus():
+                at_least_one = True
+            else:
+                data["tools_not_done"][str(
+                    tool.getId())] = tool.getDetailedString()
+            total += 1
 
-        if done != total:
-            all_complete = False
-        data["tools_status"][command_m.name] = {"done":done, "total":total}
-    if len(check_item.commands):
+    if done != total:
+        all_complete = False
+    if len(check_item.commands) > 0:
         if at_least_one and all_complete:
             data["status"] = "done"
         elif at_least_one and not all_complete:

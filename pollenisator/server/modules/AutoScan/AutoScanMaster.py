@@ -9,7 +9,8 @@ import pollenisator.core.Components.Utils as Utils
 from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.server.ServerModels.Interval import ServerInterval
 from pollenisator.server.ServerModels.Command import ServerCommand
-from pollenisator.server.ServerModels.CommandGroup import ServerCommandGroup
+from pollenisator.server.modules.Cheatsheet.checkinstance import CheckInstance
+from pollenisator.server.modules.Cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.ServerModels.Tool import ServerTool, launchTask, stopTask
 from pollenisator.server.ServerModels.Scope import ServerScope
 from pollenisator.server.ServerModels.Ip import ServerIp
@@ -62,7 +63,7 @@ def autoScan(pentest, endoded_token):
                 if str(launchableTool["tool"].getId()) not in queue:
                     queue.append(str(launchableTool["tool"].getId()))
                     logger.debug("Autoscan : launch task tools: "+str(launchableTool["tool"].getId()))
-                    res, statuscode = launchTask(pentest, launchableTool["tool"].getId(), {"group_id":launchableTool["group_id"], "group_name":launchableTool["group_name"]}, worker_token=endoded_token)
+                    res, statuscode = launchTask(pentest, launchableTool["tool"].getId(),  worker_token=endoded_token)
                 
             check = getAutoScanStatus(pentest)
             time.sleep(3)
@@ -116,45 +117,37 @@ def findLaunchableTools(pentest):
     """
     toolsLaunchable = []
     time_compatible_waves_id = searchForAddressCompatibleWithTime(pentest)
+    if time_compatible_waves_id is None:
+        return toolsLaunchable
     mongoInstance = MongoCalendar.getInstance()
-    for wave_id in time_compatible_waves_id:
-        #get command groups by priority
-        command_groups = list(ServerCommandGroup.fetchObjects({}, pentest))
-        command_groups.sort(key=lambda c: c.priority)
-        #get not done tools inside wave
-        first_command_group_launched_prio = None
-        for command_group in command_groups:
-            if first_command_group_launched_prio is not None and \
-                command_group.priority > first_command_group_launched_prio+ 2: # take only prio and prio+1
-                break
-            launched = 0
-            commandsLaunchableWave = getNotDoneTools(pentest, wave_id, command_group.commands)
-            count_running_tools = mongoInstance.countInDb(pentest, "tools", {"command_iid":{"$in":command_group.commands},"status":"running"})
-            for toolId, toolModel in commandsLaunchableWave.items():
-                if count_running_tools + launched >= command_group.max_thread:
-                    logger.info(f"Can't launch anymore command of group {command_group.name}")
+    check_items = list(CheckItem.fetchObjects({"type":"auto_commands"}))
+    check_items.sort(key=lambda c: c.priority)
+    #get not done tools inside wave
+    first_command_group_launched_prio = None
+    for check_item in check_items:
+        if first_command_group_launched_prio is not None and \
+            check_item.priority > first_command_group_launched_prio+ 2: # take only prio and prio+1
+            break
+        launched = 0
+        count_running_tools = 0
+
+        check_instances = CheckInstance.fetchObjects(pentest, {"check_iid":str(check_item._id)})
+        for check_instance in check_instances:
+            notDoneToolsInCheck = getNotDoneTools(pentest, check_instance)
+            count_running_tools += mongoInstance.countInDb(pentest, "tools", {"check_iid":str(check_instance._id), "status":"running"})
+            
+            for toolId, toolModel in notDoneToolsInCheck.items():
+                if count_running_tools + launched >= check_item.max_thread:
+                    logger.info(f"Can't launch anymore of check {check_item.title}")
                     break
                 if "error" in toolModel.status:
                     continue
                 toolsLaunchable.append(
-                    {"tool": toolModel, "name": str(toolModel), "group_id":command_group.getId(),"group_name":command_group.name,"priority":int(command_group.priority), "timedout":"timedout" in toolModel.status})
+                    {"tool": toolModel, "name": str(toolModel), "priority":int(check_item.priority), "timedout":"timedout" in toolModel.status})
                 launched += 1
-            if launched > 0 or count_running_tools > 0 and first_command_group_launched_prio is None:
-                first_command_group_launched_prio = command_group.priority
+        if launched > 0 or count_running_tools > 0 and first_command_group_launched_prio is None:
+            first_command_group_launched_prio = check_item.priority
     return toolsLaunchable
-
-# def check_on_running_tools(pentest):
-#     #TODO
-#     mongoInstance = MongoCalendar.getInstance()
-#     workers = [x["name"] for x in mongoInstance.getWorkers({"pentest":pentest})]
-#     for worker in workers:
-#         socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":worker}, False)
-#         if socket is None:
-#             logger.debug(f"Socket for worker {worker} was not found, reseting")
-#             #running_worker_tools = ServerTool.fetchObjects(pentest, {"scanner_ip":worker, "status":"running"})
-             
-#             sm = SocketManager.getInstance()
-#             sm.socketio.emit('getRunningTools', {"pentest":pentest}, room=socket["sid"])
     
 
 def searchForAddressCompatibleWithTime(pentest):
@@ -171,24 +164,24 @@ def searchForAddressCompatibleWithTime(pentest):
             waves_to_launch.add(intervalModel.wave)
     return waves_to_launch
 
-def getNotDoneTools(pentest, waveName, inList):
+def getNotDoneTools(pentest, check_instance):
     """Returns a set of tool mongo ID that are not done yet.
     """
+    #
     notDoneTools = dict()
     # get not done tools that are not IP based (scope)
-    tools = ServerTool.fetchObjects(pentest, {"wave": waveName, "command_iid":{"$in":inList},"ip": "", "dated": "None", "datef": "None"})
+    tools = ServerTool.fetchObjects(pentest, {"check_iid":str(check_instance._id), "ip":"", "dated": "None", "datef": "None"})
     for tool in tools:
         notDoneTools[tool.getId()] = tool
     # fetch scopes to get IPs in scope
-    scopes = ServerScope.fetchObjects(pentest, {"wave": waveName})
+    scopes = ServerScope.fetchObjects(pentest, {})
     for scope in scopes:
         scopeId = scope.getId()
         # get IPs in scope
         ips = ServerIp.getIpsInScope(pentest, scopeId)
         for ip in ips:
             # fetch IP level and below (e.g port) tools
-            tools = ServerTool.fetchObjects(pentest, {
-                                        "wave": waveName, "command_iid":{"$in":inList}, "ip": ip.ip, "dated": "None", "datef": "None"})
+            tools = ServerTool.fetchObjects(pentest, {"check_iid":str(check_instance._id), "ip": ip.ip, "dated": "None", "datef": "None"})
             for tool in tools:
                 notDoneTools[tool.getId()] = tool
     return notDoneTools

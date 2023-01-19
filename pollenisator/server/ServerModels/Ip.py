@@ -11,6 +11,8 @@ from pollenisator.server.ServerModels.Port import delete as port_delete
 from pollenisator.server.ServerModels.Defect import delete as defect_delete
 from pollenisator.server.ServerModels.Element import ServerElement
 from pollenisator.core.Components.Utils import JSONEncoder, performLookUp
+from pollenisator.server.modules.Cheatsheet.cheatsheet import CheckItem
+from pollenisator.server.modules.Cheatsheet.checkinstance import CheckInstance, delete as checkinstance_delete
 from pollenisator.server.permission import permission
 import json
 
@@ -152,35 +154,17 @@ class ServerIp(Ip, ServerElement):
             return ip_in_db["_id"]
         return None
 
-    def addAllTool(self, command_iid, wave_name, scope):
+    def addAllChecks(self):
         """
-        Kind of recursive operation as it will call the same function in its children ports.
-        Add the appropriate tools (level check and wave's commands check) for this ip.
-        Also add for all registered ports the appropriate tools.
-
-        Args:
-            command_name: The command that we want to create all the tools for.
-            wave_name: the wave name from where we want to load tools
-            scope: a scope object allowing to launch this command. Opt
+        Add the appropriate checks (level check and wave's commands check) for this scope.
         """
-        # retrieve the command level
-        mongoInstance = MongoCalendar.getInstance()
-        command = mongoInstance.findInDb(self.pentest,
-                                         "commands", {"_id": ObjectId(command_iid)}, False)
-        if command is None:
+        # query mongo db commands collection for all commands having lvl == network or domain
+        checkitems = CheckItem.fetchObjects({"lvl": {"$in": ["ip"]}})
+        if checkitems is None:
             return
-        if command["lvl"] == "ip":
-            # finally add tool
-            newTool = ServerTool(self.pentest)
-            newTool.initialize(command_iid, wave_name, None,
-                               "", self.ip, "", "", "ip")
-            newTool.addInDb()
-            return
-        # Do the same thing for all children ports.
-        ports = mongoInstance.findInDb(self.pentest, "ports", {"ip": self.ip})
-        for port in ports:
-            p = ServerPort(self.pentest, port)
-            p.addAllTool(command_iid, wave_name, scope)
+        for check in checkitems:
+            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "ips")
+    
 
     def addInDb(self):
         return insert(self.pentest, IpController(self).getData())
@@ -198,6 +182,10 @@ def delete(pentest, ip_iid):
                                 {"ip": ip_dic["ip"]}, True)
     for tool in tools:
         tool_delete(pentest, tool["_id"])
+    checks = mongoInstance.findInDb(pentest, "cheatsheet",
+                                {"target_iid": str(ip_iid)}, True)
+    for check in checks:
+        checkinstance_delete(pentest, check["_id"])
     defects = mongoInstance.findInDb(pentest, "defects",
                                     {"ip": ip_dic["ip"], "$or": [{"port": {"$exists": False}}, {"port": None}]}, True)
     for defect in defects:
@@ -226,22 +214,9 @@ def insert(pentest, body):
     parent = ip_o.getParentId()
     ins_result = mongoInstance.insertInDb(pentest, "ips", body, parent)
     iid = ins_result.inserted_id
+    ip_o._id = iid
     if ip_o.in_scopes:
-        waves = mongoInstance.findInDb(pentest, "waves", {})
-        for wave in waves:
-            waveName = wave["wave"]
-            commands = wave["wave_commands"]
-            for comm_iid in commands:
-                # 2. finding the command only if lvl is port
-                comm = mongoInstance.findInDb(pentest, "commands",
-                                                {"_id":ObjectId(comm_iid), "lvl": "ip"}, False)
-                if comm is not None:
-                    # 3. checking if the added port fit into the command's allowed service
-                    # 3.1 first, default the selected port as tcp if no protocole is defined.
-                    tool_o = ServerTool(pentest)
-                    tool_o.initialize(comm_iid, waveName, None, "", ip_o.ip, "", "", "ip")
-                    tool_o.addInDb()
-    # NetworkDiscovery.handleNotif(pentest, "ips", iid, "insert")
+        ip_o.addAllChecks()
     return {"res":True, "iid":iid}
 
 @permission("pentester")

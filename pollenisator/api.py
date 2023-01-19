@@ -262,7 +262,7 @@ def create_app():
         mongoInstance = MongoCalendar.getInstance()
         todel = mongoInstance.findInDb("pollenisator", "sockets", {"sid":sid}, False)
         if todel:
-            unregister(todel)
+            unregister(todel.get("worker"))
             mongoInstance.deleteFromDb("pollenisator", "sockets", {"sid":sid}, False)
 
     flask_app.json_encoder = JSONEncoder

@@ -5,7 +5,6 @@ from pollenisator.core.Components.mongo import MongoCalendar
 from pollenisator.core.Controllers.ToolController import ToolController
 from pollenisator.core.Components.SocketManager import SocketManager
 from pollenisator.server.ServerModels.Command import addUserCommandsToPentest
-from pollenisator.server.ServerModels.CommandGroup import addUserGroupCommandsToPentest
 from pollenisator.server.ServerModels.Tool import ServerTool, update as tool_update
 from bson import ObjectId
 from pollenisator.server.permission import permission
@@ -39,7 +38,6 @@ def listWorkers(pipeline=None):
 def doSetInclusion(name, pentest, setInclusion):
     if setInclusion:
         addUserCommandsToPentest(pentest, name)
-        addUserGroupCommandsToPentest(pentest, name)
     return mongoInstance.setWorkerInclusion(name, pentest, setInclusion)
 
 @permission("pentester", "body.db")
