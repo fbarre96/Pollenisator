@@ -74,11 +74,16 @@ class Tool(Element):
         Returns:
             this object
         """
-        self.command_iid = str(command_iid)
-        if name is None and self.command_iid != "":
-            mongoInstance = MongoCalendar.getInstance()
-            res = mongoInstance.findInDb(self.pentest, "commands", {"original_iid":str(command_iid)}, False)
+        mongoInstance = MongoCalendar.getInstance()
+        if command_iid is not None and command_iid != "":
+            res = mongoInstance.findInDb(self.pentest, "commands", {"$or": [
+                {"original_iid":str(command_iid)},
+                {"_id": ObjectId(command_iid)}
+            ]}, False)
             name = res["name"]
+            self.command_iid = str(res["_id"])
+        else:
+            self.command_iid = None
         self.check_iid = str(check_iid) if check_iid is not None else None
         self.name = name
         self.wave = wave
@@ -102,6 +107,14 @@ class Tool(Element):
             status = [status]
         self.status = status
         return self
+
+    def getData(self):
+        return {"command_iid": self.command_iid, "check_iid": self.check_iid, 
+                "name": self.name, "wave": self.wave, "scope": self.scope,
+                "ip": self.ip, "port": self.port, "proto": self.proto,
+                "lvl": self.lvl, "text": self.text, "dated": self.dated,
+                "datef": self.datef, "scanner_ip": self.scanner_ip,
+                "notes": self.notes, "_id": self.getId(), "tags": self.tags, "infos": self.infos, "status":self.getStatus()}
 
 
     def getStatus(self):

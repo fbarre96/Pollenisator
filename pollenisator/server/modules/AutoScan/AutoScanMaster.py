@@ -122,11 +122,14 @@ def findLaunchableTools(pentest):
     mongoInstance = MongoCalendar.getInstance()
     check_items = list(CheckItem.fetchObjects({"type":"auto_commands"}))
     check_items.sort(key=lambda c: c.priority)
+    
+    authorized_diff_of_prio = 2 #TODO not hardcode  parameter
+
     #get not done tools inside wave
     first_command_group_launched_prio = None
     for check_item in check_items:
         if first_command_group_launched_prio is not None and \
-            check_item.priority > first_command_group_launched_prio+ 2: # take only prio and prio+1
+            check_item.priority > first_command_group_launched_prio+ authorized_diff_of_prio: # take only prio and prio+1
             break
         launched = 0
         count_running_tools = 0

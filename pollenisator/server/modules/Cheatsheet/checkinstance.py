@@ -101,7 +101,6 @@ class CheckInstance(ServerElement):
     
     
     def updateInfos(self):
-        # TODO, change to match new design
         check_item = CheckItem.fetchObject({"_id": ObjectId(self.check_iid)})
         if check_item is None:
             return "Check item parent not found"
@@ -135,10 +134,10 @@ class CheckInstance(ServerElement):
             elif at_least_one and not all_complete:
                 data["status"] = "running"
             else:
-                data["status"] = "not done"
+                data["status"] = "todo"
         else:
             data["status"] = ""
-        if data["status"] != "" and self.status == "":
+        if data["status"] != "":
             self.status = data["status"]
             self.update()
 
@@ -164,7 +163,8 @@ def doInsert(pentest, data, checkItem=None, toolInfos=None):
     if checkItem is None:
         return "Check Item not found", 404
     for command in checkItem.commands:
-        ServerTool(pentest).initialize(str(command), str(iid), target.get("wave", ""), None, target.get("scope", ""), target.get("ip", ""), target.get("port", ""),
+        command_pentest = ServerCommand.fetchObject({"original_iid": str(command)}, pentest)
+        ServerTool(pentest).initialize(str(command_pentest._id), str(iid), target.get("wave", ""), None, target.get("scope", ""), target.get("ip", ""), target.get("port", ""),
                                        target.get("proto", ""), checkItem.lvl, infos=toolInfos).addInDb()
 
     return {"res": True, "iid": iid}
@@ -233,7 +233,7 @@ def update(pentest, iid, body):
         del body["_id"]
 
     mongoInstance.updateInDb(pentest, CheckInstance.coll_name, {"_id": ObjectId(
-        iid), "type": "checkinstance"}, {"$set": body}, False, True)
+        iid), "type": "checkinstance"}, {"$set": body}, many=False, notify=True)
     return True
 
 
@@ -251,7 +251,8 @@ def getInformations(pentest, iid):
     data = inst.getData()
     check_item_data = check_item.getData()
     data["check_item"] = check_item_data
-    data["tools_status"] = {}
+    data["tools_done"] = {}
+    data["tools_running"] = {}
     data["tools_not_done"] = {}
     all_complete = True
     at_least_one = False
@@ -263,8 +264,11 @@ def getInformations(pentest, iid):
             if "done" in tool.getStatus():
                 done += 1
                 at_least_one = True
+                data["tools_done"][str(tool.getId())] = tool.getData()
             elif "running" in tool.getStatus():
                 at_least_one = True
+                data["tools_running"][str(
+                    tool.getId())] = tool.getDetailedString()
             else:
                 data["tools_not_done"][str(
                     tool.getId())] = tool.getDetailedString()
@@ -278,7 +282,7 @@ def getInformations(pentest, iid):
         elif at_least_one and not all_complete:
             data["status"] = "running"
         else:
-            data["status"] = "not done"
+            data["status"] = "todo"
     else:
         data["status"] = ""
     return data

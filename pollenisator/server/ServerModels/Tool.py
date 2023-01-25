@@ -173,7 +173,7 @@ class ServerTool(Tool, ServerElement):
         mongoInstance = MongoCalendar.getInstance()
         if self.plugin_used != "":
             return self.plugin_used
-        command_o = mongoInstance.findInDb(self.pentest,"commands",{"original_iid": str(self.command_iid)}, False)
+        command_o = mongoInstance.findInDb(self.pentest,"commands",{"_id": ObjectId(self.command_iid)}, False)
         if command_o and "plugin" in command_o.keys():
             return command_o["plugin"]
         return None
@@ -373,7 +373,7 @@ def craftCommandLine(pentest, tool_iid):
         return "Tool does not exist : "+str(tool_iid), 404
     # GET COMMAND OBJECT FOR THE TOOL
     if toolModel.text == "":
-        command_o = ServerCommand.fetchObject({"original_iid": str(toolModel.command_iid)}, pentest)
+        command_o = ServerCommand.fetchObject({"_id": ObjectId(toolModel.command_iid)}, pentest)
         if command_o is None:
             return "Associated command was not found", 404
     else:
@@ -481,7 +481,7 @@ def launchTask(pentest, tool_iid, **kwargs):
     worker_token = kwargs.get("worker_token") if kwargs.get("worker_token") else encode_token(kwargs.get("token_info"))
     mongoInstance = MongoCalendar.getInstance()
     launchableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
-    command_o = ServerCommand.fetchObject({"original_iid": str(launchableTool.command_iid)}, pentest)
+    command_o = ServerCommand.fetchObject({"_id": ObjectId(launchableTool.command_iid)}, pentest)
     if launchableTool is None:
         logger.debug("Error in launch task : not found :"+str(tool_iid))
         return "Tool not found", 404
@@ -495,7 +495,9 @@ def launchTask(pentest, tool_iid, **kwargs):
     choosenWorker = ""
     for owner in command_o.owners:
         if owner in workers:
-            choosenWorker = owner
+            running_tools = mongoInstance.countInDb(pentest,"tools",{"status":"running", "scanner_ip":owner})
+            if running_tools <= 5: # TODO not hardcode this parameter
+                choosenWorker = owner
     if choosenWorker == "":
         logger.debug("Error in launch task : no worker available:"+str(tool_iid))
         return "No worker available", 404
