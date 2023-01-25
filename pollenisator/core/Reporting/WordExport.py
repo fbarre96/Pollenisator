@@ -56,7 +56,10 @@ def createReport(context, template, out_name, **kwargs):
         for instance in defect.get("instances", []):
             for i,proof in enumerate(instance.get("proofs", [])):
                 instance["proofs"][i] = InlineImage(doc, proof)
-    doc.render(context, jinja_env)
+    try:
+        doc.render(context, jinja_env)
+    except jinja2.exceptions.TemplateSyntaxError as e:
+        return False, "Error in template syntax : "+str(e)
     dir_path = os.path.dirname(os.path.realpath(__file__))
     out_path = os.path.join(dir_path, "../../exports/", out_name+".docx")
     doc.save(out_path)
