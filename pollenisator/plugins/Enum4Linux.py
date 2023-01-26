@@ -1,12 +1,12 @@
 """A plugin to parse a CrackMapExex scan"""
 
 import re
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
-from pollenisator.server.modules.ActiveDirectory.computers import Computer
-from pollenisator.server.modules.ActiveDirectory.users import insert as user_insert, User
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
+from pollenisator.server.modules.activedirectory.computers import Computer
+from pollenisator.server.modules.activedirectory.users import insert as user_insert, User
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.core.Components.Utils import performLookUp
+from pollenisator.core.components.utils import performLookUp
 import json
 
 def getInfos(enum4linux_file):
@@ -159,7 +159,7 @@ class Enum4Linux(Plugin):
         enum_infos = getInfos(file_opened)
         notes = json.dumps(enum_infos, indent=4)
         if enum_infos is not None and enum_infos.get("users") is not None:
-            tags = ["enum4linux-success"]
+            tags = ["info-enum4linux-success"]
         elif enum_infos is None:
             return None, None, None, None
         targets = updateDatabase(pentest, enum_infos)

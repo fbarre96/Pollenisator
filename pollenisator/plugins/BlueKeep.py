@@ -1,7 +1,7 @@
 """A plugin to parse a bluekeep scan : rdpscan"""
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
 
 class BlueKeep(Plugin):
     """Inherits Plugin
@@ -75,7 +75,7 @@ class BlueKeep(Plugin):
                 targets[str(p_o.getId())] = {"ip": ip, "port": kwargs.get(
                     "port", None), "proto": kwargs.get("proto", None)}
             if "VULNERABLE" in line:
-                tags=["pwned", "bluekeep"]
+                tags=["pwned-bluekeep"]
                 if p_o is not None:
                     p_o.addTag("pwned")
                     p_o.addTag("bluekeep")

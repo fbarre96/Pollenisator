@@ -1,6 +1,6 @@
 """A plugin to parse a dig scan"""
 
-from pollenisator.server.ServerModels.Ip import ServerIp
+from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.plugins.plugin import Plugin
 
 def parse_reverse_dig(result_dig):

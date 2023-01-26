@@ -1,8 +1,8 @@
 """A plugin to parse nmap httpmethods scan"""
 
-from pollenisator.server.ServerModels.Defect import ServerDefect
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
+from pollenisator.server.servermodels.defect import ServerDefect
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.plugins.plugin import Plugin
 import re
 
@@ -121,5 +121,5 @@ class HttpMethods(Plugin):
             notes = "RISKY HTTP METHODS ALLOWED : " + " ".join(risky_methods)
             tags = []
             p_o.addTag("RISKY-HTTP-METHODS")
-            tags.append("Interesting")
+            tags.append("info-http-risky-methods")
         return notes, tags, "port", targets

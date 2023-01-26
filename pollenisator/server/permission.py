@@ -1,4 +1,4 @@
-from pollenisator.core.Components.logger_config import logger
+from pollenisator.core.components.logger_config import logger
 import inspect
 
 from pollenisator.server.token import checkTokenValidity

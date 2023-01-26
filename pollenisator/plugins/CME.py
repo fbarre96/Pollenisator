@@ -1,9 +1,9 @@
 """A plugin to parse a CrackMapExex scan"""
 
 import re
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
-from pollenisator.server.modules.ActiveDirectory.computers import Computer
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
+from pollenisator.server.modules.activedirectory.computers import Computer
 
 from pollenisator.plugins.plugin import Plugin
 
@@ -297,14 +297,14 @@ class CME(Plugin):
         hostsInfos, countPwnd,  countSuccess, notes, secrets, lsassy = getInfos(file_opened)
         if countPwnd is not None:
             if int(countPwnd) > 0:
-                tags = ["cme-pwned"]
+                tags = ["pwned-cme"]
         if countSuccess is not None:
             if int(countSuccess) > 0:
-                tags += ["cme-connection-success"]
+                tags += ["info-cme-connection-success"]
             if len(secrets) > 0:
-                tags += ["cme-secrets-dump"]
+                tags += ["todo-cme-secrets-dump"]
             if lsassy:
-                tags += ["lsassy-success"]
+                tags += ["todo-lsassy-success"]
         if hostsInfos is None:
             return None, None, None, None
         targets = editScopeIPs(pentest, hostsInfos)

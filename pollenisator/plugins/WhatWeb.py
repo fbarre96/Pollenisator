@@ -4,8 +4,8 @@ import json
 import re
 import webbrowser
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
 
 class WhatWeb(Plugin):
     def __init__(self):

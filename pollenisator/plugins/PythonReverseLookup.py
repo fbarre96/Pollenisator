@@ -1,7 +1,7 @@
 """A plugin to parse python reverse lookup scan"""
 
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.ServerModels.Ip import ServerIp
+from pollenisator.server.servermodels.ip import ServerIp
 import re
 
 

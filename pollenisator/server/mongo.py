@@ -1,20 +1,20 @@
 import json
-from pollenisator.core.Components.logger_config import logger
+from pollenisator.core.components.logger_config import logger
 import os
 from bson import ObjectId
 from flask import send_file
 import tempfile
 import re
 import shutil
-from pollenisator.core.Components.mongo import MongoCalendar
-from pollenisator.core.Components.parser import Parser, ParseError, Term
-from pollenisator.core.Components.Utils import JSONDecoder, getMainDir, isIp, JSONEncoder
-from pollenisator.core.Controllers.WaveController import WaveController
-from pollenisator.core.Controllers.IntervalController import IntervalController
-from pollenisator.server.ServerModels.Command import ServerCommand, addUserCommandsToPentest, doInsert as command_insert
-from pollenisator.server.ServerModels.Wave import ServerWave, insert as insert_wave
-from pollenisator.server.ServerModels.Interval import ServerInterval, insert as insert_interval
-from pollenisator.server.ServerModels.Scope import insert as insert_scope
+from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.parser import Parser, ParseError, Term
+from pollenisator.core.components.utils import JSONDecoder, getMainDir, isIp, JSONEncoder
+from pollenisator.core.controllers.wavecontroller import WaveController
+from pollenisator.core.controllers.intervalcontroller import IntervalController
+from pollenisator.server.servermodels.command import ServerCommand, addUserCommandsToPentest, doInsert as command_insert
+from pollenisator.server.servermodels.wave import ServerWave, insert as insert_wave
+from pollenisator.server.servermodels.interval import ServerInterval, insert as insert_interval
+from pollenisator.server.servermodels.scope import insert as insert_scope
 from pollenisator.server.permission import permission
 mongoInstance = MongoCalendar.getInstance()
 
@@ -136,7 +136,7 @@ def _evaluateCondition(searchable_collections, condition_list):
                 1th element is a binary operator
 
     Example:
-    [[<core.Components.parser.Term object at 0x7f05ba85f910>, '==', '"port"'], 'and', [[<core.Components.parser.Term object at 0x7f05ba85f730>, '==', '"43"'], 'or', [<core.Components.parser.Term object at 0x7f05b9844280>, '==', '"44"']]]
+    [[<core.components.parser.term object at 0x7f05ba85f910>, '==', '"port"'], 'and', [[<core.components.parser.term object at 0x7f05ba85f730>, '==', '"43"'], 'or', [<core.components.parser.term object at 0x7f05b9844280>, '==', '"44"']]]
     becomes
     searchable_collections = ["ports"], builtPipeline = {"$or":[{"port":"43"}, {"port":44}]}
     """

@@ -1,8 +1,8 @@
 """A plugin to parse nuclei results"""
 
-from pollenisator.server.ServerModels.Defect import ServerDefect
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
+from pollenisator.server.servermodels.defect import ServerDefect
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.plugins.plugin import Plugin
 import json
 
@@ -100,7 +100,7 @@ class Nuclei(Plugin):
                 notes += finding["info"]["name"]+" ("+finding["info"]["severity"]+") "+finding["info"].get("description", "")+"\n"
             for finding in findings:
                 if finding["info"]["severity"] in ["medium", "high", "critical"]:
-                    tags = ["interesting-nuclei"]
+                    tags = ["todo-nuclei-severity"]
             ip_o = ServerIp(pentest).initialize(host, notes, infos={"plugin":Nuclei.get_name()})
             inserted = ip_o.addInDb()
             if not inserted["res"]:

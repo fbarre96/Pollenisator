@@ -1,8 +1,8 @@
 """A plugin to parse a dirsearch scan"""
 
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
 import re
 import os
 
@@ -113,7 +113,7 @@ class Dirsearch(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
-        tags = ["todo-dirsearch"]
+        tags = []
         try:
             data = file_opened.read().decode("utf-8")
         except UnicodeDecodeError:
@@ -141,12 +141,17 @@ class Dirsearch(Plugin):
                     results = "\n".join(hosts[host][port]["paths"])
                     notes += results
                     newInfos = {}
+                    atLeastOne = False
                     for statuscode in hosts[host][port]:
                         if isinstance(statuscode, int):
                             if statuscode != 404:
                                 if hosts[host][port].get(statuscode, []):
                                     newInfos["Dirsearch_"+str(statuscode)
                                             ] = hosts[host][port][statuscode]
+                        else:
+                            atLeastOne = True
                     newInfos["SSL"] = "True" if hosts[host][port]["service"] == "https" else "False"
                     port_o.updateInfos(newInfos)
+                    if atLeastOne:
+                        tags = ["todo-dirsearch"]
         return notes, tags, "port", targets

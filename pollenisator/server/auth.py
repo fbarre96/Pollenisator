@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-from pollenisator.core.Components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoCalendar
 import bcrypt
 
 from werkzeug.exceptions import Unauthorized
 from pollenisator.server.permission import permission
 from pollenisator.server.token import getTokenFor
 from pollenisator.server.mongo import doImportCommands
-from pollenisator.core.Components.Utils import getDefaultCommandsFile, getDefaultWorkerCommandsFile
+from pollenisator.core.components.utils import getDefaultCommandsFile, getDefaultWorkerCommandsFile
 
 @permission("admin")
 def createUser(body):

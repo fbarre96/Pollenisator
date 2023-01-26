@@ -1,6 +1,6 @@
-from pollenisator.core.Components.logger_config import logger
+from pollenisator.core.components.logger_config import logger
 from jose import JWTError, jwt
-from pollenisator.core.Components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoCalendar
 import datetime
 import uuid
 from werkzeug.exceptions import Unauthorized

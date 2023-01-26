@@ -719,7 +719,7 @@ paths:
             application/json:
               examples:
                 Success:
-                  value: '"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjY3MDE0MjcsImV4cCI6MTYyNjcwNTAyNywic3ViIjoiYWRtaW4iLCJzY29wZSI6WyJhZG1pbiIsInVzZXIiXX0.Tmv96VqKyqBa_xYjnfOqM7deKn6-UKmTB-rY9IrKX1M"'
+                  value: '"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjY3MDE0MjcsImV4cCI6MTYyNjcwNTAyNywic3ViIjoiYWRtaW4iLCJzY29wZSI6WyJhZG1pbiIsInVzZXIiXX0.tmv96VqKyqBa_xYjnfOqM7deKn6-UKmTB-rY9IrKX1M"'
         '400':
           description: Missing parameters
           content:
@@ -762,7 +762,7 @@ paths:
             application/json:
               examples:
                 Success:
-                  value: '"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjY3MDI2NzQsImV4cCI6MTYyNjcwNjI3NCwic3ViIjoiYWRtaW4iLCJzY29wZSI6WyJhZG1pbiIsInVzZXIiLCJUZXN0aW5hIiwib3duZXIiLCJwZW50ZXN0ZXIiXX0.PxLT9qfHAsoebokDIU34cmUWWmzSxkTXWV2nBJayzq8"'
+                  value: '"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjY3MDI2NzQsImV4cCI6MTYyNjcwNjI3NCwic3ViIjoiYWRtaW4iLCJzY29wZSI6WyJhZG1pbiIsInVzZXIiLCJUZXN0aW5hIiwib3duZXIiLCJwZW50ZXN0ZXIiXX0.pxLT9qfHAsoebokDIU34cmUWWmzSxkTXWV2nBJayzq8"'
         '403':
           description: Forbidden
           content:
@@ -876,7 +876,7 @@ paths:
                   default: false
       responses:
         "200":
-          description: successfully inserted an item in db, return its ObjectId (bson.ObjectId type)
+          description: successfully inserted an item in db, return its ObjectId (bson.objectid type)
           content:
             application/json:
               examples:
@@ -1780,7 +1780,7 @@ paths:
 
   "/commands/find":
     post:
-      operationId: pollenisator.server.ServerModels.Command.getCommands
+      operationId: pollenisator.server.servermodels.command.getCommands
       tags:
         - Commands
       summary: "Return all exisiting"
@@ -1803,7 +1803,7 @@ paths:
                   value: '[{"_id": "60a3aaa129926f9ad7197919", "parent": "ObjectId|60a3aaa129926f9ad7197915",  "scope": "test",   "wave": "Testina" },  { "_id": "60f58598d8357e0f40e7fa66","scope": "test.fr" }]'
   "/commands/delete/{command_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Command.deleteCommand
+      operationId: pollenisator.server.servermodels.command.deleteCommand
       tags:
         - Mongo
       summary: Delete something in db
@@ -1833,7 +1833,7 @@ paths:
   
   "/commands/addToMyCommands/{command_iid}":
     post:
-      operationId: pollenisator.server.ServerModels.Command.addToMyCommands
+      operationId: pollenisator.server.servermodels.command.addToMyCommands
       tags:
         - Commands
       summary: "Mark this command as used by the current user"
@@ -1855,7 +1855,7 @@ paths:
   
   "/commands/{pentest}":
     post:
-      operationId: pollenisator.server.ServerModels.Command.insert
+      operationId: pollenisator.server.servermodels.command.insert
       tags:
         - Commands
       summary: Insert a command or return the conflicting existing one
@@ -1879,7 +1879,7 @@ paths:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/commands/update/{pentest}/{command_iid}":
     put:
-      operationId: pollenisator.server.ServerModels.Command.update
+      operationId: pollenisator.server.servermodels.command.update
       tags:
         - Commands
       summary: "Update a command "
@@ -1907,7 +1907,7 @@ paths:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/commands/{pentest}/{command_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Command.delete
+      operationId: pollenisator.server.servermodels.command.delete
       tags:
         - Commands
       summary: Delete a command and dependencies
@@ -1934,7 +1934,7 @@ paths:
   
   "/defects/{pentest}":
     post:
-      operationId: pollenisator.server.ServerModels.Defect.insert
+      operationId: pollenisator.server.servermodels.defect.insert
       tags:
         - Defects
       summary: Insert a defect or return the conflicting existing one
@@ -1958,7 +1958,7 @@ paths:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/defects/update/{pentest}/{defect_iid}":
     put:
-      operationId: pollenisator.server.ServerModels.Defect.update
+      operationId: pollenisator.server.servermodels.defect.update
       tags:
         - Defects
       summary: "Update a defect "
@@ -1986,7 +1986,7 @@ paths:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/defects/{pentest}/{defect_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Defect.delete
+      operationId: pollenisator.server.servermodels.defect.delete
       tags:
         - Defects
       summary: Delete a defect and dependencies
@@ -2012,7 +2012,7 @@ paths:
                 type: integer
   "/intervals/{pentest}":
     post:
-      operationId: pollenisator.server.ServerModels.Interval.insert
+      operationId: pollenisator.server.servermodels.interval.insert
       tags:
         - Intervals
       summary: Insert an interval or return the conflicting existing one
@@ -2036,7 +2036,7 @@ paths:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/intervals/update/{pentest}/{interval_iid}":
     put:
-      operationId: pollenisator.server.ServerModels.Interval.update
+      operationId: pollenisator.server.servermodels.interval.update
       tags:
         - Intervals
       summary: "Update an interval "
@@ -2064,7 +2064,7 @@ paths:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/intervals/{pentest}/{interval_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Interval.delete
+      operationId: pollenisator.server.servermodels.interval.delete
       tags:
         - Intervals
       summary: Delete an interval and dependencies
@@ -2090,7 +2090,7 @@ paths:
                 type: integer
   "/ips/{pentest}":
     post:
-      operationId: pollenisator.server.ServerModels.Ip.insert
+      operationId: pollenisator.server.servermodels.ip.insert
       tags:
         - Ips
       summary: Insert an ip or return the conflicting existing one
@@ -2114,7 +2114,7 @@ paths:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/ips/update/{pentest}/{ip_iid}":
     put:
-      operationId: pollenisator.server.ServerModels.Ip.update
+      operationId: pollenisator.server.servermodels.ip.update
       tags:
         - Ips
       summary: "Update an ip "
@@ -2142,7 +2142,7 @@ paths:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/ips/{pentest}/{ip_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Ip.delete
+      operationId: pollenisator.server.servermodels.ip.delete
       tags:
         - Ips
       summary: Delete an ip and dependencies
@@ -2168,7 +2168,7 @@ paths:
                 type: integer
   "/ports/{pentest}":
     post:
-      operationId: pollenisator.server.ServerModels.Port.insert
+      operationId: pollenisator.server.servermodels.port.insert
       tags:
         - Ports
       summary: Insert an port or return the conflicting existing one
@@ -2192,7 +2192,7 @@ paths:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/ports/update/{pentest}/{port_iid}":
     put:
-      operationId: pollenisator.server.ServerModels.Port.update
+      operationId: pollenisator.server.servermodels.port.update
       tags:
         - Ports
       summary: Update a port
@@ -2220,7 +2220,7 @@ paths:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/ports/{pentest}/{port_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Port.delete
+      operationId: pollenisator.server.servermodels.port.delete
       tags:
         - Ports
       summary: Delete a port and dependencies
@@ -2246,7 +2246,7 @@ paths:
                 type: integer
   # "/ports/{pentest}/{port_iid}/addCustomTool/":
   #   post:
-  #     operationId: pollenisator.server.ServerModels.Port.addCustomTool
+  #     operationId: pollenisator.server.servermodels.port.addCustomTool
   #     tags:
   #       - Ports
   #     summary: Add a tool manually to a port in the Custom Tools wave
@@ -2286,7 +2286,7 @@ paths:
   #                 value: '"Not connected"'
   "/scopes/{pentest}":
     post:
-      operationId: pollenisator.server.ServerModels.Scope.insert
+      operationId: pollenisator.server.servermodels.scope.insert
       tags:
         - Scopes
       summary: Insert a scope or return the conflicting existing one
@@ -2310,7 +2310,7 @@ paths:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/scopes/update/{pentest}/{scope_iid}":
     put:
-      operationId: pollenisator.server.ServerModels.Scope.update
+      operationId: pollenisator.server.servermodels.scope.update
       tags:
         - Scopes
       summary: Update a scope
@@ -2338,7 +2338,7 @@ paths:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/scopes/{pentest}/{scope_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Scope.delete
+      operationId: pollenisator.server.servermodels.scope.delete
       tags:
         - Scopes
       summary: Delete a scope and dependencies
@@ -2364,7 +2364,7 @@ paths:
                 type: integer
   /tools/plugins:
     get:
-      operationId: pollenisator.server.ServerModels.Tool.listPlugins
+      operationId: pollenisator.server.servermodels.tool.listPlugins
       tags:
         - Tools
       summary: Get a list of existing plugins
@@ -2378,7 +2378,7 @@ paths:
                   value: '["Nmap.py", "WhatWeb.py", ...]'
   "/tools/{pentest}":
     post:
-      operationId: pollenisator.server.ServerModels.Tool.insert
+      operationId: pollenisator.server.servermodels.tool.insert
       tags:
         - Tools
       summary: Insert a tool or return the conflicting existing one
@@ -2402,7 +2402,7 @@ paths:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/tools/update/{pentest}/{tool_iid}":
     put:
-      operationId: pollenisator.server.ServerModels.Tool.update
+      operationId: pollenisator.server.servermodels.tool.update
       tags:
         - Tools
       summary: Update a tool
@@ -2430,7 +2430,7 @@ paths:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/tools/{pentest}/{tool_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Tool.delete
+      operationId: pollenisator.server.servermodels.tool.delete
       tags:
         - Tools
       summary: Delete a tool and dependencies
@@ -2456,7 +2456,7 @@ paths:
                 type: integer
   "/waves/{pentest}":
     post:
-      operationId: pollenisator.server.ServerModels.Wave.insert
+      operationId: pollenisator.server.servermodels.wave.insert
       tags:
         - Waves
       summary: Insert a wave or return the conflicting existing one
@@ -2480,7 +2480,7 @@ paths:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/waves/update/{pentest}/{wave_iid}":
     put:
-      operationId: pollenisator.server.ServerModels.Wave.update
+      operationId: pollenisator.server.servermodels.wave.update
       tags:
         - Waves
       summary: Update a wave
@@ -2508,7 +2508,7 @@ paths:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/waves/{pentest}/{wave_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Wave.delete
+      operationId: pollenisator.server.servermodels.wave.delete
       tags:
         - Waves
       summary: Delete a wave and dependencies
@@ -2535,7 +2535,7 @@ paths:
   
   "/tools/{pentest}/craftCommandLine/{tool_iid}":
     get:
-      operationId: pollenisator.server.ServerModels.Tool.craftCommandLine
+      operationId: pollenisator.server.servermodels.tool.craftCommandLine
       tags:
         - Tools
       summary: Get the command line to execute the tool (using plugin + parameters) a
@@ -2577,7 +2577,7 @@ paths:
                   value: '"An empty command line was crafted"'
   "/tools/{pentest}/completeDesiredOuput/{tool_iid}":
     get:
-      operationId: pollenisator.server.ServerModels.Tool.completeDesiredOuput
+      operationId: pollenisator.server.servermodels.tool.completeDesiredOuput
       tags:
         - Tools
       summary: add the plugin desired output option in the command (using plugin + parameters) a
@@ -2629,7 +2629,7 @@ paths:
                   value: '"An empty command line was crafted"'
   "/tools/getDesiredOutputForPlugin":
     post:
-      operationId: pollenisator.server.ServerModels.Tool.getDesiredOutputForPlugin
+      operationId: pollenisator.server.servermodels.tool.getDesiredOutputForPlugin
       tags:
         - Tools
       summary: add the plugin desired output option in the command (using plugin + parameters) a
@@ -2670,7 +2670,7 @@ paths:
                   value: '"An empty command line was crafted"'
   "/tools/{pentest}/importResult/{tool_iid}":
     post:
-      operationId: pollenisator.server.ServerModels.Tool.importResult
+      operationId: pollenisator.server.servermodels.tool.importResult
       tags:
         - Tools
       summary: Upload a tool result file
@@ -2726,7 +2726,7 @@ paths:
                   value: '"The given iid does not match an existing tool"'
   "/tools/{pentest}/launchTask/{tool_iid}":
     post:
-      operationId: pollenisator.server.ServerModels.Tool.launchTask
+      operationId: pollenisator.server.servermodels.tool.launchTask
       tags:
         - Tools
       summary: Try to launch a tool on any worker
@@ -2772,7 +2772,7 @@ paths:
                   value: '"No worker available"'
   "/tools/{pentest}/stopTask/{tool_iid}":
     post:
-      operationId: pollenisator.server.ServerModels.Tool.stopTask
+      operationId: pollenisator.server.servermodels.tool.stopTask
       tags:
         - Tools
       summary: Try to stop a tool
@@ -2832,7 +2832,7 @@ paths:
 
   "/tools/{pentest}/getProgress/{tool_iid}":
     get:
-      operationId: pollenisator.server.ServerModels.Tool.getProgress
+      operationId: pollenisator.server.servermodels.tool.getProgress
       tags:
         - Tools
       summary: Try to get progress of a tool
@@ -2878,7 +2878,7 @@ paths:
 
   "/tools/{pentest}/{tool_iid}/changeStatus":
     post:
-      operationId: pollenisator.server.ServerModels.Tool.setStatus
+      operationId: pollenisator.server.servermodels.tool.setStatus
       tags:
         - Tools
       summary: Update a tool staus
@@ -2930,7 +2930,7 @@ paths:
     
   "/workers/{name}/setInclusion":
     post:
-      operationId: pollenisator.server.modules.Worker.worker.setInclusion
+      operationId: pollenisator.server.modules.worker.worker.setInclusion
       tags:
         - Worker
       summary: Set a worker exclusion from database
@@ -2976,7 +2976,7 @@ paths:
   # # autoscan
   # "/autoscan/{pentest}/start":
   #   post:
-  #     operationId: pollenisator.server.modules.AutoScan.AutoScanMaster.startAutoScan
+  #     operationId: pollenisator.server.modules.autoscan.autoscanmaster.startAutoScan
   #     tags:
   #       - Auto scan
   #     summary: Start an automatic scan
@@ -3012,7 +3012,7 @@ paths:
             
   # "/autoscan/{pentest}/status":
   #   get:
-  #     operationId: pollenisator.server.modules.AutoScan.AutoScanMaster.getAutoScanStatus
+  #     operationId: pollenisator.server.modules.autoscan.autoscanmaster.getAutoScanStatus
   #     tags:
   #       - Auto scan
   #     summary: Returns status of automatic scan
@@ -3033,7 +3033,7 @@ paths:
 
   # "/autoscan/{pentest}/stop":
   #   post:
-  #     operationId: pollenisator.server.modules.AutoScan.AutoScanMaster.stopAutoScan
+  #     operationId: pollenisator.server.modules.autoscan.autoscanmaster.stopAutoScan
   #     tags:
   #       - Auto scan
   #     summary: Stop an automatic scan
@@ -3055,7 +3055,7 @@ paths:
   # #file manager
   # "/files/{pentest}/upload/proof/{defect_iid}":
   #   post:
-  #     operationId: pollenisator.server.modules.FileManager.FileManager.upload
+  #     operationId: pollenisator.server.modules.filemanager.filemanager.upload
   #     tags:
   #       - FileManager
   #     summary: Upload a file
@@ -3101,7 +3101,7 @@ paths:
   #                 value: '"The given iid does not match an existing defect"'
   # "/files/{pentest}/download/{filetype}/{attached_iid}":
   #   get:
-  #     operationId: pollenisator.server.modules.FileManager.FileManager.listFiles
+  #     operationId: pollenisator.server.modules.filemanager.filemanager.listFiles
   #     tags:
   #       - FileManager
   #     summary: Lists attached to given iid
@@ -3137,7 +3137,7 @@ paths:
   #                 type: string
   # "/files/{pentest}/download/{filetype}/{attached_iid}/{filename}":
   #   get:
-  #     operationId: pollenisator.server.modules.FileManager.FileManager.download
+  #     operationId: pollenisator.server.modules.filemanager.filemanager.download
   #     tags:
   #       - FileManager
   #     summary: Download a file
@@ -3185,7 +3185,7 @@ paths:
   #                 value: '"File not found"'
   # "/files/{pentest}/{defect_iid}/{filename}":
   #   delete:
-  #     operationId: pollenisator.server.modules.FileManager.FileManager.rmProof
+  #     operationId: pollenisator.server.modules.filemanager.filemanager.rmProof
   #     tags:
   #       - FileManager
   #     summary: Remove a proof file
@@ -3225,7 +3225,7 @@ paths:
 
   # "/files/{pentest}/import":
   #   post:
-  #     operationId: pollenisator.server.modules.FileManager.FileManager.importExistingFile
+  #     operationId: pollenisator.server.modules.filemanager.filemanager.importExistingFile
   #     tags:
   #       - FileManager
   #     summary: Import an existing tool file

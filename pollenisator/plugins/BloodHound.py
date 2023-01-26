@@ -1,9 +1,9 @@
 """A plugin to parse a bloodhound scan """
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.modules.ActiveDirectory.users import User
-from pollenisator.server.modules.ActiveDirectory.computers import Computer
-from pollenisator.core.Components.Utils import performLookUp
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.modules.activedirectory.users import User
+from pollenisator.server.modules.activedirectory.computers import Computer
+from pollenisator.core.components.utils import performLookUp
 from zipfile import ZipFile
 from io import BytesIO
 import json

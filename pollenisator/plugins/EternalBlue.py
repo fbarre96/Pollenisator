@@ -1,9 +1,9 @@
 """A plugin to parse namp script ms17-010 scan"""
 
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.ServerModels.Defect import ServerDefect
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
+from pollenisator.server.servermodels.defect import ServerDefect
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
 import re
 
 
@@ -76,7 +76,7 @@ class EternalBlue(Plugin):
             targets[str(p_o.getId())] = {
                 "ip": ip, "port": port, "proto": proto}
         if "VULNERABLE" in notes:
-            tags=["pwned", "eternalblue"]
+            tags=["pwned-eternalblue"]
             if res_insert is not None:
                 p_o.addTag("pwned")
                 p_o.addTag("eternalblue")

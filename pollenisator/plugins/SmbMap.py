@@ -1,13 +1,13 @@
 """A plugin to parse smbmap scan"""
 
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
-from pollenisator.server.modules.ActiveDirectory.computers import Computer
-from pollenisator.server.modules.ActiveDirectory.shares import Share
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
+from pollenisator.server.modules.activedirectory.computers import Computer
+from pollenisator.server.modules.activedirectory.shares import Share
 
 import shlex
-from pollenisator.core.Components.logger_config import logger
+from pollenisator.core.components.logger_config import logger
 
 
 def smbmap_format(row):
@@ -122,7 +122,7 @@ class SmbMap(Plugin):
                 interesting_files[interesting_file_type] = interesting_files.get(interesting_file_type, [])
                 interesting_files[interesting_file_type].append(', '.join(row))
                 isInteresting = True
-                tags=["smbmap-interesting"]
+                tags=["todo-smbmap-interesting"]
             else:
                 less_interesting_notes += ", ".join(row)+"\n"
             shares[target] = shares.get(target, {}) #{"<ip>":{"<shareName">:set(<tuple>)}}
@@ -164,7 +164,7 @@ class SmbMap(Plugin):
                     share_m.update(res["iid"])
 
             if password == "":
-                tags += ["anon-share-found"]
+                tags += ["todo-anon-share-found"]
         if notes.strip() != "" and not tags:
-            tags = ["smbmap-todo"]
+            tags = ["todo-smbmap"]
         return notes, tags, "port", targets

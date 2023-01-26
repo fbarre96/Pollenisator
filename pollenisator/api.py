@@ -9,7 +9,7 @@ else:
     async_mode = "eventlet"
     
 # ENABLE LOGGING EARLY ON
-from pollenisator.core.Components.logger_config import logger
+from pollenisator.core.components.logger_config import logger
 
 from pollenisator.server.permission import permission
 
@@ -18,16 +18,16 @@ from flask_cors import CORS
 from getpass import getpass
 from bson import ObjectId
 from pollenisator.server.token import verifyToken, decode_token
-from pollenisator.core.Components.Utils import JSONEncoder, loadServerConfig
-from pollenisator.core.Components.SocketManager import SocketManager
-from pollenisator.server.modules.Worker.worker import doSetInclusion
+from pollenisator.core.components.utils import JSONEncoder, loadServerConfig
+from pollenisator.core.components.socketmanager import SocketManager
+from pollenisator.server.modules.worker.worker import doSetInclusion
 from flask import request
 import sys
 import bcrypt
 import json
 
-from pollenisator.core.Components.mongo import MongoCalendar
-from pollenisator.server.modules.Worker.worker import removeWorkers, unregister
+from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.server.modules.worker.worker import removeWorkers, unregister
 import connexion
 from pathlib import Path
 import ruamel.yaml
@@ -268,6 +268,7 @@ def create_app():
     flask_app.json_encoder = JSONEncoder
     CORS(flask_app)
     return flask_app
+
 
 def main():
     """Create the app and run it

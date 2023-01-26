@@ -1,9 +1,9 @@
 """A plugin to parse a CrackMapExex scan"""
 
 import re
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
-from pollenisator.server.modules.ActiveDirectory.computers import Computer
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
+from pollenisator.server.modules.activedirectory.computers import Computer
 from pollenisator.plugins.plugin import Plugin
 
 
@@ -154,6 +154,6 @@ class RunFinger(Plugin):
         if hostsInfos is None:
             return None, None, None, None
         if hostsInfos:
-            tags += ["runfinger-infos"]
+            tags += ["info-runfinger"]
         targets = editScopeIPs(pentest, hostsInfos)
         return notes, tags, "ports", targets

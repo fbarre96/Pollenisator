@@ -1,8 +1,8 @@
 """A plugin to parse nikto scan"""
 
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
 import re
 
 
@@ -74,7 +74,7 @@ class Nikto(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
-        tags = ["nikto-todo"]
+        tags = ["todo-nikto"]
         targets = {}
         try:
             notes = file_opened.read().decode("utf-8")
