@@ -1,0 +1,80 @@
+
+paths:
+  "/autoscan/{pentest}/start":
+    post:
+      operationId: pollenisator.server.modules.autoscan.autoscanmaster.startAutoScan
+      tags:
+        - Auto scan
+      summary: Start an automatic scan
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successfully started auto scan
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"Success"'
+        "403":
+          description: Autoscan already running
+          content:
+            application/json:
+              examples:
+               Already running:
+                  value: '"An autoscan is already running"'
+        "404":
+          description: No worker available/found
+          content:
+            application/json:
+              examples:
+                No worker available:
+                  value: '"No worker registered for this pentest"'
+            
+  "/autoscan/{pentest}/status":
+    get:
+      operationId: pollenisator.server.modules.autoscan.autoscanmaster.getAutoScanStatus
+      tags:
+        - Auto scan
+      summary: Returns status of automatic scan
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successfully returned status of auto scan
+          content:
+            application/json:
+              schema:
+                type: boolean
+
+  "/autoscan/{pentest}/stop":
+    post:
+      operationId: pollenisator.server.modules.autoscan.autoscanmaster.stopAutoScan
+      tags:
+        - Auto scan
+      summary: Stop an automatic scan
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successfully stoped auto scan
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"Success"'
