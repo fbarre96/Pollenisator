@@ -1,7 +1,7 @@
 import json
 from pollenisator.core.components.logger_config import logger
 import uuid
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.controllers.toolcontroller import ToolController
 from pollenisator.core.components.socketmanager import SocketManager
 from pollenisator.server.servermodels.command import addUserCommandsToPentest
@@ -18,7 +18,7 @@ try:
 except:
     git_available = False
 
-mongoInstance = MongoClient.getInstance()
+dbclient = DBClient.getInstance()
 
 @permission("user")
 def listWorkers(pipeline=None):
@@ -30,7 +30,7 @@ def listWorkers(pipeline=None):
     if not isinstance(pipeline, dict):
         return "Pipeline argument was not valid", 400
     ret = []
-    for w in mongoInstance.getWorkers(pipeline):
+    for w in dbclient.getWorkers(pipeline):
         w["_id"] = str(w["_id"])
         ret.append(w)
     return ret
@@ -38,7 +38,7 @@ def listWorkers(pipeline=None):
 def doSetInclusion(name, pentest, setInclusion):
     if setInclusion:
         addUserCommandsToPentest(pentest, name)
-    return mongoInstance.setWorkerInclusion(name, pentest, setInclusion)
+    return dbclient.setWorkerInclusion(name, pentest, setInclusion)
 
 @permission("pentester", "body.db")
 def setInclusion(name, body, **kwargs):
@@ -47,21 +47,21 @@ def setInclusion(name, body, **kwargs):
 
 
 def doDeleteWorker(name):
-    res = mongoInstance.findInDb("pollenisator","workers",{"name":name}, False)
+    res = dbclient.findInDb("pollenisator","workers",{"name":name}, False)
     if res is None:
         return "Worker not found", 404
-    socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":name}, False)
+    socket = dbclient.findInDb("pollenisator", "sockets", {"user":name}, False)
     if socket is not None:
         sm = SocketManager.getInstance()
         sm.socketio.emit('deleteWorker', {'name': name}, room=socket["sid"])
     if res.get("container_id") is not None:
         stop_docker(res["container_id"])
-    return mongoInstance.deleteWorker(name)
+    return dbclient.deleteWorker(name)
 
 
 def removeWorkers():
-    mongoInstance = MongoClient.getInstance()
-    workers = mongoInstance.getWorkers()
+    dbclient = DBClient.getInstance()
+    workers = dbclient.getWorkers()
     count = 0
     for worker in workers:
         running_tools = worker.get("running_tools", [])
@@ -124,15 +124,15 @@ def start_docker(force_reinstall, docker_id):
 @permission("pentester")
 def startWorker(pentest, **kwargs):
     user = kwargs["token_info"]["sub"]
-    existing = mongoInstance.findInDb("pollenisator", "workers", {"pentest": pentest}, False)
+    existing = dbclient.findInDb("pollenisator", "workers", {"pentest": pentest}, False)
     if existing is not None:
         return str(existing["name"])
     docker_id = uuid.uuid4()
-    existing = mongoInstance.insertInDb("pollenisator", "workers", {"pentest": pentest, "name":str(docker_id)}, False, False)
+    existing = dbclient.insertInDb("pollenisator", "workers", {"pentest": pentest, "name":str(docker_id)}, False, False)
     ret, msg = start_docker(True, docker_id)
     
     if ret:
-        mongoInstance.updateInDb("pollenisator", "workers", {"pentest": pentest, "name":str(docker_id)}, {"$set":{"container_id":msg}}, False, False)
+        dbclient.updateInDb("pollenisator", "workers", {"pentest": pentest, "name":str(docker_id)}, {"$set":{"container_id":msg}}, False, False)
         return str(docker_id)
     return msg, 403
 
@@ -140,11 +140,11 @@ def startWorker(pentest, **kwargs):
 def registerWorker(body):
     name = body["name"]
     command_names = body["command_names"]
-    res = mongoInstance.registerCommands(name, command_names)
+    res = dbclient.registerCommands(name, command_names)
     return res
 
 def unregister(name):
-    worker = mongoInstance.getWorker(name)
+    worker = dbclient.getWorker(name)
     if worker is not None:
         running_tools = worker.get("running_tools", [])
         for running_tool in running_tools:

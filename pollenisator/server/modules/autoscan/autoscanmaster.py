@@ -6,7 +6,7 @@ from threading import Thread
 from datetime import datetime
 from bson.objectid import ObjectId
 import pollenisator.core.components.utils as utils
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.server.servermodels.interval import ServerInterval
 from pollenisator.server.servermodels.command import ServerCommand
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
@@ -20,21 +20,21 @@ from pollenisator.server.token import encode_token
     
 @permission("pentester")
 def startAutoScan(pentest, **kwargs):
-    mongoInstance = MongoClient.getInstance()
-    autoscanRunning = mongoInstance.findInDb(pentest, "autoscan", {"special":True}, False) is not None
+    dbclient = DBClient.getInstance()
+    autoscanRunning = dbclient.findInDb(pentest, "autoscan", {"special":True}, False) is not None
     if autoscanRunning:
         return "An auto scan is already running", 403
-    workers = mongoInstance.getWorkers({"pentest":pentest})
+    workers = dbclient.getWorkers({"pentest":pentest})
     if workers is None:
         return "No worker registered for this pentest", 404
-    mongoInstance.insertInDb(pentest, "autoscan", {"start":datetime.now(), "special":True})
+    dbclient.insertInDb(pentest, "autoscan", {"start":datetime.now(), "special":True})
     encoded = encode_token(kwargs["token_info"])
     autoscan = Thread(target=autoScan, args=(pentest, encoded))
     try:
         logger.debug("Autoscan : start")
         autoscan.start()
     except(KeyboardInterrupt, SystemExit):
-        mongoInstance.deleteFromDb(pentest, "autoscan", {}, True)
+        dbclient.deleteFromDb(pentest, "autoscan", {}, True)
     return "Success"
 
 def autoScan(pentest, endoded_token):
@@ -45,7 +45,7 @@ def autoScan(pentest, endoded_token):
     Args:
         pentest: The database to search tools in
     """
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     check = True
     try:
         while check:
@@ -70,7 +70,7 @@ def autoScan(pentest, endoded_token):
     except(KeyboardInterrupt, SystemExit):
         logger.debug("Autoscan : EXIT by expected EXCEPTION (exit or interrupt)")
         logger.info("stop autoscan : Kill received...")
-        mongoInstance.deleteFromDb(pentest, "autoscan", {}, True)
+        dbclient.deleteFromDb(pentest, "autoscan", {}, True)
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
@@ -85,24 +85,24 @@ def autoScan(pentest, endoded_token):
 @permission("pentester")
 def stopAutoScan(pentest):
     logger.debug("Autoscan : stop autoscan received ")
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     toolsRunning = []
-    workers = mongoInstance.getWorkers({"pentest":pentest})
+    workers = dbclient.getWorkers({"pentest":pentest})
     for worker in workers:
-        tools = mongoInstance.findInDb(pentest, "tools", {"scanner_ip": worker["name"], "status":"running"}, True)
+        tools = dbclient.findInDb(pentest, "tools", {"scanner_ip": worker["name"], "status":"running"}, True)
         for tool in tools:
             toolsRunning.append(tool["_id"])
-    mongoInstance.deleteFromDb(pentest, "autoscan", {}, True)
+    dbclient.deleteFromDb(pentest, "autoscan", {}, True)
     for toolId in toolsRunning:
         res, msg = stopTask(pentest, toolId, {"forceReset":True})
     return "Success"
 
 @permission("pentester")
 def getAutoScanStatus(pentest):
-    #commandsRunning = mongoInstance.aggregate("tools", [{"$match": {"datef": "None", "dated": {
+    #commandsRunning = dbclient.aggregate("tools", [{"$match": {"datef": "None", "dated": {
     #        "$ne": "None"}, "scanner_ip": {"$ne": "None"}}}, {"$group": {"_id": "$name", "count": {"$sum": 1}}}])
-    mongoInstance = MongoClient.getInstance()
-    return mongoInstance.findInDb(pentest, "autoscan", {"special":True}, False) is not None
+    dbclient = DBClient.getInstance()
+    return dbclient.findInDb(pentest, "autoscan", {"special":True}, False) is not None
 
 
 def findLaunchableTools(pentest):
@@ -119,7 +119,7 @@ def findLaunchableTools(pentest):
     time_compatible_waves_id = searchForAddressCompatibleWithTime(pentest)
     if time_compatible_waves_id is None:
         return toolsLaunchable
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     check_items = list(CheckItem.fetchObjects({"type":"auto_commands"}))
     check_items.sort(key=lambda c: c.priority)
     
@@ -137,7 +137,7 @@ def findLaunchableTools(pentest):
         check_instances = CheckInstance.fetchObjects(pentest, {"check_iid":str(check_item._id)})
         for check_instance in check_instances:
             notDoneToolsInCheck = getNotDoneTools(pentest, check_instance)
-            count_running_tools += mongoInstance.countInDb(pentest, "tools", {"check_iid":str(check_instance._id), "status":"running"})
+            count_running_tools += dbclient.countInDb(pentest, "tools", {"check_iid":str(check_instance._id), "status":"running"})
             
             for toolId, toolModel in notDoneToolsInCheck.items():
                 if count_running_tools + launched >= check_item.max_thread:

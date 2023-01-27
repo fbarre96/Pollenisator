@@ -5,7 +5,7 @@ from netaddr import IPNetwork, IPAddress
 from netaddr.core import AddrFormatError
 from pollenisator.core.models.port import Port
 from pollenisator.core.components.utils import isNetworkIp, performLookUp
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 import re
 
 
@@ -57,10 +57,10 @@ class Ip(Element):
         Returns:
             boolean: True if this ip/domain is in given scope. False otherwise.
         """
-        mongoInstance = MongoClient.getInstance()
-        settings_scope_ip = mongoInstance.findInDb(self.pentest, "settings", {"key":"include_domains_with_ip_in_scope"}, False)
-        settings_all_domains = mongoInstance.findInDb(self.pentest,"settings", {"key":"include_all_domains"}, False)
-        settings_top_domain = mongoInstance.findInDb(self.pentest, "settings", {"key":"include_domains_with_topdomain_in_scope"}, False)
+        dbclient = DBClient.getInstance()
+        settings_scope_ip = dbclient.findInDb(self.pentest, "settings", {"key":"include_domains_with_ip_in_scope"}, False)
+        settings_all_domains = dbclient.findInDb(self.pentest,"settings", {"key":"include_all_domains"}, False)
+        settings_top_domain = dbclient.findInDb(self.pentest, "settings", {"key":"include_domains_with_topdomain_in_scope"}, False)
         if isNetworkIp(scope):
             if Ip.checkIpScope(scope, self.ip):
                 return True

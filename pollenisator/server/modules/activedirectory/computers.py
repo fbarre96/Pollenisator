@@ -2,7 +2,7 @@
 
 from __future__ import absolute_import
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.logger_config import logger
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.servermodels.command import ServerCommand
@@ -52,11 +52,11 @@ class Computer(ServerElement):
         self.admins = admins
         self.users = users
         self._infos = ComputerInfos(infos)
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.pentestName != "":
-            self.pentest = mongoInstance.pentestName
+        elif dbclient.pentestName != "":
+            self.pentest = dbclient.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
     
@@ -72,9 +72,9 @@ class Computer(ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         pipeline["type"] = "computer"
-        ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
+        ds = dbclient.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
             return None
         for d in ds:
@@ -90,8 +90,8 @@ class Computer(ServerElement):
             Returns a cursor to iterate on model objects
         """
         pipeline["type"] = "computer"
-        mongoInstance = MongoClient.getInstance()
-        d = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
+        dbclient = DBClient.getInstance()
+        d = dbclient.findInDb(pentest, cls.coll_name, pipeline, False)
         if d is None:
             return None
         return cls(pentest, d)
@@ -185,11 +185,11 @@ def delete(pentest, computer_iid):  # noqa: E501
 
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
-    mongoInstance = MongoClient.getInstance()
-    share_dic = mongoInstance.findInDb(pentest, "ActiveDirectory", {"_id":ObjectId(computer_iid), "type":"computer"}, False)
+    dbclient = DBClient.getInstance()
+    share_dic = dbclient.findInDb(pentest, "ActiveDirectory", {"_id":ObjectId(computer_iid), "type":"computer"}, False)
     if share_dic is None:
         return 0
-    res = mongoInstance.deleteFromDb(pentest, "ActiveDirectory", {"_id": ObjectId(computer_iid), "type":"computer"}, False)
+    res = dbclient.deleteFromDb(pentest, "ActiveDirectory", {"_id": ObjectId(computer_iid), "type":"computer"}, False)
     if res is None:
         return 0
     else:
@@ -211,7 +211,7 @@ def update(pentest, computer_iid, body):  # noqa: E501
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     computer = Computer(pentest, body) 
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     existing = Computer.fetchObject(pentest, {"_id": ObjectId(computer_iid)})
     if computer.ip != existing.ip:
         return "Forbidden", 403
@@ -224,7 +224,7 @@ def update(pentest, computer_iid, body):  # noqa: E501
         domain = domain.lower()
         body["domain"] = domain
     if domain is not None and domain != "":
-        existingDomain = mongoInstance.findInDb(pentest, 
+        existingDomain = dbclient.findInDb(pentest, 
              "ActiveDirectory", {"type":"computer", "domain":domain}, False)
         if existingDomain is None:
             computer.addCheck("AD:onNewDomainDiscovered", {"domain":domain})
@@ -234,7 +234,7 @@ def update(pentest, computer_iid, body):  # noqa: E501
         for user in existing.users:
             existing.addCheck("AD:onNewUserOnDC", {"user":user[-1]})
 
-    mongoInstance.updateInDb(pentest, "ActiveDirectory", {"_id": ObjectId(computer_iid), "type":"computer"}, {"$set": body}, False, True)
+    dbclient.updateInDb(pentest, "ActiveDirectory", {"_id": ObjectId(computer_iid), "type":"computer"}, {"$set": body}, False, True)
     return True
 
 @permission("pentester")
@@ -251,8 +251,8 @@ def insert(pentest, body):  # noqa: E501
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     computer = Computer(pentest, body)
-    mongoInstance = MongoClient.getInstance()
-    existing = mongoInstance.findInDb(pentest, 
+    dbclient = DBClient.getInstance()
+    existing = dbclient.findInDb(pentest, 
         "ActiveDirectory", {"type":"computer", "ip":computer.ip}, False)
     if existing is not None:
         return {"res": False, "iid": existing["_id"]}
@@ -264,11 +264,11 @@ def insert(pentest, body):  # noqa: E501
         domain = domain.lower()
         body["domain"] = domain
     if domain is not None and domain != "":
-        existingDomain = mongoInstance.findInDb(pentest, 
+        existingDomain = dbclient.findInDb(pentest, 
              "ActiveDirectory", {"type":"computer", "domain":domain.lower()}, False)
         if existingDomain is None:
             computer.addCheck("AD:onNewDomainDiscovered", {"domain":domain.lower()})
-    ins_result = mongoInstance.insertInDb(pentest, 
+    ins_result = dbclient.insertInDb(pentest, 
         "ActiveDirectory", body, True)
     
 
@@ -277,14 +277,14 @@ def insert(pentest, body):  # noqa: E501
 
 @permission("pentester")
 def getUsers(pentest, computer_iid):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     computer_m = Computer.fetchObject(pentest, {"_id":ObjectId(computer_iid)})
     if computer_m is None:
         return "Not found", 404
-    users = mongoInstance.findInDb(pentest, "ActiveDirectory", { "type":"user", "_id" : { "$in" : [ObjectId(x) for x in computer_m.users ]} } , multi=True)
+    users = dbclient.findInDb(pentest, "ActiveDirectory", { "type":"user", "_id" : { "$in" : [ObjectId(x) for x in computer_m.users ]} } , multi=True)
     if users is None:
         users = []
-    admins = mongoInstance.findInDb(pentest, "ActiveDirectory", { "type":"user", "_id" : { "$in" : [ObjectId(x) for x in computer_m.admins ]} }, multi=True)
+    admins = dbclient.findInDb(pentest, "ActiveDirectory", { "type":"user", "_id" : { "$in" : [ObjectId(x) for x in computer_m.admins ]} }, multi=True)
     if admins is None:
         admins = []
     return {"users":list(users), "admins":list(admins)}

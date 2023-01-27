@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.servermodels.tool import ServerTool
 from pollenisator.server.permission import permission
@@ -30,11 +30,11 @@ class AuthInfo(ServerElement):
         self.name = name
         self.value = value
         self.type = type
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.pentestName != "":
-            self.pentest = mongoInstance.pentestName
+        elif dbclient.pentestName != "":
+            self.pentest = dbclient.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         return self
@@ -63,11 +63,11 @@ def insert(pentest, body):
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     auth = AuthInfo(pentest, body)
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     if "_id" in body:
         del body["_id"]
     
-    ins_result = mongoInstance.insertInDb(pentest,
+    ins_result = dbclient.insertInDb(pentest,
         AuthInfo.coll_name, body, True)
     iid = ins_result.inserted_id
     return {"res": True, "iid": iid}
@@ -75,13 +75,13 @@ def insert(pentest, body):
 @permission("pentester")
 def link(pentest, auth_iid, object_iid):
     #TODO swap to add checks
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     lookup = { "scopes":"network", "ips":"ip","ports":"port","waves":"wave"}
     lvl_found = None
     collection_found = None
     object_found = None
     for collection,lvl in lookup.items():
-        res = mongoInstance.findInDb(pentest, collection, {"_id":ObjectId(object_iid)}, False)
+        res = dbclient.findInDb(pentest, collection, {"_id":ObjectId(object_iid)}, False)
         if res is not None:
             lvl_found = lvl
             object_found = res
@@ -89,7 +89,7 @@ def link(pentest, auth_iid, object_iid):
             break
     if lvl_found is None:
         return "Object to link must be an existing wave,scope,ip or port", 400
-    auth_d = mongoInstance.findInDb(pentest, AuthInfo.coll_name, {"_id":ObjectId(auth_iid)}, False)
+    auth_d = dbclient.findInDb(pentest, AuthInfo.coll_name, {"_id":ObjectId(auth_iid)}, False)
     if auth_d is None:
         return f"Authentication info with iid {str(auth_iid)} was not found", 404
     if auth_d["type"].lower() == "cookie":
@@ -97,8 +97,8 @@ def link(pentest, auth_iid, object_iid):
     if auth_d["type"].lower() == "password":
         command_lvl = "auth:password"
     object_found["infos"]["auth_cookie"] = auth_d["name"]+"="+auth_d["value"]+";"
-    mongoInstance.updateInDb(pentest, collection_found, {"_id":ObjectId(object_found["_id"])}, {"$set":object_found})
-    commands = mongoInstance.findInDb(pentest, "commands", {"lvl":command_lvl}, multi=True)
+    dbclient.updateInDb(pentest, collection_found, {"_id":ObjectId(object_found["_id"])}, {"$set":object_found})
+    commands = dbclient.findInDb(pentest, "commands", {"lvl":command_lvl}, multi=True)
     if commands is None:
         return "No command found", 404
     for command in commands:

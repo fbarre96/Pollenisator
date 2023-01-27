@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.servermodels.tool import ServerTool
 from pollenisator.server.servermodels.command import ServerCommand
@@ -12,11 +12,11 @@ class CheckInstance(ServerElement):
 
     
     def __init__(self, pentest, valuesFromDb=None):
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.pentestName != "":
-            self.pentest = mongoInstance.pentestName
+        elif dbclient.pentestName != "":
+            self.pentest = dbclient.pentestName
         else:
             raise ValueError(
                 "An empty pentest name was given and the database is not set in mongo instance.")
@@ -37,11 +37,11 @@ class CheckInstance(ServerElement):
         self.target_type = target_type
         self.status = status
         self.notes = notes
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.pentestName != "":
-            self.pentest = mongoInstance.pentestName
+        elif dbclient.pentestName != "":
+            self.pentest = dbclient.pentestName
         else:
             raise ValueError(
                 "An empty pentest name was given and the database is not set in mongo instance.")
@@ -55,9 +55,9 @@ class CheckInstance(ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         pipeline["type"] = "checkinstance"
-        ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
+        ds = dbclient.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
             return None
         for d in ds:
@@ -72,9 +72,9 @@ class CheckInstance(ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         pipeline["type"] = "checkinstance"
-        d = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
+        d = dbclient.findInDb(pentest, cls.coll_name, pipeline, False)
         if d is None:
             return None
         return cls(pentest, d)
@@ -144,19 +144,19 @@ class CheckInstance(ServerElement):
 def doInsert(pentest, data, checkItem=None, toolInfos=None):
     if "_id" in data:
         del data["_id"]
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     data["type"] = "checkinstance"
     existing = CheckInstance.fetchObject(pentest, {"check_iid": str(data["check_iid"]), "target_iid": data.get(
         "target_iid", ""), "target_type": data.get("target_type", "")})
     if existing is not None:
         return {"res": False, "iid": existing.getId()}
-    ins_result = mongoInstance.insertInDb(
+    ins_result = dbclient.insertInDb(
         pentest, CheckInstance.coll_name, data, True)
     iid = ins_result.inserted_id
     if checkItem is None or str(checkItem._id) != str(data["check_iid"]):
         checkItem = CheckItem.fetchObject(
             {"_id": ObjectId(str(data["check_iid"]))})
-    target = mongoInstance.findInDb(pentest, data["target_type"], {
+    target = dbclient.findInDb(pentest, data["target_type"], {
                                     "_id": ObjectId(str(data["target_iid"]))}, False)
     if target is None:
         return "Invalid target not found", 404
@@ -191,17 +191,17 @@ def insert(pentest, body):
 def delete(pentest, iid):
     """delete cheatsheet item
     """
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     if pentest == "pollenisator":
         return "Forbidden", 403
     existing = CheckInstance.fetchObject(pentest, {"_id": ObjectId(iid)})
     if existing is None:
         return "Not found", 404
     # delete tools
-    mongoInstance.deleteFromDb(
+    dbclient.deleteFromDb(
         pentest, 'tools', {"check_iid": ObjectId(iid)}, many=True, notify=True)
 
-    res = mongoInstance.deleteFromDb(pentest, CheckInstance.coll_name, {
+    res = dbclient.deleteFromDb(pentest, CheckInstance.coll_name, {
                                      "_id": ObjectId(iid)}, many=False, notify=True)
     if res is None:
         return 0
@@ -213,7 +213,7 @@ def update(pentest, iid, body):
     if pentest == "pollenisator":
         return "Forbidden", 403
     checkinstance = CheckInstance(pentest, body)
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     existing = CheckInstance.fetchObject(pentest, {"_id": ObjectId(iid)})
     if existing is None:
         return "Not found", 404
@@ -226,7 +226,7 @@ def update(pentest, iid, body):
     if "_id" in body:
         del body["_id"]
 
-    mongoInstance.updateInDb(pentest, CheckInstance.coll_name, {"_id": ObjectId(
+    dbclient.updateInDb(pentest, CheckInstance.coll_name, {"_id": ObjectId(
         iid), "type": "checkinstance"}, {"$set": body}, many=False, notify=True)
     return True
 

@@ -6,7 +6,7 @@ from flask import send_file
 import tempfile
 import re
 import shutil
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.parser import Parser, ParseError, Term
 from pollenisator.core.components.utils import JSONDecoder, getMainDir, isIp, JSONEncoder
 from pollenisator.core.controllers.wavecontroller import WaveController
@@ -16,7 +16,7 @@ from pollenisator.server.servermodels.wave import ServerWave, insert as insert_w
 from pollenisator.server.servermodels.interval import ServerInterval, insert as insert_interval
 from pollenisator.server.servermodels.scope import insert as insert_scope
 from pollenisator.server.permission import permission
-mongoInstance = MongoClient.getInstance()
+dbclient = DBClient.getInstance()
 
 searchable_collections = ["waves","scopes","ips","ports","tools","defects"]
 validCollections = [ "cheatsheet", "commands", "settings"]
@@ -25,8 +25,8 @@ operato_trans = {
     }
 
 def status():
-    mongoInstance.connect()
-    return mongoInstance.client != None
+    dbclient.connect()
+    return dbclient.client != None
 
 def getVersion():
     # TODO : return connexion openapi version instead
@@ -51,10 +51,10 @@ def update(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in mongoInstance.listPentestNames():
+    elif pentest not in dbclient.listPentestNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
     
-    mongoInstance.updateInDb(pentest, collection, pipeline, updatePipeline, body["many"], body["notify"], body.get("upsert", False))
+    dbclient.updateInDb(pentest, collection, pipeline, updatePipeline, body["many"], body["notify"], body.get("upsert", False))
     return True
 
 @permission("pentester")
@@ -67,9 +67,9 @@ def insert(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in mongoInstance.listPentestNames():
+    elif pentest not in dbclient.listPentestNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
-    res = mongoInstance.insertInDb(pentest, collection, pipeline, body["parent"], body["notify"])
+    res = dbclient.insertInDb(pentest, collection, pipeline, body["parent"], body["notify"])
     return str(res.inserted_id)
 
 @permission("pentester")
@@ -82,9 +82,9 @@ def find(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in mongoInstance.listPentestNames():
+    elif pentest not in dbclient.listPentestNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
-    res = mongoInstance.findInDb(pentest, collection, pipeline, body.get("many", True), body.get("skip", None), body.get("limit", None))
+    res = dbclient.findInDb(pentest, collection, pipeline, body.get("many", True), body.get("skip", None), body.get("limit", None))
     if isinstance(res, dict):
         return res
     elif res is None:
@@ -101,7 +101,7 @@ def search(pentest, s):
     """Use a parser to convert the search query into mongo queries and returns all matching objects
     """
     searchQuery = s
-    if pentest not in mongoInstance.listPentestNames():
+    if pentest not in dbclient.listPentestNames():
         return "Pentest argument is not a valid pollenisator pentest", 400
     try:
         parser = Parser(searchQuery)
@@ -115,7 +115,7 @@ def search(pentest, s):
         list_of_objects = {}
         for collection in collections:
             list_of_objects[collection] = []
-            res = mongoInstance.findInDb(pentest, collection, builtPipeline, True)
+            res = dbclient.findInDb(pentest, collection, builtPipeline, True)
             if res is None:
                 continue
             for elem in res:
@@ -191,14 +191,14 @@ def count(pentest, collection, body):
             return "Collection argument is not a valid pollenisator collection", 403
     if not isinstance(pipeline, dict):
         return "Pipeline argument was not valid", 400
-    elif pentest not in mongoInstance.listPentestNames():
+    elif pentest not in dbclient.listPentestNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
-    res = mongoInstance.countInDb(pentest, collection, pipeline)
+    res = dbclient.countInDb(pentest, collection, pipeline)
     return res
 
 @permission("pentester")
 def fetchNotifications(pentest, fromTime):
-    res = mongoInstance.fetchNotifications(pentest, fromTime)
+    res = dbclient.fetchNotifications(pentest, fromTime)
     if res is None:
         return []
     return [n for n in res]
@@ -209,9 +209,9 @@ def aggregate(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in mongoInstance.listPentestNames():
+    elif pentest not in dbclient.listPentestNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
-    res = mongoInstance.aggregateFromDb(pentest, collection, body)
+    res = dbclient.aggregateFromDb(pentest, collection, body)
     for r in res:
         ret.append(r)
     return ret
@@ -226,9 +226,9 @@ def delete(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in mongoInstance.listPentestNames():
+    elif pentest not in dbclient.listPentestNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
-    res = mongoInstance.deleteFromDb(pentest, collection, pipeline, body["many"], body["notify"])
+    res = dbclient.deleteFromDb(pentest, collection, pipeline, body["many"], body["notify"])
     if res is None:
         return
     else:
@@ -243,7 +243,7 @@ def bulk_delete(pentest, body):
         return "body was not a valid dictionnary", 400
     if pentest == "pollenisator":
         return "Impossible to bulk delete in this database", 403
-    elif pentest not in mongoInstance.listPentestNames():
+    elif pentest not in dbclient.listPentestNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
     deleted = 0
     for obj_type in data:
@@ -251,7 +251,7 @@ def bulk_delete(pentest, body):
             if not isinstance(obj_id, ObjectId):
                 if obj_id.startswith("ObjectId|"):
                     obj_id = ObjectId(obj_id.split("ObjectId|")[1])
-            res = mongoInstance.deleteFromDb(pentest, obj_type, {"_id": ObjectId(obj_id)}, False, True)
+            res = dbclient.deleteFromDb(pentest, obj_type, {"_id": ObjectId(obj_id)}, False, True)
             if res is not None:
                 deleted += res.deleted_count
     return deleted
@@ -272,7 +272,7 @@ def bulk_delete_commands(body, **kwargs):
             if not isinstance(obj_id, ObjectId):
                 if obj_id.startswith("ObjectId|"):
                     obj_id = ObjectId(obj_id.split("ObjectId|")[1])
-            res = mongoInstance.deleteFromDb("pollenisator", obj_type, {"_id": ObjectId(obj_id)}, False, True)
+            res = dbclient.deleteFromDb("pollenisator", obj_type, {"_id": ObjectId(obj_id)}, False, True)
             if res is not None:
                 deleted += res.deleted_count
     return deleted
@@ -282,14 +282,14 @@ def listPentests(**kwargs):
     username = kwargs["token_info"]["sub"]
     if "admin" in kwargs["token_info"]["scope"]:
         username = None
-    ret = mongoInstance.listPentests(username)
+    ret = dbclient.listPentests(username)
     if ret:
         return ret
     else:
         return []
 
 def deletePentestFiles(pentest):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     local_path = os.path.join(getMainDir(), "files")
     proofspath = os.path.join(local_path, pentest, "proof")
     if os.path.isdir(proofspath):
@@ -301,9 +301,9 @@ def deletePentestFiles(pentest):
 @permission("user")
 def deletePentest(pentest, **kwargs):
     username = kwargs["token_info"]["sub"]
-    if username != mongoInstance.getPentestOwner(pentest) and "admin" not in kwargs["token_info"]["scope"]:
+    if username != dbclient.getPentestOwner(pentest) and "admin" not in kwargs["token_info"]["scope"]:
         return "Forbidden", 403
-    ret = mongoInstance.doDeletePentest(pentest)
+    ret = dbclient.doDeletePentest(pentest)
     if ret:
         deletePentestFiles(pentest)
         return "Successful deletion"
@@ -313,7 +313,7 @@ def deletePentest(pentest, **kwargs):
 @permission("user")
 def registerPentest(pentest, body, **kwargs):
     username = kwargs["token_info"]["sub"]
-    ret, msg = mongoInstance.registerPentest(username, pentest, False, False)
+    ret, msg = dbclient.registerPentest(username, pentest, False, False)
     
     if ret:
         #token = connectToPentest(pentest, **kwargs)
@@ -338,7 +338,7 @@ def preparePentest(dbName, pentest_type, start_date, end_date, scope, settings, 
             * "Add all domains found":  Unsafe. if 1, all new domains found by tools will be considered in scope.
     """
     user = kwargs["token_info"]["sub"]
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
 
     addUserCommandsToPentest(dbName, user)  
     #addCheckInstancesToPentest(dbName, pentest_type)
@@ -362,17 +362,17 @@ def preparePentest(dbName, pentest_type, start_date, end_date, scope, settings, 
                 insert_scope(dbName, {"wave":dbName, "scope":scope_item.strip()+"/32"})
             else:
                 insert_scope(dbName, {"wave":dbName, "scope":scope_item.strip()})
-    mongoInstance.insertInDb(dbName, "settings", {"key":"pentest_type", "value":pentest_type}, notify=False)
-    mongoInstance.insertInDb(dbName, "settings", {"key":"include_domains_with_ip_in_scope", "value": settings['Add domains whose IP are in scope'] == 1}, notify=False)
-    mongoInstance.insertInDb(dbName, "settings", {"key":"include_domains_with_topdomain_in_scope", "value":settings["Add domains who have a parent domain in scope"] == 1}, notify=False)
-    mongoInstance.insertInDb(dbName, "settings", {"key":"include_all_domains", "value":settings["Add all domains found"] == 1}, notify=False)
+    dbclient.insertInDb(dbName, "settings", {"key":"pentest_type", "value":pentest_type}, notify=False)
+    dbclient.insertInDb(dbName, "settings", {"key":"include_domains_with_ip_in_scope", "value": settings['Add domains whose IP are in scope'] == 1}, notify=False)
+    dbclient.insertInDb(dbName, "settings", {"key":"include_domains_with_topdomain_in_scope", "value":settings["Add domains who have a parent domain in scope"] == 1}, notify=False)
+    dbclient.insertInDb(dbName, "settings", {"key":"include_all_domains", "value":settings["Add all domains found"] == 1}, notify=False)
     pentester_list = list(map(lambda x: x.strip(), pentesters.replace("\n",",").split(",")))
     pentester_list.insert(0, owner)
-    mongoInstance.insertInDb(dbName, "settings", {"key":"pentesters", "value": pentester_list}, notify=False)
+    dbclient.insertInDb(dbName, "settings", {"key":"pentesters", "value": pentester_list}, notify=False)
 
 @permission("user")
 def getSettings():
-    res = mongoInstance.findInDb("pollenisator", "settings", {}, True)
+    res = dbclient.findInDb("pollenisator", "settings", {}, True)
     if res is None:
         return []
     return [s for s in res]
@@ -383,13 +383,13 @@ def getSetting(pipeline):
         pipeline = json.loads(pipeline, cls=JSONDecoder)
     if not isinstance(pipeline, dict):
         return "Pipeline argument was not valid", 400
-    return mongoInstance.findInDb("pollenisator", "settings", pipeline, False)
+    return dbclient.findInDb("pollenisator", "settings", pipeline, False)
 
 @permission("admin")
 def createSetting(body):
     key = body['key']
     value = body["value"]
-    res = mongoInstance.insertInDb("pollenisator", "settings", {"key":key, "value":value})
+    res = dbclient.insertInDb("pollenisator", "settings", {"key":key, "value":value})
     if res:
         return True
     return False
@@ -398,7 +398,7 @@ def createSetting(body):
 def updateSetting(body):
     key = body['key']
     value = body["value"]
-    mongoInstance.updateInDb("pollenisator", "settings", {
+    dbclient.updateInDb("pollenisator", "settings", {
                     "key": key}, {"$set": {"value": value}})
     return True
 
@@ -408,20 +408,20 @@ def updateSetting(body):
 def registerTag(pentest, body):
     name = body["name"]
     color = body["color"]
-    return mongoInstance.doRegisterTag(pentest, name, color)
+    return dbclient.doRegisterTag(pentest, name, color)
 
 @permission("pentester", "body.pentest")
 def unregisterTag(body):
     name = body["name"]
     pentest = body.get("pentest", "pollenisator")
     if pentest == "pollenisator":
-        tags = json.loads(mongoInstance.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=JSONDecoder)
+        tags = json.loads(dbclient.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=JSONDecoder)
         val = tags.pop(name, None)
         if val is None:
             return 404, "Not found"
-        mongoInstance.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=JSONEncoder)}}, many=False, notify=True)
+        dbclient.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=JSONEncoder)}}, many=False, notify=True)
     else:
-        tags = mongoInstance.find("settings", {"key":"tags"}, False)
+        tags = dbclient.find("settings", {"key":"tags"}, False)
         if tags is None:
             return 404, "Not found"
         else:
@@ -429,11 +429,11 @@ def unregisterTag(body):
             val = tags.pop(name, None)
             if val is None:
                 return 404, "Not found"
-            mongoInstance.updateInDb(pentest, "settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
-            mongoInstance.updateInDb(pentest, "scopes", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
-            mongoInstance.updateInDb(pentest, "ips", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
-            mongoInstance.updateInDb(pentest, "ports", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
-            mongoInstance.updateInDb(pentest, "tools", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
+            dbclient.updateInDb(pentest, "settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
+            dbclient.updateInDb(pentest, "scopes", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
+            dbclient.updateInDb(pentest, "ips", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
+            dbclient.updateInDb(pentest, "ports", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
+            dbclient.updateInDb(pentest, "tools", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
     return True
 
 @permission("pentester")
@@ -441,7 +441,7 @@ def updatePentestTag(pentest, body):
     name = body["name"]
     color = body["color"]
     
-    tags = mongoInstance.findInDb(pentest, "settings", {"key":"tags"}, False)
+    tags = dbclient.findInDb(pentest, "settings", {"key":"tags"}, False)
     if tags is None:
         return "Not found", 404
     else:
@@ -449,17 +449,17 @@ def updatePentestTag(pentest, body):
         if name not in tags:
             return  "Not found", 404
         tags[name] = color
-        mongoInstance.updateInDb(pentest, "settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
+        dbclient.updateInDb(pentest, "settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
 
 @permission("user")
 def updateTag(body):
     name = body["name"]
     color = body["color"]
-    tags = json.loads(mongoInstance.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=JSONDecoder)
+    tags = json.loads(dbclient.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=JSONDecoder)
     if name not in tags:
         return "Not found", 404
     tags[name] = color
-    mongoInstance.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=JSONEncoder)}}, many=False, notify=True)
+    dbclient.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=JSONEncoder)}}, many=False, notify=True)
 
     return True
 
@@ -473,12 +473,12 @@ def dumpDb(dbName, collection=""):
         dbName: the database name to dump
         collection: (Opt.) the collection to dump.
     """
-    if dbName != "pollenisator" and dbName not in mongoInstance.listPentestNames():
+    if dbName != "pollenisator" and dbName not in dbclient.listPentestNames():
         return "Database not found", 404
 
-    if collection != "" and collection not in mongoInstance.db.collection_names():
+    if collection != "" and collection not in dbclient.db.collection_names():
         return "Collection not found in database provided", 404
-    path = mongoInstance.dumpDb(dbName, collection)
+    path = dbclient.dumpDb(dbName, collection)
     if not os.path.isfile(path):
         return "Failed to export database", 503
     try:
@@ -492,7 +492,7 @@ def importDb(upfile, **kwargs):
     tmpfile = os.path.join(dirpath, os.path.basename(upfile.filename))
     with open(tmpfile, "wb") as f:
         f.write(upfile.stream.read())
-    success = mongoInstance.importDatabase(username, tmpfile)
+    success = dbclient.importDatabase(username, tmpfile)
     shutil.rmtree(dirpath)
     return success
 
@@ -530,9 +530,9 @@ def importCommands(upfile, **kwargs):
     return doImportCommands(data, user)
     
 def doExportCommands():
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     res = {"commands":[]}
-    commands = mongoInstance.findInDb("pollenisator", "commands", {}, True)
+    commands = dbclient.findInDb("pollenisator", "commands", {}, True)
     for command in commands:
         c = command
         del c["owners"]
@@ -551,4 +551,4 @@ def exportCommands(**kwargs):
 def copyDb(body):
     toCopyName = body["toDb"]
     fromCopyName = body["fromDb"]
-    return mongoInstance.copyDb(fromCopyName, toCopyName)
+    return dbclient.copyDb(fromCopyName, toCopyName)

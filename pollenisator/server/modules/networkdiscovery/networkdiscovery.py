@@ -1,5 +1,5 @@
 from pollenisator.server.permission import permission
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.server.servermodels.command import ServerCommand
 from pollenisator.server.servermodels.scope import ServerScope
 #from pollenisator.server.servermodels.tool import ServerTool, delete as tool_delete
@@ -17,16 +17,16 @@ def getModuleInfo():
 
 @permission("pentester")
 def addRangeMatchingIps(pentest):
-    mongoInstance = MongoClient.getInstance()
-    #mongoInstance.find("settings", {"key":"network_discovery_"})
-    ips = mongoInstance.findInDb(pentest, "ips", {})
+    dbclient = DBClient.getInstance()
+    #dbclient.find("settings", {"key":"network_discovery_"})
+    ips = dbclient.findInDb(pentest, "ips", {})
     if ips is None:
         ips = []
     networks = set()
     for ip in ips:
         networks.add(str(ipaddress.IPv4Network(f'{ip.ip}/255.255.255.0', strict=False)))
     if networks:
-        wave = mongoInstance.findInDb(pentest, "waves", {"wave":{"$ne":"Imported"}}, False)
+        wave = dbclient.findInDb(pentest, "waves", {"wave":{"$ne":"Imported"}}, False)
         for net in networks:
             ServerScope(pentest).initialize(wave["wave"], scope=str(net)).addInDb()
             #insertNetwork(pentest, net)
@@ -34,10 +34,10 @@ def addRangeMatchingIps(pentest):
 
 @permission("pentester")
 def addRangeCloseToOthers(pentest):
-    mongoInstance = MongoClient.getInstance()
-    #mongoInstance.find("settings", {"key":"network_discovery_"})
-    wave = mongoInstance.findInDb(pentest, "waves", {"wave":{"$ne":"Imported"}}, False)
-    real_networks = mongoInstance.aggregateFromDb(pentest, "ips", [
+    dbclient = DBClient.getInstance()
+    #dbclient.find("settings", {"key":"network_discovery_"})
+    wave = dbclient.findInDb(pentest, "waves", {"wave":{"$ne":"Imported"}}, False)
+    real_networks = dbclient.aggregateFromDb(pentest, "ips", [
         {
             '$unwind': {
                 'path': '$in_scopes', 
@@ -52,7 +52,7 @@ def addRangeCloseToOthers(pentest):
         }
     ])
     for real_network in real_networks:
-        scope_d = mongoInstance.findInDb(pentest, "scopes", {"_id":ObjectId(real_network["_id"]["in_scopes"])}, False)
+        scope_d = dbclient.findInDb(pentest, "scopes", {"_id":ObjectId(real_network["_id"]["in_scopes"])}, False)
         try:
             net = IPNetwork(scope_d["scope"])
         except:
@@ -65,16 +65,16 @@ def addRangeCloseToOthers(pentest):
 
 @permission("pentester")
 def addCommonRanges(pentest):
-    mongoInstance = MongoClient.getInstance()
-    wave = mongoInstance.findInDb(pentest, "waves", {"wave":{"$ne":"Imported"}}, False)
+    dbclient = DBClient.getInstance()
+    wave = dbclient.findInDb(pentest, "waves", {"wave":{"$ne":"Imported"}}, False)
     for common in COMMONS:
         ServerScope(pentest).initialize(wave["wave"], scope=str(common)).addInDb()
     return "OK"
 
 @permission("pentester")
 def addAllLANRanges(pentest):
-    mongoInstance = MongoClient.getInstance()
-    wave = mongoInstance.findInDb(pentest, "waves", {"wave":{"$ne":"Imported"}}, False)
+    dbclient = DBClient.getInstance()
+    wave = dbclient.findInDb(pentest, "waves", {"wave":{"$ne":"Imported"}}, False)
     net = IPNetwork("10.0.0.0/8")
     subnets = list(net.subnet(16))
     net = IPNetwork("192.168.0.0/16")

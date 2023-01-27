@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.wave import Wave
 from pollenisator.server.servermodels.tool import ServerTool
 from pollenisator.server.servermodels.scope import ServerScope
@@ -15,11 +15,11 @@ class ServerWave(Wave, ServerElement):
 
     def __init__(self, pentest="", *args, **kwargs):
         super().__init__(*args, **kwargs)
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.pentestName != "":
-            self.pentest = mongoInstance.pentestName
+        elif dbclient.pentestName != "":
+            self.pentest = dbclient.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
 
@@ -43,7 +43,7 @@ class ServerWave(Wave, ServerElement):
         Args:
             command_name: The command that we want to remove all the tools.
         """
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         tools = ServerTool.fetchObjects(self.pentest, {"name": command_name, "wave": self.wave})
         for tool in tools:
             if "done" not in tool.getStatus():
@@ -51,15 +51,15 @@ class ServerWave(Wave, ServerElement):
 
 @permission("pentester")
 def delete(pentest, wave_iid):
-    mongoInstance = MongoClient.getInstance()
-    wave_o = ServerWave(pentest, mongoInstance.findInDb(pentest, "waves", {"_id": ObjectId(wave_iid)}, False))
-    mongoInstance.deleteFromDb(pentest, "tools", {"wave": wave_o.wave}, True)
-    mongoInstance.deleteFromDb(pentest, "intervals", {"wave": wave_o.wave}, True)
-    checks = mongoInstance.findInDb(pentest, "cheatsheet",
+    dbclient = DBClient.getInstance()
+    wave_o = ServerWave(pentest, dbclient.findInDb(pentest, "waves", {"_id": ObjectId(wave_iid)}, False))
+    dbclient.deleteFromDb(pentest, "tools", {"wave": wave_o.wave}, True)
+    dbclient.deleteFromDb(pentest, "intervals", {"wave": wave_o.wave}, True)
+    checks = dbclient.findInDb(pentest, "cheatsheet",
                                 {"target_iid": str(wave_iid)}, True)
     for check in checks:
         checkinstance_delete(pentest, check["_id"])
-    res = mongoInstance.deleteFromDb(pentest, "waves", {"_id": ObjectId(wave_iid)}, False)
+    res = dbclient.deleteFromDb(pentest, "waves", {"_id": ObjectId(wave_iid)}, False)
     
     if res is None:
         return 0
@@ -68,16 +68,16 @@ def delete(pentest, wave_iid):
     
 @permission("pentester")
 def insert(pentest, body):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     wave_o = ServerWave(pentest, body)
     # Checking unicity
-    existing = mongoInstance.findInDb(pentest, "waves", {"wave": wave_o.wave}, False)
+    existing = dbclient.findInDb(pentest, "waves", {"wave": wave_o.wave}, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
     if "_id" in body:
         del body["_id"]
     # Inserting scope
-    res_insert = mongoInstance.insertInDb(pentest, "waves", {"wave": wave_o.wave, "wave_commands": list(wave_o.wave_commands)})
+    res_insert = dbclient.insertInDb(pentest, "waves", {"wave": wave_o.wave, "wave_commands": list(wave_o.wave_commands)})
     ret = res_insert.inserted_id
     wave_o._id = ret
     wave_o.addAllChecks()
@@ -85,19 +85,19 @@ def insert(pentest, body):
 
 @permission("pentester")
 def update(pentest, wave_iid, body):
-    mongoInstance = MongoClient.getInstance()
-    oldWave_o = ServerWave(pentest, mongoInstance.findInDb(pentest, "waves", {"_id":ObjectId(wave_iid)}, False))
+    dbclient = DBClient.getInstance()
+    oldWave_o = ServerWave(pentest, dbclient.findInDb(pentest, "waves", {"_id":ObjectId(wave_iid)}, False))
     oldCommands = oldWave_o.wave_commands
     wave_commands = body["wave_commands"]
-    mongoInstance.updateInDb(pentest, "waves", {"_id":ObjectId(wave_iid)}, {"$set":body}, False, True)
+    dbclient.updateInDb(pentest, "waves", {"_id":ObjectId(wave_iid)}, {"$set":body}, False, True)
     
 
 def addUserCommandsToWave(pentest, wave_iid, user):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     
-    mycommands = mongoInstance.findInDb(pentest, "commands", {"owners":user}, True)
+    mycommands = dbclient.findInDb(pentest, "commands", {"owners":user}, True)
     comms = [command["_id"] for command in mycommands]
-    wave = mongoInstance.findInDb(pentest, "waves", {"_id":ObjectId(wave_iid)}, False)
+    wave = dbclient.findInDb(pentest, "waves", {"_id":ObjectId(wave_iid)}, False)
     if wave is None:
         return False
     wave["wave_commands"] += comms

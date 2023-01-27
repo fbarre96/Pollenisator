@@ -11,7 +11,7 @@ from pollenisator.core.components.logger_config import logger
 from bson import ObjectId
 
 
-class MongoClient:
+class DBClient:
     # pylint: disable=unsubscriptable-object
     """
     Centralize all direct contacts with the database.
@@ -23,16 +23,16 @@ class MongoClient:
         """ Singleton Static access method.
         """
         pid = os.getpid()  # HACK : One mongo per process.
-        instance = MongoClient.__instances.get(pid, None)
+        instance = DBClient.__instances.get(pid, None)
         if instance is None:
-            MongoClient()
-        return MongoClient.__instances[pid]
+            DBClient()
+        return DBClient.__instances[pid]
 
     def __init__(self):
         """ DO NOT USE THIS CONSTRUCTOR IT IS A
-        Virtually private constructor.  Use MongoClient.getInstance()
+        Virtually private constructor.  Use DBClient.getInstance()
         Args:
-            client: a MongoClient instance or None
+            client: a DBClient instance or None
             host: the host where the database is running
             user: a user login to the database
             password: a password corresponding with the user to connect to the database
@@ -45,7 +45,7 @@ class MongoClient:
             Exception if it is instanciated.
         """
         pid = os.getpid()  # HACK : One mongo per process.
-        if MongoClient.__instances.get(pid, None) is not None:
+        if DBClient.__instances.get(pid, None) is not None:
             raise Exception("This class is a singleton!")
         else:
             self.client = None
@@ -59,7 +59,7 @@ class MongoClient:
             self.db = None
             self.forbiddenNames = ["admin", "config", "local",
                                    "broker_pollenisator", "pollenisator"]
-            MongoClient.__instances[pid] = self
+            DBClient.__instances[pid] = self
 
     def reinitConnection(self):
         """Reset client connection"""
@@ -811,8 +811,8 @@ class MongoClient:
         return global_tags+pentest_tags
 
     def getGlobalTags(self):
-        mongoInstance = MongoClient.getInstance()
-        tags = mongoInstance.findInDb("pollenisator", "settings", {"key": "tags"}, False)
+        dbclient = DBClient.getInstance()
+        tags = dbclient.findInDb("pollenisator", "settings", {"key": "tags"}, False)
         if tags is not None:
             if isinstance(tags["value"], dict):
                 return tags["value"]
@@ -867,7 +867,7 @@ class MongoClient:
         #     {"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now()})
 
     def do_upload(self, pentest, attached_iid, filetype, upfile):
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         local_path = os.path.join(utils.getMainDir(), "files")
         try:
             os.makedirs(local_path)
@@ -875,7 +875,7 @@ class MongoClient:
             pass
         filepath = os.path.join(local_path, pentest, filetype, attached_iid)
         if filetype == "result":
-            res = mongoInstance.findInDb(pentest, "tools", {"_id": ObjectId(attached_iid)}, False)
+            res = dbclient.findInDb(pentest, "tools", {"_id": ObjectId(attached_iid)}, False)
             if res is None:
                 return "The given iid does not match an existing tool", 404, ""
             else:
@@ -884,7 +884,7 @@ class MongoClient:
                     for existing_file in files:
                         os.remove(os.path.join(filepath, files[0]))
         elif filetype == "proof":
-            res = mongoInstance.findInDb(pentest, "defects", {"_id": ObjectId(attached_iid)}, False)
+            res = dbclient.findInDb(pentest, "defects", {"_id": ObjectId(attached_iid)}, False)
             if res is None:
                 return "The given iid does not match an existing defect", 404, ""
         else:
@@ -901,5 +901,5 @@ class MongoClient:
         upfile.stream.seek(0)
         
         if filetype == "proof":
-            mongoInstance.updateInDb(pentest, "defects", {"_id": ObjectId(attached_iid)}, {"$push":{"proofs":name}})
+            dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(attached_iid)}, {"$push":{"proofs":name}})
         return name + " was successfully uploaded", 200, filepath

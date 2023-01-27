@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.scope import Scope
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance, delete as checkinstance_delete
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
@@ -13,25 +13,25 @@ from pollenisator.server.permission import permission
 class ServerScope(Scope, ServerElement):
     
     def __init__(self, pentest="", *args, **kwargs):
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         super().__init__(*args, **kwargs)
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.pentestName != "":
-            self.pentest = mongoInstance.pentestName
+        elif dbclient.pentestName != "":
+            self.pentest = dbclient.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
 
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
-        mongoInstance = MongoClient.getInstance()
-        results = mongoInstance.findInDb(pentest, "scopes", pipeline)
+        dbclient = DBClient.getInstance()
+        results = dbclient.findInDb(pentest, "scopes", pipeline)
         for result in results:
             yield(cls(pentest, result))
 
     def getParentId(self):
-        mongoInstance = MongoClient.getInstance()
-        res = mongoInstance.findInDb(self.pentest, "waves", {"wave": self.wave}, False)
+        dbclient = DBClient.getInstance()
+        res = dbclient.findInDb(self.pentest, "waves", {"wave": self.wave}, False)
         return res["_id"]
 
     def addInDb(self):
@@ -56,8 +56,8 @@ class ServerScope(Scope, ServerElement):
         Returns:
             A list ip IP dictionnary from mongo db
         """
-        mongoInstance = MongoClient.getInstance()
-        ips = mongoInstance.findInDb(self.pentest, "ips", )
+        dbclient = DBClient.getInstance()
+        ips = dbclient.findInDb(self.pentest, "ips", )
         ips_fitting = []
         isdomain = self.isDomain()
         for ip in ips:
@@ -79,22 +79,22 @@ class ServerScope(Scope, ServerElement):
         return ips_fitting
 @permission("pentester")
 def delete(pentest, scope_iid):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     # deleting checks with scope lvl
-    scope_o = ServerScope(pentest, mongoInstance.findInDb(pentest, "scopes", {"_id": ObjectId(scope_iid)}, False))
-    checks = mongoInstance.findInDb(pentest, "cheatsheet", {"target_iid": str(scope_iid), "target_type": "scopes"})
+    scope_o = ServerScope(pentest, dbclient.findInDb(pentest, "scopes", {"_id": ObjectId(scope_iid)}, False))
+    checks = dbclient.findInDb(pentest, "cheatsheet", {"target_iid": str(scope_iid), "target_type": "scopes"})
     for check in checks:
         checkinstance_delete(pentest, check["_id"])
     # Deleting this scope against every ips
     ips = ServerIp.getIpsInScope(pentest, scope_iid)
     for ip in ips:
         ip.removeScopeFitting(pentest, scope_iid)
-    res = mongoInstance.deleteFromDb(pentest, "scopes", {"_id": ObjectId(scope_iid)}, False)
+    res = dbclient.deleteFromDb(pentest, "scopes", {"_id": ObjectId(scope_iid)}, False)
     
-    parent_wave = mongoInstance.findInDb(pentest, "waves", {"wave": scope_o.wave}, False)
+    parent_wave = dbclient.findInDb(pentest, "waves", {"wave": scope_o.wave}, False)
     if parent_wave is None:
         return
-    mongoInstance.send_notify(pentest,
+    dbclient.send_notify(pentest,
                             "waves", parent_wave["_id"], "update", "")
     # Finally delete the selected element
     if res is None:
@@ -104,24 +104,24 @@ def delete(pentest, scope_iid):
         
 @permission("pentester")
 def insert(pentest, body):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     scope_o = ServerScope(pentest, body)
     # Checking unicity
     base = scope_o.getDbKey()
-    existing = mongoInstance.findInDb(pentest, "scopes", base, False)
+    existing = dbclient.findInDb(pentest, "scopes", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
     if "_id" in body:
         del body["_id"]
     # Inserting scope
     parent = scope_o.getParentId()
-    res_insert = mongoInstance.insertInDb(pentest, "scopes", base, parent)
+    res_insert = dbclient.insertInDb(pentest, "scopes", base, parent)
     ret = res_insert.inserted_id
     scope_o._id = ret
     # adding the appropriate checks for this scope.
     scope_o.addAllChecks()
     # Testing this scope against every ips
-    ips = mongoInstance.findInDb(pentest, "ips", {})
+    ips = dbclient.findInDb(pentest, "ips", {})
     for ip in ips:
         ip_o = ServerIp(pentest, ip)
         if scope_o._id not in ip_o.in_scopes:
@@ -131,6 +131,6 @@ def insert(pentest, body):
 
 @permission("pentester")
 def update(pentest, scope_iid, body):
-    mongoInstance = MongoClient.getInstance()
-    mongoInstance.updateInDb(pentest, "scopes", {"_id":ObjectId(scope_iid)}, {"$set":body}, False, True)
+    dbclient = DBClient.getInstance()
+    dbclient.updateInDb(pentest, "scopes", {"_id":ObjectId(scope_iid)}, {"$set":body}, False, True)
     return True

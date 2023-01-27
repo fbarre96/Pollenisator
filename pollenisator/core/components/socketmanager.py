@@ -20,7 +20,7 @@ class SocketManager:
 
     def __init__(self):
         """ DO NOT USE THIS CONSTRUCTOR IT IS A
-        Virtually private constructor.  Use MongoClient.getInstance()
+        Virtually private constructor.  Use DBClient.getInstance()
         Args:
            
         Raises:

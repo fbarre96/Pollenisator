@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from netaddr import IPNetwork, IPAddress
 from netaddr.core import AddrFormatError
 from pollenisator.core.models.ip import Ip
@@ -20,11 +20,11 @@ import json
 class ServerIp(Ip, ServerElement):
 
     def __init__(self, pentest="", *args, **kwargs):
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.pentestName != "":
-            self.pentest = mongoInstance.pentestName
+        elif dbclient.pentestName != "":
+            self.pentest = dbclient.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         super().__init__(*args, **kwargs)
@@ -54,8 +54,8 @@ class ServerIp(Ip, ServerElement):
             a list of scopes objects Mongo Ids where this IP/Domain is in scope.
         """
         ret = []
-        mongoInstance = MongoClient.getInstance()
-        scopes = mongoInstance.findInDb(self.pentest, "scopes", {})
+        dbclient = DBClient.getInstance()
+        scopes = dbclient.findInDb(self.pentest, "scopes", {})
         if scopes is None:
             return ret
         for scope in scopes:
@@ -71,8 +71,8 @@ class ServerIp(Ip, ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoClient.getInstance()
-        ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
+        dbclient = DBClient.getInstance()
+        ds = dbclient.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
             return None
         for d in ds:
@@ -87,8 +87,8 @@ class ServerIp(Ip, ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoClient.getInstance()
-        ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
+        dbclient = DBClient.getInstance()
+        ds = dbclient.findInDb(pentest, cls.coll_name, pipeline, False)
         if ds is None:
             return None
         return cls(pentest, ds) 
@@ -101,8 +101,8 @@ class ServerIp(Ip, ServerElement):
         Returns:
             a mongo cursor of IP objects matching the given scopeId
         """
-        mongoInstance = MongoClient.getInstance()
-        ips = mongoInstance.findInDb(pentest, "ips", {"in_scopes": {"$elemMatch": {"$eq": str(scopeId)}}})
+        dbclient = DBClient.getInstance()
+        ips = dbclient.findInDb(pentest, "ips", {"in_scopes": {"$elemMatch": {"$eq": str(scopeId)}}})
         for ip in ips:
             yield ServerIp(pentest, ip)
     
@@ -145,8 +145,8 @@ class ServerIp(Ip, ServerElement):
             return None
         ip_real = performLookUp(self.ip)
         if ip_real is not None:
-            mongoInstance = MongoClient.getInstance()
-            ip_in_db = mongoInstance.findInDb(self.pentest, "ips", {"ip": ip_real}, False)
+            dbclient = DBClient.getInstance()
+            ip_in_db = dbclient.findInDb(self.pentest, "ips", {"ip": ip_real}, False)
             if ip_in_db is None:
                 return None
             self.parent = ip_in_db["_id"]
@@ -174,27 +174,27 @@ class ServerIp(Ip, ServerElement):
 
 @permission("pentester")
 def delete(pentest, ip_iid):
-    mongoInstance = MongoClient.getInstance()
-    ip_dic = mongoInstance.findInDb(pentest, "ips", {"_id":ObjectId(ip_iid)}, False)
+    dbclient = DBClient.getInstance()
+    ip_dic = dbclient.findInDb(pentest, "ips", {"_id":ObjectId(ip_iid)}, False)
     if ip_dic is None:
         return 0
-    tools = mongoInstance.findInDb(pentest, "tools",
+    tools = dbclient.findInDb(pentest, "tools",
                                 {"ip": ip_dic["ip"]}, True)
     for tool in tools:
         tool_delete(pentest, tool["_id"])
-    checks = mongoInstance.findInDb(pentest, "cheatsheet",
+    checks = dbclient.findInDb(pentest, "cheatsheet",
                                 {"target_iid": str(ip_iid)}, True)
     for check in checks:
         checkinstance_delete(pentest, check["_id"])
-    defects = mongoInstance.findInDb(pentest, "defects",
+    defects = dbclient.findInDb(pentest, "defects",
                                     {"ip": ip_dic["ip"], "$or": [{"port": {"$exists": False}}, {"port": None}]}, True)
     for defect in defects:
         defect_delete(pentest, defect["_id"])
-    ports = mongoInstance.findInDb(pentest, "ports",
+    ports = dbclient.findInDb(pentest, "ports",
                                 {"ip": ip_dic["ip"]}, True)
     for port in ports:
         port_delete(pentest, port["_id"])
-    res = mongoInstance.deleteFromDb(pentest, "ips", {"_id": ObjectId(ip_iid)}, False)
+    res = dbclient.deleteFromDb(pentest, "ips", {"_id": ObjectId(ip_iid)}, False)
     if res is None:
         return 0
     else:
@@ -202,17 +202,17 @@ def delete(pentest, ip_iid):
 
 @permission("pentester")
 def insert(pentest, body):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     ip_o = ServerIp(pentest, body)
     base = ip_o.getDbKey()
-    existing = mongoInstance.findInDb(pentest, 
+    existing = dbclient.findInDb(pentest, 
             "ips", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
     if "_id" in body:
         del body["_id"]
     parent = ip_o.getParentId()
-    ins_result = mongoInstance.insertInDb(pentest, "ips", body, parent)
+    ins_result = dbclient.insertInDb(pentest, "ips", body, parent)
     iid = ins_result.inserted_id
     ip_o._id = iid
     if ip_o.in_scopes:
@@ -221,7 +221,7 @@ def insert(pentest, body):
 
 @permission("pentester")
 def update(pentest, ip_iid, body):
-    mongoInstance = MongoClient.getInstance()
-    mongoInstance.updateInDb(pentest, "ips", {"_id":ObjectId(ip_iid)}, {"$set":body}, False, True)
+    dbclient = DBClient.getInstance()
+    dbclient.updateInDb(pentest, "ips", {"_id":ObjectId(ip_iid)}, {"$set":body}, False, True)
     return True
 

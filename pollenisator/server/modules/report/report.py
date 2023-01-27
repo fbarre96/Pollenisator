@@ -7,7 +7,7 @@ import pollenisator.core.reporting.wordexport as wordexport
 import pollenisator.core.reporting.powerpointexport as powerpointexport
 import pollenisator.core.reporting.excelexport as excelexport
 from pollenisator.server.servermodels.defect import getGlobalDefects
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.utils import JSONEncoder, loadServerConfig, getMainDir
 from pollenisator.server.permission import permission
 from multiprocessing import Process, Manager
@@ -155,11 +155,11 @@ def search(body):
         coll = "defects"
     else:
         return "Invalid parameter: type must be either defect or remark.", 400
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     p = {"title":re.compile(terms, re.IGNORECASE)}
     if lang != "":
         p["language"] = lang
-    res = mongoInstance.findInDb("pollenisator", coll, p, True)
+    res = dbclient.findInDb("pollenisator", coll, p, True)
     ret = []
     for x in res:
         ret.append(x)
@@ -182,7 +182,7 @@ def search(body):
     return ret, 200
 
 def craftContext(pentest, **kwargs):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     context = {}
     for k, v in kwargs.items():
         context[k] = v
@@ -192,7 +192,7 @@ def craftContext(pentest, **kwargs):
     context["positive_remarks"] = []
     context["negative_remarks"] = []
     context["neutral_remarks"] = []
-    remarks = mongoInstance.findInDb(pentest, "remarks", {}, True)
+    remarks = dbclient.findInDb(pentest, "remarks", {}, True)
     for remark in remarks:
         if remark["type"].lower() == "positive":
             context["positive_remarks"].append(remark["description"])
@@ -211,18 +211,18 @@ def craftContext(pentest, **kwargs):
             "Strong": "002060",
         }
     }
-    scopes_list = [scope for scope in mongoInstance.findInDb(pentest, "scopes", {}, True)]
+    scopes_list = [scope for scope in dbclient.findInDb(pentest, "scopes", {}, True)]
     context["scopes"] = scopes_list
-    pentesters = mongoInstance.getPentestUsers(pentest)
+    pentesters = dbclient.getPentestUsers(pentest)
     context["pentesters"] = []
     for pentesterName in pentesters:
-        p = mongoInstance.getUserRecordFromUsername(pentesterName)
+        p = dbclient.getUserRecordFromUsername(pentesterName)
         if p is not None:
             context["pentesters"].append(p)
-    owner = mongoInstance.getPentestOwner(pentest)
-    p = mongoInstance.getUserRecordFromUsername(owner)
+    owner = dbclient.getPentestOwner(pentest)
+    p = dbclient.getUserRecordFromUsername(owner)
     context["owner"] = p if p is not None else None
-    ports = mongoInstance.findInDb(pentest, "ports", {}, True)
+    ports = dbclient.findInDb(pentest, "ports", {}, True)
     ports = [port for port in ports]
     ports.sort(key=lambda x: (x["ip"],int(x["port"])))
     context["ports"] = ports
@@ -252,7 +252,7 @@ def craftContext(pentest, **kwargs):
             defect_completed["fixes"][i]["description_paragraphs"] = fix["description"].replace("\r","").split("\n\n")
         completed_fixes += defect_completed["fixes"]
         defect_id += 1
-        assignedDefects = mongoInstance.findInDb(pentest, "defects", {"global_defect":ObjectId(defect_completed["_id"])}, True)
+        assignedDefects = dbclient.findInDb(pentest, "defects", {"global_defect":ObjectId(defect_completed["_id"])}, True)
         defect_completed["instances"] = []
         for assignedDefect in assignedDefects:
             local_proofs = []

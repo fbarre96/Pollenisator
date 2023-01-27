@@ -8,11 +8,11 @@ import hashlib
 from pollenisator.core.components.logger_config import logger
 from datetime import datetime
 from pollenisator.core.components.utils import listPlugin, loadPlugin
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.utils import JSONDecoder, getMainDir
 from pollenisator.server.permission import permission
 
-mongoInstance = MongoClient.getInstance()
+dbclient = DBClient.getInstance()
 local_path = os.path.join(getMainDir(), "files")
 try:
     os.makedirs(local_path)
@@ -34,7 +34,7 @@ def md5(f):
 
 @permission("pentester")
 def upload(pentest, defect_iid, upfile):
-    msg, status, filepath = mongoInstance.do_upload(pentest, defect_iid, "proof", upfile)
+    msg, status, filepath = dbclient.do_upload(pentest, defect_iid, "proof", upfile)
     return msg, status
     
 @permission("pentester")
@@ -92,7 +92,7 @@ def importExistingFile(pentest, upfile, body, **kwargs):
             targets["default"] = {"lvl":default_target_objects[0], "wave":default_target_objects[1],"scope":default_target_objects[2], "ip":default_target_objects[3], 
                                 "port":default_target_objects[4], "proto":default_target_objects[5]}
         for tag in tags:
-            res = mongoInstance.doRegisterTag(pentest, tag)
+            res = dbclient.doRegisterTag(pentest, tag)
 
         # ADD THE RESULTING TOOL TO AFFECTED
         for target in targets.values():
@@ -112,15 +112,15 @@ def importExistingFile(pentest, upfile, body, **kwargs):
                 proto = target.get("proto", None)
             if wave is None:
                 wave = "Imported"
-            if mongoInstance.findInDb(pentest, "waves", {"wave":wave}, False) is None:
-                mongoInstance.insertInDb(pentest, "waves", {"wave":wave, "wave_commands":[]})
+            if dbclient.findInDb(pentest, "waves", {"wave":wave}, False) is None:
+                dbclient.insertInDb(pentest, "waves", {"wave":wave, "wave_commands":[]})
             tool_m = ServerTool(pentest).initialize("", None, wave, name=toolName, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
                                         dated=date, datef=date, scanner_ip=user, status=["done"], notes=notes, tags=tags)
             ret = tool_m.addInDb()
             upfile.stream.seek(0)
-            msg, status, filepath = mongoInstance.do_upload(pentest, str(ret["iid"]), "result", upfile)
+            msg, status, filepath = dbclient.do_upload(pentest, str(ret["iid"]), "result", upfile)
             if status == 200:
-                mongoInstance.updateInDb(pentest, "tools", {"_id":ObjectId(ret["iid"])}, {"$set":{"resultfile":  filepath, "plugin_used":plugin}})
+                dbclient.updateInDb(pentest, "tools", {"_id":ObjectId(ret["iid"])}, {"$set":{"resultfile":  filepath, "plugin_used":plugin}})
     return results
 
 @permission("pentester")
@@ -151,7 +151,7 @@ def download(pentest, attached_iid, filetype, filename):
 def rmProof(pentest, defect_iid, filename):
     filename = filename.replace("/", "_")
     filepath = os.path.join(local_path, pentest, "proof", defect_iid, filename)
-    mongoInstance.updateInDb(pentest, "defects", {"_id": ObjectId(defect_iid)}, {"$pull":{"proofs":filename}})
+    dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(defect_iid)}, {"$pull":{"proofs":filename}})
     if not os.path.isfile(filepath):
         return "File not found", 404
     os.remove(filepath)

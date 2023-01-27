@@ -1,6 +1,6 @@
 from pollenisator.core.components.logger_config import logger
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.tool import Tool
 from pollenisator.core.controllers.toolcontroller import ToolController
 from pollenisator.server.servermodels.command import ServerCommand
@@ -19,11 +19,11 @@ import socketio
 class ServerTool(Tool, ServerElement):
 
     def __init__(self, pentest="", *args, **kwargs):
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.pentestName != "":
-            self.pentest = mongoInstance.pentestName
+        elif dbclient.pentestName != "":
+            self.pentest = dbclient.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         super().__init__(*args, **kwargs)
@@ -49,15 +49,15 @@ class ServerTool(Tool, ServerElement):
 
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
-        mongoInstance = MongoClient.getInstance()
-        results = mongoInstance.findInDb(pentest, "tools", pipeline)
+        dbclient = DBClient.getInstance()
+        results = dbclient.findInDb(pentest, "tools", pipeline)
         for result in results:
             yield(cls(pentest, result))
 
     @classmethod
     def fetchObject(cls, pentest, pipeline):
-        mongoInstance = MongoClient.getInstance()
-        result = mongoInstance.findInDb(pentest, "tools", pipeline, False)
+        dbclient = DBClient.getInstance()
+        result = dbclient.findInDb(pentest, "tools", pipeline, False)
         return cls(pentest, result)
 
     def getCommand(self):
@@ -67,8 +67,8 @@ class ServerTool(Tool, ServerElement):
         Return:
             Returns the Mongo dict command fetched instance associated with this tool's name.
         """
-        mongoInstance = MongoClient.getInstance()
-        commandTemplate = mongoInstance.findInDb(self.pentest,
+        dbclient = DBClient.getInstance()
+        commandTemplate = dbclient.findInDb(self.pentest,
                                                  "commands", {"_id": ObjectId(self.command_iid)}, False)
         return commandTemplate
 
@@ -95,17 +95,17 @@ class ServerTool(Tool, ServerElement):
         delete(self.pentest, self._id)
 
     def getParentId(self):
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         try:
             if self.lvl == "wave":
-                wave = mongoInstance.findInDb(self.pentest, "waves", {"wave": self.wave}, False)
+                wave = dbclient.findInDb(self.pentest, "waves", {"wave": self.wave}, False)
                 return wave["_id"]
             elif self.lvl == "network" or self.lvl == "domain":
-                return mongoInstance.findInDb(self.pentest, "scopes", {"wave": self.wave, "scope": self.scope}, False)["_id"]
+                return dbclient.findInDb(self.pentest, "scopes", {"wave": self.wave, "scope": self.scope}, False)["_id"]
             elif self.lvl == "ip":
-                return mongoInstance.findInDb(self.pentest, "ips", {"ip": self.ip}, False)["_id"]
+                return dbclient.findInDb(self.pentest, "ips", {"ip": self.ip}, False)["_id"]
             else:
-                return mongoInstance.findInDb(self.pentest, "ports", {"ip": self.ip, "port": self.port, "proto": self.proto}, False)["_id"]
+                return dbclient.findInDb(self.pentest, "ports", {"ip": self.ip, "port": self.port, "proto": self.proto}, False)["_id"]
         except TypeError:
             # None type returned:
             return None
@@ -117,7 +117,7 @@ class ServerTool(Tool, ServerElement):
         Return:
             Returns the bash command of this tool instance, a marker |outputDir| is still to be replaced.
         """
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         toolHasCommand = self.text
         if isinstance(command_o, str):
             command = command_o
@@ -142,7 +142,7 @@ class ServerTool(Tool, ServerElement):
                 command = command.replace("|parent_domain|", topdomain)
         if lvl == "ip":
             command = command.replace("|ip|", self.ip)
-            ip_db = mongoInstance.findInDb(self.pentest, "ips", {"ip":self.ip}, False)
+            ip_db = dbclient.findInDb(self.pentest, "ips", {"ip":self.ip}, False)
             if ip_db is None:
                 return ""
             ip_infos = ip_db.get("infos", {})
@@ -155,7 +155,7 @@ class ServerTool(Tool, ServerElement):
         if hasattr(self, "proto") and getattr(self, "proto", "") != "":
             command = command.replace("|port.proto|", self.proto)
         if hasattr(self, "port") and hasattr(self, "ip"):
-            port_db = mongoInstance.findInDb(self.pentest, "ports", {"port":self.port, "proto":self.proto, "ip":self.ip}, False)
+            port_db = dbclient.findInDb(self.pentest, "ports", {"port":self.port, "proto":self.proto, "ip":self.ip}, False)
             if port_db is not None:
                 command = command.replace("|port.service|", port_db.get("service", ""))
                 command = command.replace("|port.product|", port_db.get("product",""))
@@ -170,10 +170,10 @@ class ServerTool(Tool, ServerElement):
         return command
 
     def getPluginName(self):
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         if self.plugin_used != "":
             return self.plugin_used
-        command_o = mongoInstance.findInDb(self.pentest,"commands",{"_id": ObjectId(self.command_iid)}, False)
+        command_o = dbclient.findInDb(self.pentest,"commands",{"_id": ObjectId(self.command_iid)}, False)
         if command_o and "plugin" in command_o.keys():
             return command_o["plugin"]
         return None
@@ -198,8 +198,8 @@ class ServerTool(Tool, ServerElement):
             newStatus.append("OOT")
         self.status = newStatus
         self.resultfile = file_name
-        mongoInstance = MongoClient.getInstance()
-        mongoInstance.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
 
     def markAsError(self):
         """Set this tool status as not done by removing "done" or "running" and adding an error status.
@@ -207,8 +207,8 @@ class ServerTool(Tool, ServerElement):
         """
         self.dated = "None"
         self.datef = "None"
-        mongoInstance = MongoClient.getInstance()
-        mongoInstance.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
         self.scanner_ip = "None"
         if "done" in self.status:
             self.status.remove("done")
@@ -222,8 +222,8 @@ class ServerTool(Tool, ServerElement):
         """
         self.dated = "None"
         self.datef = "None"
-        mongoInstance = MongoClient.getInstance()
-        mongoInstance.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
         self.scanner_ip = "None"
         if "done" in self.status:
             self.status.remove("done")
@@ -237,9 +237,9 @@ class ServerTool(Tool, ServerElement):
         """
         self.dated = "None"
         self.datef = "None"
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         if self.scanner_ip != "None":
-            mongoInstance.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
+            dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
         self.scanner_ip = "None"
         if "done" in self.status:
             self.status.remove("done")
@@ -263,8 +263,8 @@ class ServerTool(Tool, ServerElement):
             newStatus.append("timedout")
         self.status = newStatus
         self.scanner_ip = workerName
-        mongoInstance = MongoClient.getInstance()
-        mongoInstance.updateInDb("pollenisator", "workers", {"name":workerName}, {"$push":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=True)
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb("pollenisator", "workers", {"name":workerName}, {"$push":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=True)
     
 @permission("pentester")
 def setStatus(pentest, tool_iid, body):
@@ -293,10 +293,10 @@ def setStatus(pentest, tool_iid, body):
 
 @permission("pentester")
 def delete(pentest, tool_iid):
-    mongoInstance = MongoClient.getInstance()
-    if not mongoInstance.isUserConnected():
+    dbclient = DBClient.getInstance()
+    if not dbclient.isUserConnected():
         return "Not connected", 503
-    res = mongoInstance.deleteFromDb(pentest, "tools", {"_id": ObjectId(tool_iid)}, False)
+    res = dbclient.deleteFromDb(pentest, "tools", {"_id": ObjectId(tool_iid)}, False)
     if res is None:
         return 0
     else:
@@ -309,8 +309,8 @@ def insert(pentest, body, **kwargs):
     do_insert(pentest, body, **kwargs)
 
 def do_insert(pentest, body, **kwargs):
-    mongoInstance = MongoClient.getInstance()
-    if not mongoInstance.isUserConnected():
+    dbclient = DBClient.getInstance()
+    if not dbclient.isUserConnected():
         return "Not connected", 503
     if body.get("name", "") == "None" or body.get("name", "") == "" or body.get("name", "") is None:
         del body["name"]
@@ -320,7 +320,7 @@ def do_insert(pentest, body, **kwargs):
     if kwargs.get("base") is not None:
         for k,v in kwargs.get("base").items():
             base[k] = v 
-    existing = mongoInstance.findInDb(pentest, "tools", base, False)
+    existing = dbclient.findInDb(pentest, "tools", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
     if "_id" in body:
@@ -329,8 +329,8 @@ def do_insert(pentest, body, **kwargs):
     parent = tool_o.getParentId()
     if tool_o.lvl == "port" and tool_o.command_iid is not None and tool_o.command_iid != "":
         if kwargs.get("check", True):
-            comm = mongoInstance.findInDb(pentest, "commands", {"_id":ObjectId(tool_o.command_iid)}, False)
-            port = mongoInstance.findInDb(pentest, "ports", {"_id":ObjectId(parent)}, False)
+            comm = dbclient.findInDb(pentest, "commands", {"_id":ObjectId(tool_o.command_iid)}, False)
+            port = dbclient.findInDb(pentest, "ports", {"_id":ObjectId(parent)}, False)
             if comm:
                 allowed_ports_services = comm["ports"].split(",")
                 if not checkCommandService(allowed_ports_services, port["port"], port["proto"], port["service"]):
@@ -346,7 +346,7 @@ def do_insert(pentest, body, **kwargs):
     base["notes"] = body.get("notes", "")
     base["tags"] = body.get("tags", [])
     base["infos"] = body.get("infos", {})
-    res_insert = mongoInstance.insertInDb(pentest, "tools", base, parent)
+    res_insert = dbclient.insertInDb(pentest, "tools", base, parent)
     ret = res_insert.inserted_id
     tool_o._id = ret
     # adding the appropriate tools for this scope.
@@ -354,12 +354,12 @@ def do_insert(pentest, body, **kwargs):
 
 @permission("pentester")
 def update(pentest, tool_iid, body):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     tags = body.get("tags", [])
     for tag in tags:
-        mongoInstance.doRegisterTag(pentest, tag)
-    orig = mongoInstance.findInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, False)
-    res = mongoInstance.updateInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
+        dbclient.doRegisterTag(pentest, tag)
+    orig = dbclient.findInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, False)
+    res = dbclient.updateInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
     from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
     check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(orig.get("check_iid"))})
     check.updateInfos()
@@ -430,9 +430,9 @@ def listPlugins():
     
 @permission("pentester")
 def importResult(pentest, tool_iid, upfile, body):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     #STORE FILE
-    res, status, filepath = mongoInstance.do_upload(pentest, tool_iid, "result", upfile)
+    res, status, filepath = dbclient.do_upload(pentest, tool_iid, "result", upfile)
     if status != 200:
         return res, status
     # Analyze
@@ -479,7 +479,7 @@ def importResult(pentest, tool_iid, upfile, body):
 def launchTask(pentest, tool_iid, **kwargs):
     logger.debug("launch task : "+str(tool_iid))
     worker_token = kwargs.get("worker_token") if kwargs.get("worker_token") else encode_token(kwargs.get("token_info"))
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     launchableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     command_o = ServerCommand.fetchObject({"_id": ObjectId(launchableTool.command_iid)}, pentest)
     if launchableTool is None:
@@ -490,12 +490,12 @@ def launchTask(pentest, tool_iid, **kwargs):
         return "Command associated not found", 404
     
     # Find a worker that can launch the tool without breaking limitations
-    workers = [x["name"] for x in mongoInstance.getWorkers({"pentest":pentest})]
+    workers = [x["name"] for x in dbclient.getWorkers({"pentest":pentest})]
     logger.debug(f"Available workers are {str(workers)}, (tool id {tool_iid})")
     choosenWorker = ""
     for owner in command_o.owners:
         if owner in workers:
-            running_tools = mongoInstance.countInDb(pentest,"tools",{"status":"running", "scanner_ip":owner})
+            running_tools = dbclient.countInDb(pentest,"tools",{"status":"running", "scanner_ip":owner})
             if running_tools <= 5: # TODO not hardcode this parameter
                 choosenWorker = owner
     if choosenWorker == "":
@@ -503,7 +503,7 @@ def launchTask(pentest, tool_iid, **kwargs):
         return "No worker available", 404
     logger.debug(f"Choosen worker for tool_iid {tool_iid} is {str(choosenWorker)}")
     workerName = choosenWorker
-    socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":workerName}, False)
+    socket = dbclient.findInDb("pollenisator", "sockets", {"user":workerName}, False)
     if socket is None:
         logger.debug(f"Error in launching {tool_iid} : socket not found to contact {workerName}")
         return "Socket not found", 503
@@ -522,7 +522,7 @@ def launchTask(pentest, tool_iid, **kwargs):
 
 @permission("pentester")
 def getProgress(pentest, tool_iid):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     tool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     logger.info("Trying to get progress of task "+str(tool))
     if tool is None:
@@ -531,7 +531,7 @@ def getProgress(pentest, tool_iid):
         return True
     elif "running"  not in tool.status:
         return "Tool is not running", 400
-    workers = mongoInstance.getWorkers({})
+    workers = dbclient.getWorkers({})
     workerNames = [worker["name"] for worker in workers]
     saveScannerip = tool.scanner_ip
     if saveScannerip == "":
@@ -540,7 +540,7 @@ def getProgress(pentest, tool_iid):
         return "Tools running in localhost cannot be stopped through API", 405
     if saveScannerip not in workerNames:
         return "The worker running this tool is not running anymore", 404
-    socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":saveScannerip}, False)
+    socket = dbclient.findInDb("pollenisator", "sockets", {"user":saveScannerip}, False)
     sm = SocketManager.getInstance()
     sm.socketio.emit('getProgress', {'pentest': pentest, "tool_iid":str(tool_iid)}, room=socket["sid"])
     global response
@@ -568,12 +568,12 @@ def getProgress(pentest, tool_iid):
     
 @permission("pentester")
 def stopTask(pentest, tool_iid, body):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     stopableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     logger.info("Trying to stop task "+str(stopableTool))
     if stopableTool is None:
         return "Tool not found", 404
-    workers = mongoInstance.getWorkers({})
+    workers = dbclient.getWorkers({})
     workerNames = [worker["name"] for worker in workers]
     forceReset = body["forceReset"]
     saveScannerip = stopableTool.scanner_ip
@@ -586,7 +586,7 @@ def stopTask(pentest, tool_iid, body):
         return "Tools running in localhost cannot be stopped through API", 405
     if saveScannerip not in workerNames:
         return "The worker running this tool is not running anymore", 404
-    socket = mongoInstance.findInDb("pollenisator", "sockets", {"user":saveScannerip}, False)
+    socket = dbclient.findInDb("pollenisator", "sockets", {"user":saveScannerip}, False)
     if socket is None:
         return "The worker running this tool is not running anymore", 404
     sm = SocketManager.getInstance()
@@ -607,8 +607,8 @@ def getNbOfLaunchedCommand(pentestName, worker, command_iid):
     Returns:
         Return the total of running tools with this command's name as an integer.
     """
-    mongoInstance = MongoClient.getInstance()
-    t = mongoInstance.countInDb(pentestName, "tools", {"command_iid": str(command_iid), "scanner_ip": worker, "dated": {
+    dbclient = DBClient.getInstance()
+    t = dbclient.countInDb(pentestName, "tools", {"command_iid": str(command_iid), "scanner_ip": worker, "dated": {
                             "$ne": "None"}, "datef": "None"})
     if t is not None:
         return t

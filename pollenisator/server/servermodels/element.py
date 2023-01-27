@@ -1,4 +1,4 @@
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from bson import ObjectId
 import pprint
 
@@ -15,8 +15,8 @@ class ServerElement(object):
         """
         tags = self.tags
         if newTag not in self.tags:
-            mongoInstance = MongoClient.getInstance()
-            for group in mongoInstance.getTagsGroups():
+            dbclient = DBClient.getInstance()
+            for group in dbclient.getTagsGroups():
                 if newTag in group:
                     i = 0
                     len_tags = len(tags)
@@ -31,8 +31,8 @@ class ServerElement(object):
                         i += 1
             tags.append(newTag)
             self.tags = tags
-            mongoInstance.doRegisterTag(self.pentest, newTag)
-            mongoInstance.updateInDb(self.pentest, self.__class__.coll_name, {"_id":ObjectId(self.getId())}, {"$set":{"tags":tags}})
+            dbclient.doRegisterTag(self.pentest, newTag)
+            dbclient.updateInDb(self.pentest, self.__class__.coll_name, {"_id":ObjectId(self.getId())}, {"$set":{"tags":tags}})
 
     def updateInfos(self, newInfos):
         """Change all infos stores in self.infos with the given new ones and update database.
@@ -42,8 +42,8 @@ class ServerElement(object):
         if "" in newInfos:
             del newInfos[""]
         self.infos.update(newInfos)
-        mongoInstance = MongoClient.getInstance()
-        ret = mongoInstance.updateInDb(self.pentest, self.__class__.coll_name, {"_id":ObjectId(self.getId())}, {"$set":{"infos":self.infos}})
+        dbclient = DBClient.getInstance()
+        ret = dbclient.updateInDb(self.pentest, self.__class__.coll_name, {"_id":ObjectId(self.getId())}, {"$set":{"infos":self.infos}})
     
     def getId(self):
         return self._id

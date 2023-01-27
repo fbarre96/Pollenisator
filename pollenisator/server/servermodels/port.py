@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.port import Port
 from pollenisator.core.controllers.portcontroller import PortController
 from pollenisator.server.servermodels.tool import ServerTool, delete as tool_delete
@@ -19,19 +19,19 @@ from pollenisator.server.permission import permission
 class ServerPort(Port, ServerElement):
     
     def __init__(self, pentest="", *args, **kwargs):
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.pentestName != "":
-            self.pentest = mongoInstance.pentestName
+        elif dbclient.pentestName != "":
+            self.pentest = dbclient.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         super().__init__(*args, **kwargs)
 
 
     def getParentId(self):
-        mongoInstance = MongoClient.getInstance()
-        return mongoInstance.findInDb(self.pentest, "ips", {"ip": self.ip}, False)["_id"]
+        dbclient = DBClient.getInstance()
+        return dbclient.findInDb(self.pentest, "ips", {"ip": self.ip}, False)["_id"]
 
     def addAllChecks(self):
         """
@@ -55,8 +55,8 @@ class ServerPort(Port, ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoClient.getInstance()
-        ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
+        dbclient = DBClient.getInstance()
+        ds = dbclient.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
             return None
         for d in ds:
@@ -71,8 +71,8 @@ class ServerPort(Port, ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoClient.getInstance()
-        d = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
+        dbclient = DBClient.getInstance()
+        d = dbclient.findInDb(pentest, cls.coll_name, pipeline, False)
         if d is None:
             return None
         return cls(pentest, d) 
@@ -85,22 +85,22 @@ class ServerPort(Port, ServerElement):
 
 @permission("pentester")
 def delete(pentest, port_iid):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
 
-    port_o = ServerPort(pentest, mongoInstance.findInDb(pentest, "ports", {"_id":ObjectId(port_iid)}, False))
-    tools = mongoInstance.findInDb(pentest, "tools", {"port": port_o.port, "proto": port_o.proto,
+    port_o = ServerPort(pentest, dbclient.findInDb(pentest, "ports", {"_id":ObjectId(port_iid)}, False))
+    tools = dbclient.findInDb(pentest, "tools", {"port": port_o.port, "proto": port_o.proto,
                                              "ip": port_o.ip}, True)
     for tool in tools:
         tool_delete(pentest, tool["_id"])
-    checks = mongoInstance.findInDb(pentest, "cheatsheet",
+    checks = dbclient.findInDb(pentest, "cheatsheet",
                                 {"target_iid": str(port_iid)}, True)
     for check in checks:
         checkinstance_delete(pentest, check["_id"])
-    defects = mongoInstance.findInDb(pentest, "defects", {"port": port_o.port, "proto": port_o.proto,
+    defects = dbclient.findInDb(pentest, "defects", {"port": port_o.port, "proto": port_o.proto,
                                                 "ip": port_o.ip}, True)
     for defect in defects:
         defect_delete(pentest, defect["_id"])
-    res = mongoInstance.deleteFromDb(pentest, "ports", {"_id": ObjectId(port_iid)}, False)
+    res = dbclient.deleteFromDb(pentest, "ports", {"_id": ObjectId(port_iid)}, False)
     if res is None:
         return 0
     else:
@@ -108,17 +108,17 @@ def delete(pentest, port_iid):
 
 @permission("pentester")
 def insert(pentest, body):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     port_o = ServerPort(pentest, body)
     base = port_o.getDbKey()
-    existing = mongoInstance.findInDb(pentest,
+    existing = dbclient.findInDb(pentest,
             "ports", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
     if "_id" in body:
         del body["_id"]
     parent = port_o.getParentId()
-    ins_result = mongoInstance.insertInDb(pentest, "ports", body, parent)
+    ins_result = dbclient.insertInDb(pentest, "ports", body, parent)
     iid = ins_result.inserted_id
     port_o._id = iid
     if int(port_o.port) == 445:
@@ -134,17 +134,17 @@ def insert(pentest, body):
 
 @permission("pentester")
 def update(pentest, port_iid, body):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     
-    oldPort = ServerPort(pentest, mongoInstance.findInDb(pentest, "ports", {"_id": ObjectId(port_iid)}, False))
+    oldPort = ServerPort(pentest, dbclient.findInDb(pentest, "ports", {"_id": ObjectId(port_iid)}, False))
     if oldPort is None:
         return
     port_o = ServerPort(pentest, body)
     oldService = oldPort.service
     if oldService != port_o.service:
-        mongoInstance.deleteFromDb(pentest, "tools", {
+        dbclient.deleteFromDb(pentest, "tools", {
                                 "lvl": "port", "ip": oldPort.ip, "port": oldPort.port, "proto": oldPort.proto, "status":{"$ne":"done"}}, many=True)
-        port_commands = mongoInstance.findInDb(
+        port_commands = dbclient.findInDb(
             pentest, "commands", {"lvl": "port"})
         for port_command in port_commands:
             allowed_services = port_command["ports"].split(",")
@@ -152,12 +152,12 @@ def update(pentest, port_iid, body):
                 if not(elem.strip().startswith("tcp/") or elem.strip().startswith("udp/")):
                     allowed_services[i] = "tcp/"+str(elem)
             if port_o.proto+"/"+str(port_o.service) in allowed_services:
-                waves = mongoInstance.findInDb(pentest, "waves", {"wave_commands": {"$elemMatch": {
+                waves = dbclient.findInDb(pentest, "waves", {"wave_commands": {"$elemMatch": {
                     "$eq": str(port_command["_id"]).strip()}}})
                 for wave in waves:
                     tool_m = ServerTool(pentest).initialize(port_command["_id"], wave["wave"], None, "",
                                                 oldPort.ip, oldPort.port, oldPort.proto, "port")
                     tool_m.addInDb(check=False) # already checked and not updated yet so service would be wrong
-    mongoInstance.updateInDb(pentest, "ports", {"_id":ObjectId(port_iid)}, {"$set":body}, False, True)
+    dbclient.updateInDb(pentest, "ports", {"_id":ObjectId(port_iid)}, {"$set":body}, False, True)
     return True
    

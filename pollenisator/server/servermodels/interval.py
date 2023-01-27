@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.interval import Interval
 from pollenisator.server.servermodels.tool import ServerTool
 from pollenisator.server.servermodels.element import ServerElement
@@ -11,11 +11,11 @@ class ServerInterval(Interval, ServerElement):
 
     def __init__(self, pentest="", *args, **kwargs):
         super().__init__(*args, **kwargs)
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.pentestName != "":
-            self.pentest = mongoInstance.pentestName
+        elif dbclient.pentestName != "":
+            self.pentest = dbclient.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
             
@@ -35,8 +35,8 @@ class ServerInterval(Interval, ServerElement):
         Returns:
             Returns the parent wave's ObjectId _id".
         """
-        mongoInstance = MongoClient.getInstance()
-        return mongoInstance.findInDb(self.pentest, "waves", {"wave": self.wave}, False)["_id"]
+        dbclient = DBClient.getInstance()
+        return dbclient.findInDb(self.pentest, "waves", {"wave": self.wave}, False)["_id"]
 
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
@@ -46,9 +46,9 @@ class ServerInterval(Interval, ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
 
-        ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
+        ds = dbclient.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
             return None
         for d in ds:
@@ -57,14 +57,14 @@ class ServerInterval(Interval, ServerElement):
 
 @permission("pentester")
 def delete(pentest, interval_iid):
-    mongoInstance = MongoClient.getInstance()
-    interval_o = ServerInterval(pentest, mongoInstance.findInDb(pentest, "intervals", {"_id": ObjectId(interval_iid)}, False))
-    res = mongoInstance.deleteFromDb(pentest, "intervals", {"_id": ObjectId(interval_iid)}, False)
-    parent_wave = mongoInstance.findInDb(pentest, "waves", {"wave": interval_o.wave}, False)
+    dbclient = DBClient.getInstance()
+    interval_o = ServerInterval(pentest, dbclient.findInDb(pentest, "intervals", {"_id": ObjectId(interval_iid)}, False))
+    res = dbclient.deleteFromDb(pentest, "intervals", {"_id": ObjectId(interval_iid)}, False)
+    parent_wave = dbclient.findInDb(pentest, "waves", {"wave": interval_o.wave}, False)
     if parent_wave is not None:
-        mongoInstance.send_notify(pentest,
+        dbclient.send_notify(pentest,
                                 "waves", parent_wave["_id"], "update", "")
-        other_intervals = mongoInstance.findInDb(pentest, "waves", {"wave": interval_o.wave})
+        other_intervals = dbclient.findInDb(pentest, "waves", {"wave": interval_o.wave})
         no_interval_in_time = True
         for other_interval in other_intervals:
             other_interval = ServerInterval(pentest, other_interval)
@@ -72,7 +72,7 @@ def delete(pentest, interval_iid):
                 no_interval_in_time = False
                 break
         if no_interval_in_time:
-            tools = mongoInstance.findInDb(pentest, "tools", {"wave": interval_o.wave})
+            tools = dbclient.findInDb(pentest, "tools", {"wave": interval_o.wave})
             for tool in tools:
                 tool = ServerTool(pentest, tool)
                 tool.setOutOfTime(pentest)
@@ -82,20 +82,20 @@ def delete(pentest, interval_iid):
         return res.deleted_count
 @permission("pentester")
 def insert(pentest, body):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     if "_id" in body:
         del body["_id"]
     interval_o = ServerInterval(pentest, body)
     parent = interval_o.getParentId()
-    ins_result = mongoInstance.insertInDb(pentest, "intervals", body, parent)
+    ins_result = dbclient.insertInDb(pentest, "intervals", body, parent)
     interval_o.setToolsInTime()
     iid = ins_result.inserted_id
     return {"res":True, "iid":iid}
 
 @permission("pentester")
 def update(pentest, interval_iid, body):
-    mongoInstance = MongoClient.getInstance()
-    interval_o = ServerInterval(pentest, mongoInstance.findInDb(pentest, "intervals", {"_id": ObjectId(interval_iid)}, False))
+    dbclient = DBClient.getInstance()
+    interval_o = ServerInterval(pentest, dbclient.findInDb(pentest, "intervals", {"_id": ObjectId(interval_iid)}, False))
     interval_o.setToolsInTime()
-    mongoInstance.updateInDb(pentest, "intervals", {"_id":ObjectId(interval_iid)}, {"$set":body}, False, True)
+    dbclient.updateInDb(pentest, "intervals", {"_id":ObjectId(interval_iid)}, {"$set":body}, False, True)
     return True

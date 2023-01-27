@@ -2,7 +2,7 @@
 
 from __future__ import absolute_import
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.modules.activedirectory.share_file import ShareFile
 from pollenisator.server.permission import permission
@@ -35,11 +35,11 @@ class Share(ServerElement):
                 if not isinstance(f, ShareFile):
                     f = ShareFile(f)
                 self.files.append(f)
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.pentestName != "":
-            self.pentest = mongoInstance.pentestName
+        elif dbclient.pentestName != "":
+            self.pentest = dbclient.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         return self
@@ -63,9 +63,9 @@ class Share(ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         pipeline["type"] = "share"
-        ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
+        ds = dbclient.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
             return None
         for d in ds:
@@ -81,8 +81,8 @@ class Share(ServerElement):
             Returns a cursor to iterate on model objects
         """
         pipeline["type"] = "share"
-        mongoInstance = MongoClient.getInstance()
-        d = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
+        dbclient = DBClient.getInstance()
+        d = dbclient.findInDb(pentest, cls.coll_name, pipeline, False)
         if d is None:
             return None
         return cls(pentest, d)
@@ -175,11 +175,11 @@ def delete(pentest, share_iid):
 
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
-    mongoInstance = MongoClient.getInstance()
-    share_dic = mongoInstance.findInDb(pentest, "ActiveDirectory", {"_id":ObjectId(share_iid), "type":"share"}, False)
+    dbclient = DBClient.getInstance()
+    share_dic = dbclient.findInDb(pentest, "ActiveDirectory", {"_id":ObjectId(share_iid), "type":"share"}, False)
     if share_dic is None:
         return 0
-    res = mongoInstance.deleteFromDb(pentest, "ActiveDirectory", {"_id": ObjectId(share_iid), "type":"share"}, False)
+    res = dbclient.deleteFromDb(pentest, "ActiveDirectory", {"_id": ObjectId(share_iid), "type":"share"}, False)
     if res is None:
         return 0
     else:
@@ -199,15 +199,15 @@ def insert(pentest, body):
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     share = Share(pentest, body) 
-    mongoInstance = MongoClient.getInstance()
-    existing = mongoInstance.findInDb(pentest, 
+    dbclient = DBClient.getInstance()
+    existing = dbclient.findInDb(pentest, 
         "ActiveDirectory", {"type":"share", "share":share.share, "ip":share.ip}, False)
     if existing is not None:
         return {"res": False, "iid": existing["_id"]}
     if "_id" in body:
         del body["_id"]
     body["type"] = "share"
-    ins_result = mongoInstance.insertInDb(pentest,
+    ins_result = dbclient.insertInDb(pentest,
         "ActiveDirectory", body, True)
     iid = ins_result.inserted_id
     return {"res": True, "iid": iid}
@@ -228,7 +228,7 @@ def update(pentest, share_iid, body):
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     share = Share(pentest, body) 
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     existing = Share.fetchObject(pentest, {"_id": ObjectId(share_iid)})
     if existing.share != share.share  and existing.ip != share.ip:
         return "Forbidden", 403
@@ -236,5 +236,5 @@ def update(pentest, share_iid, body):
         del body["type"]
     if "_id" in body:
         del body["_id"]
-    mongoInstance.updateInDb(pentest, "ActiveDirectory", {"_id": ObjectId(share_iid), "type":"share"}, {"$set": body}, False, True)
+    dbclient.updateInDb(pentest, "ActiveDirectory", {"_id": ObjectId(share_iid), "type":"share"}, {"$set": body}, False, True)
     return True

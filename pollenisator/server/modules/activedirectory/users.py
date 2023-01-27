@@ -3,7 +3,7 @@
 from __future__ import absolute_import
 from pollenisator.core.components.logger_config import logger
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
@@ -47,11 +47,11 @@ class User(ServerElement):
         self.groups = groups
         self.description = description
         self.infos =  infos if infos is not None else {}
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.pentestName != "":
-            self.pentest = mongoInstance.pentestName
+        elif dbclient.pentestName != "":
+            self.pentest = dbclient.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         return self
@@ -69,9 +69,9 @@ class User(ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         pipeline["type"] = "user"
-        ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
+        ds = dbclient.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
             return None
         for d in ds:
@@ -86,9 +86,9 @@ class User(ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         pipeline["type"] = "user"
-        d = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
+        d = dbclient.findInDb(pentest, cls.coll_name, pipeline, False)
         if d is None:
             return None
         return cls(pentest, d)
@@ -105,8 +105,8 @@ class User(ServerElement):
         username = user_o.username if user_o.username is not None else ""
         password = user_o.password if user_o.password is not None else ""
         domain = user_o.domain if user_o.domain is not None else ""
-        mongoInstance = MongoClient.getInstance()
-        dc_computer = mongoInstance.findInDb(self.pentest, "ActiveDirectory", {"type":"computer", "domain":domain, "infos.is_dc":True}, False)
+        dbclient = DBClient.getInstance()
+        dc_computer = dbclient.findInDb(self.pentest, "ActiveDirectory", {"type":"computer", "domain":domain, "infos.is_dc":True}, False)
         dc_ip = None if dc_computer is None else dc_computer.get("ip")
         infos = {"username":username, "password":password, "domain":domain, "dc_ip":dc_ip}
         if dc_ip is None:
@@ -232,11 +232,11 @@ def delete(pentest, user_iid):
 
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
-    mongoInstance = MongoClient.getInstance()
-    user_dic = mongoInstance.findInDb(pentest, "ActiveDirectory", {"_id":ObjectId(user_iid), "type":"user"}, False)
+    dbclient = DBClient.getInstance()
+    user_dic = dbclient.findInDb(pentest, "ActiveDirectory", {"_id":ObjectId(user_iid), "type":"user"}, False)
     if user_dic is None:
         return 0
-    computers = mongoInstance.findInDb(pentest, "ActiveDirectory",
+    computers = dbclient.findInDb(pentest, "ActiveDirectory",
                                 {"type":"computer", "$or": [ { "users": str(user_iid) }, { "admins": str(user_iid) } ] }, True)
     for computer in computers:
         if str(user_iid) in computer["users"]:
@@ -245,7 +245,7 @@ def delete(pentest, user_iid):
         if str(user_iid) in computer["admins"]:
             computer["admins"].remove(str(user_iid))
             Computer.update(pentest, computer["_id"], computer)
-    res = mongoInstance.deleteFromDb(pentest, "ActiveDirectory", {"_id": ObjectId(str(user_iid)), "type":"user"}, False)
+    res = dbclient.deleteFromDb(pentest, "ActiveDirectory", {"_id": ObjectId(str(user_iid)), "type":"user"}, False)
     if res is None:
         return 0
     else:
@@ -265,23 +265,23 @@ def insert(pentest, body):
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     user = User(pentest, body)
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     domain = user.domain.lower() if user.domain is not None else ""
     username = user.username.lower() if user.username is not None else ""
     password = user.password if user.password is not None else ""
-    existing = mongoInstance.findInDb(pentest, 
+    existing = dbclient.findInDb(pentest, 
         "ActiveDirectory", {"type":"user", "domain":domain, "username":username, "password":password}, False)
     if existing is not None:
         if existing["password"] != "":
             return {"res": False, "iid": existing["_id"]}
         else:
-            mongoInstance.updateInDb(pentest, "ActiveDirectory", {"_id":ObjectId(existing["_id"])}, {"$set":{"password":password}})
+            dbclient.updateInDb(pentest, "ActiveDirectory", {"_id":ObjectId(existing["_id"])}, {"$set":{"password":password}})
             return {"res": False, "iid": existing["_id"]}
     if "_id" in body:
         del body["_id"]
     body["type"] = "user"
     
-    ins_result = mongoInstance.insertInDb(pentest, 
+    ins_result = dbclient.insertInDb(pentest, 
         "ActiveDirectory", body, True)
     if password.strip() != "":
         user.addCheck("AD:onNewValidUser", {"user":user})
@@ -308,7 +308,7 @@ def update(pentest, user_iid, body):
     user = User(pentest, body)
     user.username = user.username.lower()
     user.domain = user.domain.lower()
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     user_existing = User.fetchObject(pentest, {"_id": ObjectId(user_iid)})
     if user_existing.username != user.username  and user_existing.domain != user.domain:
         return "Forbidden", 403
@@ -316,5 +316,5 @@ def update(pentest, user_iid, body):
         del body["type"]
     if "_id" in body:
         del body["_id"]
-    mongoInstance.updateInDb(pentest, "ActiveDirectory", {"_id": ObjectId(user_iid), "type":"user"}, {"$set": body}, False, True)
+    dbclient.updateInDb(pentest, "ActiveDirectory", {"_id": ObjectId(user_iid), "type":"user"}, {"$set": body}, False, True)
     return True

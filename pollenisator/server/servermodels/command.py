@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.command import Command
 from pollenisator.core.controllers.commandcontroller import CommandController
 from pollenisator.server.servermodels.element import ServerElement
@@ -21,9 +21,9 @@ class ServerCommand(Command, ServerElement):
         Returns:
             Returns a cursor to iterate on Command objects
         """
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
 
-        results = mongoInstance.findInDb(targetdb, "commands", pipeline, True)
+        results = dbclient.findInDb(targetdb, "commands", pipeline, True)
         if results is None:
             return None
         for result in results:
@@ -37,8 +37,8 @@ class ServerCommand(Command, ServerElement):
         Returns:
             Returns a Server Command
         """
-        mongoInstance = MongoClient.getInstance()
-        result = mongoInstance.findInDb(targetdb, "commands", pipeline, False)
+        dbclient = DBClient.getInstance()
+        result = dbclient.findInDb(targetdb, "commands", pipeline, False)
         if result is None:
             return None
         return ServerCommand(targetdb, result)
@@ -61,33 +61,33 @@ def getCommands(body):
     pipeline = body.get("pipeline", {})
     if isinstance(pipeline, str):
         pipeline = json.loads(pipeline, cls=JSONDecoder)
-    mongoInstance = MongoClient.getInstance()
-    results = mongoInstance.findInDb("pollenisator", "commands", pipeline, True)
+    dbclient = DBClient.getInstance()
+    results = dbclient.findInDb("pollenisator", "commands", pipeline, True)
     if results is None:
         return []
     return [x for x in results]
 
 def doDelete(pentest, command):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     #TODO : delete from checks
     # Remove from all waves this command.
     if command.indb == "pollenisator":
-        pentests = mongoInstance.listPentestNames()
+        pentests = dbclient.listPentestNames()
     else:
         pentests = [command.indb]
     for pentest in pentests:
-        waves = mongoInstance.findInDb(pentest, "waves")
+        waves = dbclient.findInDb(pentest, "waves")
         for wave in waves:
             toBeUpdated = wave["wave_commands"]
             if command._id in wave["wave_commands"]:
                 toBeUpdated.remove(command._id)
-                mongoInstance.updateInDb(pentest, "waves", {"_id": wave["_id"]}, {
+                dbclient.updateInDb(pentest, "waves", {"_id": wave["_id"]}, {
                     "$set": {"wave_commands": toBeUpdated}}, False)
         # Remove all tools refering to this command's name.
-        mongoInstance.deleteFromDb(pentest,
+        dbclient.deleteFromDb(pentest,
                                    "tools", {"name": command.name}, True, True)
 
-    res = mongoInstance.deleteFromDb(command.indb, "commands", {
+    res = dbclient.deleteFromDb(command.indb, "commands", {
         "_id": ObjectId(command._id)}, False, True)
     if res is None:
         return 0
@@ -97,8 +97,8 @@ def doDelete(pentest, command):
 @permission("user")
 def deleteCommand(command_iid, **kwargs):
     user = kwargs["token_info"]["sub"]
-    mongoInstance = MongoClient.getInstance()
-    c = mongoInstance.findInDb("pollenisator",
+    dbclient = DBClient.getInstance()
+    c = dbclient.findInDb("pollenisator",
         "commands", {"_id": ObjectId(command_iid)}, False)
     if c is None:
         return "Not found", 404
@@ -109,8 +109,8 @@ def deleteCommand(command_iid, **kwargs):
 @permission("pentester")
 def delete(pentest, command_iid, **kwargs):
     user = kwargs["token_info"]["sub"]
-    mongoInstance = MongoClient.getInstance()
-    c = mongoInstance.findInDb(pentest,
+    dbclient = DBClient.getInstance()
+    c = dbclient.findInDb(pentest,
         "commands", {"_id": ObjectId(command_iid)}, False)
     if c is None:
         return "Not found", 404
@@ -119,15 +119,15 @@ def delete(pentest, command_iid, **kwargs):
     
 
 def doInsert(pentest, body, user):
-    mongoInstance = MongoClient.getInstance()
-    existing = mongoInstance.findInDb(
+    dbclient = DBClient.getInstance()
+    existing = dbclient.findInDb(
         body["indb"], "commands", {"name": body["name"]}, False)
     if existing is not None:
         return {"res": False, "iid": existing["_id"]}
     if "_id" in body:
         del body["_id"]
     body["owners"] = [user]
-    ins_result = mongoInstance.insertInDb(
+    ins_result = dbclient.insertInDb(
         body["indb"], "commands", body, '', True)
     iid = ins_result.inserted_id
     return {"res": True, "iid": iid}
@@ -140,41 +140,41 @@ def insert(pentest, body, **kwargs):
 
 @permission("pentester")
 def update(pentest, command_iid, body, **kwargs):
-    mongoInstance = MongoClient.getInstance()
-    command = Command(mongoInstance.findInDb(pentest,
+    dbclient = DBClient.getInstance()
+    command = Command(dbclient.findInDb(pentest,
         "commands", {"_id": ObjectId(command_iid)}, False))
     if "owners" in body:
         del body["owners"]
     if "_id" in body:
         del body["_id"]
-    mongoInstance.updateInDb(command.indb, "commands", {"_id": ObjectId(command_iid)}, {"$set": body}, False, True)
+    dbclient.updateInDb(command.indb, "commands", {"_id": ObjectId(command_iid)}, {"$set": body}, False, True)
     return True
 
 @permission("user")
 def addToMyCommands(command_iid, **kwargs):
     """Add a command to the user's commands list."""
     user = kwargs["token_info"]["sub"]
-    mongoInstance = MongoClient.getInstance()
-    res = mongoInstance.findInDb("pollenisator", "commands", {
+    dbclient = DBClient.getInstance()
+    res = dbclient.findInDb("pollenisator", "commands", {
                                  "_id": ObjectId(command_iid)}, False)
     if res is None:
         return "Not found", 404
-    mongoInstance.updateInDb("pollenisator", "commands", {
+    dbclient.updateInDb("pollenisator", "commands", {
                                  "_id": ObjectId(command_iid)}, {"$push":{"owners":user}})
     res = "Updated"
     return "OK"
 
 def addUserCommandsToPentest(pentest, user):
     """Add all commands owned by user to pentest database."""
-    mongoInstance = MongoClient.getInstance()
-    worker = mongoInstance.findInDb(
+    dbclient = DBClient.getInstance()
+    worker = dbclient.findInDb(
         "pollenisator", "workers", {"name": user}, False)
     if worker is not None:
         worker_commands = worker.get("known_commands", [])
-        commands = mongoInstance.findInDb(
+        commands = dbclient.findInDb(
             "pollenisator", "commands", {"bin_path": {"$in":worker_commands}}, True)
     else:
-        commands = mongoInstance.findInDb(
+        commands = dbclient.findInDb(
             "pollenisator", "commands", {"owners": user}, True)
     for command in commands:
         mycommand = command
@@ -182,7 +182,7 @@ def addUserCommandsToPentest(pentest, user):
         mycommand["indb"] = pentest
         res = doInsert(pentest, mycommand, user)
         if not res["res"]:
-            mongoInstance.updateInDb(pentest, "commands", {
+            dbclient.updateInDb(pentest, "commands", {
                                  "_id": ObjectId(res["iid"])}, {"$push":{"owners":user}})
     return True
    

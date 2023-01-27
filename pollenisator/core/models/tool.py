@@ -1,6 +1,6 @@
 """Tool Model. A tool is an instanciation of a command against a target"""
 
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.element import Element
 from bson.objectid import ObjectId
 from datetime import datetime
@@ -74,9 +74,9 @@ class Tool(Element):
         Returns:
             this object
         """
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         if command_iid is not None and command_iid != "":
-            res = mongoInstance.findInDb(self.pentest, "commands", {"$or": [
+            res = dbclient.findInDb(self.pentest, "commands", {"$or": [
                 {"original_iid":str(command_iid)},
                 {"_id": ObjectId(command_iid)}
             ]}, False)

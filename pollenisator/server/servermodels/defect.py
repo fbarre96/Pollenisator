@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoClient
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.defect import Defect
 from pollenisator.core.controllers.defectcontroller import DefectController
 from pollenisator.server.servermodels.element import ServerElement
@@ -11,12 +11,12 @@ import json
 
 class ServerDefect(Defect, ServerElement):
     def __init__(self, pentest="", *args, **kwargs):
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         super().__init__(*args, **kwargs)
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.pentestName != "":
-            self.pentest = mongoInstance.pentestName
+        elif dbclient.pentestName != "":
+            self.pentest = dbclient.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
 
@@ -34,11 +34,11 @@ class ServerDefect(Defect, ServerElement):
             port = None
         if port is None:
             port = ""
-        mongoInstance = MongoClient.getInstance()
+        dbclient = DBClient.getInstance()
         if port == "":
-            obj = mongoInstance.findInDb(self.pentest, "ips", {"ip": self.ip}, False)
+            obj = dbclient.findInDb(self.pentest, "ips", {"ip": self.ip}, False)
         else:
-            obj = mongoInstance.findInDb(self.pentest,
+            obj = dbclient.findInDb(self.pentest,
                 "ports", {"ip": self.ip, "port": self.port, "proto": self.proto}, False)
         if obj is None:
             return ""
@@ -52,8 +52,8 @@ class ServerDefect(Defect, ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoClient.getInstance()
-        ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
+        dbclient = DBClient.getInstance()
+        ds = dbclient.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
             return None
         for d in ds:
@@ -68,8 +68,8 @@ class ServerDefect(Defect, ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoClient.getInstance()
-        d = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
+        dbclient = DBClient.getInstance()
+        d = dbclient.findInDb(pentest, cls.coll_name, pipeline, False)
         if d is None:
             return None
         return cls(pentest, d) 
@@ -80,8 +80,8 @@ def getProofPath(pentest, defect_iid):
     return os.path.join(local_path, pentest, "proof", str(defect_iid))
 @permission("pentester")
 def delete(pentest, defect_iid):
-    mongoInstance = MongoClient.getInstance()
-    defect = ServerDefect(pentest, mongoInstance.findInDb(pentest, "defects", {"_id": ObjectId(defect_iid)}, False))
+    dbclient = DBClient.getInstance()
+    defect = ServerDefect(pentest, dbclient.findInDb(pentest, "defects", {"_id": ObjectId(defect_iid)}, False))
     if defect is None:
         return 0
     if not defect.isAssigned() and pentest != "pollenisator":
@@ -101,7 +101,7 @@ def delete(pentest, defect_iid):
                 os.remove(os.path.join(proofs_path, filetodelete))
             os.rmdir(proofs_path)
     
-    res = mongoInstance.deleteFromDb(pentest, "defects", {"_id": ObjectId(defect_iid)}, False)
+    res = dbclient.deleteFromDb(pentest, "defects", {"_id": ObjectId(defect_iid)}, False)
     if res is None:
         return 0
     else:
@@ -109,10 +109,10 @@ def delete(pentest, defect_iid):
 
 @permission("pentester")
 def insert(pentest, body):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     defect_o = ServerDefect(pentest, body)
     base = defect_o.getDbKey()
-    existing = mongoInstance.findInDb(pentest, "defects", base, False)
+    existing = dbclient.findInDb(pentest, "defects", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
     if defect_o.ip.strip() == "" and defect_o.port.strip() != "":
@@ -144,7 +144,7 @@ def insert(pentest, body):
             del body["synthesis"]
         if "fixes" in body:
             del body["fixes"]
-    ins_result = mongoInstance.insertInDb(pentest, "defects", body, parent)
+    ins_result = dbclient.insertInDb(pentest, "defects", body, parent)
     iid = ins_result.inserted_id
     defect_o._id = iid
 
@@ -156,7 +156,7 @@ def insert(pentest, body):
         defect_o.parent = ""
         defect_o.notes = ""
         insert_res = insert(pentest, DefectController(defect_o).getData())
-        mongoInstance.updateInDb(pentest, "defects", {"_id":ObjectId(iid)}, {"$set":{"global_defect": insert_res["iid"]}})
+        dbclient.updateInDb(pentest, "defects", {"_id":ObjectId(iid)}, {"$set":{"global_defect": insert_res["iid"]}})
     return {"res":True, "iid":iid}
 
 @permission("pentester")
@@ -174,7 +174,7 @@ def findInsertPosition(pentest, risk):
 
 @permission("pentester")
 def update(pentest, defect_iid, body):
-    mongoInstance = MongoClient.getInstance()
+    dbclient = DBClient.getInstance()
     defect_o = ServerDefect.fetchObject(pentest, {"_id":ObjectId(defect_iid)})
     if defect_o is None:
         return "This defect does not exist", 404
@@ -190,7 +190,7 @@ def update(pentest, defect_iid, body):
                 moveDefect(pentest, defect_iid, defectTarget.getId())
             if "index" in body:
                 del body["index"]
-    res = mongoInstance.updateInDb(pentest, "defects", {"_id":ObjectId(defect_iid)}, {"$set":body}, False, True)
+    res = dbclient.updateInDb(pentest, "defects", {"_id":ObjectId(defect_iid)}, {"$set":body}, False, True)
     return True
     
 @permission("pentester")
