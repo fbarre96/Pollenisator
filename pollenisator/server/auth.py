@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 import bcrypt
 
 from werkzeug.exceptions import Unauthorized
@@ -19,7 +19,7 @@ def createUser(body):
         return "username is required", 400
     elif pwd == "":
         return "pwd is required", 400
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     user = mongoInstance.findInDb("pollenisator", "users", {"username":username}, False)
     if user is not None:
         return "A user with this username already exists", 403
@@ -33,7 +33,7 @@ def updateUserInfos(body):
     username = body.get("username", "")
     if username == "":
         return "username is required", 400
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     user = mongoInstance.findInDb("pollenisator", "users", {"username":username}, False)
     if user is None:
         return "User not found", 404
@@ -45,7 +45,7 @@ def updateUserInfos(body):
 
 @permission("admin")
 def deleteUser(username):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     user = mongoInstance.findInDb("pollenisator", "users", {"username":username}, False)
     if user is not None:
         mongoInstance.deleteFromDb("pollenisator", "users", {"username":username}, False, False)
@@ -63,7 +63,7 @@ def changePassword(body, **kwargs):
     elif newPwd == "":
         return "newPwd is required", 400
     username = thisUser
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     user_record = mongoInstance.findInDb("pollenisator", "users", {"username":username}, False)
     if user_record is None:
         return "This user does not exist", 404
@@ -82,7 +82,7 @@ def resetPassword(body):
         return "username is required", 400
     elif newPwd == "":
         return "newPwd is required", 400
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     user_record = mongoInstance.findInDb("pollenisator", "users", {"username":username}, False)
     if user_record is None:
         return "This user does not exist", 404
@@ -93,13 +93,13 @@ def resetPassword(body):
 
 @permission("admin")
 def listUsers():
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     user_records = mongoInstance.aggregateFromDb("pollenisator", "users", [{"$project":{"hash":0, "token":0}}])
     return [user_record for user_record in user_records]
     
 @permission("user")
 def searchUsers(searchreq):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     user_records = mongoInstance.findInDb("pollenisator", "users", {"username":{"$regex":f".*{searchreq}.*"}})
     return [user_record["username"] for user_record in user_records]
 
@@ -110,7 +110,7 @@ def login(body):
         return "username is required", 400
     elif pwd == "":
         return "pwd is required", 400
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(pwd.encode(), salt)
     user_record = mongoInstance.findInDb("pollenisator", "users", {"username":username}, False)
@@ -125,8 +125,8 @@ def login(body):
 def connectToPentest(pentest, body, **kwargs):
     username = kwargs["token_info"]["sub"]
     addDefaultCommands = body.get("addDefaultCommands", False)
-    mongoInstance = MongoCalendar.getInstance()
-    if pentest not in mongoInstance.listCalendarNames():
+    mongoInstance = MongoClient.getInstance()
+    if pentest not in mongoInstance.listPentestNames():
         return "Pentest not found", 404
     testers = mongoInstance.getPentestUsers(pentest)
     token = kwargs.get("token_info", {})

@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.core.models.scope import Scope
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance, delete as checkinstance_delete
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
@@ -13,24 +13,24 @@ from pollenisator.server.permission import permission
 class ServerScope(Scope, ServerElement):
     
     def __init__(self, pentest="", *args, **kwargs):
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         super().__init__(*args, **kwargs)
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.calendarName != "":
-            self.pentest = mongoInstance.calendarName
+        elif mongoInstance.pentestName != "":
+            self.pentest = mongoInstance.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
 
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         results = mongoInstance.findInDb(pentest, "scopes", pipeline)
         for result in results:
             yield(cls(pentest, result))
 
     def getParentId(self):
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         res = mongoInstance.findInDb(self.pentest, "waves", {"wave": self.wave}, False)
         return res["_id"]
 
@@ -56,7 +56,7 @@ class ServerScope(Scope, ServerElement):
         Returns:
             A list ip IP dictionnary from mongo db
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         ips = mongoInstance.findInDb(self.pentest, "ips", )
         ips_fitting = []
         isdomain = self.isDomain()
@@ -79,7 +79,7 @@ class ServerScope(Scope, ServerElement):
         return ips_fitting
 @permission("pentester")
 def delete(pentest, scope_iid):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     # deleting checks with scope lvl
     scope_o = ServerScope(pentest, mongoInstance.findInDb(pentest, "scopes", {"_id": ObjectId(scope_iid)}, False))
     checks = mongoInstance.findInDb(pentest, "cheatsheet", {"target_iid": str(scope_iid), "target_type": "scopes"})
@@ -104,7 +104,7 @@ def delete(pentest, scope_iid):
         
 @permission("pentester")
 def insert(pentest, body):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     scope_o = ServerScope(pentest, body)
     # Checking unicity
     base = scope_o.getDbKey()
@@ -131,6 +131,6 @@ def insert(pentest, body):
 
 @permission("pentester")
 def update(pentest, scope_iid, body):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     mongoInstance.updateInDb(pentest, "scopes", {"_id":ObjectId(scope_iid)}, {"$set":body}, False, True)
     return True

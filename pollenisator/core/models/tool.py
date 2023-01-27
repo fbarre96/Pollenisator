@@ -1,6 +1,6 @@
 """Tool Model. A tool is an instanciation of a command against a target"""
 
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.core.models.element import Element
 from bson.objectid import ObjectId
 from datetime import datetime
@@ -74,7 +74,7 @@ class Tool(Element):
         Returns:
             this object
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         if command_iid is not None and command_iid != "":
             res = mongoInstance.findInDb(self.pentest, "commands", {"$or": [
                 {"original_iid":str(command_iid)},
@@ -143,17 +143,17 @@ class Tool(Element):
         var_to_path = var_to_path.replace(":", "_")
         return var_to_path
 
-    def getOutputDir(self, calendarName):
+    def getOutputDir(self, pentestName):
         """
         Get the tool required output directory path.
         Args:
-            calendarName: the pentest database name
+            pentestName: the pentest database name
         Return:
             Returns the output directory of this tool instance.
         """
         # get command needed directory
         output_dir = Tool.__sanitize(
-            calendarName)+"/"+Tool.__sanitize(self.name)+"/"
+            pentestName)+"/"+Tool.__sanitize(self.name)+"/"
         if self.wave != "" and self.wave is not None:
             output_dir += Tool.__sanitize(self.wave)+"/"
         if self.scope != "" and self.scope is not None:

@@ -1,16 +1,16 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.permission import permission
 
 class CheckItem(ServerElement):
     coll_name = 'cheatsheet'
     def __init__(self, pentest, valuesFromDb=None):
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.calendarName != "":
-            self.pentest = mongoInstance.calendarName
+        elif mongoInstance.pentestName != "":
+            self.pentest = mongoInstance.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         if valuesFromDb is None:
@@ -42,11 +42,11 @@ class CheckItem(ServerElement):
         self.pentest_types = [] if pentest_types is None else pentest_types
         self.defects = [] if defects is None else defects
         self.infos = {} if infos is None else infos
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.calendarName != "":
-            self.pentest = mongoInstance.calendarName
+        elif mongoInstance.pentestName != "":
+            self.pentest = mongoInstance.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         return self
@@ -59,7 +59,7 @@ class CheckItem(ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         pipeline["type"] = "checkitem"
         ds = mongoInstance.findInDb("pollenisator", cls.coll_name, pipeline, True)
         if ds is None:
@@ -76,7 +76,7 @@ class CheckItem(ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         pipeline["type"] = "checkitem"
         d = mongoInstance.findInDb("pollenisator", cls.coll_name, pipeline, False)
         if d is None:
@@ -123,7 +123,7 @@ def doInsert(pentest, data):
         else:
             step = 1
         data["step"] = step
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     data["type"] = "checkitem"
     existing = CheckItem.fetchObject({"title":data["title"]})
     if existing is not None:
@@ -150,13 +150,13 @@ def insert(body):
 def delete(iid):
     """delete cheatsheet item
     """
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     existing = CheckItem.fetchObject({"_id":ObjectId(iid)})
     if existing is None:
         return "Not found", 404
-    calendars = mongoInstance.listCalendarNames()
-    for calendar in calendars:
-        mongoInstance.deleteFromDb(calendar, CheckItem.coll_name, {"check_iid":ObjectId(iid)}, many=True, notify=True)
+    pentests = mongoInstance.listPentestNames()
+    for pentest in pentests:
+        mongoInstance.deleteFromDb(pentest, CheckItem.coll_name, {"check_iid":ObjectId(iid)}, many=True, notify=True)
     res = mongoInstance.deleteFromDb("pollenisator", CheckItem.coll_name, {"_id":ObjectId(iid)}, many=False, notify=True)
     if res is None:
         return 0
@@ -180,6 +180,6 @@ def update(iid, body):
     if "_id" in body:
         del body["_id"]
     # Update the checkitem
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     mongoInstance.updateInDb("pollenisator", CheckItem.coll_name, {"_id": ObjectId(iid), "type":"checkitem"}, {"$set": body}, False, True)
     return True

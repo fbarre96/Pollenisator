@@ -26,7 +26,7 @@ import sys
 import bcrypt
 import json
 
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.server.modules.worker.worker import removeWorkers, unregister
 import connexion
 from pathlib import Path
@@ -83,13 +83,6 @@ def home():
     return "Api working"
 
 
-# def createWorker():
-#     salt = bcrypt.gensalt()
-#     mongoInstance = MongoCalendar.getInstance()
-#     mongoInstance.insertInDb("pollenisator", "users", {
-#                              "username": "Worker", "hash": bcrypt.hashpw("".encode(), salt), "scope": ["worker"]})
-
-
 def createAdmin(username="", password=""):
     """Prompts the user to enter a username and password and creates a new admin account with those credentials.
 
@@ -109,7 +102,7 @@ def createAdmin(username="", password=""):
             print("Password cannot be empty")
             password = getpass("password: ")
     salt = bcrypt.gensalt()
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     mongoInstance.insertInDb("pollenisator", "users", {"username": username, "hash": bcrypt.hashpw(
         password.encode(), salt), "scope": ["admin", "user"]})
     print("Administrator created")
@@ -118,7 +111,7 @@ def createAdmin(username="", password=""):
 def notify_clients(notif):
     """Notify clients websockets
     """
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     sm = SocketManager.getInstance()
     sockets = mongoInstance.findInDb("pollenisator","sockets",{}, True)
     if notif["db"] == "pollenisator":
@@ -132,7 +125,7 @@ def notify_clients(notif):
 def init():
     """Initialize empty databases or remaining tmp data from last run
     """
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     mongoInstance.deleteFromDb("pollenisator", "sockets", {}, many=True, notify=False)
     any_user = mongoInstance.findInDb("pollenisator", "users", {}, False)
     noninteractive = False
@@ -185,7 +178,7 @@ def create_app():
         Args:
             data: A dictionary containing the worker's name and list of supported binaries.
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         workerName = data.get("name")
         binaries = data.get("binaries", [])
         
@@ -215,7 +208,7 @@ def create_app():
         token_info = decode_token(token)
         if res:
             if pentest in token_info["scope"]:
-                mongoInstance = MongoCalendar.getInstance()
+                mongoInstance = MongoClient.getInstance()
                 socket = mongoInstance.findInDb("pollenisator", "sockets", {"sid":sid}, False)
                 if socket is None:
                     mongoInstance.insertInDb("pollenisator", "sockets", {"sid":sid, "pentest":pentest}, False)
@@ -236,7 +229,7 @@ def create_app():
         """
         running_tasks = data.get("running_tasks", [])
         workerName = data.get("name")
-        mongoInstance = MongoCalendar.getInstance()        
+        mongoInstance = MongoClient.getInstance()        
         worker = mongoInstance.findInDb("pollenisator","workers", {"name":workerName}, False)
         if worker is None:
             sm.socketio.emit("deleteWorker", room=request.sid)
@@ -259,7 +252,7 @@ def create_app():
         """
         sid = request.sid
         todel = None
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         todel = mongoInstance.findInDb("pollenisator", "sockets", {"sid":sid}, False)
         if todel:
             unregister(todel.get("worker"))

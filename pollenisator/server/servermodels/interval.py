@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.core.models.interval import Interval
 from pollenisator.server.servermodels.tool import ServerTool
 from pollenisator.server.servermodels.element import ServerElement
@@ -11,11 +11,11 @@ class ServerInterval(Interval, ServerElement):
 
     def __init__(self, pentest="", *args, **kwargs):
         super().__init__(*args, **kwargs)
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.calendarName != "":
-            self.pentest = mongoInstance.calendarName
+        elif mongoInstance.pentestName != "":
+            self.pentest = mongoInstance.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
             
@@ -35,7 +35,7 @@ class ServerInterval(Interval, ServerElement):
         Returns:
             Returns the parent wave's ObjectId _id".
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         return mongoInstance.findInDb(self.pentest, "waves", {"wave": self.wave}, False)["_id"]
 
     @classmethod
@@ -46,7 +46,7 @@ class ServerInterval(Interval, ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
 
         ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
@@ -57,7 +57,7 @@ class ServerInterval(Interval, ServerElement):
 
 @permission("pentester")
 def delete(pentest, interval_iid):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     interval_o = ServerInterval(pentest, mongoInstance.findInDb(pentest, "intervals", {"_id": ObjectId(interval_iid)}, False))
     res = mongoInstance.deleteFromDb(pentest, "intervals", {"_id": ObjectId(interval_iid)}, False)
     parent_wave = mongoInstance.findInDb(pentest, "waves", {"wave": interval_o.wave}, False)
@@ -82,7 +82,7 @@ def delete(pentest, interval_iid):
         return res.deleted_count
 @permission("pentester")
 def insert(pentest, body):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     if "_id" in body:
         del body["_id"]
     interval_o = ServerInterval(pentest, body)
@@ -94,7 +94,7 @@ def insert(pentest, body):
 
 @permission("pentester")
 def update(pentest, interval_iid, body):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     interval_o = ServerInterval(pentest, mongoInstance.findInDb(pentest, "intervals", {"_id": ObjectId(interval_iid)}, False))
     interval_o.setToolsInTime()
     mongoInstance.updateInDb(pentest, "intervals", {"_id":ObjectId(interval_iid)}, {"$set":body}, False, True)

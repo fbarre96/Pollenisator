@@ -1,4 +1,4 @@
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from bson import ObjectId
 import pprint
 
@@ -15,7 +15,7 @@ class ServerElement(object):
         """
         tags = self.tags
         if newTag not in self.tags:
-            mongoInstance = MongoCalendar.getInstance()
+            mongoInstance = MongoClient.getInstance()
             for group in mongoInstance.getTagsGroups():
                 if newTag in group:
                     i = 0
@@ -42,7 +42,7 @@ class ServerElement(object):
         if "" in newInfos:
             del newInfos[""]
         self.infos.update(newInfos)
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         ret = mongoInstance.updateInDb(self.pentest, self.__class__.coll_name, {"_id":ObjectId(self.getId())}, {"$set":{"infos":self.infos}})
     
     def getId(self):

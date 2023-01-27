@@ -6,7 +6,7 @@ from threading import Thread
 from datetime import datetime
 from bson.objectid import ObjectId
 import pollenisator.core.components.utils as utils
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.server.servermodels.interval import ServerInterval
 from pollenisator.server.servermodels.command import ServerCommand
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
@@ -20,7 +20,7 @@ from pollenisator.server.token import encode_token
     
 @permission("pentester")
 def startAutoScan(pentest, **kwargs):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     autoscanRunning = mongoInstance.findInDb(pentest, "autoscan", {"special":True}, False) is not None
     if autoscanRunning:
         return "An auto scan is already running", 403
@@ -45,7 +45,7 @@ def autoScan(pentest, endoded_token):
     Args:
         pentest: The database to search tools in
     """
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     check = True
     try:
         while check:
@@ -85,7 +85,7 @@ def autoScan(pentest, endoded_token):
 @permission("pentester")
 def stopAutoScan(pentest):
     logger.debug("Autoscan : stop autoscan received ")
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     toolsRunning = []
     workers = mongoInstance.getWorkers({"pentest":pentest})
     for worker in workers:
@@ -101,7 +101,7 @@ def stopAutoScan(pentest):
 def getAutoScanStatus(pentest):
     #commandsRunning = mongoInstance.aggregate("tools", [{"$match": {"datef": "None", "dated": {
     #        "$ne": "None"}, "scanner_ip": {"$ne": "None"}}}, {"$group": {"_id": "$name", "count": {"$sum": 1}}}])
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     return mongoInstance.findInDb(pentest, "autoscan", {"special":True}, False) is not None
 
 
@@ -119,7 +119,7 @@ def findLaunchableTools(pentest):
     time_compatible_waves_id = searchForAddressCompatibleWithTime(pentest)
     if time_compatible_waves_id is None:
         return toolsLaunchable
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     check_items = list(CheckItem.fetchObjects({"type":"auto_commands"}))
     check_items.sort(key=lambda c: c.priority)
     

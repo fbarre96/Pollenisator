@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.core.models.port import Port
 from pollenisator.core.controllers.portcontroller import PortController
 from pollenisator.server.servermodels.tool import ServerTool, delete as tool_delete
@@ -19,18 +19,18 @@ from pollenisator.server.permission import permission
 class ServerPort(Port, ServerElement):
     
     def __init__(self, pentest="", *args, **kwargs):
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.calendarName != "":
-            self.pentest = mongoInstance.calendarName
+        elif mongoInstance.pentestName != "":
+            self.pentest = mongoInstance.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         super().__init__(*args, **kwargs)
 
 
     def getParentId(self):
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         return mongoInstance.findInDb(self.pentest, "ips", {"ip": self.ip}, False)["_id"]
 
     def addAllChecks(self):
@@ -55,7 +55,7 @@ class ServerPort(Port, ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
             return None
@@ -71,7 +71,7 @@ class ServerPort(Port, ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         d = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
         if d is None:
             return None
@@ -85,7 +85,7 @@ class ServerPort(Port, ServerElement):
 
 @permission("pentester")
 def delete(pentest, port_iid):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
 
     port_o = ServerPort(pentest, mongoInstance.findInDb(pentest, "ports", {"_id":ObjectId(port_iid)}, False))
     tools = mongoInstance.findInDb(pentest, "tools", {"port": port_o.port, "proto": port_o.proto,
@@ -108,7 +108,7 @@ def delete(pentest, port_iid):
 
 @permission("pentester")
 def insert(pentest, body):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     port_o = ServerPort(pentest, body)
     base = port_o.getDbKey()
     existing = mongoInstance.findInDb(pentest,
@@ -134,7 +134,7 @@ def insert(pentest, body):
 
 @permission("pentester")
 def update(pentest, port_iid, body):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     
     oldPort = ServerPort(pentest, mongoInstance.findInDb(pentest, "ports", {"_id": ObjectId(port_iid)}, False))
     if oldPort is None:
@@ -160,14 +160,4 @@ def update(pentest, port_iid, body):
                     tool_m.addInDb(check=False) # already checked and not updated yet so service would be wrong
     mongoInstance.updateInDb(pentest, "ports", {"_id":ObjectId(port_iid)}, {"$set":body}, False, True)
     return True
-    
-# @permission("pentester")
-# def addCustomTool(pentest, port_iid, body):
-#     mongoInstance = MongoCalendar.getInstance()
-#     if not mongoInstance.isUserConnected():
-#         return "Not connected", 503
-#     if mongoInstance.findInDb(pentest, "waves", {"wave": 'Custom Tools'}, False) is None:
-#         mongoInstance.insertInDb(pentest, "waves", {"wave": 'Custom Tools', "wave_commands": list()})
-#     port_o = ServerPort(pentest, mongoInstance.findInDb(pentest, "ports", {"_id":ObjectId(port_iid)}, False))
-#     port_o.addAllTool(body["command_iid"], 'Custom Tools', '', check=False)
-#     return "Success", 200
+   

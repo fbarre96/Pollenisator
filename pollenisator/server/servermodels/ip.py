@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from netaddr import IPNetwork, IPAddress
 from netaddr.core import AddrFormatError
 from pollenisator.core.models.ip import Ip
@@ -20,11 +20,11 @@ import json
 class ServerIp(Ip, ServerElement):
 
     def __init__(self, pentest="", *args, **kwargs):
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.calendarName != "":
-            self.pentest = mongoInstance.calendarName
+        elif mongoInstance.pentestName != "":
+            self.pentest = mongoInstance.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         super().__init__(*args, **kwargs)
@@ -54,7 +54,7 @@ class ServerIp(Ip, ServerElement):
             a list of scopes objects Mongo Ids where this IP/Domain is in scope.
         """
         ret = []
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         scopes = mongoInstance.findInDb(self.pentest, "scopes", {})
         if scopes is None:
             return ret
@@ -71,7 +71,7 @@ class ServerIp(Ip, ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
             return None
@@ -87,7 +87,7 @@ class ServerIp(Ip, ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
         if ds is None:
             return None
@@ -101,7 +101,7 @@ class ServerIp(Ip, ServerElement):
         Returns:
             a mongo cursor of IP objects matching the given scopeId
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         ips = mongoInstance.findInDb(pentest, "ips", {"in_scopes": {"$elemMatch": {"$eq": str(scopeId)}}})
         for ip in ips:
             yield ServerIp(pentest, ip)
@@ -145,7 +145,7 @@ class ServerIp(Ip, ServerElement):
             return None
         ip_real = performLookUp(self.ip)
         if ip_real is not None:
-            mongoInstance = MongoCalendar.getInstance()
+            mongoInstance = MongoClient.getInstance()
             ip_in_db = mongoInstance.findInDb(self.pentest, "ips", {"ip": ip_real}, False)
             if ip_in_db is None:
                 return None
@@ -174,7 +174,7 @@ class ServerIp(Ip, ServerElement):
 
 @permission("pentester")
 def delete(pentest, ip_iid):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     ip_dic = mongoInstance.findInDb(pentest, "ips", {"_id":ObjectId(ip_iid)}, False)
     if ip_dic is None:
         return 0
@@ -202,7 +202,7 @@ def delete(pentest, ip_iid):
 
 @permission("pentester")
 def insert(pentest, body):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     ip_o = ServerIp(pentest, body)
     base = ip_o.getDbKey()
     existing = mongoInstance.findInDb(pentest, 
@@ -221,7 +221,7 @@ def insert(pentest, body):
 
 @permission("pentester")
 def update(pentest, ip_iid, body):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     mongoInstance.updateInDb(pentest, "ips", {"_id":ObjectId(ip_iid)}, {"$set":body}, False, True)
     return True
 

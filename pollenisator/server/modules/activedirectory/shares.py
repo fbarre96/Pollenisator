@@ -2,7 +2,7 @@
 
 from __future__ import absolute_import
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.modules.activedirectory.share_file import ShareFile
 from pollenisator.server.permission import permission
@@ -35,11 +35,11 @@ class Share(ServerElement):
                 if not isinstance(f, ShareFile):
                     f = ShareFile(f)
                 self.files.append(f)
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.calendarName != "":
-            self.pentest = mongoInstance.calendarName
+        elif mongoInstance.pentestName != "":
+            self.pentest = mongoInstance.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         return self
@@ -63,7 +63,7 @@ class Share(ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         pipeline["type"] = "share"
         ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
@@ -81,7 +81,7 @@ class Share(ServerElement):
             Returns a cursor to iterate on model objects
         """
         pipeline["type"] = "share"
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         d = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
         if d is None:
             return None
@@ -175,7 +175,7 @@ def delete(pentest, share_iid):
 
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     share_dic = mongoInstance.findInDb(pentest, "ActiveDirectory", {"_id":ObjectId(share_iid), "type":"share"}, False)
     if share_dic is None:
         return 0
@@ -199,7 +199,7 @@ def insert(pentest, body):
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     share = Share(pentest, body) 
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     existing = mongoInstance.findInDb(pentest, 
         "ActiveDirectory", {"type":"share", "share":share.share, "ip":share.ip}, False)
     if existing is not None:
@@ -228,7 +228,7 @@ def update(pentest, share_iid, body):
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     share = Share(pentest, body) 
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     existing = Share.fetchObject(pentest, {"_id": ObjectId(share_iid)})
     if existing.share != share.share  and existing.ip != share.ip:
         return "Forbidden", 403

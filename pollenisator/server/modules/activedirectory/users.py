@@ -3,7 +3,7 @@
 from __future__ import absolute_import
 from pollenisator.core.components.logger_config import logger
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
@@ -47,11 +47,11 @@ class User(ServerElement):
         self.groups = groups
         self.description = description
         self.infos =  infos if infos is not None else {}
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.calendarName != "":
-            self.pentest = mongoInstance.calendarName
+        elif mongoInstance.pentestName != "":
+            self.pentest = mongoInstance.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         return self
@@ -69,7 +69,7 @@ class User(ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         pipeline["type"] = "user"
         ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
@@ -86,7 +86,7 @@ class User(ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         pipeline["type"] = "user"
         d = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
         if d is None:
@@ -105,7 +105,7 @@ class User(ServerElement):
         username = user_o.username if user_o.username is not None else ""
         password = user_o.password if user_o.password is not None else ""
         domain = user_o.domain if user_o.domain is not None else ""
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         dc_computer = mongoInstance.findInDb(self.pentest, "ActiveDirectory", {"type":"computer", "domain":domain, "infos.is_dc":True}, False)
         dc_ip = None if dc_computer is None else dc_computer.get("ip")
         infos = {"username":username, "password":password, "domain":domain, "dc_ip":dc_ip}
@@ -232,7 +232,7 @@ def delete(pentest, user_iid):
 
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     user_dic = mongoInstance.findInDb(pentest, "ActiveDirectory", {"_id":ObjectId(user_iid), "type":"user"}, False)
     if user_dic is None:
         return 0
@@ -265,7 +265,7 @@ def insert(pentest, body):
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     user = User(pentest, body)
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     domain = user.domain.lower() if user.domain is not None else ""
     username = user.username.lower() if user.username is not None else ""
     password = user.password if user.password is not None else ""
@@ -308,7 +308,7 @@ def update(pentest, user_iid, body):
     user = User(pentest, body)
     user.username = user.username.lower()
     user.domain = user.domain.lower()
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     user_existing = User.fetchObject(pentest, {"_id": ObjectId(user_iid)})
     if user_existing.username != user.username  and user_existing.domain != user.domain:
         return "Forbidden", 403

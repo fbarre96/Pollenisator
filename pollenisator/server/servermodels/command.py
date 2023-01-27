@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.core.models.command import Command
 from pollenisator.core.controllers.commandcontroller import CommandController
 from pollenisator.server.servermodels.element import ServerElement
@@ -21,7 +21,7 @@ class ServerCommand(Command, ServerElement):
         Returns:
             Returns a cursor to iterate on Command objects
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
 
         results = mongoInstance.findInDb(targetdb, "commands", pipeline, True)
         if results is None:
@@ -37,7 +37,7 @@ class ServerCommand(Command, ServerElement):
         Returns:
             Returns a Server Command
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         result = mongoInstance.findInDb(targetdb, "commands", pipeline, False)
         if result is None:
             return None
@@ -61,30 +61,30 @@ def getCommands(body):
     pipeline = body.get("pipeline", {})
     if isinstance(pipeline, str):
         pipeline = json.loads(pipeline, cls=JSONDecoder)
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     results = mongoInstance.findInDb("pollenisator", "commands", pipeline, True)
     if results is None:
         return []
     return [x for x in results]
 
 def doDelete(pentest, command):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     #TODO : delete from checks
     # Remove from all waves this command.
     if command.indb == "pollenisator":
-        calendars = mongoInstance.listCalendarNames()
+        pentests = mongoInstance.listPentestNames()
     else:
-        calendars = [command.indb]
-    for calendar in calendars:
-        waves = mongoInstance.findInDb(calendar, "waves")
+        pentests = [command.indb]
+    for pentest in pentests:
+        waves = mongoInstance.findInDb(pentest, "waves")
         for wave in waves:
             toBeUpdated = wave["wave_commands"]
             if command._id in wave["wave_commands"]:
                 toBeUpdated.remove(command._id)
-                mongoInstance.updateInDb(calendar, "waves", {"_id": wave["_id"]}, {
+                mongoInstance.updateInDb(pentest, "waves", {"_id": wave["_id"]}, {
                     "$set": {"wave_commands": toBeUpdated}}, False)
         # Remove all tools refering to this command's name.
-        mongoInstance.deleteFromDb(calendar,
+        mongoInstance.deleteFromDb(pentest,
                                    "tools", {"name": command.name}, True, True)
 
     res = mongoInstance.deleteFromDb(command.indb, "commands", {
@@ -97,7 +97,7 @@ def doDelete(pentest, command):
 @permission("user")
 def deleteCommand(command_iid, **kwargs):
     user = kwargs["token_info"]["sub"]
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     c = mongoInstance.findInDb("pollenisator",
         "commands", {"_id": ObjectId(command_iid)}, False)
     if c is None:
@@ -109,7 +109,7 @@ def deleteCommand(command_iid, **kwargs):
 @permission("pentester")
 def delete(pentest, command_iid, **kwargs):
     user = kwargs["token_info"]["sub"]
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     c = mongoInstance.findInDb(pentest,
         "commands", {"_id": ObjectId(command_iid)}, False)
     if c is None:
@@ -119,7 +119,7 @@ def delete(pentest, command_iid, **kwargs):
     
 
 def doInsert(pentest, body, user):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     existing = mongoInstance.findInDb(
         body["indb"], "commands", {"name": body["name"]}, False)
     if existing is not None:
@@ -140,7 +140,7 @@ def insert(pentest, body, **kwargs):
 
 @permission("pentester")
 def update(pentest, command_iid, body, **kwargs):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     command = Command(mongoInstance.findInDb(pentest,
         "commands", {"_id": ObjectId(command_iid)}, False))
     if "owners" in body:
@@ -154,7 +154,7 @@ def update(pentest, command_iid, body, **kwargs):
 def addToMyCommands(command_iid, **kwargs):
     """Add a command to the user's commands list."""
     user = kwargs["token_info"]["sub"]
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     res = mongoInstance.findInDb("pollenisator", "commands", {
                                  "_id": ObjectId(command_iid)}, False)
     if res is None:
@@ -166,7 +166,7 @@ def addToMyCommands(command_iid, **kwargs):
 
 def addUserCommandsToPentest(pentest, user):
     """Add all commands owned by user to pentest database."""
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     worker = mongoInstance.findInDb(
         "pollenisator", "workers", {"name": user}, False)
     if worker is not None:

@@ -1,7 +1,7 @@
 import json
 from pollenisator.core.components.logger_config import logger
 import uuid
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.core.controllers.toolcontroller import ToolController
 from pollenisator.core.components.socketmanager import SocketManager
 from pollenisator.server.servermodels.command import addUserCommandsToPentest
@@ -18,7 +18,7 @@ try:
 except:
     git_available = False
 
-mongoInstance = MongoCalendar.getInstance()
+mongoInstance = MongoClient.getInstance()
 
 @permission("user")
 def listWorkers(pipeline=None):
@@ -60,7 +60,7 @@ def doDeleteWorker(name):
 
 
 def removeWorkers():
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     workers = mongoInstance.getWorkers()
     count = 0
     for worker in workers:

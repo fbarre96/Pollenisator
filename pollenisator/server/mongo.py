@@ -6,7 +6,7 @@ from flask import send_file
 import tempfile
 import re
 import shutil
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.core.components.parser import Parser, ParseError, Term
 from pollenisator.core.components.utils import JSONDecoder, getMainDir, isIp, JSONEncoder
 from pollenisator.core.controllers.wavecontroller import WaveController
@@ -16,7 +16,7 @@ from pollenisator.server.servermodels.wave import ServerWave, insert as insert_w
 from pollenisator.server.servermodels.interval import ServerInterval, insert as insert_interval
 from pollenisator.server.servermodels.scope import insert as insert_scope
 from pollenisator.server.permission import permission
-mongoInstance = MongoCalendar.getInstance()
+mongoInstance = MongoClient.getInstance()
 
 searchable_collections = ["waves","scopes","ips","ports","tools","defects"]
 validCollections = [ "cheatsheet", "commands", "settings"]
@@ -51,7 +51,7 @@ def update(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in mongoInstance.listCalendarNames():
+    elif pentest not in mongoInstance.listPentestNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
     
     mongoInstance.updateInDb(pentest, collection, pipeline, updatePipeline, body["many"], body["notify"], body.get("upsert", False))
@@ -67,7 +67,7 @@ def insert(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in mongoInstance.listCalendarNames():
+    elif pentest not in mongoInstance.listPentestNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
     res = mongoInstance.insertInDb(pentest, collection, pipeline, body["parent"], body["notify"])
     return str(res.inserted_id)
@@ -82,7 +82,7 @@ def find(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in mongoInstance.listCalendarNames():
+    elif pentest not in mongoInstance.listPentestNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
     res = mongoInstance.findInDb(pentest, collection, pipeline, body.get("many", True), body.get("skip", None), body.get("limit", None))
     if isinstance(res, dict):
@@ -101,7 +101,7 @@ def search(pentest, s):
     """Use a parser to convert the search query into mongo queries and returns all matching objects
     """
     searchQuery = s
-    if pentest not in mongoInstance.listCalendarNames():
+    if pentest not in mongoInstance.listPentestNames():
         return "Pentest argument is not a valid pollenisator pentest", 400
     try:
         parser = Parser(searchQuery)
@@ -191,7 +191,7 @@ def count(pentest, collection, body):
             return "Collection argument is not a valid pollenisator collection", 403
     if not isinstance(pipeline, dict):
         return "Pipeline argument was not valid", 400
-    elif pentest not in mongoInstance.listCalendarNames():
+    elif pentest not in mongoInstance.listPentestNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
     res = mongoInstance.countInDb(pentest, collection, pipeline)
     return res
@@ -209,7 +209,7 @@ def aggregate(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in mongoInstance.listCalendarNames():
+    elif pentest not in mongoInstance.listPentestNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
     res = mongoInstance.aggregateFromDb(pentest, collection, body)
     for r in res:
@@ -226,7 +226,7 @@ def delete(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in mongoInstance.listCalendarNames():
+    elif pentest not in mongoInstance.listPentestNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
     res = mongoInstance.deleteFromDb(pentest, collection, pipeline, body["many"], body["notify"])
     if res is None:
@@ -243,7 +243,7 @@ def bulk_delete(pentest, body):
         return "body was not a valid dictionnary", 400
     if pentest == "pollenisator":
         return "Impossible to bulk delete in this database", 403
-    elif pentest not in mongoInstance.listCalendarNames():
+    elif pentest not in mongoInstance.listPentestNames():
         return "Pentest argument is not a valid pollenisator pentest", 403
     deleted = 0
     for obj_type in data:
@@ -282,14 +282,14 @@ def listPentests(**kwargs):
     username = kwargs["token_info"]["sub"]
     if "admin" in kwargs["token_info"]["scope"]:
         username = None
-    ret = mongoInstance.listCalendars(username)
+    ret = mongoInstance.listPentests(username)
     if ret:
         return ret
     else:
         return []
 
 def deletePentestFiles(pentest):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     local_path = os.path.join(getMainDir(), "files")
     proofspath = os.path.join(local_path, pentest, "proof")
     if os.path.isdir(proofspath):
@@ -303,7 +303,7 @@ def deletePentest(pentest, **kwargs):
     username = kwargs["token_info"]["sub"]
     if username != mongoInstance.getPentestOwner(pentest) and "admin" not in kwargs["token_info"]["scope"]:
         return "Forbidden", 403
-    ret = mongoInstance.doDeleteCalendar(pentest)
+    ret = mongoInstance.doDeletePentest(pentest)
     if ret:
         deletePentestFiles(pentest)
         return "Successful deletion"
@@ -311,19 +311,19 @@ def deletePentest(pentest, **kwargs):
         return  "Unknown pentest", 404
 
 @permission("user")
-def registerCalendar(pentest, body, **kwargs):
+def registerPentest(pentest, body, **kwargs):
     username = kwargs["token_info"]["sub"]
-    ret, msg = mongoInstance.registerCalendar(username, pentest, False, False)
+    ret, msg = mongoInstance.registerPentest(username, pentest, False, False)
     
     if ret:
         #token = connectToPentest(pentest, **kwargs)
         #kwargs["token_info"] = decode_token(token[0])
-        prepareCalendar(pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username, **kwargs)
+        preparePentest(pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username, **kwargs)
         return msg
     else:
         return msg, 403
 
-def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings, pentesters, owner, **kwargs):
+def preparePentest(dbName, pentest_type, start_date, end_date, scope, settings, pentesters, owner, **kwargs):
     """
     Initiate a pentest database with wizard info
     Args:
@@ -338,7 +338,7 @@ def prepareCalendar(dbName, pentest_type, start_date, end_date, scope, settings,
             * "Add all domains found":  Unsafe. if 1, all new domains found by tools will be considered in scope.
     """
     user = kwargs["token_info"]["sub"]
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
 
     addUserCommandsToPentest(dbName, user)  
     #addCheckInstancesToPentest(dbName, pentest_type)
@@ -473,7 +473,7 @@ def dumpDb(dbName, collection=""):
         dbName: the database name to dump
         collection: (Opt.) the collection to dump.
     """
-    if dbName != "pollenisator" and dbName not in mongoInstance.listCalendarNames():
+    if dbName != "pollenisator" and dbName not in mongoInstance.listPentestNames():
         return "Database not found", 404
 
     if collection != "" and collection not in mongoInstance.db.collection_names():
@@ -530,7 +530,7 @@ def importCommands(upfile, **kwargs):
     return doImportCommands(data, user)
     
 def doExportCommands():
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     res = {"commands":[]}
     commands = mongoInstance.findInDb("pollenisator", "commands", {}, True)
     for command in commands:

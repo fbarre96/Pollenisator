@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.servermodels.tool import ServerTool
 from pollenisator.server.servermodels.command import ServerCommand
@@ -12,11 +12,11 @@ class CheckInstance(ServerElement):
 
     
     def __init__(self, pentest, valuesFromDb=None):
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.calendarName != "":
-            self.pentest = mongoInstance.calendarName
+        elif mongoInstance.pentestName != "":
+            self.pentest = mongoInstance.pentestName
         else:
             raise ValueError(
                 "An empty pentest name was given and the database is not set in mongo instance.")
@@ -37,11 +37,11 @@ class CheckInstance(ServerElement):
         self.target_type = target_type
         self.status = status
         self.notes = notes
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.calendarName != "":
-            self.pentest = mongoInstance.calendarName
+        elif mongoInstance.pentestName != "":
+            self.pentest = mongoInstance.pentestName
         else:
             raise ValueError(
                 "An empty pentest name was given and the database is not set in mongo instance.")
@@ -55,7 +55,7 @@ class CheckInstance(ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         pipeline["type"] = "checkinstance"
         ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
@@ -72,7 +72,7 @@ class CheckInstance(ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         pipeline["type"] = "checkinstance"
         d = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
         if d is None:
@@ -144,7 +144,7 @@ class CheckInstance(ServerElement):
 def doInsert(pentest, data, checkItem=None, toolInfos=None):
     if "_id" in data:
         del data["_id"]
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     data["type"] = "checkinstance"
     existing = CheckInstance.fetchObject(pentest, {"check_iid": str(data["check_iid"]), "target_iid": data.get(
         "target_iid", ""), "target_type": data.get("target_type", "")})
@@ -170,12 +170,6 @@ def doInsert(pentest, data, checkItem=None, toolInfos=None):
     return {"res": True, "iid": iid}
     
 
-# def addCheckInstancesToPentest(pentest, pentest_type):
-#     mongoInstance = MongoCalendar.getInstance()
-#     checkItems = CheckItem.fetchObjects({"pentest_types":pentest_type})
-#     for checkItem in checkItems:
-#         CheckInstance.createFromCheckItem(pentest, checkItem)
-#     return True
 
 
 @permission("pentester")
@@ -197,7 +191,7 @@ def insert(pentest, body):
 def delete(pentest, iid):
     """delete cheatsheet item
     """
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     if pentest == "pollenisator":
         return "Forbidden", 403
     existing = CheckInstance.fetchObject(pentest, {"_id": ObjectId(iid)})
@@ -219,7 +213,7 @@ def update(pentest, iid, body):
     if pentest == "pollenisator":
         return "Forbidden", 403
     checkinstance = CheckInstance(pentest, body)
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     existing = CheckInstance.fetchObject(pentest, {"_id": ObjectId(iid)})
     if existing is None:
         return "Not found", 404

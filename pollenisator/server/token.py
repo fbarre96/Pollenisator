@@ -1,6 +1,6 @@
 from pollenisator.core.components.logger_config import logger
 from jose import JWTError, jwt
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 import datetime
 import uuid
 from werkzeug.exceptions import Unauthorized
@@ -10,7 +10,7 @@ JWT_LIFETIME_SECONDS = 3600*8
 JWT_ALGORITHM = 'HS256'
 
 def getTokenFor(username, pentest="", owner=False):
-    mongoinstance = MongoCalendar.getInstance()
+    mongoinstance = MongoClient.getInstance()
     user_record = mongoinstance.findInDb("pollenisator", "users", {"username":username}, False)
     if user_record is None:
         return ""
@@ -52,7 +52,7 @@ def generateNewToken(user_record, new_scopes):
     jwt_encoded = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
     # Update the user record in the database with the new token
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     mongoInstance.updateInDb("pollenisator", "users", {"_id":user_record["_id"]}, {"$set":{"token":jwt_encoded}})
 
     # Return the encoded JWT
@@ -68,7 +68,7 @@ def verifyToken(access_token):
     return checkTokenValidity(jwt_decoded)
 
 def checkTokenValidity(jwt_decoded):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     access_token = encode_token(jwt_decoded)
     user = mongoInstance.findInDb("pollenisator", "users", {"token":access_token}, False)
     if user is not None:

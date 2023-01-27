@@ -2,7 +2,7 @@
 
 from __future__ import absolute_import
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.core.components.logger_config import logger
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.servermodels.command import ServerCommand
@@ -52,11 +52,11 @@ class Computer(ServerElement):
         self.admins = admins
         self.users = users
         self._infos = ComputerInfos(infos)
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.calendarName != "":
-            self.pentest = mongoInstance.calendarName
+        elif mongoInstance.pentestName != "":
+            self.pentest = mongoInstance.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
     
@@ -72,7 +72,7 @@ class Computer(ServerElement):
         Returns:
             Returns a cursor to iterate on model objects
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         pipeline["type"] = "computer"
         ds = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, True)
         if ds is None:
@@ -90,7 +90,7 @@ class Computer(ServerElement):
             Returns a cursor to iterate on model objects
         """
         pipeline["type"] = "computer"
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         d = mongoInstance.findInDb(pentest, cls.coll_name, pipeline, False)
         if d is None:
             return None
@@ -185,7 +185,7 @@ def delete(pentest, computer_iid):  # noqa: E501
 
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     share_dic = mongoInstance.findInDb(pentest, "ActiveDirectory", {"_id":ObjectId(computer_iid), "type":"computer"}, False)
     if share_dic is None:
         return 0
@@ -211,7 +211,7 @@ def update(pentest, computer_iid, body):  # noqa: E501
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     computer = Computer(pentest, body) 
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     existing = Computer.fetchObject(pentest, {"_id": ObjectId(computer_iid)})
     if computer.ip != existing.ip:
         return "Forbidden", 403
@@ -251,7 +251,7 @@ def insert(pentest, body):  # noqa: E501
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     computer = Computer(pentest, body)
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     existing = mongoInstance.findInDb(pentest, 
         "ActiveDirectory", {"type":"computer", "ip":computer.ip}, False)
     if existing is not None:
@@ -277,7 +277,7 @@ def insert(pentest, body):  # noqa: E501
 
 @permission("pentester")
 def getUsers(pentest, computer_iid):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     computer_m = Computer.fetchObject(pentest, {"_id":ObjectId(computer_iid)})
     if computer_m is None:
         return "Not found", 404

@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.core.models.wave import Wave
 from pollenisator.server.servermodels.tool import ServerTool
 from pollenisator.server.servermodels.scope import ServerScope
@@ -15,11 +15,11 @@ class ServerWave(Wave, ServerElement):
 
     def __init__(self, pentest="", *args, **kwargs):
         super().__init__(*args, **kwargs)
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.calendarName != "":
-            self.pentest = mongoInstance.calendarName
+        elif mongoInstance.pentestName != "":
+            self.pentest = mongoInstance.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
 
@@ -43,7 +43,7 @@ class ServerWave(Wave, ServerElement):
         Args:
             command_name: The command that we want to remove all the tools.
         """
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         tools = ServerTool.fetchObjects(self.pentest, {"name": command_name, "wave": self.wave})
         for tool in tools:
             if "done" not in tool.getStatus():
@@ -51,7 +51,7 @@ class ServerWave(Wave, ServerElement):
 
 @permission("pentester")
 def delete(pentest, wave_iid):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     wave_o = ServerWave(pentest, mongoInstance.findInDb(pentest, "waves", {"_id": ObjectId(wave_iid)}, False))
     mongoInstance.deleteFromDb(pentest, "tools", {"wave": wave_o.wave}, True)
     mongoInstance.deleteFromDb(pentest, "intervals", {"wave": wave_o.wave}, True)
@@ -68,7 +68,7 @@ def delete(pentest, wave_iid):
     
 @permission("pentester")
 def insert(pentest, body):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     wave_o = ServerWave(pentest, body)
     # Checking unicity
     existing = mongoInstance.findInDb(pentest, "waves", {"wave": wave_o.wave}, False)
@@ -85,7 +85,7 @@ def insert(pentest, body):
 
 @permission("pentester")
 def update(pentest, wave_iid, body):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     oldWave_o = ServerWave(pentest, mongoInstance.findInDb(pentest, "waves", {"_id":ObjectId(wave_iid)}, False))
     oldCommands = oldWave_o.wave_commands
     wave_commands = body["wave_commands"]
@@ -93,7 +93,7 @@ def update(pentest, wave_iid, body):
     
 
 def addUserCommandsToWave(pentest, wave_iid, user):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     
     mycommands = mongoInstance.findInDb(pentest, "commands", {"owners":user}, True)
     comms = [command["_id"] for command in mycommands]

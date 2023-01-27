@@ -7,7 +7,7 @@ import pollenisator.core.reporting.wordexport as wordexport
 import pollenisator.core.reporting.powerpointexport as powerpointexport
 import pollenisator.core.reporting.excelexport as excelexport
 from pollenisator.server.servermodels.defect import getGlobalDefects
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.core.components.utils import JSONEncoder, loadServerConfig, getMainDir
 from pollenisator.server.permission import permission
 from multiprocessing import Process, Manager
@@ -155,7 +155,7 @@ def search(body):
         coll = "defects"
     else:
         return "Invalid parameter: type must be either defect or remark.", 400
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     p = {"title":re.compile(terms, re.IGNORECASE)}
     if lang != "":
         p["language"] = lang
@@ -182,7 +182,7 @@ def search(body):
     return ret, 200
 
 def craftContext(pentest, **kwargs):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     context = {}
     for k, v in kwargs.items():
         context[k] = v
@@ -272,91 +272,3 @@ def getProofPath(pentest, defect_iid):
     local_path = os.path.join(getMainDir(), "files")
 
     return os.path.join(local_path, pentest, "proof", str(defect_iid))
-
-# def getKnownDefectFromKnowledgeDB(defect):
-#     mongoInstance = MongoCalendar.getInstance()
-#     #result, status = search({"type":"defect", "terms":defect["title"]})
-#     if status != 200:
-#         result = None
-#     impossible_to_connect = False
-#     if result is None:
-#         impossible_to_connect = True
-#     elif isinstance(result, bool):
-#         if result == False:
-#             impossible_to_connect = True
-#     elif len(result) == 0:
-#         impossible_to_connect = True
-#     if impossible_to_connect:
-#         result = [
-#             {
-#                 "id": "0",
-#                 "title": defect["title"],
-#                 "ease": defect["ease"],
-#                 "impact": defect["impact"],
-#                 "risk": defect["risk"],
-#                 "type": defect["type"],
-#                 "synthesis": "ToDo",
-#                 "description": "ToDo",
-#                 "redactor": "N/A",
-#                 "fixes": [
-#                     {
-#                         "title": "ToDo",
-#                         "execution": "Moderate",
-#                         "gain": "Moderate",
-#                         "synthesis": "ToDo",
-#                         "description": "ToDo",
-#                     }
-#                 ]
-#             }
-#         ]
-
-#     result = result[0]
-#     if result["description"]:
-#         result["description"] = result.get("description", "ToDo").replace(
-#             "<", "&lt;").replace(">", "&gt;")
-#         result["description_paragraphs"] = result["description"].replace(
-#             "\r", "").split("\n\n")
-#     if result["synthesis"]:
-#         result["synthesis"] = result.get("synthesis", "ToDo").replace(
-#             "<", "&lt;").replace(">", "&gt;")
-#     for fix in result["fixes"]:
-#         if fix["synthesis"]:
-#             fix["synthesis"] = fix.get("synthesis", "ToDo").replace(
-#                 "<", "&lt;").replace(">", "&gt;")
-#         if fix["description"]:
-#             fix["description"] = fix.get("description", "ToDo").replace(
-#                 "<", "&lt;").replace(">", "&gt;")
-#             fix["description_paragraphs"] = fix["description"].replace(
-#                 "\r", "").split("\n\n")
-#     for key, val in defect.items():
-#         if result.get(key, None) is None:
-#             result[key] = val
-
-#     result["ease"] = defect["ease"]
-#     result["impact"] = defect["impact"]
-#     result["risk"] = defect["risk"]
-#     return result
-
-
-# def getKnownRemarkFromKnowledgeDB(remark):
-#     result, status = search({"type":"remark", "terms":remark["title"]})
-#     if status != 200:
-#         result = None
-#     impossible_to_connect = False
-#     if result is None:
-#         impossible_to_connect = True
-#     elif isinstance(result, bool):
-#         if result == False:
-#             impossible_to_connect = True
-#     elif len(result) == 0:
-#         impossible_to_connect = True
-#     if impossible_to_connect:
-#         result = [
-#             {
-#                 "id": None,
-#                 "title": remark["title"],
-#                 "description": remark["title"],
-#                 "type": remark["type"],
-#             }
-#         ]
-#     return result[0]

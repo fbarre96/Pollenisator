@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.servermodels.tool import ServerTool
 from pollenisator.server.permission import permission
@@ -30,11 +30,11 @@ class AuthInfo(ServerElement):
         self.name = name
         self.value = value
         self.type = type
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif mongoInstance.calendarName != "":
-            self.pentest = mongoInstance.calendarName
+        elif mongoInstance.pentestName != "":
+            self.pentest = mongoInstance.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         return self
@@ -63,7 +63,7 @@ def insert(pentest, body):
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     auth = AuthInfo(pentest, body)
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     if "_id" in body:
         del body["_id"]
     
@@ -75,7 +75,7 @@ def insert(pentest, body):
 @permission("pentester")
 def link(pentest, auth_iid, object_iid):
     #TODO swap to add checks
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     lookup = { "scopes":"network", "ips":"ip","ports":"port","waves":"wave"}
     lvl_found = None
     collection_found = None

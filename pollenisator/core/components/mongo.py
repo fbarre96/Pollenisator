@@ -11,7 +11,7 @@ from pollenisator.core.components.logger_config import logger
 from bson import ObjectId
 
 
-class MongoCalendar:
+class MongoClient:
     # pylint: disable=unsubscriptable-object
     """
     Centralize all direct contacts with the database.
@@ -23,29 +23,29 @@ class MongoCalendar:
         """ Singleton Static access method.
         """
         pid = os.getpid()  # HACK : One mongo per process.
-        instance = MongoCalendar.__instances.get(pid, None)
+        instance = MongoClient.__instances.get(pid, None)
         if instance is None:
-            MongoCalendar()
-        return MongoCalendar.__instances[pid]
+            MongoClient()
+        return MongoClient.__instances[pid]
 
     def __init__(self):
         """ DO NOT USE THIS CONSTRUCTOR IT IS A
-        Virtually private constructor.  Use MongoCalendar.getInstance()
+        Virtually private constructor.  Use MongoClient.getInstance()
         Args:
             client: a MongoClient instance or None
             host: the host where the database is running
             user: a user login to the database
             password: a password corresponding with the user to connect to the database
             ssl: Absolute path to the folder containing client.pem and ca.pem or empty if ssl is disabled
-            calendarName: the calendar name the db has connected to. Or None if not connected to any calendar.
+            pentestName: the pentest name the db has connected to. Or None if not connected to any pentest.
             ssldir: The string path to a folder where all the ssl certificates are to be found.
             db: The database to the client last connected.
-            forbiddenNames: A list of names forbidden for calendars because they are reserved by mongo, this application. ("admin", "config", "local", "broker_pollenisator", "pollenisator")
+            forbiddenNames: A list of names forbidden for pentests because they are reserved by mongo, this application. ("admin", "config", "local", "broker_pollenisator", "pollenisator")
         Raises:
             Exception if it is instanciated.
         """
         pid = os.getpid()  # HACK : One mongo per process.
-        if MongoCalendar.__instances.get(pid, None) is not None:
+        if MongoClient.__instances.get(pid, None) is not None:
             raise Exception("This class is a singleton!")
         else:
             self.client = None
@@ -54,12 +54,12 @@ class MongoCalendar:
             self.user = ""
             self.ssl = ""
             self.port = ""
-            self.calendarName = None
+            self.pentestName = None
             self.ssldir = ""
             self.db = None
             self.forbiddenNames = ["admin", "config", "local",
                                    "broker_pollenisator", "pollenisator"]
-            MongoCalendar.__instances[pid] = self
+            MongoClient.__instances[pid] = self
 
     def reinitConnection(self):
         """Reset client connection"""
@@ -145,7 +145,7 @@ class MongoCalendar:
             connectionString = ""
             if self.user != "":
                 connectionString = self.user+':'+self.password+'@'
-            self.calendarName = None
+            self.pentestName = None
             try:
                 if cfg["ssl"].strip() != "":
 
@@ -170,23 +170,23 @@ class MongoCalendar:
     def isUserConnected(self):
         """Return True if the user is able to list databases. False otherwise.
         Returns: bool"""
-        return self.listCalendars() is not None
+        return self.listPentests() is not None
 
-    def connectToDb(self, calendarName):
+    def connectToDb(self, pentestName):
         """
-        Connect to the pentest database given by calendarName (pentestName).
+        Connect to the pentest database given by pentestName (pentestName).
 
         Args:
-            calendarName: the pentest name to which you want to connect
+            pentestName: the pentest name to which you want to connect
         """
         try:
             if self.client is None:
                 self.connect()
                 if self.client is None:
                     raise IOError()
-            self.calendarName = calendarName
-            if calendarName is not None:
-                self.db = self.client[calendarName]
+            self.pentestName = pentestName
+            if pentestName is not None:
+                self.db = self.client[pentestName]
                 
         except IOError as e:
             print("Failed to connect." + str(e))
@@ -203,7 +203,7 @@ class MongoCalendar:
             "name": worker_name}, False, True)
 
     def resetRunningTools(self):
-        dbs = self.listCalendarNames()
+        dbs = self.listPentestNames()
         for db in dbs:
             self.updateInDb(db, "tools", {"datef": "None", "scanner_ip": {"$ne": "None"}}, {"$set":{"dated":"None", "datef":"None", "scanner_ip":"None"}, "$pull":{"status":"running"}})
             self.updateInDb(db, "tools", {"datef": "None", "dated": {"$ne": "None"}}, {"$set":{"dated":"None", "datef":"None", "scanner_ip":"None"}, "$pull":{"status":"running"}})
@@ -254,7 +254,7 @@ class MongoCalendar:
         Returns:
             Return the pymongo result of the update or update_many function.
         """
-        return self._update(self.calendarName, collection, pipeline, updatePipeline, many=many, notify=notify, upsert=upsert)
+        return self._update(self.pentestName, collection, pipeline, updatePipeline, many=many, notify=notify, upsert=upsert)
 
     def updateInDb(self, db, collection, pipeline, updatePipeline, many=False, notify=True, upsert=False):
         """
@@ -320,7 +320,7 @@ class MongoCalendar:
         """
         if values.get("parent", None) is None:
             values["parent"] = parent
-        ret = self._insert(self.calendarName, collection, values, notify, parent)
+        ret = self._insert(self.pentestName, collection, values, notify, parent)
         return ret
 
     def insertInDb(self, db, collection, values, _parent='', notify=True):
@@ -516,7 +516,7 @@ class MongoCalendar:
         Returns:
             Return the pymongo result of the delete_one or delete_many function.
         """
-        return self._delete(self.calendarName, collection, pipeline, many, True)
+        return self._delete(self.pentestName, collection, pipeline, many, True)
 
     def deleteFromDb(self, db, collection, pipeline, many=False, notify=True):
         """
@@ -563,7 +563,7 @@ class MongoCalendar:
                 res = db[collection].delete_one(pipeline)
         return res
 
-    def listCalendars(self, username=None):
+    def listPentests(self, username=None):
         """Return the list of pollenisator databases.
         Raises:
             Raise Exception if client is not connected to database
@@ -577,15 +577,15 @@ class MongoCalendar:
                 self.connect()
                 if self.client is None:
                     raise Exception()
-            calendars = self.findInDb("pollenisator", "calendars")
+            pentests = self.findInDb("pollenisator", "pentests")
             try:
-                for calendar in calendars:
+                for pentest in pentests:
                     if username is not None:
-                        res = self.findInDb(calendar["nom"], "settings", {"key":"pentesters", "value":username}, False)
-                        if res is not None or username == calendar.get("owner"):
-                            ret.append(calendar)
+                        res = self.findInDb(pentest["nom"], "settings", {"key":"pentesters", "value":username}, False)
+                        if res is not None or username == pentest.get("owner"):
+                            ret.append(pentest)
                     else:
-                        ret.append(calendar)
+                        ret.append(pentest)
             except OperationFailure:
                 print("The connected user has no rights")
                 return None
@@ -597,14 +597,14 @@ class MongoCalendar:
             return None
         return ret
 
-    def listCalendarNames(self, username=None):
+    def listPentestNames(self, username=None):
         """Return the list of pollenisator databases.
         Raises:
             Raise Exception if client is not connected to database
         Returns:
             None if the server connection is not established. A list of string with pollenisator databases.
         """
-        cals = self.listCalendars(username)
+        cals = self.listPentests(username)
         if cals is None:
             return None
         ret = []
@@ -612,84 +612,84 @@ class MongoCalendar:
             ret.append(cal["nom"])
         return ret
 
-    def hasACalendarOpen(self):
+    def hasAPentestOpen(self):
         """
-        Return wether or not a calendar is open.
+        Return wether or not a pentest is open.
 
         Returns:
-            Return True if a calendar is open, False otherwise.
+            Return True if a pentest is open, False otherwise.
         """
-        return self.calendarName is not None
+        return self.pentestName is not None
 
-    def doDeleteCalendar(self, calendarName):
+    def doDeletePentest(self, pentestName):
         """
-        Remove the given calendar name from the database.
+        Remove the given pentest name from the database.
 
         Args:
-            calendarName: the calendar name to delete.
+            pentestName: the pentest name to delete.
         """
         result = self.deleteFromDb(
-            "pollenisator", "calendars", {"nom": calendarName})
+            "pollenisator", "pentests", {"nom": pentestName})
         if result is not None:
             if result.deleted_count == 1:
-                self.client.drop_database(calendarName)
+                self.client.drop_database(pentestName)
                 return True
 
         return False
 
-    def validateCalendarName(self, calendarName):
+    def validatePentestName(self, pentestName):
         """Check the database name to see if it usable.
         Checks mongo and pollenisator name overlapping.
         Check space and dot in name.
         Check existing pollenisator pentest database names.
         Returns: a boolean"""
         # check for forbidden names
-        if calendarName.strip().lower() in self.forbiddenNames:
+        if pentestName.strip().lower() in self.forbiddenNames:
             msg = "This name is forbidden."
             return False, msg
-        elif "." in calendarName.strip():
+        elif "." in pentestName.strip():
             msg = "The name cannot contain a dot (.)."
             return False, msg
-        elif " " in calendarName.strip():
+        elif " " in pentestName.strip():
             msg = "The name cannot contain a space."
             return False, msg
-        calendars = self.listCalendarNames()
-        if calendars is None:
+        pentests = self.listPentestNames()
+        if pentests is None:
             return False, "API has trouble connecting to db. Check api server config."
-        calendars = [x.lower() for x in calendars]
-        if calendarName.strip().lower() in calendars:
+        pentests = [x.lower() for x in pentests]
+        if pentestName.strip().lower() in pentests:
             msg = "A database with the same name already exists."
             return False, msg
         return True, ""
 
-    def registerCalendar(self, owner, saveAsName, askDeleteIfExists=True, autoconnect=True):
+    def registerPentest(self, owner, saveAsName, askDeleteIfExists=True, autoconnect=True):
         """
-        Register a new calendar into database.
+        Register a new pentest into database.
 
         Args:
             owner: the owner's username
-            saveAsName: the calendar name to register
-            askDeleteIfExists: boolean to ask the user for a deletion in case of an already existing calendar with the same name.
-                                If false, and the case appends, calendar will not be registered. Default is True.
-            autoconnect: boolean indicating if the database should connect to the calendar after it is registered. Default to True.
+            saveAsName: the pentest name to register
+            askDeleteIfExists: boolean to ask the user for a deletion in case of an already existing pentest with the same name.
+                                If false, and the case appends, pentest will not be registered. Default is True.
+            autoconnect: boolean indicating if the database should connect to the pentest after it is registered. Default to True.
 
         Returns:
-            Returns True if calendar was successfully registered, False otherwise.
+            Returns True if pentest was successfully registered, False otherwise.
         """
-        oldConnection = self.calendarName
-        authorized, msg = self.validateCalendarName(saveAsName.strip().lower())
+        oldConnection = self.pentestName
+        authorized, msg = self.validatePentestName(saveAsName.strip().lower())
         # check for forbidden names
         if not authorized:
             logger.warn("LOG : add database attempt failed:"+str(msg))
             return False, msg
         # check if already exists
         self.connectToDb("pollenisator")
-        if self.db.calendars.find_one({"nom": saveAsName.strip()}) is not None and askDeleteIfExists:
+        if self.db.pentests.find_one({"nom": saveAsName.strip()}) is not None and askDeleteIfExists:
             msg = "The database has not been overwritten choose a different name to save it."
             return False, msg
-        # insert in database  calendars
+        # insert in database  pentests
         self.connectToDb("pollenisator")
-        self.db.calendars.insert_one({"nom": saveAsName.strip(), "owner":owner, "creation_date": datetime.datetime.now()})
+        self.db.pentests.insert_one({"nom": saveAsName.strip(), "owner":owner, "creation_date": datetime.datetime.now()})
         self.connectToDb(saveAsName.strip())
         if autoconnect:
             self.connectToDb(saveAsName.strip())
@@ -704,7 +704,7 @@ class MongoCalendar:
         return pentesters["value"]
 
     def getPentestOwner(self, pentest):
-        pentest_data = self.findInDb("pollenisator", "calendars", {"nom":pentest}, False)
+        pentest_data = self.findInDb("pollenisator", "pentests", {"nom":pentest}, False)
         if pentest_data is None:
             return "admin"
         return pentest_data.get("owner", "admin")
@@ -721,19 +721,19 @@ class MongoCalendar:
         Copy a database.
 
         Args:
-            toCopyName: the output calendar will have this name. If default empty string is given, a user window prompt will be used.
-            fromCopyName: the calendar name to be copied. If default empty string is given, the opened calendar will be used.
+            toCopyName: the output pentest will have this name. If default empty string is given, a user window prompt will be used.
+            fromCopyName: the pentest name to be copied. If default empty string is given, the opened pentest will be used.
         """
         if fromCopyName == "":
             return "database to copy : empty name", 400
         if toCopyName == "":
             return "database destination name is empty", 400
-        if fromCopyName not in self.listCalendarNames():
+        if fromCopyName not in self.listPentestNames():
             return "database to copy : not found", 404
         
         major_version = ".".join(self.client.server_info()["version"].split(".")[:2])
         if float(major_version) < 4.2:
-            succeed, msg = self.registerCalendar(self.getPentestOwner(fromCopyName),
+            succeed, msg = self.registerPentest(self.getPentestOwner(fromCopyName),
                 toCopyName, True, True)
             if succeed:
                 self.client.admin.command('copydb',
@@ -773,7 +773,7 @@ class MongoCalendar:
 
     def importDatabase(self, owner, filename, **kwargs):
         """
-        Import a database dump into a calendar database.
+        Import a database dump into a pentest database.
             It uses the mongorestore utily installed with mongodb-org-tools
 
         Args:
@@ -787,7 +787,7 @@ class MongoCalendar:
             toDbName = kwargs.get("nsTo")
         else:
             toDbName = os.path.splitext(os.path.basename(filename))[0]
-        success, msg = self.registerCalendar(owner, toDbName, True, False)
+        success, msg = self.registerPentest(owner, toDbName, True, False)
         if success:
             connectionString = '' if self.user == '' else "-u "+self.user + \
                 " -p "+self.password + " --authenticationDatabase admin "
@@ -811,7 +811,7 @@ class MongoCalendar:
         return global_tags+pentest_tags
 
     def getGlobalTags(self):
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         tags = mongoInstance.findInDb("pollenisator", "settings", {"key": "tags"}, False)
         if tags is not None:
             if isinstance(tags["value"], dict):
@@ -867,7 +867,7 @@ class MongoCalendar:
         #     {"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now()})
 
     def do_upload(self, pentest, attached_iid, filetype, upfile):
-        mongoInstance = MongoCalendar.getInstance()
+        mongoInstance = MongoClient.getInstance()
         local_path = os.path.join(utils.getMainDir(), "files")
         try:
             os.makedirs(local_path)

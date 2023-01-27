@@ -1,5 +1,5 @@
 from pollenisator.server.permission import permission
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.server.servermodels.command import ServerCommand
 from pollenisator.server.servermodels.scope import ServerScope
 #from pollenisator.server.servermodels.tool import ServerTool, delete as tool_delete
@@ -17,7 +17,7 @@ def getModuleInfo():
 
 @permission("pentester")
 def addRangeMatchingIps(pentest):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     #mongoInstance.find("settings", {"key":"network_discovery_"})
     ips = mongoInstance.findInDb(pentest, "ips", {})
     if ips is None:
@@ -34,7 +34,7 @@ def addRangeMatchingIps(pentest):
 
 @permission("pentester")
 def addRangeCloseToOthers(pentest):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     #mongoInstance.find("settings", {"key":"network_discovery_"})
     wave = mongoInstance.findInDb(pentest, "waves", {"wave":{"$ne":"Imported"}}, False)
     real_networks = mongoInstance.aggregateFromDb(pentest, "ips", [
@@ -65,7 +65,7 @@ def addRangeCloseToOthers(pentest):
 
 @permission("pentester")
 def addCommonRanges(pentest):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     wave = mongoInstance.findInDb(pentest, "waves", {"wave":{"$ne":"Imported"}}, False)
     for common in COMMONS:
         ServerScope(pentest).initialize(wave["wave"], scope=str(common)).addInDb()
@@ -73,7 +73,7 @@ def addCommonRanges(pentest):
 
 @permission("pentester")
 def addAllLANRanges(pentest):
-    mongoInstance = MongoCalendar.getInstance()
+    mongoInstance = MongoClient.getInstance()
     wave = mongoInstance.findInDb(pentest, "waves", {"wave":{"$ne":"Imported"}}, False)
     net = IPNetwork("10.0.0.0/8")
     subnets = list(net.subnet(16))

@@ -8,11 +8,11 @@ import hashlib
 from pollenisator.core.components.logger_config import logger
 from datetime import datetime
 from pollenisator.core.components.utils import listPlugin, loadPlugin
-from pollenisator.core.components.mongo import MongoCalendar
+from pollenisator.core.components.mongo import MongoClient
 from pollenisator.core.components.utils import JSONDecoder, getMainDir
 from pollenisator.server.permission import permission
 
-mongoInstance = MongoCalendar.getInstance()
+mongoInstance = MongoClient.getInstance()
 local_path = os.path.join(getMainDir(), "files")
 try:
     os.makedirs(local_path)
