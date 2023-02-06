@@ -87,6 +87,7 @@ def doDelete(pentest, command):
         dbclient.deleteFromDb(pentest,
                                    "tools", {"name": command.name}, True, True)
 
+
     res = dbclient.deleteFromDb(command.indb, "commands", {
         "_id": ObjectId(command._id)}, False, True)
     if res is None:

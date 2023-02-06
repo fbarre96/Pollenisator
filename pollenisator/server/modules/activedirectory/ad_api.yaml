@@ -5,16 +5,6 @@ info:
   title: Swagger REST Article
 
 paths:
-  '/ActiveDirectory/getModuleInfo':
-    get:
-      summary: get module info
-      tags:
-        - Active Directory
-      operationId: pollenisator.server.modules.activedirectory.ad.getModuleInfo
-      responses:
-        '200':
-          description: OK
-      description: get module info
   '/ActiveDirectory/users/{pentest}':
     post:
       summary: insert user

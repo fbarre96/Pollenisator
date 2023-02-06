@@ -44,35 +44,8 @@ class ServerDefect(Defect, ServerElement):
             return ""
         return obj.get("_id", None)
 
-    @classmethod
-    def fetchObjects(cls, pentest, pipeline):
-        """Fetch many commands from database and return a Cursor to iterate over model objects
-        Args:
-            pipeline: a Mongo search pipeline (dict)
-        Returns:
-            Returns a cursor to iterate on model objects
-        """
-        dbclient = DBClient.getInstance()
-        ds = dbclient.findInDb(pentest, cls.coll_name, pipeline, True)
-        if ds is None:
-            return None
-        for d in ds:
-            # disabling this error as it is an abstract function
-            yield cls(pentest, d)  #  pylint: disable=no-value-for-parameter
-    
-    @classmethod
-    def fetchObject(cls, pentest, pipeline):
-        """Fetch many commands from database and return a Cursor to iterate over model objects
-        Args:
-            pipeline: a Mongo search pipeline (dict)
-        Returns:
-            Returns a cursor to iterate on model objects
-        """
-        dbclient = DBClient.getInstance()
-        d = dbclient.findInDb(pentest, cls.coll_name, pipeline, False)
-        if d is None:
-            return None
-        return cls(pentest, d) 
+
+
 
 def getProofPath(pentest, defect_iid):
     local_path = os.path.join(getMainDir(), "files")

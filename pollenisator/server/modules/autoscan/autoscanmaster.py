@@ -66,7 +66,7 @@ def autoScan(pentest, endoded_token):
                     res, statuscode = launchTask(pentest, launchableTool["tool"].getId(),  worker_token=endoded_token)
                 
             check = getAutoScanStatus(pentest)
-            time.sleep(3)
+            time.sleep(6)
     except(KeyboardInterrupt, SystemExit):
         logger.debug("Autoscan : EXIT by expected EXCEPTION (exit or interrupt)")
         logger.info("stop autoscan : Kill received...")

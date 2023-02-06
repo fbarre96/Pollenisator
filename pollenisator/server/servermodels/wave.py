@@ -22,18 +22,29 @@ class ServerWave(Wave, ServerElement):
             self.pentest = dbclient.pentestName
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
+            
+    @classmethod
+    def replaceCommandVariables(cls, pentest, command, data):
+        return command.replace("|wave|", data.get("wave", ""))
 
 
-    def addAllChecks(self):
+    def addChecks(self, lvls):
         """
         Add the appropriate checks (level check and wave's commands check) for this scope.
         """
         # query mongo db commands collection for all commands having lvl == network or domain
-        checkitems = CheckItem.fetchObjects({"lvl": {"$in": ["wave"]}})
+        checkitems = CheckItem.fetchObjects({"lvl": {"$in": lvls}})
         if checkitems is None:
             return
         for check in checkitems:
-            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "waves")
+            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "wave")
+
+    def getTools(self):
+        """Return scope assigned tools as a list of mongo fetched tools dict
+        Returns:
+            list of defect raw mongo data dictionnaries
+        """
+        return ServerTool.fetchObjects(self.pentest, {"wave": self.wave, "lvl": {"$in": self.getTriggers()}})
 
     def removeAllTool(self, command_name):
         """
@@ -48,6 +59,13 @@ class ServerWave(Wave, ServerElement):
         for tool in tools:
             if "done" not in tool.getStatus():
                 tool.delete()
+
+    @classmethod
+    def getTriggers(cls):
+        """
+        Return the list of trigger declared here
+        """
+        return ["wave:onAdd"]
 
 @permission("pentester")
 def delete(pentest, wave_iid):
@@ -80,7 +98,7 @@ def insert(pentest, body):
     res_insert = dbclient.insertInDb(pentest, "waves", {"wave": wave_o.wave, "wave_commands": list(wave_o.wave_commands)})
     ret = res_insert.inserted_id
     wave_o._id = ret
-    wave_o.addAllChecks()
+    wave_o.addChecks(["wave:onAdd"])
     return {"res":True, "iid":ret}
 
 @permission("pentester")

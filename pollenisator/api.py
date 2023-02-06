@@ -235,6 +235,8 @@ def create_app():
             sm.socketio.emit("deleteWorker", room=request.sid)
             return
         pentest = worker.get("pentest", "")
+        if pentest == "":
+            return
         for tool_iid in running_tasks:
             tool_d = dbclient.findInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, False)
             if tool_d is None:

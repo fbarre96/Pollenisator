@@ -29,6 +29,23 @@ class ServerScope(Scope, ServerElement):
         for result in results:
             yield(cls(pentest, result))
 
+    @classmethod
+    def replaceCommandVariables(cls, pentest, command, data):
+        scope = data.get("scope", "")
+        command = command.replace("|scope|", scope)
+        if not isNetworkIp(scope):
+            depths = scope.split(".")
+            if len(depths) > 2:
+                topdomain = ".".join(depths[1:])
+            else:
+                topdomain = ".".join(depths)
+            command = command.replace("|parent_domain|", topdomain)
+        return command
+        
+    @classmethod
+    def completeDetailedString(cls, data):
+        return data.get("scope", "")+" "
+
     def getParentId(self):
         dbclient = DBClient.getInstance()
         res = dbclient.findInDb(self.pentest, "waves", {"wave": self.wave}, False)
@@ -37,19 +54,22 @@ class ServerScope(Scope, ServerElement):
     def addInDb(self):
         return insert(self.pentest, ScopeController(self).getData())
 
-    def addAllChecks(self):
+    @classmethod
+    def getTriggers(cls):
+        """
+        Return the list of trigger declared here
+        """
+        return ["scope:onRangeAdd", "scope:onDomainAdd", "scope:onAdd"]
+
+    def addChecks(self, lvls):
         """
         Add the appropriate checks (level check and wave's commands check) for this scope.
         """
-        # query mongo db commands collection for all commands having lvl == network or domain
-        checkitems = CheckItem.fetchObjects({"lvl": {"$in": ["network", "domain"]}})
+        checkitems = CheckItem.fetchObjects({"lvl": {"$in": lvls}}) 
         if checkitems is None:
             return
         for check in checkitems:
-            if check.lvl == "network" and isNetworkIp(self.scope):
-                CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "scopes")
-            elif check.lvl == "domain" and not isNetworkIp(self.scope):
-                CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "scopes")
+            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "scope")
 
     def getIpsFitting(self):
         """Returns a list of ip mongo dict fitting this scope
@@ -77,12 +97,13 @@ class ServerScope(Scope, ServerElement):
                 if ServerIp.checkIpScope(self.scope, ip["ip"]):
                     ips_fitting.append(ip)
         return ips_fitting
+        
 @permission("pentester")
 def delete(pentest, scope_iid):
     dbclient = DBClient.getInstance()
-    # deleting checks with scope lvl
+    # deleting checks with scope 
     scope_o = ServerScope(pentest, dbclient.findInDb(pentest, "scopes", {"_id": ObjectId(scope_iid)}, False))
-    checks = dbclient.findInDb(pentest, "cheatsheet", {"target_iid": str(scope_iid), "target_type": "scopes"})
+    checks = dbclient.findInDb(pentest, "cheatsheet", {"target_iid": str(scope_iid), "target_type": "scope"})
     for check in checks:
         checkinstance_delete(pentest, check["_id"])
     # Deleting this scope against every ips
@@ -119,7 +140,12 @@ def insert(pentest, body):
     ret = res_insert.inserted_id
     scope_o._id = ret
     # adding the appropriate checks for this scope.
-    scope_o.addAllChecks()
+    
+    if isNetworkIp(scope_o.scope):
+        scope_o.addChecks(["scope:onRangeAdd", "scope:onAdd"])
+    else:
+        scope_o.addChecks(["scope:onDomainAdd", "scope:onAdd"])
+        
     # Testing this scope against every ips
     ips = dbclient.findInDb(pentest, "ips", {})
     for ip in ips:

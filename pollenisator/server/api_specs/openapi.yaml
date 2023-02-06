@@ -395,6 +395,17 @@ paths:
       responses:
         '200':
           description: Successful read user
+    
+  /getTriggerLevels:
+    get:
+      operationId: pollenisator.server.servermodels.element.getTriggerLevels
+      tags:
+        - Modules
+      summary: Get current user
+      security: []
+      responses:
+        '200':
+          description: Successful read user
           
   /issue:
     post:
@@ -2454,6 +2465,33 @@ paths:
             application/json:
               schema:
                 type: integer
+  "/tools/{pentest}/{tool_iid}/getDetailedString":
+    get:
+      operationId: pollenisator.server.servermodels.tool.getDetailedString
+      tags:
+        - Tools
+      summary: get a tool DetailedString
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: tool_iid
+          in: path
+          description: tool iid to get
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A detailed string describing the tool
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'ip:port name'
   "/waves/{pentest}":
     post:
       operationId: pollenisator.server.servermodels.wave.insert

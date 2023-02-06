@@ -33,49 +33,45 @@ class ServerPort(Port, ServerElement):
         dbclient = DBClient.getInstance()
         return dbclient.findInDb(self.pentest, "ips", {"ip": self.ip}, False)["_id"]
 
-    def addAllChecks(self):
+    def addChecks(self, lvls):
         """
         Add the appropriate checks (level check and wave's commands check) for this scope.
         """
-        # query mongo db commands collection for all commands having lvl == network or domain
-        checkitems = CheckItem.fetchObjects({"lvl": {"$in": ["port"]}})
+        checkitems = CheckItem.fetchObjects({"lvl": {"$in": lvls}})
         if checkitems is None:
             return
         for check in checkitems:
             allowed_ports_services = check.ports.split(",")
             if checkCommandService(allowed_ports_services, self.port, self.proto, self.service):
-                CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "ports")
+                CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "port")
 
-    
     @classmethod
-    def fetchObjects(cls, pentest, pipeline):
-        """Fetch many commands from database and return a Cursor to iterate over model objects
-        Args:
-            pipeline: a Mongo search pipeline (dict)
-        Returns:
-            Returns a cursor to iterate on model objects
+    def getTriggers(cls):
         """
-        dbclient = DBClient.getInstance()
-        ds = dbclient.findInDb(pentest, cls.coll_name, pipeline, True)
-        if ds is None:
-            return None
-        for d in ds:
-            # disabling this error as it is an abstract function
-            yield cls(pentest, d)  #  pylint: disable=no-value-for-parameter
-    
+        Return the list of trigger declared here
+        """
+        return ["port:onServiceUpdate"]
+
+
+
     @classmethod
-    def fetchObject(cls, pentest, pipeline):
-        """Fetch many commands from database and return a Cursor to iterate over model objects
-        Args:
-            pipeline: a Mongo search pipeline (dict)
-        Returns:
-            Returns a cursor to iterate on model objects
-        """
-        dbclient = DBClient.getInstance()
-        d = dbclient.findInDb(pentest, cls.coll_name, pipeline, False)
-        if d is None:
-            return None
-        return cls(pentest, d) 
+    def replaceCommandVariables(cls, pentest, command, data):
+        command = command.replace("|port|", data.get("port", ""))
+        command = command.replace("|port.proto|", data.get("proto", ""))
+        if data.get("port")  is not None and data.get("ip")  is not None:
+            dbclient = DBClient.getInstance()
+            port_db = dbclient.findInDb(pentest, "ports", {"port":data.get("port") , "proto":data.get("proto", "tcp") , "ip":data.get("ip") }, False)
+            if port_db is not None:
+                command = command.replace("|port.service|", port_db.get("service", ""))
+                command = command.replace("|port.product|", port_db.get("product",""))
+                port_infos = port_db.get("infos", {})
+                for info in port_infos:
+                    command = command.replace("|port.infos."+str(info)+"|", str(port_infos[info]))
+        return command
+
+    @classmethod
+    def completeDetailedString(cls, data):
+        return data.get("ip", "")+":"+data.get("port", "")+ " "
 
     def addInDb(self):
         return insert(self.pentest, PortController(self).getData())
@@ -129,7 +125,7 @@ def insert(pentest, body):
             comp = Computer.fetchObject(pentest, {"_id":ObjectId(res["iid"])})
             comp.infos.is_dc = True
             comp.update()
-    port_o.addAllChecks()
+    port_o.addChecks(["port:onServiceUpdate"])
     return {"res":True, "iid":iid}
 
 @permission("pentester")
@@ -142,22 +138,12 @@ def update(pentest, port_iid, body):
     port_o = ServerPort(pentest, body)
     oldService = oldPort.service
     if oldService != port_o.service:
+        
         dbclient.deleteFromDb(pentest, "tools", {
-                                "lvl": "port", "ip": oldPort.ip, "port": oldPort.port, "proto": oldPort.proto, "status":{"$ne":"done"}}, many=True)
-        port_commands = dbclient.findInDb(
-            pentest, "commands", {"lvl": "port"})
-        for port_command in port_commands:
-            allowed_services = port_command["ports"].split(",")
-            for i, elem in enumerate(allowed_services):
-                if not(elem.strip().startswith("tcp/") or elem.strip().startswith("udp/")):
-                    allowed_services[i] = "tcp/"+str(elem)
-            if port_o.proto+"/"+str(port_o.service) in allowed_services:
-                waves = dbclient.findInDb(pentest, "waves", {"wave_commands": {"$elemMatch": {
-                    "$eq": str(port_command["_id"]).strip()}}})
-                for wave in waves:
-                    tool_m = ServerTool(pentest).initialize(port_command["_id"], wave["wave"], None, "",
-                                                oldPort.ip, oldPort.port, oldPort.proto, "port")
-                    tool_m.addInDb(check=False) # already checked and not updated yet so service would be wrong
+                                "lvl": "port:onServiceUpdate", "ip": oldPort.ip, "port": oldPort.port, "proto": oldPort.proto, "status":{"$ne":"done"}}, many=True)
+        dbclient.deleteFromDb(pentest, "cheatsheet", {
+                                "lvl": "port:onServiceUpdate", "ip": oldPort.ip, "port": oldPort.port, "proto": oldPort.proto, "status":{"$ne":"done"}}, many=True)     
+        port_o.addChecks(["port:onServiceUpdate"])
     dbclient.updateInDb(pentest, "ports", {"_id":ObjectId(port_iid)}, {"$set":body}, False, True)
     return True
    

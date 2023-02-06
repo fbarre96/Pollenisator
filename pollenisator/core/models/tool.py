@@ -75,7 +75,7 @@ class Tool(Element):
             this object
         """
         dbclient = DBClient.getInstance()
-        if command_iid is not None and command_iid != "":
+        if command_iid is not None and command_iid != "" and command_iid != "None":
             res = dbclient.findInDb(self.pentest, "commands", {"$or": [
                 {"original_iid":str(command_iid)},
                 {"_id": ObjectId(command_iid)}
@@ -166,40 +166,7 @@ class Tool(Element):
             output_dir += Tool.__sanitize(port_dir)+"/"
         return output_dir
 
-    def __str__(self):
-        """
-        Get a string representation of a tool.
-
-        Returns:
-            Returns the tool name. The wave name is prepended if tool lvl is "port" or "ip"
-        """
-        ret = self.name
-        if self.lvl == "ip" or self.lvl == "port":
-            ret = self.wave+"-"+ret
-        return ret
-
-    def getDetailedString(self):
-        """
-        Get a more detailed string representation of a tool.
-
-        Returns:
-            string
-        """
-        if self.lvl == "wave":
-            return str(self)
-        elif self.lvl == "network" or self.lvl == "domain":
-            return str(self.scope)+" "+str(self)
-        elif self.lvl == "ip":
-            return str(self.ip)+" "+str(self)
-        else:
-            return str(self.ip)+":"+str(self.proto+"/"+self.port)+" "+str(self)
-
-    def getResultFile(self):
-        """Returns the result file of this tool
-        Returns:
-            strings
-        """
-        return self.resultfile
+    
 
     
 
@@ -237,21 +204,11 @@ class Tool(Element):
 
     
 
-    def getDbKey(self):
-        """Return a dict from model to use as unique composed key.
+    
+
+    def getResultFile(self):
+        """Returns the result file of this tool
         Returns:
-            A dict (7 keys :"wave", "scope", "ip", "port", "proto", "name", "lvl")
+            strings
         """
-        base = {"wave": self.wave, "scope": "", "ip": "", "port": "",
-                "proto": "", "name": self.name, "lvl": self.lvl, "check_iid":self.check_iid}
-        if self.lvl == "wave":
-            return base
-        if self.lvl in ("domain", "network"):
-            base["scope"] = self.scope
-            return base
-        base["ip"] = self.ip
-        if self.lvl == "ip":
-            return base
-        base["port"] = self.port
-        base["proto"] = self.proto
-        return base
+        return self.resultfile

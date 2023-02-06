@@ -56,6 +56,15 @@ class User(ServerElement):
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         return self
   
+    def __str__(self):
+        """
+        Get a string representation of a defect.
+
+        Returns:
+            Returns the defect +title.
+        """
+        return self.domain+"\\"+self.username 
+
     def getData(self):
         return {"_id": self._id, "username":self.username, "password": self.password, "domain":self.domain,
          "groups": self.groups, "description":self.description, "infos":self.infos}
@@ -96,6 +105,13 @@ class User(ServerElement):
     def addInDb(self):
         return insert(self.pentest, self.getData())
 
+    @classmethod
+    def replaceCommandVariables(cls, pentest, command, data):
+        command = command.replace("|username|", data.get("username", ""))
+        command = command.replace("|domain|", data.get("domain", ""))
+        command = command.replace("|password|", data.get("password", ""))
+        return command
+
     def addCheck(self, lvl, info):
         checks = CheckItem.fetchObjects({"lvl":lvl})
         user_o = info.get("user")
@@ -112,7 +128,14 @@ class User(ServerElement):
         if dc_ip is None:
             return
         for check in checks:
-            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "ActiveDirectory", infos=infos)
+            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "user", infos=infos)
+
+    @classmethod
+    def getTriggers(cls):
+        """
+        Return the list of trigger declared here
+        """
+        return ["AD:onNewValidUser", "AD:onNewUserFound"]
 
     @property
     def username(self):
@@ -283,11 +306,13 @@ def insert(pentest, body):
     
     ins_result = dbclient.insertInDb(pentest, 
         "ActiveDirectory", body, True)
+    iid = ins_result.inserted_id
+    user._id = iid
     if password.strip() != "":
         user.addCheck("AD:onNewValidUser", {"user":user})
     else:
         user.addCheck("AD:onNewUserFound", {"user":user})
-    iid = ins_result.inserted_id
+    
     return {"res": True, "iid": iid}
 
 @permission("pentester")

@@ -63,35 +63,6 @@ class ServerIp(Ip, ServerElement):
                 ret.append(str(scope["_id"]))
         return ret
 
-    @classmethod
-    def fetchObjects(cls, pentest, pipeline):
-        """Fetch many commands from database and return a Cursor to iterate over model objects
-        Args:
-            pipeline: a Mongo search pipeline (dict)
-        Returns:
-            Returns a cursor to iterate on model objects
-        """
-        dbclient = DBClient.getInstance()
-        ds = dbclient.findInDb(pentest, cls.coll_name, pipeline, True)
-        if ds is None:
-            return None
-        for d in ds:
-            # disabling this error as it is an abstract function
-            yield cls(pentest, d)  #  pylint: disable=no-value-for-parameter
-    
-    @classmethod
-    def fetchObject(cls, pentest, pipeline):
-        """Fetch many commands from database and return a Cursor to iterate over model objects
-        Args:
-            pipeline: a Mongo search pipeline (dict)
-        Returns:
-            Returns a cursor to iterate on model objects
-        """
-        dbclient = DBClient.getInstance()
-        ds = dbclient.findInDb(pentest, cls.coll_name, pipeline, False)
-        if ds is None:
-            return None
-        return cls(pentest, ds) 
 
     @classmethod
     def getIpsInScope(cls, pentest, scopeId):
@@ -105,6 +76,22 @@ class ServerIp(Ip, ServerElement):
         ips = dbclient.findInDb(pentest, "ips", {"in_scopes": {"$elemMatch": {"$eq": str(scopeId)}}})
         for ip in ips:
             yield ServerIp(pentest, ip)
+
+    @classmethod
+    def replaceCommandVariables(cls, pentest, command, data):
+        command = command.replace("|ip|", data.get("ip", ""))
+        dbclient = DBClient.getInstance()
+        ip_db = dbclient.findInDb(pentest, "ips", {"ip":data.get("ip", "")}, False)
+        if ip_db is None:
+            return command
+        ip_infos = ip_db.get("infos", {})
+        for info in ip_infos:
+            command = command.replace("|ip.infos."+str(info)+"|", command)
+        return command
+
+    @classmethod
+    def completeDetailedString(cls, data):
+        return data.get("ip", "")+" "
     
     def removeScopeFitting(self, pentest, scopeId):
         """Remove the given scopeId from the list of scopes this IP fits in.
@@ -154,17 +141,23 @@ class ServerIp(Ip, ServerElement):
             return ip_in_db["_id"]
         return None
 
-    def addAllChecks(self):
+    def addChecks(self, lvls):
         """
         Add the appropriate checks (level check and wave's commands check) for this scope.
         """
-        # query mongo db commands collection for all commands having lvl == network or domain
-        checkitems = CheckItem.fetchObjects({"lvl": {"$in": ["ip"]}})
+        # query mongo db commands collection for all commands having lvl == network or domain 
+        checkitems = CheckItem.fetchObjects({"lvl": {"$in": lvls}})
         if checkitems is None:
             return
         for check in checkitems:
-            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "ips")
+            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "ip")
     
+    @classmethod
+    def getTriggers(cls):
+        """
+        Return the list of trigger declared here
+        """
+        return ["ip:onAdd"]
 
     def addInDb(self):
         return insert(self.pentest, IpController(self).getData())
@@ -216,7 +209,7 @@ def insert(pentest, body):
     iid = ins_result.inserted_id
     ip_o._id = iid
     if ip_o.in_scopes:
-        ip_o.addAllChecks()
+        ip_o.addChecks(["ip:onAdd"])
     return {"res":True, "iid":iid}
 
 @permission("pentester")

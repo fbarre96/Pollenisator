@@ -79,6 +79,12 @@ class CheckInstance(ServerElement):
             return None
         return cls(pentest, d)
 
+    def getTargetData(self):
+        target_class = ServerElement.classFactory(self.target_type)
+        dbclient = DBClient.getInstance()
+        return dbclient.findInDb(self.pentest, target_class.coll_name, {
+                                        "_id": ObjectId(self.target_iid)}, False)
+
     def getData(self):
         return {"_id": self._id, "type": self.type, "check_iid": self.check_iid, "target_iid": self.target_iid, "target_type": self.target_type, "parent": self.parent, "status": self.status, "notes": self.notes}
 
@@ -155,9 +161,11 @@ def doInsert(pentest, data, checkItem=None, toolInfos=None):
     iid = ins_result.inserted_id
     if checkItem is None or str(checkItem._id) != str(data["check_iid"]):
         checkItem = CheckItem.fetchObject(
-            {"_id": ObjectId(str(data["check_iid"]))})
-    target = dbclient.findInDb(pentest, data["target_type"], {
-                                    "_id": ObjectId(str(data["target_iid"]))}, False)
+            {"_id": ObjectId(data["check_iid"])})
+    
+    target_class = ServerElement.classFactory(data["target_type"])
+    target = dbclient.findInDb(pentest, target_class.coll_name, {
+                                    "_id": ObjectId(data["target_iid"])}, False)
     if target is None:
         return "Invalid target not found", 404
     if checkItem is None:
@@ -231,11 +239,8 @@ def update(pentest, iid, body):
     return True
 
 
-
-
 @permission("pentester")
 def getInformations(pentest, iid):
-    # TODO, change to match new design
     inst = CheckInstance.fetchObject(pentest, {"_id": ObjectId(iid)})
     if inst is None:
         return "Not found", 404
@@ -280,3 +285,20 @@ def getInformations(pentest, iid):
     else:
         data["status"] = ""
     return data
+
+
+@permission("pentester")
+def getTargetRepr(pentest, body):
+    dbclient = DBClient.getInstance()
+    iids_list = [ ObjectId(x) for x in body ]
+    checkinstances = dbclient.findInDb(pentest, "cheatsheet", {"_id": {"$in": iids_list}}, True)
+    ret = {}
+    for data in checkinstances:
+        class_element = ServerElement.classFactory(data["target_type"])
+        elem = class_element.fetchObject(pentest, {"_id": ObjectId(data["target_iid"])})
+        if elem is None:
+            ret_str = "Target not found"
+        else:
+            ret_str = elem.getDetailedString()
+        ret[str(data["_id"])] = ret_str
+    return ret

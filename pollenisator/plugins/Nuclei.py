@@ -25,7 +25,8 @@ def parse(opened_file):
             if "template-id" in data and "info" in data and "name" in data["info"] and "author" in data["info"] and "tags" in data["info"]:
                 host = data["host"]
                 if data["type"] == "network":
-                    parts = data["host"].split(":")
+                    host_part = data["host"].split("://")[-1]
+                    parts = host_part.split(":")
                     if len(parts) == 2:
                         host = parts[0]
                 elif data["type"] == "http":

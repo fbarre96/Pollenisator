@@ -45,9 +45,13 @@ class AuthInfo(ServerElement):
     def addInDb(self):
         return insert(self.pentest, self.getData())
 
-@permission("user")
-def getModuleInfo():
-    return {"registerLvls": ["auth:password", "auth:cookie"]}
+    @classmethod
+    def getTriggers(cls):
+        """
+        Return the list of trigger declared here
+        """
+        return ["auth:password", "auth:cookie"]
+
 
 @permission("pentester")
 def insert(pentest, body):
@@ -74,13 +78,13 @@ def insert(pentest, body):
 
 @permission("pentester")
 def link(pentest, auth_iid, object_iid):
-    #TODO swap to add checks
+    #TODO swap to add checks #TODO lvl change
     dbclient = DBClient.getInstance()
     lookup = { "scopes":"network", "ips":"ip","ports":"port","waves":"wave"}
     lvl_found = None
     collection_found = None
     object_found = None
-    for collection,lvl in lookup.items():
+    for collection, lvl in lookup.items():
         res = dbclient.findInDb(pentest, collection, {"_id":ObjectId(object_iid)}, False)
         if res is not None:
             lvl_found = lvl

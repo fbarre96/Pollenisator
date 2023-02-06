@@ -60,6 +60,15 @@ class Computer(ServerElement):
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
     
+    def __str__(self):
+        """
+        Get a string representation of a defect.
+
+        Returns:
+            Returns the defect +title.
+        """
+        return self.domain+"\\"+self.name + " ("+self.ip+")"
+
     def getData(self):
         return {"_id": self._id, "name":self.name, "ip":self.ip, "domain":self.domain,
             "admins":self.admins, "users": self.users, "infos":self.infos.getData()}
@@ -101,6 +110,15 @@ class Computer(ServerElement):
     
     def addInDb(self):
         return insert(self.pentest, self.getData())
+
+    @classmethod
+    def getTriggers(cls):
+        """
+        Return the list of trigger declared here
+        """
+        return ["AD:onFirstUserOnDC", "AD:onFirstAdminOnDC",  "AD:onNewUserOnDC", "AD:onNewAdminOnDC", 
+                            "AD:onFirstUserOnComputer", "AD:onFirstAdminOnComputer", "AD:onNewUserOnComputer", "AD:onNewAdminOnComputer",
+                            "AD:onNewDomainDiscovered"]
 
 
     @property
@@ -155,6 +173,11 @@ class Computer(ServerElement):
                 self.addCheck("AD:onFirstAdminOnComputer", {"user":self.admins[-1]})
             self.addCheck("AD:onNewAdminOnComputer", {"user":self.admins[-1]})
         self.update()
+
+    @classmethod
+    def replaceCommandVariables(cls, pentest, command, data):
+        command = command.replace("|domain|", data.get("domain", ""))
+        return command
         
     def addCheck(self, lvl, info):
         checks = CheckItem.fetchObjects({"lvl":lvl})
@@ -170,7 +193,7 @@ class Computer(ServerElement):
             domain = user_o.domain if user_o.domain is not None else ""
             infos = {"username":username, "password":password, "domain":domain}
         for check in checks:
-            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "ActiveDirectory", infos=infos)
+            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "computer", infos=infos)
 
 @permission("pentester")
 def delete(pentest, computer_iid):  # noqa: E501

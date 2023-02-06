@@ -11,9 +11,6 @@ from netaddr import IPNetwork
 coll_name = "NetworkDiscovery"
 COMMONS = ["10.0.0.0/24","10.10.0.0/24", "10.10.10.0/24"]
 
-@permission("user")
-def getModuleInfo():
-    return {"registerLvls": []}
 
 @permission("pentester")
 def addRangeMatchingIps(pentest):

@@ -96,9 +96,6 @@ class CheckItem(ServerElement):
 
 
 
-@permission("user")
-def getModuleInfo():
-    return {"registerLvls": []}
 
 def doInsert(pentest, data):
     """Insert a checkitem into the database.

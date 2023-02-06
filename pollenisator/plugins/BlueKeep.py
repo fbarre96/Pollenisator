@@ -53,6 +53,7 @@ class BlueKeep(Plugin):
         notes = ""
         tags = ["neutral"]
         targets = {}
+        success = False
         for line in file_opened:
             # Auto Detect
             try:
@@ -68,6 +69,7 @@ class BlueKeep(Plugin):
                 return None, None, None, None
             # Parse
             ip = line.split(" ")[0].strip()
+            success = True
             ServerIp(pentest).initialize(ip, infos={"plugin":BlueKeep.get_name()}).addInDb()
             p_o = ServerPort.fetchObject(pentest, {"ip": ip, "port": kwargs.get(
                 "port", None), "proto": kwargs.get("proto", None)})
@@ -86,4 +88,6 @@ class BlueKeep(Plugin):
             elif "UNKNOWN" in line:
                 tags = ["todo-bluekeep"]
             notes += line
+        if not success:
+            return None, None, None, None
         return notes, tags, "port", targets

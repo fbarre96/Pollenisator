@@ -5,16 +5,7 @@ info:
   title: Swagger REST Article
 
 paths:
-  '/cheatsheet/getModuleInfo':
-    get:
-      tags:
-        - Cheatsheet
-      summary: get module info
-      operationId: pollenisator.server.modules.cheatsheet.cheatsheet.getModuleInfo
-      responses:
-        '200':
-          description: OK
-      description: get module info
+
   '/cheatsheet/':
     post:
       summary: insert cheatsheet item
@@ -70,7 +61,6 @@ paths:
         in: path
         required: true
     post:
-      
       summary: insert checkinstance item
       operationId: pollenisator.server.modules.cheatsheet.checkinstance.insert
       responses:
@@ -85,6 +75,29 @@ paths:
         description: ''
       tags:
         - Cheatsheet
+  '/cheatsheet/{pentest}/getTargetRepr':
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+    post:
+      tags:
+        - Cheatsheet
+      summary: get a string representation of the check instance target
+      operationId: pollenisator.server.modules.cheatsheet.checkinstance.getTargetRepr
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+      description: 'get a string representation of the check instance target'
+      responses:
+        '200':
+          description: a list of targets representation string in same order as iids list
   '/cheatsheet/{pentest}/{iid}':
     parameters:
       - schema:

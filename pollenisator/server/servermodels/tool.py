@@ -6,6 +6,7 @@ from pollenisator.core.controllers.toolcontroller import ToolController
 from pollenisator.server.servermodels.command import ServerCommand
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.core.components.socketmanager import SocketManager
+from pollenisator.core.components.utils import JSONEncoder, JSONDecoder
 
 from pollenisator.core.components.utils import  checkCommandService, isNetworkIp, loadPlugin
 from datetime import datetime
@@ -97,15 +98,10 @@ class ServerTool(Tool, ServerElement):
     def getParentId(self):
         dbclient = DBClient.getInstance()
         try:
-            if self.lvl == "wave":
-                wave = dbclient.findInDb(self.pentest, "waves", {"wave": self.wave}, False)
-                return wave["_id"]
-            elif self.lvl == "network" or self.lvl == "domain":
-                return dbclient.findInDb(self.pentest, "scopes", {"wave": self.wave, "scope": self.scope}, False)["_id"]
-            elif self.lvl == "ip":
-                return dbclient.findInDb(self.pentest, "ips", {"ip": self.ip}, False)["_id"]
+            if self.check_iid is not None:
+                return self.check_iid
             else:
-                return dbclient.findInDb(self.pentest, "ports", {"ip": self.ip, "port": self.port, "proto": self.proto}, False)["_id"]
+                return None
         except TypeError:
             # None type returned:
             return None
@@ -117,7 +113,6 @@ class ServerTool(Tool, ServerElement):
         Return:
             Returns the bash command of this tool instance, a marker |outputDir| is still to be replaced.
         """
-        dbclient = DBClient.getInstance()
         toolHasCommand = self.text
         if isinstance(command_o, str):
             command = command_o
@@ -130,38 +125,15 @@ class ServerTool(Tool, ServerElement):
             else:
                 command = command_o.text
                 lvl = self.lvl #not command lvl as it can be changed by modules
-        command = command.replace("|wave|", self.wave)
-        if lvl == "network" or lvl == "domain":
-            command = command.replace("|scope|", self.scope)
-            if isNetworkIp(self.scope) == False:
-                depths = self.scope.split(".")
-                if len(depths) > 2:
-                    topdomain = ".".join(depths[1:])
-                else:
-                    topdomain = ".".join(depths)
-                command = command.replace("|parent_domain|", topdomain)
-        if lvl == "ip":
-            command = command.replace("|ip|", self.ip)
-            ip_db = dbclient.findInDb(self.pentest, "ips", {"ip":self.ip}, False)
-            if ip_db is None:
-                return ""
-            ip_infos = ip_db.get("infos", {})
-            for info in ip_infos:
-                command = command.replace("|ip.infos."+str(info)+"|", command)
-        if hasattr(self, "ip") and getattr(self, "ip", "") != "":
-            command = command.replace("|ip|", self.ip)
-        if hasattr(self, "port") and getattr(self, "port", "") != "":
-            command = command.replace("|port|", self.port)
-        if hasattr(self, "proto") and getattr(self, "proto", "") != "":
-            command = command.replace("|port.proto|", self.proto)
-        if hasattr(self, "port") and hasattr(self, "ip"):
-            port_db = dbclient.findInDb(self.pentest, "ports", {"port":self.port, "proto":self.proto, "ip":self.ip}, False)
-            if port_db is not None:
-                command = command.replace("|port.service|", port_db.get("service", ""))
-                command = command.replace("|port.product|", port_db.get("product",""))
-                port_infos = port_db.get("infos", {})
-                for info in port_infos:
-                    command = command.replace("|port.infos."+str(info)+"|", str(port_infos[info]))
+        data = self.getData()
+        if self.check_iid is not None:
+            from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
+            check = CheckInstance.fetchObject(self.pentest, {"_id":ObjectId(self.check_iid)})
+            if check is not None:
+                target = check.getTargetData()
+                if target is not None:
+                    data = target
+        command = ServerElement.replaceAllCommandVariables(self.pentest, command, data)
         tool_infos = self.infos
         for info in tool_infos:
             command = command.replace("|tool.infos."+str(info)+"|", str(tool_infos[info]))
@@ -265,6 +237,34 @@ class ServerTool(Tool, ServerElement):
         self.scanner_ip = workerName
         dbclient = DBClient.getInstance()
         dbclient.updateInDb("pollenisator", "workers", {"name":workerName}, {"$push":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=True)
+
+    def getDbKey(self):
+        """Return a dict from model to use as unique composed key.
+        Returns:
+        {"wave": self.wave, "lvl": self.lvl, "check_iid":self.check_iid}
+        """
+        base = {"wave": self.wave, "name":self.name, "lvl": self.lvl, "check_iid":self.check_iid}
+        return base
+
+    def __str__(self):
+        """
+        Get a string representation of a tool.
+
+        Returns:
+            Returns the tool name. The wave name is prepended if tool lvl is "port" or "ip"
+        """
+        return self.name
+
+    def getDetailedString(self):
+        """
+        Get a more detailed string representation of a tool.
+
+        Returns:
+            string
+        """
+        class_element = ServerElement.getClassWithTrigger(self.lvl)
+        return class_element.completeDetailedString(self.getData()) + str(self.name)
+        
     
 @permission("pentester")
 def setStatus(pentest, tool_iid, body):
@@ -327,15 +327,21 @@ def do_insert(pentest, body, **kwargs):
         del body["_id"]
     # Checking port /service tool
     parent = tool_o.getParentId()
-    if tool_o.lvl == "port" and tool_o.command_iid is not None and tool_o.command_iid != "":
-        if kwargs.get("check", True):
-            comm = dbclient.findInDb(pentest, "commands", {"_id":ObjectId(tool_o.command_iid)}, False)
-            port = dbclient.findInDb(pentest, "ports", {"_id":ObjectId(parent)}, False)
-            if comm:
-                allowed_ports_services = comm["ports"].split(",")
-                if not checkCommandService(allowed_ports_services, port["port"], port["proto"], port["service"]):
-                    return "This tool parent does not match its command ports/services allowed list", 403
+    # SHould be handled in check i think
+    # if tool_o.lvl == "port" and tool_o.command_iid is not None and tool_o.command_iid != "":
+    #     if kwargs.get("check", True):
+    #         comm = dbclient.findInDb(pentest, "commands", {"_id":ObjectId(tool_o.command_iid)}, False)
+    #         port = dbclient.findInDb(pentest, "ports", {"_id":ObjectId(parent)}, False)
+    #         if comm:
+    #             allowed_ports_services = comm["ports"].split(",")
+    #             if not checkCommandService(allowed_ports_services, port["port"], port["proto"], port["service"]):
+    #                 return "This tool parent does not match its command ports/services allowed list", 403
     # Inserting tool
+    base["name"] = body.get("name", "")
+    base["ip"] = body.get("ip", "")
+    base["scope"] = body.get("scope", "")
+    base["port"] = body.get("port", "")
+    base["proto"] = body.get("proto", "")
     base["command_iid"] = body.get("command_iid", "")
     base["check_iid"] = body.get("check_iid", "")
     base["scanner_ip"] = body.get("scanner_ip", "None")
@@ -596,6 +602,12 @@ def stopTask(pentest, tool_iid, body):
         update(pentest, tool_iid, ToolController(stopableTool).getData())
     return "Success", 200
 
+@permission("pentester")
+def getDetailedString(pentest, tool_iid):
+    tool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
+    if tool is None:
+        return "Tool not found", 404
+    return tool.getDetailedString()
 
 def getNbOfLaunchedCommand(pentestName, worker, command_iid):
     """

@@ -5,16 +5,7 @@ info:
   title: Swagger REST Article
 
 paths:
-  '/NetworkDiscovery/getModuleInfo':
-    get:
-      summary: get module info
-      tags:
-        - Network Discovery
-      operationId: pollenisator.server.modules.networkdiscovery.networkdiscovery.getModuleInfo
-      responses:
-        '200':
-          description: OK
-      description: get module info
+
   # '/NetworkDiscovery/{pentest}':
   #   post:
   #     summary: insert network

@@ -160,6 +160,22 @@ class Share(ServerElement):
             share_file.add_user(domain, user, priv)
             self.files.append(share_file)
 
+    @classmethod
+    def getTriggers(cls):
+        """
+        Return the list of trigger declared here
+        """
+        return []
+
+    def __str__(self):
+        """
+        Get a string representation of a defect.
+
+        Returns:
+            Returns the defect +title.
+        """
+        return self.share
+
 
 
 @permission("pentester")

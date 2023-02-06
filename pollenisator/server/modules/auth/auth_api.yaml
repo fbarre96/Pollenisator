@@ -5,16 +5,7 @@ info:
   title: Swagger REST Article
 
 paths:
-  '/auth/getModuleInfo':
-    get:
-      tags:
-        - Authentication Info
-      summary: get module info
-      operationId: pollenisator.server.modules.auth.auth.getModuleInfo
-      responses:
-        '200':
-          description: OK
-      description: get module info
+  
   '/auth/{pentest}':
     post:
       summary: insert authentication inf

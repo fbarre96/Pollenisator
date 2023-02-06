@@ -29,3 +29,19 @@ class ShareFile(ServerElement):
         users = set(self.users)
         users.add((domain, user, priv))
         self.users = list(users)
+    
+    @classmethod
+    def getTriggers(cls):
+        """
+        Return the list of trigger declared here
+        """
+        return []
+
+    def __str__(self):
+        """
+        Get a string representation of a defect.
+
+        Returns:
+            Returns the defect +title.
+        """
+        return self.path
