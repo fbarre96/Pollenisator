@@ -109,17 +109,17 @@ def doInsert(pentest, data):
     """
     if "_id" in data:
         del data["_id"]
-    if data.get("parent") is not None:
-        parent_iid = ObjectId(data.get("parent"))
-        parent_m = CheckItem.fetchObject({"_id":parent_iid})
-        if parent_m is None:
-            return "Parent not found", 404
-        brothers = list(CheckItem.fetchObjects({"parent":str(parent_iid)}))
-        if len(brothers) > 0:
-            step = max([x.step for x in brothers])+1
-        else:
-            step = 1
-        data["step"] = step
+    # if data.get("parent") is not None:
+    #     parent_iid = ObjectId(data.get("parent"))
+    #     parent_m = CheckItem.fetchObject({"_id":parent_iid})
+    #     if parent_m is None:
+    #         return "Parent not found", 404
+    #     brothers = list(CheckItem.fetchObjects({"parent":str(parent_iid)}))
+    #     if len(brothers) > 0:
+    #         step = max([x.step for x in brothers])+1
+    #     else:
+    #         step = 1
+    #     data["step"] = step
     dbclient = DBClient.getInstance()
     data["type"] = "checkitem"
     existing = CheckItem.fetchObject({"title":data["title"]})
