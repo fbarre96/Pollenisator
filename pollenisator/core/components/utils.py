@@ -131,6 +131,15 @@ def splitRange(rangeIp):
     return subnets
 
 
+def getDefaultWorkerCommandsFile():
+    return os.path.join(getMainDir(), "config", "worker_commands.json")
+
+def getDefaultCommandsFile():
+    return os.path.join(getMainDir(), "config", "default_commands.json")
+
+def getDefaultCheatsheetFile():
+    return os.path.join(getMainDir(), "config", "default_cheatsheet.json")
+
 def resetUnfinishedTools():
     """
     Reset all tools running to a ready state. This is useful if a command was running on a worker and the auto scanning was interrupted.
