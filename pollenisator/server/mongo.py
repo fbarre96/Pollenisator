@@ -525,7 +525,7 @@ def doImportCommands(data, user):
 
 
 
-def doImportCheatsheet(obj_ins,data,user):
+def doImportCheatsheet(data,user):
     try:
         checks = json.loads(data, cls=JSONDecoder)
     except:
