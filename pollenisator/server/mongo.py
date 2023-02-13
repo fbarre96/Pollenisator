@@ -546,14 +546,14 @@ def doImportCheatsheet(data,user):
         save_id = str(command["_id"])
         del command["_id"]
         obj_ins = command_insert("pollenisator", command, user)
-        if obj_ins["res"]:
-            matchings[save_id] = str(obj_ins["iid"])
-        else:
+        matchings[save_id] = str(obj_ins["iid"])
+
+        if not obj_ins["res"]:
             failed.append(command)
     for check in checks["checkitems"]:
         save_id = str(check["_id"])
         del check["_id"]
-        check["command_iid"] = str(matchings[check["command_iid"]])
+        check["commands"] = [str(matchings[c]) for c in check["commands"]]
         obj_ins = check_insert("pollenisator", check)
         if obj_ins["res"]:
             matchings[save_id] = str(obj_ins["iid"])
