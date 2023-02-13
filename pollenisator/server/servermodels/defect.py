@@ -174,7 +174,7 @@ def getGlobalDefects(pentest):
     defects_ordered = []
     for defect in defects:
         defects_ordered.append(DefectController(defect).getData())
-    return defects_ordered
+    return sorted(defects_ordered, key=lambda defect: int(defect["index"]))
     
 @permission("pentester")
 def moveDefect(pentest, defect_id_to_move, target_id):
