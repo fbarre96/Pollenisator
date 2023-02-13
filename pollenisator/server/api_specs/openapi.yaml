@@ -1091,6 +1091,26 @@ paths:
               examples:
                 Server issue:
                   value: 'Failed to export'
+  "/exportCheatsheet":
+    get:
+      operationId: pollenisator.server.mongo.exportCheatsheet
+      tags:
+        - Cheatsheet
+      summary: Return user checkitems as json
+      responses:
+        "200":
+          description:  content
+          content:
+              application/json:
+                schema:
+                  type: string
+        '503':
+          description: Failed to create an export
+          content:
+            application/json:
+              examples:
+                Server issue:
+                  value: 'Failed to export'
  
   "/dumpDb/{dbName}":
     get:
@@ -1179,7 +1199,32 @@ paths:
               examples:
                 Success:
                   value: 'true'
-
+  /importCheatsheet:
+    post:
+      operationId: pollenisator.server.mongo.importCheatsheet
+      tags:
+        - Cheatsheet
+      summary: Import an existing cheatsheet database file
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                upfile:
+                  description: The file to upload
+                  type: string
+                  format: binary
+              required:
+                - upfile
+      responses:
+        "200":
+          description: Successfully imported the file
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
   /copyDb:
     post:
       operationId: pollenisator.server.mongo.copyDb

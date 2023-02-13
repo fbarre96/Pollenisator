@@ -298,6 +298,9 @@ def getDefaultWorkerCommandsFile():
 def getDefaultCommandsFile():
     return os.path.join(getMainDir(), "config", "default_commands.json")
 
+def getDefaultCheatsheetFile():
+    return os.path.join(getMainDir(), "config", "default_cheatsheet.json")
+
 def loadServerConfig():
     """Return data converted from json inside config/server.cfg
     Returns:

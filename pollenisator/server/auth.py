@@ -5,8 +5,8 @@ import bcrypt
 from werkzeug.exceptions import Unauthorized
 from pollenisator.server.permission import permission
 from pollenisator.server.token import getTokenFor
-from pollenisator.server.mongo import doImportCommands
-from pollenisator.core.components.utils import getDefaultCommandsFile, getDefaultWorkerCommandsFile
+from pollenisator.server.mongo import doImportCheatsheet
+from pollenisator.core.components.utils import getDefaultCommandsFile, getDefaultWorkerCommandsFile, getDefaultCheatsheetFile
 
 @permission("admin")
 def createUser(body):
@@ -132,11 +132,8 @@ def connectToPentest(pentest, body, **kwargs):
     token = kwargs.get("token_info", {})
     try:
         if dbclient.countInDb("pollenisator", "commands", {}) == 0:
-            with open(getDefaultWorkerCommandsFile()) as f:
-                doImportCommands(f.read(), username)
-        if addDefaultCommands:
-            with open(getDefaultCommandsFile()) as f:
-                doImportCommands(f.read(), username)
+            with open(getDefaultCheatsheetFile()) as f:
+                doImportCheatsheet,(f.read(), username)
     except FileNotFoundError:
         pass
     if "admin" in token.get("scope", []):

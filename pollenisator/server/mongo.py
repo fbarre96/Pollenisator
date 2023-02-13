@@ -11,6 +11,7 @@ from pollenisator.core.components.parser import Parser, ParseError, Term
 from pollenisator.core.components.utils import JSONDecoder, getMainDir, isIp, JSONEncoder
 from pollenisator.core.controllers.wavecontroller import WaveController
 from pollenisator.core.controllers.intervalcontroller import IntervalController
+from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem, doInsert as check_insert
 from pollenisator.server.servermodels.command import ServerCommand, addUserCommandsToPentest, doInsert as command_insert
 from pollenisator.server.servermodels.wave import ServerWave, insert as insert_wave
 from pollenisator.server.servermodels.interval import ServerInterval, insert as insert_interval
@@ -522,12 +523,57 @@ def doImportCommands(data, user):
    
     return failed
 
+
+
+def doImportCheatsheet(obj_ins,data,user):
+    try:
+        checks = json.loads(data, cls=JSONDecoder)
+    except:
+        return "Invalid file format, json expected", 400
+    if not isinstance(checks, dict):
+        return "Invalid file format, object expected", 400
+    if "checkitems" not in checks.keys():
+        return "Invalid file format, object expected property: checkitems", 400
+    if not isinstance(checks["checkitems"], list):
+        return "Invalid file format, checkitems  properties must be lists", 400
+    matchings = {}
+    failed = []
+    if "commands" not in checks.keys():
+        return "Invalid file format, object expected property: commands", 400
+    if not isinstance(checks["commands"], list):
+        return "Invalid file format, commands  properties must be lists", 400
+    for command in checks["commands"]:
+        save_id = str(command["_id"])
+        del command["_id"]
+        obj_ins = command_insert("pollenisator", command, user)
+        if obj_ins["res"]:
+            matchings[save_id] = str(obj_ins["iid"])
+        else:
+            failed.append(command)
+    for check in checks["checkitems"]:
+        save_id = str(check["_id"])
+        del check["_id"]
+        check["command_iid"] = str(matchings[check["command_iid"]])
+        obj_ins = check_insert("pollenisator", check)
+        if obj_ins["res"]:
+            matchings[save_id] = str(obj_ins["iid"])
+        else:
+            failed.append(check)
+   
+    return failed
+
     
 @permission("user")
 def importCommands(upfile, **kwargs):
     user = kwargs["token_info"]["sub"]
     data = upfile.stream.read()
     return doImportCommands(data, user)
+
+@permission("user")
+def importCheatsheet(upfile, **kwargs):
+    user = kwargs["token_info"]["sub"]
+    data = upfile.stream.read()
+    return doImportCheatsheet(data, user)
     
 def doExportCommands():
     dbclient = DBClient.getInstance()
@@ -539,12 +585,31 @@ def doExportCommands():
         if "users" in c:
             del c["users"]
         res["commands"].append(c)
-   
+    return res
+
+def doExportCheatsheet():
+    dbclient = DBClient.getInstance()
+    res = {"checkitems":[], "commands":[]}
+    checks = dbclient.findInDb("pollenisator", "cheatsheet", {}, True)
+    for check in checks:
+        c = check
+        res["checkitems"].append(c)
+    commands = dbclient.findInDb("pollenisator", "commands", {}, True)
+    for command in commands:
+        c = command
+        del c["owners"]
+        if "users" in c:
+            del c["users"]
+        res["commands"].append(c)
     return res
 
 @permission("user")
 def exportCommands(**kwargs):
     return doExportCommands()
+
+@permission("user")
+def exportCheatsheet(**kwargs):
+    return doExportCheatsheet()
     
 
 @permission("pentester", "body.fromDb")
