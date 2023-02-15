@@ -122,7 +122,7 @@ class SmbMap(Plugin):
                 interesting_files[interesting_file_type] = interesting_files.get(interesting_file_type, [])
                 interesting_files[interesting_file_type].append(', '.join(row))
                 isInteresting = True
-                tags=["todo-smbmap-interesting"]
+                tags=[("todo-smbmap-interesting", "green")]
             else:
                 less_interesting_notes += ", ".join(row)+"\n"
             shares[target] = shares.get(target, {}) #{"<ip>":{"<shareName">:set(<tuple>)}}
@@ -164,7 +164,7 @@ class SmbMap(Plugin):
                     share_m.update(res["iid"])
 
             if password == "":
-                tags += ["todo-anon-share-found"]
+                tags += [("todo-anon-share-found", "green")]
         if notes.strip() != "" and not tags:
-            tags = ["todo-smbmap"]
+            tags = [("todo-smbmap", "blue")]
         return notes, tags, "port", targets

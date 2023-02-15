@@ -95,6 +95,11 @@ class ServerElement(metaclass=MetaElement):
             overrideGroupe: Default to True. If newTag is in a group with a tag already assigned to this object, it will replace this old tag.
         """
         tags = self.tags
+        if isinstance(newTag, tuple):
+            newTagColor = newTag[1]
+            newTag = newTag[0]
+        else:
+            newTagColor = "white"
         if newTag not in self.tags:
             dbclient = DBClient.getInstance()
             for group in dbclient.getTagsGroups():
@@ -112,7 +117,7 @@ class ServerElement(metaclass=MetaElement):
                         i += 1
             tags.append(newTag)
             self.tags = tags
-            dbclient.doRegisterTag(self.pentest, newTag)
+            dbclient.doRegisterTag(self.pentest, newTag, newTagColor)
             dbclient.updateInDb(self.pentest, self.__class__.coll_name, {"_id":ObjectId(self.getId())}, {"$set":{"tags":tags}})
 
     def updateInfos(self, newInfos):

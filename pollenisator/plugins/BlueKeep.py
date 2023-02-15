@@ -77,7 +77,7 @@ class BlueKeep(Plugin):
                 targets[str(p_o.getId())] = {"ip": ip, "port": kwargs.get(
                     "port", None), "proto": kwargs.get("proto", None)}
             if "VULNERABLE" in line:
-                tags=["pwned-bluekeep"]
+                tags=[("pwned-bluekeep", "red")]
                 if p_o is not None:
                     p_o.addTag("pwned")
                     p_o.addTag("bluekeep")

@@ -100,8 +100,10 @@ class Nuclei(Plugin):
             for finding in findings:
                 notes += finding["info"]["name"]+" ("+finding["info"]["severity"]+") "+finding["info"].get("description", "")+"\n"
             for finding in findings:
-                if finding["info"]["severity"] in ["medium", "high", "critical"]:
-                    tags = ["todo-nuclei-severity"]
+                if finding["info"]["severity"] in ["medium"]:
+                    tags = [("todo-nuclei-severity","red")]
+                if finding["info"]["severity"] in ["critical","high"]:
+                    tags = [("todo-high-nuclei-severity","red")]
             ip_o = ServerIp(pentest).initialize(host, notes, infos={"plugin":Nuclei.get_name()})
             inserted = ip_o.addInDb()
             if not inserted["res"]:

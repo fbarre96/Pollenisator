@@ -92,7 +92,14 @@ def importExistingFile(pentest, upfile, body, **kwargs):
             targets["default"] = {"lvl":default_target_objects[0], "wave":default_target_objects[1],"scope":default_target_objects[2], "ip":default_target_objects[3], 
                                 "port":default_target_objects[4], "proto":default_target_objects[5]}
         for tag in tags:
-            res = dbclient.doRegisterTag(pentest, tag)
+            if isinstance(tag, tuple):
+                color = tag[1]
+                tag_name = tag[0]
+            else:
+                color = "white"
+                tag_name = tag
+            res = dbclient.doRegisterTag(pentest, tag_name, color)
+
 
         # ADD THE RESULTING TOOL TO AFFECTED
         for target in targets.values():

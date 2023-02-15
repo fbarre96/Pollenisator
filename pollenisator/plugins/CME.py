@@ -297,14 +297,14 @@ class CME(Plugin):
         hostsInfos, countPwnd,  countSuccess, notes, secrets, lsassy = getInfos(file_opened)
         if countPwnd is not None:
             if int(countPwnd) > 0:
-                tags = ["pwned-cme"]
+                tags = [("pwned-cme", "red")]
         if countSuccess is not None:
             if int(countSuccess) > 0:
-                tags += ["info-cme-connection-success"]
+                tags += [("info-cme-connection-success", "green")]
             if len(secrets) > 0:
-                tags += ["todo-cme-secrets-dump"]
+                tags += [("todo-cme-secrets-dump","red")]
             if lsassy:
-                tags += ["todo-lsassy-success"]
+                tags += [("todo-lsassy-success","red")]
         if hostsInfos is None:
             return None, None, None, None
         targets = editScopeIPs(pentest, hostsInfos)

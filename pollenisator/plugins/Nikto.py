@@ -74,7 +74,7 @@ class Nikto(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
-        tags = ["todo-nikto"]
+        tags = [("todo-nikto", "blue")]
         targets = {}
         try:
             notes = file_opened.read().decode("utf-8")

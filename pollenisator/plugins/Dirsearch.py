@@ -153,5 +153,5 @@ class Dirsearch(Plugin):
                     newInfos["SSL"] = "True" if hosts[host][port]["service"] == "https" else "False"
                     port_o.updateInfos(newInfos)
                     if atLeastOne:
-                        tags = ["todo-dirsearch"]
+                        tags = [("todo-dirsearch", "blue")]
         return notes, tags, "port", targets
