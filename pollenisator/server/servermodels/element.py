@@ -99,7 +99,7 @@ class ServerElement(metaclass=MetaElement):
             newTagColor = newTag[1]
             newTag = newTag[0]
         else:
-            newTagColor = "white"
+            newTagColor = "transparent"
         if newTag not in self.tags:
             dbclient = DBClient.getInstance()
             for group in dbclient.getTagsGroups():

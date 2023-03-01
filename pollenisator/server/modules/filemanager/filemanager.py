@@ -96,7 +96,7 @@ def importExistingFile(pentest, upfile, body, **kwargs):
                 color = tag[1]
                 tag_name = tag[0]
             else:
-                color = "white"
+                color = "transparent"
                 tag_name = tag
             res = dbclient.doRegisterTag(pentest, tag_name, color)
 

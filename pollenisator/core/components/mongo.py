@@ -226,7 +226,7 @@ class DBClient:
                     raise IOError("Failed to register Worker")
             res = self.findInDb("pollenisator", "workers", {"name": worker_name}, False)
             if res is None:
-                self.insertInDb("pollenisator", "workers", {"name": worker_name, "pentest": "", "known_commands":binaries}, '', True)
+                self.insertInDb("pollenisator", "workers", {"name": worker_name, "pentest": "", "known_commands":binaries}, '', notify=True)
             else:
                 self.updateInDb("pollenisator", "workers", {"name": worker_name},
                     {"$set":{"last_heartbeat":datetime.datetime.now(), "known_commands":binaries,  "pentest":""}}, notify=True)
@@ -821,7 +821,7 @@ class DBClient:
                     return json.loads(tags["value"])
                 except:
                     pass
-        return {"todo":"orange", "unscanned":"yellow", "pwned":"red", "Interesting":"dark green", "Uninteresting":"sky blue", "neutral":"white"}
+        return {"todo":"orange", "unscanned":"yellow", "pwned":"red", "Interesting":"dark green", "Uninteresting":"sky blue", "neutral":"transparent"}
         
     def getTagsGroups(self):
         """Returns groups of tags that may not be applied at the same time
@@ -832,7 +832,7 @@ class DBClient:
         return [tags, ["hidden"]]
 
 
-    def doRegisterTag(self, pentest, name, color="white"):
+    def doRegisterTag(self, pentest, name, color="transparent"):
         if name in self.getRegisteredTags():
             return False
         if pentest == "pollenisator":

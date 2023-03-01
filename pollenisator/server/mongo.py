@@ -406,9 +406,10 @@ def updateSetting(body):
 
 
 @permission("pentester", "body.pentest")
-def registerTag(pentest, body):
+def registerTag(body):
     name = body["name"]
     color = body["color"]
+    pentest = body["pentest"]
     return dbclient.doRegisterTag(pentest, name, color)
 
 @permission("pentester", "body.pentest")
@@ -487,13 +488,15 @@ def dumpDb(dbName, collection=""):
     except TypeError as e: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
         return send_file(path, mimetype="application/gzip", download_name=os.path.basename(path))
 @permission("user")
-def importDb(upfile, **kwargs):
+def importDb(orig_name, upfile, **kwargs):
     username = kwargs["token_info"]["sub"]
     dirpath = tempfile.mkdtemp()
     tmpfile = os.path.join(dirpath, os.path.basename(upfile.filename))
     with open(tmpfile, "wb") as f:
         f.write(upfile.stream.read())
-    success = dbclient.importDatabase(username, tmpfile)
+    new_name = os.path.basename(upfile.filename)
+    new_name = os.path.splitext(new_name)[0]
+    success = dbclient.importDatabase(username, tmpfile, nsFrom=orig_name, nsTo=new_name)
     shutil.rmtree(dirpath)
     return success
 

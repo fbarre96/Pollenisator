@@ -36,6 +36,8 @@ def listWorkers(pipeline=None):
     return ret
 
 def doSetInclusion(name, pentest, setInclusion):
+    if pentest == "":
+        return False
     if setInclusion:
         addUserCommandsToPentest(pentest, name)
     return dbclient.setWorkerInclusion(name, pentest, setInclusion)

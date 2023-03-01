@@ -548,6 +548,8 @@ def getProgress(pentest, tool_iid):
         return "The worker running this tool is not running anymore", 404
     socket = dbclient.findInDb("pollenisator", "sockets", {"user":saveScannerip}, False)
     sm = SocketManager.getInstance()
+    if socket is None:
+        return "Socket not found", 404
     sm.socketio.emit('getProgress', {'pentest': pentest, "tool_iid":str(tool_iid)}, room=socket["sid"])
     global response
     response = ""

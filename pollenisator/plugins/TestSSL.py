@@ -38,8 +38,11 @@ def parseWarnings(pentest, file_opened):
             if "/" in ip:
                 domain = ip.split("/")[0]
                 ip = "/".join(ip.split("/")[1:])
-                ServerIp(pentest).initialize(domain, infos={"plugin":TestSSL.get_name()}).addInDb()
-                ServerPort(pentest).initialize(domain, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name()}).addInDb()
+                if ip.strip() != "" and domain.strip() != "":
+                    ServerIp(pentest).initialize(domain, infos={"plugin":TestSSL.get_name()}).addInDb()
+                    ServerPort(pentest).initialize(domain, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name()}).addInDb()
+            if ip.strip() == "":
+                continue
             ServerIp(pentest).initialize(ip, infos={"plugin":TestSSL.get_name()}).addInDb()
             ServerPort(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name()}).addInDb()
             if notes not in ["OK", "INFO"]:

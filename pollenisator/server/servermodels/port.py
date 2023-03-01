@@ -135,7 +135,9 @@ def update(pentest, port_iid, body):
     oldPort = ServerPort(pentest, dbclient.findInDb(pentest, "ports", {"_id": ObjectId(port_iid)}, False))
     if oldPort is None:
         return
-    port_o = ServerPort(pentest, body)
+    dbclient.updateInDb(pentest, "ports", {"_id":ObjectId(port_iid)}, {"$set":body}, False, True)
+    
+    port_o = ServerPort(pentest, dbclient.findInDb(pentest, "ports", {"_id": ObjectId(port_iid)}, False))
     oldService = oldPort.service
     if oldService != port_o.service:
         
@@ -144,6 +146,5 @@ def update(pentest, port_iid, body):
         dbclient.deleteFromDb(pentest, "cheatsheet", {
                                 "lvl": "port:onServiceUpdate", "ip": oldPort.ip, "port": oldPort.port, "proto": oldPort.proto, "status":{"$ne":"done"}}, many=True)     
         port_o.addChecks(["port:onServiceUpdate"])
-    dbclient.updateInDb(pentest, "ports", {"_id":ObjectId(port_iid)}, {"$set":body}, False, True)
     return True
    
