@@ -262,7 +262,11 @@ class ServerTool(Tool, ServerElement):
         Returns:
             string
         """
+        if self.lvl == "import":
+            return str(self.name)
         class_element = ServerElement.getClassWithTrigger(self.lvl)
+        if class_element is None:
+            return str(self.name)
         return class_element.completeDetailedString(self.getData()) + str(self.name)
         
     

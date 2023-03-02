@@ -802,8 +802,8 @@ class DBClient:
         return msg, 200 if success else 403
 
 
-    def getRegisteredTags(self):
-        tags = self.find("settings", {"key":"tags"}, False)
+    def getRegisteredTags(self, pentest):
+        tags = self.findInDb(pentest,"settings", {"key":"tags"}, False)
         if tags is None:
             return []
         pentest_tags = list(tags.keys())
@@ -833,7 +833,7 @@ class DBClient:
 
 
     def doRegisterTag(self, pentest, name, color="transparent"):
-        if name in self.getRegisteredTags():
+        if name in self.getRegisteredTags(pentest):
             return False
         if pentest == "pollenisator":
             tags = json.loads(self.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=utils.JSONDecoder)

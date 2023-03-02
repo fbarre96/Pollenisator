@@ -42,13 +42,8 @@ def importExistingFile(pentest, upfile, body, **kwargs):
     from pollenisator.server.servermodels.tool import ServerTool
     user = kwargs["token_info"]["sub"]
     plugin = body.get("plugin", "auto-detect")
-    default_target = body.get("default_target", "")
+    default_target = json.loads(body.get("default_target", {}))
     cmdline = body.get("cmdline", "")
-    default_target_objects = None
-    if default_target != "":
-        default_target_objects = default_target.split("|")
-        if len(default_target_objects) != 6:
-            return "Default target is badly crafted", 400
 
     md5File = md5(upfile.stream)
     upfile.stream.seek(0)
@@ -88,9 +83,8 @@ def importExistingFile(pentest, upfile, body, **kwargs):
         return str(error_msg)
     # IF PLUGIN FOUND SOMETHING
     if notes is not None and tags is not None:
-        if default_target_objects:
-            targets["default"] = {"lvl":default_target_objects[0], "wave":default_target_objects[1],"scope":default_target_objects[2], "ip":default_target_objects[3], 
-                                "port":default_target_objects[4], "proto":default_target_objects[5]}
+        if default_target:
+            targets["default"] = default_target
         for tag in tags:
             if isinstance(tag, tuple):
                 color = tag[1]
@@ -110,6 +104,7 @@ def importExistingFile(pentest, upfile, body, **kwargs):
                 ip = None
                 port = None
                 proto = None
+                check_iid = None
             else:
                 lvl = target.get("lvl", lvl)
                 wave = target.get("wave", None)
@@ -117,11 +112,12 @@ def importExistingFile(pentest, upfile, body, **kwargs):
                 ip = target.get("ip", None)
                 port = target.get("port", None)
                 proto = target.get("proto", None)
+                check_iid = target.get("check_iid", None)
             if wave is None:
                 wave = "Imported"
             if dbclient.findInDb(pentest, "waves", {"wave":wave}, False) is None:
                 dbclient.insertInDb(pentest, "waves", {"wave":wave, "wave_commands":[]})
-            tool_m = ServerTool(pentest).initialize("", None, wave, name=toolName, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
+            tool_m = ServerTool(pentest).initialize("", check_iid, wave, name=toolName, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
                                         dated=date, datef=date, scanner_ip=user, status=["done"], notes=notes, tags=tags)
             ret = tool_m.addInDb()
             upfile.stream.seek(0)
