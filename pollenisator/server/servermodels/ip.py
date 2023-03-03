@@ -145,8 +145,13 @@ class ServerIp(Ip, ServerElement):
         """
         Add the appropriate checks (level check and wave's commands check) for this scope.
         """
+        dbclient = DBClient.getInstance()
+        search = {"lvl":{"$in": lvls}}
+        pentest_type = dbclient.findInDb(self.pentest, "settings", {"key":"pentest_type"}, False)
+        if pentest_type is not None:
+            search["pentest_types"] = pentest_type["value"]
         # query mongo db commands collection for all commands having lvl == network or domain 
-        checkitems = CheckItem.fetchObjects({"lvl": {"$in": lvls}})
+        checkitems = CheckItem.fetchObjects(search)
         if checkitems is None:
             return
         for check in checkitems:
