@@ -2,6 +2,9 @@ from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.permission import permission
+from pollenisator.core.components.utils import JSONDecoder
+import json
+
 
 class CheckItem(ServerElement):
     coll_name = 'cheatsheet'
@@ -180,3 +183,15 @@ def update(iid, body):
     dbclient = DBClient.getInstance()
     dbclient.updateInDb("pollenisator", CheckItem.coll_name, {"_id": ObjectId(iid), "type":"checkitem"}, {"$set": body}, False, True)
     return True
+
+
+@permission("user")
+def find(body):
+    pipeline = body.get("pipeline", {})
+    if isinstance(pipeline, str):
+        pipeline = json.loads(pipeline, cls=JSONDecoder)
+    dbclient = DBClient.getInstance()
+    results = dbclient.findInDb("pollenisator", "cheatsheet", pipeline, True)
+    if results is None:
+        return []
+    return [x for x in results]

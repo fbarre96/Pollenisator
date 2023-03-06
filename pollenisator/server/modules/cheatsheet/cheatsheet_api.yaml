@@ -143,7 +143,30 @@ paths:
             schema:
               $ref: '#/components/schemas/CheckInstance'
 
-  
+  "/cheatsheet/find":
+    post:
+      operationId: pollenisator.server.modules.cheatsheet.cheatsheet.find
+      tags:
+        - Cheatsheet
+      summary: "find check items"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pipeline:
+                  type: string
+                  example: "{}"
+      responses:
+        "200":
+          description: successful find command with parameters
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '[{"_id": "60a3aaa129926f9ad7197919", "parent": "ObjectId|60a3aaa129926f9ad7197915",  "scope": "test",   "wave": "Testina" },  { "_id": "60f58598d8357e0f40e7fa66","scope": "test.fr" }]'
+    
 
 components:
   schemas:
