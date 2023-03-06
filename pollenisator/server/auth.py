@@ -131,7 +131,7 @@ def connectToPentest(pentest, body, **kwargs):
     testers = dbclient.getPentestUsers(pentest)
     token = kwargs.get("token_info", {})
     try:
-        if dbclient.countInDb("pollenisator", "commands", {}) == 0:
+        if dbclient.countInDb("pollenisator", "cheatsheet", {}) == 0:
             with open(getDefaultCheatsheetFile()) as f:
                 doImportCheatsheet,(f.read(), username)
     except FileNotFoundError:

@@ -172,8 +172,9 @@ def doInsert(pentest, data, checkItem=None, toolInfos=None):
         return "Check Item not found", 404
     for command in checkItem.commands:
         command_pentest = ServerCommand.fetchObject({"original_iid": str(command)}, pentest)
-        ServerTool(pentest).initialize(str(command_pentest._id), str(iid), target.get("wave", ""), None, target.get("scope", ""), target.get("ip", ""), target.get("port", ""),
-                                       target.get("proto", ""), checkItem.lvl, infos=toolInfos).addInDb()
+        if command_pentest is not None:
+            ServerTool(pentest).initialize(str(command_pentest._id), str(iid), target.get("wave", ""), None, target.get("scope", ""), target.get("ip", ""), target.get("port", ""),
+                                        target.get("proto", ""), checkItem.lvl, infos=toolInfos).addInDb()
 
     return {"res": True, "iid": iid}
     
