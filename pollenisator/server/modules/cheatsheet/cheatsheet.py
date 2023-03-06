@@ -190,8 +190,11 @@ def find(body):
     pipeline = body.get("pipeline", {})
     if isinstance(pipeline, str):
         pipeline = json.loads(pipeline, cls=JSONDecoder)
+    many = body.get("many", True)
     dbclient = DBClient.getInstance()
-    results = dbclient.findInDb("pollenisator", "cheatsheet", pipeline, True)
+    results = dbclient.findInDb("pollenisator", "cheatsheet", pipeline, many)
     if results is None:
         return []
-    return [x for x in results]
+    if many:
+        return [x for x in results]
+    return results
