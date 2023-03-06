@@ -408,7 +408,7 @@
     },
     {
       "_id": "ObjectId|63c66e8959cc4aaba5a8e0cb",
-      "category": "",
+      "category": "Service enumeration",
       "check_type": "auto_commands",
       "commands": [
         "635bc7657f9c2b1ae86d0c66"
@@ -425,14 +425,14 @@
       ],
       "ports": "https,http/ssl,ssl/http,ssl/ssl,ssl/https,ssl/http",
       "priority": 0,
-      "script": null,
+      "script": "",
       "step": 1,
       "title": "Authenticated HTTPS enum",
       "type": "checkitem"
     },
     {
       "_id": "ObjectId|63c66ec559cc4aaba5a8e0cc",
-      "category": "",
+      "category": "Service enumeration",
       "check_type": "auto_commands",
       "commands": [
         "635bc7657f9c2b1ae86d0c67"
@@ -449,7 +449,7 @@
       ],
       "ports": "80,http,http-alt",
       "priority": 0,
-      "script": null,
+      "script": "",
       "step": 1,
       "title": "Authenticated HTTP enum",
       "type": "checkitem"
@@ -635,6 +635,51 @@
       "step": 0,
       "title": "Web pentest",
       "type": "checkitem"
+    },
+    {
+      "_id": "ObjectId|63eb9695654444149f06eee1",
+      "category": "Service enumeration",
+      "check_type": "auto_commands",
+      "commands": [
+        "635bc7657f9c2b1ae86d0c50"
+      ],
+      "defects": [],
+      "description": "",
+      "infos": {},
+      "lvl": "port:onServiceUpdate",
+      "max_thread": 3,
+      "parent": null,
+      "pentest_types": [
+        "Web",
+        "LAN"
+      ],
+      "ports": "27017,mongodb",
+      "priority": 0,
+      "script": "",
+      "step": 0,
+      "title": "MongoDB",
+      "type": "checkitem"
+    },
+    {
+      "_id": "ObjectId|6401cc995151a67d7085ea74",
+      "category": "Active Directory",
+      "check_type": "script",
+      "commands": [],
+      "defects": [],
+      "description": "Start Responder",
+      "infos": {},
+      "lvl": "wave:onAdd",
+      "max_thread": 1,
+      "parent": null,
+      "pentest_types": [
+        "LAN"
+      ],
+      "ports": "",
+      "priority": 0,
+      "script": "lan/start_responder.py",
+      "step": 0,
+      "title": "Responder launch",
+      "type": "checkitem"
     }
   ],
   "commands": [
@@ -810,7 +855,7 @@
       "priority": 0,
       "safe": true,
       "sleep_between": 0,
-      "text": "-u http://|ip|:|port|",
+      "text": "-u http://|ip|:|port| -q",
       "timeout": 300,
       "types": [
         "Web",
@@ -830,8 +875,8 @@
       "priority": 0,
       "safe": true,
       "sleep_between": 0,
-      "text": "-u https://|ip|:|port|",
-      "timeout": 300,
+      "text": "-u https://|ip|:|port| -q",
+      "timeout": 500,
       "types": [
         "Web",
         "LAN"
@@ -962,7 +1007,7 @@
       "max_thread": 3,
       "name": "Nmap.services_scripts",
       "neededDir": "|scope.wave_id|/|scope.scope_dir|/|scope.ip_dir|/DiscoverService/|scope.port|/",
-      "plugin": "Nmap",
+      "plugin": "Default",
       "ports": "unknown,tcpwrapped,ssl/unknown",
       "priority": 0,
       "safe": true,
