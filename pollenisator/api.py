@@ -259,11 +259,17 @@ def create_app():
         if todel:
             unregister(todel.get("worker"))
             dbclient.deleteFromDb("pollenisator", "sockets", {"sid":sid}, False)
-
+    @sm.socketio.event
+    def test(data):
+        logger.info("TEST received : "+str(data))
+        print(data)
+        sm.socketio.emit("test", {"test":"HELLO"}, room=request.sid)
+        
     flask_app.json_encoder = JSONEncoder
     CORS(flask_app)
     return flask_app
 
+    
 
 def main():
     """Create the app and run it
