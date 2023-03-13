@@ -201,6 +201,7 @@ def create_app():
             Returns:
                 None
         """
+        logger.info("Registering socket for notifications "+str(data))
         sid = request.sid
         token = str(data.get("token", ""))
         pentest = str(data.get("pentest", ""))
@@ -259,12 +260,37 @@ def create_app():
         if todel:
             unregister(todel.get("worker"))
             dbclient.deleteFromDb("pollenisator", "sockets", {"sid":sid}, False)
+
     @sm.socketio.event
     def test(data):
         logger.info("TEST received : "+str(data))
-        print(data)
+        logger.debug(data)
         sm.socketio.emit("test", {"test":"HELLO"}, room=request.sid)
         
+    @sm.socketio.on('get-document')
+    def get_document(data):
+        sid = request.sid
+        dbclient = DBClient.getInstance()
+        socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid}, False)
+        if socket is None:
+            return {"error":"Forbidden"}
+        if not(socket["pentest"] == data.get("pentest") and data.get("pentest") is not None):
+            return {"error":"Forbidden"}
+        pentest = data.get("pentest")
+        doc = dbclient.findInDb(pentest, "documents", {"_id":ObjectId(data.get("doc_id"))}, False)
+        if doc is None:
+            res = dbclient.insertInDb(pentest, "documents", {"data":{}})
+            if not res["res"]:
+                return {"error": "Document could not be created"}
+            
+        sm.socketio.emit("load-document", doc.get("data", {}))
+        @sm.socketio.on("send-delta")
+        def send_delta(delta):
+            sm.socketio.emit("received-delta", delta, room=request.sid)
+        @sm.socketio.on("save-document")
+        def save_document(data):
+            dbclient.updateInDb(pentest, "documents", {"_id":ObjectId(data.get("doc_id"))}, {"$set":{"data":data.get("data")}})
+
     flask_app.json_encoder = JSONEncoder
     CORS(flask_app)
     return flask_app

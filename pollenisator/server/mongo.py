@@ -324,6 +324,31 @@ def registerPentest(pentest, body, **kwargs):
     else:
         return msg, 403
 
+@permission("pentester")
+def getPentestInfo(pentest, **kwargs):
+    dbclient = DBClient.getInstance()
+    ret = {}
+    ret["defects_count"] = dbclient.countInDb(pentest, "defects", {})
+    ret["defects_count_critical"] = dbclient.countInDb(pentest, "defects", {"risk":"Critical"})
+    ret["defects_count_major"] = dbclient.countInDb(pentest, "defects", {"risk":"Major"})
+    ret["defects_count_important"] = dbclient.countInDb(pentest, "defects", {"risk":"Important"})
+    ret["defects_count_minor"] = dbclient.countInDb(pentest, "defects", {"risk":"Minor"})
+    ret["autoscan_status"] = dbclient.findInDb(pentest, "autoscan", {"special":True}, False)
+    if ret["autoscan_status"] is None:
+        ret["autoscan_status"] = False
+    all_tags = dbclient.getRegisteredTags(pentest)
+    ret["tags"] = {}
+    for tag in all_tags:
+        ret["tags"] = 0
+        for collection in dbclient.listCollections(pentest):
+            ret["tags"] += dbclient.countInDb(pentest, collection, {"tags":tag})
+    ret["hosts_count"] = dbclient.countInDb(pentest, "ips")
+    ret["tools_done_count"] = dbclient.countInDb(pentest, "tools", {"status":"done"})
+    ret["tools_count"] = dbclient.countInDb(pentest, "tools", {})
+    ret["checks_done"] = dbclient.countInDb(pentest, "cheatsheet", {"status":"done"})
+    ret["checks_total"] = dbclient.countInDb(pentest, "cheatsheet", {})
+    return ret
+
 def preparePentest(dbName, pentest_type, start_date, end_date, scope, settings, pentesters, owner, **kwargs):
     """
     Initiate a pentest database with wizard info

@@ -1607,6 +1607,13 @@ paths:
               examples:
                 Reason:
                   value: '"*{Reason of failure, invalid name, or database already exist..}*"'
+    get:
+      summary: ''
+      operationId: pollenisator.server.mongo.getPentestInfo
+      responses:
+        '200':
+          description: OK
+      description: Get pentest infos
   "/notification/{pentest}":
     get:
       operationId: pollenisator.server.mongo.fetchNotifications

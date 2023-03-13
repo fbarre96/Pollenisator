@@ -239,7 +239,12 @@ class DBClient:
                   self.host + " and has a user mongAdmin with the correct password.")
             self.client = None
             return False
-    
+        
+    def listCollections(self, pentest):
+        self.connectToDb(pentest)
+        collections = self.db.list_collection_names()
+        return collections
+
 
     def update(self, collection, pipeline, updatePipeline, many=False, notify=True, upsert=False):
         """
@@ -800,7 +805,7 @@ class DBClient:
                 cmd += " --nsFrom='"+kwargs.get("nsFrom")+".*' --nsTo='"+toDbName+".*'"
             execute(cmd, None, True)
         return msg, 200 if success else 403
-
+    
 
     def getRegisteredTags(self, pentest):
         tags = self.findInDb(pentest,"settings", {"key":"tags"}, False)
