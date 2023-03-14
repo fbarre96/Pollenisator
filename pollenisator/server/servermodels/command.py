@@ -170,13 +170,8 @@ def addUserCommandsToPentest(pentest, user):
     dbclient = DBClient.getInstance()
     worker = dbclient.findInDb(
         "pollenisator", "workers", {"name": user}, False)
-    if worker is not None:
-        worker_commands = worker.get("known_commands", [])
-        commands = dbclient.findInDb(
-            "pollenisator", "commands", {"bin_path": {"$in":worker_commands}}, True)
-    else:
-        commands = dbclient.findInDb(
-            "pollenisator", "commands", {"owners": user}, True)
+    commands = dbclient.findInDb(
+        "pollenisator", "commands", {}, True)
     for command in commands:
         mycommand = command
         mycommand["original_iid"] = str(command["_id"])

@@ -194,7 +194,7 @@ def find(body):
     dbclient = DBClient.getInstance()
     results = dbclient.findInDb("pollenisator", "cheatsheet", pipeline, many)
     if results is None:
-        return []
+        return [] if many else ("Not found", 404)
     if many:
         return [x for x in results]
     return results
