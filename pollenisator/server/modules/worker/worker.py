@@ -55,7 +55,7 @@ def doDeleteWorker(name):
     socket = dbclient.findInDb("pollenisator", "sockets", {"user":name}, False)
     if socket is not None:
         sm = SocketManager.getInstance()
-        sm.socketio.emit('deleteWorker', {'name': name}, room=socket["sid"])
+        sm.socketio.emit('deleteWorker', {'name': name})
     if res.get("container_id") is not None:
         stop_docker(res["container_id"])
     return dbclient.deleteWorker(name)

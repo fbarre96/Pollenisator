@@ -31,8 +31,7 @@ from pollenisator.server.modules.worker.worker import removeWorkers, unregister
 import connexion
 from pathlib import Path
 import ruamel.yaml
-from ruamel.yaml.comments import CommentedSeq, CommentedMap
-from collections import OrderedDict
+from flask_socketio import join_room, leave_room
 
 # Create the application instance
 server_folder = os.path.join(os.path.dirname(
@@ -113,13 +112,11 @@ def notify_clients(notif):
     """
     dbclient = DBClient.getInstance()
     sm = SocketManager.getInstance()
-    sockets = dbclient.findInDb("pollenisator","sockets",{}, True)
+    #sockets = dbclient.findInDb("pollenisator","sockets",{}, True)
     if notif["db"] == "pollenisator":
         sm.socketio.emit("notif", json.dumps(notif, cls=JSONEncoder))
     else:
-        for socket in sockets:
-            if socket["pentest"] == notif["db"]:
-                sm.socketio.emit("notif", json.dumps(notif, cls=JSONEncoder), to=socket["sid"])
+        sm.socketio.emit("notif", json.dumps(notif, cls=JSONEncoder), to=notif["db"])
 
 
 def init():
@@ -206,16 +203,18 @@ def create_app():
         token = str(data.get("token", ""))
         pentest = str(data.get("pentest", ""))
         res = verifyToken(token)
-        token_info = decode_token(token)
         if res:
+            token_info = decode_token(token)
             if pentest in token_info["scope"]:
                 dbclient = DBClient.getInstance()
                 socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid}, False)
                 if socket is None:
                     dbclient.insertInDb("pollenisator", "sockets", {"sid":sid, "pentest":pentest}, False)
                 else:
+                    leave_room(pentest)
                     dbclient.updateInDb("pollenisator", "sockets", {"sid":sid}, {"$set":{"pentest":pentest}}, notify=False)
-    
+                join_room(pentest)
+
     @sm.socketio.event
     def keepalive(data):
         """Keep the worker alive and update the running tasks.
@@ -233,7 +232,7 @@ def create_app():
         dbclient = DBClient.getInstance()        
         worker = dbclient.findInDb("pollenisator","workers", {"name":workerName}, False)
         if worker is None:
-            sm.socketio.emit("deleteWorker", room=request.sid)
+            sm.socketio.emit("deleteWorker", to=request.sid)
             return
         pentest = worker.get("pentest", "")
         if pentest == "":
@@ -265,7 +264,7 @@ def create_app():
     def test(data):
         logger.info("TEST received : "+str(data))
         logger.debug(data)
-        sm.socketio.emit("test", {"test":"HELLO"}, room=request.sid)
+        sm.socketio.emit("test", {"test":"HELLO"}, to=data.get("pentest"))
         
     @sm.socketio.on('get-document')
     def get_document(data):
@@ -276,20 +275,21 @@ def create_app():
             return {"error":"Forbidden"}
         if not(socket["pentest"] == data.get("pentest") and data.get("pentest") is not None):
             return {"error":"Forbidden"}
-        pentest = data.get("pentest")
-        doc = dbclient.findInDb(pentest, "documents", {"_id":ObjectId(data.get("doc_id"))}, False)
+        pentest = data.get("pentest","")
+        doc = dbclient.findInDb(pentest, "documents", {"pentest":pentest}, False)
         if doc is None:
-            res = dbclient.insertInDb(pentest, "documents", {"data":{}})
-            if not res["res"]:
+            ins_result = dbclient.insertInDb(pentest, "documents", {"data":{}, "pentest":pentest})
+            if ins_result is None:
                 return {"error": "Document could not be created"}
-            
-        sm.socketio.emit("load-document", doc.get("data", {}))
+            res = ins_result.inserted_id
+        sm.socketio.emit("load-document", doc.get("data", {}), room=request.sid)
         @sm.socketio.on("send-delta")
         def send_delta(delta):
-            sm.socketio.emit("received-delta", delta, room=request.sid)
+			#socket.broadcast.to(documentId).emit("received-delta", delta);
+            sm.socketio.broadcast.emit("received-delta", delta, to=pentest)
         @sm.socketio.on("save-document")
         def save_document(data):
-            dbclient.updateInDb(pentest, "documents", {"_id":ObjectId(data.get("doc_id"))}, {"$set":{"data":data.get("data")}})
+            dbclient.updateInDb(pentest, "documents", {"pentest":pentest}, {"$set":{"data":data}})
 
     flask_app.json_encoder = JSONEncoder
     CORS(flask_app)
