@@ -282,14 +282,31 @@ def create_app():
             if ins_result is None:
                 return {"error": "Document could not be created"}
             res = ins_result.inserted_id
+            doc = {}
         sm.socketio.emit("load-document", doc.get("data", {}), room=request.sid)
-        @sm.socketio.on("send-delta")
-        def send_delta(delta):
-			#socket.broadcast.to(documentId).emit("received-delta", delta);
-            sm.socketio.broadcast.emit("received-delta", delta, to=pentest)
-        @sm.socketio.on("save-document")
-        def save_document(data):
-            dbclient.updateInDb(pentest, "documents", {"pentest":pentest}, {"$set":{"data":data}})
+    
+    @sm.socketio.on("send-delta")
+    def send_delta(delta):
+        sid = request.sid
+        dbclient = DBClient.getInstance()
+        socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid}, False)
+        if socket is None:
+            return {"error":"Forbidden"}
+        if socket["pentest"] == "":
+            return {"error":"Forbidden"}
+        pentest = socket["pentest"]
+        sm.socketio.emit("received-delta", delta, room=pentest, include_self=False)
+    @sm.socketio.on("save-document")
+    def save_document(data):
+        dbclient = DBClient.getInstance()
+        sid = request.sid
+        socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid}, False)
+        if socket is None:
+            return {"error":"Forbidden"}
+        if socket["pentest"] == "":
+            return {"error":"Forbidden"}
+        pentest = socket["pentest"]
+        dbclient.updateInDb(pentest, "documents", {"pentest":pentest}, {"$set":{"data":data}})
 
     flask_app.json_encoder = JSONEncoder
     CORS(flask_app)
