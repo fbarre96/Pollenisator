@@ -153,7 +153,6 @@ def init():
         ssl_context = None
     return port
 
-
 def create_app():
     """Loads all API ymal modules and init the App with SocketIO + Connexion + Flask
     """

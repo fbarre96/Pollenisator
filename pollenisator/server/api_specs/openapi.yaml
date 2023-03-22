@@ -2649,10 +2649,16 @@ paths:
           required: true
           schema:
             type: string
+        - name: commandline_options
+          schema:
+            type: string
+            default: ''
+          in: query
+          description: change command default options
       responses:
         "200":
-          description: The command line to execute with a marker for |outputDir| to be
-            replaced
+          description: 'The command line to execute (if add_output_dir : with a marker for |outputDir| to be
+            replaced)'
           content:
             application/json:
               examples:

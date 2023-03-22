@@ -376,11 +376,15 @@ def update(pentest, tool_iid, body):
     return True
     
 @permission("pentester")
-def craftCommandLine(pentest, tool_iid):
+def craftCommandLine(pentest, tool_iid, commandline_options=""):
     # CHECK TOOL EXISTS
     toolModel = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     if toolModel is None:
         return "Tool does not exist : "+str(tool_iid), 404
+    if commandline_options != "":
+        toolModel.text = commandline_options
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, {"$set":{"text":commandline_options}}, False, True)
     # GET COMMAND OBJECT FOR THE TOOL
     if toolModel.text == "":
         command_o = ServerCommand.fetchObject({"_id": ObjectId(toolModel.command_iid)}, pentest)
@@ -394,13 +398,14 @@ def craftCommandLine(pentest, tool_iid):
     if comm == "":
         return "An empty command line was crafted", 400
     # Load the plugin
-    
+    ext = ""
     mod = toolModel.getPlugin()
     if mod is None:
         return "Plugin not found for this tool", 400
     # craft outputfile name
-    comm = mod.changeCommand(comm, "|outputDir|", mod.getFileOutputExt())
-    return {"comm":comm, "ext":mod.getFileOutputExt()}
+    comm_complete = mod.changeCommand(comm, "|outputDir|", mod.getFileOutputExt())
+    ext = mod.getFileOutputExt()
+    return {"comm":comm_complete, "ext":ext, "comm_with_output":comm}
 
 @permission("pentester")
 def completeDesiredOuput(pentest, tool_iid, plugin, command_line_options):
