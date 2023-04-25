@@ -45,6 +45,13 @@ class ServerScope(Scope, ServerElement):
     @classmethod
     def completeDetailedString(cls, data):
         return data.get("scope", "")+" "
+    
+    @classmethod
+    def updateScopesSettings(cls, pentest):
+        scopes = ServerScope.fetchObjects(pentest, {})
+        for scope in scopes:
+            _updateIpsScopes(pentest, scope)
+        
 
     def getParentId(self):
         dbclient = DBClient.getInstance()
@@ -77,32 +84,32 @@ class ServerScope(Scope, ServerElement):
         for check in checkitems:
             CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "scope")
 
-    def getIpsFitting(self):
-        """Returns a list of ip mongo dict fitting this scope
-        Returns:
-            A list ip IP dictionnary from mongo db
-        """
-        dbclient = DBClient.getInstance()
-        ips = dbclient.findInDb(self.pentest, "ips", )
-        ips_fitting = []
-        isdomain = self.isDomain()
-        for ip in ips:
-            if isdomain:
-                my_ip = performLookUp(self.scope)
-                my_domain = self.scope
-                ip_isdomain = not isIp(ip["ip"])
-                if ip_isdomain:
-                    if my_domain == ip["ip"]:
-                        ips_fitting.append(ip)
-                    if ServerScope.isSubDomain(my_domain, ip["ip"]):
-                        ips_fitting.append(ip)
-                else:
-                    if my_ip == ip["ip"]:
-                        ips_fitting.append(ip)
-            else:
-                if ServerIp.checkIpScope(self.scope, ip["ip"]):
-                    ips_fitting.append(ip)
-        return ips_fitting
+    # def getIpsFitting(self):
+    #     """Returns a list of ip mongo dict fitting this scope
+    #     Returns:
+    #         A list ip IP dictionnary from mongo db
+    #     """
+    #     dbclient = DBClient.getInstance()
+    #     ips = dbclient.findInDb(self.pentest, "ips", )
+    #     ips_fitting = []
+    #     isdomain = self.isDomain()
+    #     for ip in ips:
+    #         if isdomain:
+    #             my_ip = performLookUp(self.scope)
+    #             my_domain = self.scope
+    #             ip_isdomain = not isIp(ip["ip"])
+    #             if ip_isdomain:
+    #                 if my_domain == ip["ip"]:
+    #                     ips_fitting.append(ip)
+    #                 if ServerScope.isSubDomain(my_domain, ip["ip"]):
+    #                     ips_fitting.append(ip)
+    #             else:
+    #                 if my_ip == ip["ip"]:
+    #                     ips_fitting.append(ip)
+    #         else:
+    #             if ServerIp.checkIpScope(self.scope, ip["ip"]):
+    #                 ips_fitting.append(ip)
+    #     return ips_fitting
         
 @permission("pentester")
 def delete(pentest, scope_iid):
@@ -152,14 +159,18 @@ def insert(pentest, body):
     else:
         scope_o.addChecks(["scope:onDomainAdd", "scope:onAdd"])
         
+    _updateIpsScopes(pentest, scope_o)
+    return {"res":True, "iid":ret}
+
+def _updateIpsScopes(pentest, scope_o):
     # Testing this scope against every ips
+    dbclient = DBClient.getInstance()
     ips = dbclient.findInDb(pentest, "ips", {})
     for ip in ips:
         ip_o = ServerIp(pentest, ip)
         if scope_o._id not in ip_o.in_scopes:
             if ip_o.fitInScope(scope_o.scope):
                 ip_o.addScopeFitting(pentest, scope_o.getId())
-    return {"res":True, "iid":ret}
 
 @permission("pentester")
 def update(pentest, scope_iid, body):

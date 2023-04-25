@@ -29,6 +29,12 @@ components:
           schema:
             $ref: "#/components/schemas/Ips"
       required: true
+    Settings:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Settings"
+      required: true
     Ports:
       content:
         application/json:
@@ -211,6 +217,12 @@ components:
         dated:
           type: string
         datef:
+          type: string
+    Settings:
+      properties:
+        key:
+          type: string
+        value:
           type: string
     Ips:
       properties:
@@ -2628,7 +2640,49 @@ paths:
             application/json:
               schema:
                 type: integer
-  
+  '/settings/{pentest}':
+    post:
+      operationId: pollenisator.server.settings.upsert
+      tags:
+        - Settings
+      summary: Insert or update a settings
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: '#/components/requestBodies/Settings'
+      responses:
+        '200':
+          description: Successful settings insertion
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"res":true, "key":"<key>"}'
+    get:
+      summary: ''
+      operationId: pollenisator.server.settings.find
+      tags:
+        - Settings
+      responses:
+        '200':
+          description: OK
+      description: ''
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - schema:
+            type: string
+          in: query
+          name: key
+          description: the setting key to retrieve
+                
   "/tools/{pentest}/craftCommandLine/{tool_iid}":
     get:
       operationId: pollenisator.server.servermodels.tool.craftCommandLine

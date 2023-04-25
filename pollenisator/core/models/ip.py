@@ -59,8 +59,14 @@ class Ip(Element):
         """
         dbclient = DBClient.getInstance()
         settings_scope_ip = dbclient.findInDb(self.pentest, "settings", {"key":"include_domains_with_ip_in_scope"}, False)
+        if isinstance(settings_scope_ip, str):
+            settings_scope_ip = settings_scope_ip.lower() == "true"
         settings_all_domains = dbclient.findInDb(self.pentest,"settings", {"key":"include_all_domains"}, False)
+        if isinstance(settings_all_domains, str):
+            settings_all_domains = settings_all_domains.lower() == "true"
         settings_top_domain = dbclient.findInDb(self.pentest, "settings", {"key":"include_domains_with_topdomain_in_scope"}, False)
+        if isinstance(settings_top_domain, str):
+            settings_top_domain = settings_top_domain.lower() == "true"
         if isNetworkIp(scope):
             if Ip.checkIpScope(scope, self.ip):
                 return True

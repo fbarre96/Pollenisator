@@ -372,7 +372,8 @@ def update(pentest, tool_iid, body):
     res = dbclient.updateInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
     from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
     check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(orig.get("check_iid"))})
-    check.updateInfos()
+    if check is not None:
+        check.updateInfos()
     return True
     
 @permission("pentester")
