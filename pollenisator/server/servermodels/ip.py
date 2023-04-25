@@ -220,6 +220,10 @@ def insert(pentest, body):
 @permission("pentester")
 def update(pentest, ip_iid, body):
     dbclient = DBClient.getInstance()
+    old = Ip.fetchObject(pentest, ip_iid)
     dbclient.updateInDb(pentest, "ips", {"_id":ObjectId(ip_iid)}, {"$set":body}, False, True)
+    new = Ip.fetchObject(pentest, ip_iid)
+    if not old.in_scopes and new.in_scopes:
+        new.addChecks(["ip:onAdd"])
     return True
 
