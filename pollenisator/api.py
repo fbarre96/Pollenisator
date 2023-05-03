@@ -1,5 +1,6 @@
 # ENABLE debug mode early because evenlet monkey patch other libs
 import os
+import uuid
 debug = os.environ.get("FLASK_DEBUG", False)
 if debug:
     async_mode = "threading" # Be aware thats sockets does not seems to work when debugging
@@ -118,6 +119,38 @@ def notify_clients(notif):
     else:
         sm.socketio.emit("notif", json.dumps(notif, cls=JSONEncoder), to=notif["db"])
 
+def migrate():
+    dbclient = DBClient.getInstance()
+    version = dbclient.findInDb("pollenisator","infos",{"key":"version"}, False)
+    if version is None:
+        dbclient.insertInDb("pollenisator","infos",{"key":"version","value":"1"})
+        version = "1"
+    else:
+        version = version["value"]
+    if version == "1":
+        version = migrate_1()
+    if version == "1.1":
+        version = migrate_1_1()
+        
+def migrate_1():
+    dbclient = DBClient.getInstance()
+    pentests = dbclient.findInDb("pollenisator","pentests",{}, True)
+    for pentest in pentests:
+        dbclient.updateInDb("pollenisator", "pentests", {"_id":ObjectId(pentest["_id"])}, {"$set":{"uuid":str(uuid.uuid4())}})
+    dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"1.1"}})
+    return "1.1"
+
+def migrate_1_1():
+    dbclient = DBClient.getInstance()
+    pentests = dbclient.findInDb("pollenisator","pentests",{}, True)
+    dbs = dbclient.client.list_database_names()
+    for pentest in pentests:
+        if pentest["uuid"] not in dbs:
+            print("missing pentest uuid, exporting it:")
+            outpath = dbclient.dumpDb(pentest["nom"])
+            return dbclient.importDatabase(dbclient.getPentestOwner(pentest["nom"]), outpath, nsFrom=pentest["nom"], nsTo=pentest["uuid"])
+    dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"1.2"}})
+    return "1.2"
 
 def init():
     """Initialize empty databases or remaining tmp data from last run
@@ -142,6 +175,7 @@ def init():
         else:
             createAdmin()
         #createWorker()
+    migrate()
     removeWorkers()
     dbclient.resetRunningTools()
     conf = loadServerConfig()

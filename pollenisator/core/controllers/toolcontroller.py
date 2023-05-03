@@ -57,14 +57,14 @@ class ToolController(ControllerElement):
             return None
         return self.model.getData()
         
-    def getOutputDir(self, pentestName):
+    def getOutputDir(self, pentest):
         """Returns directory of the tool file output 
         Args:
-            pentestName: the pentest database name
+            pentest: the pentest uuid
         Returns:
             string (path)
         """
-        return self.model.getOutputDir(pentestName)
+        return self.model.getOutputDir(pentest)
 
     def getResultFile(self):
         """Returns path of the tool resulting file output

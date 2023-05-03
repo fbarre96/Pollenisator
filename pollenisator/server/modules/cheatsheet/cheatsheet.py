@@ -12,8 +12,8 @@ class CheckItem(ServerElement):
         dbclient = DBClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif dbclient.pentestName != "":
-            self.pentest = dbclient.pentestName
+        elif dbclient.current_pentest != "":
+            self.pentest = dbclient.current_pentest
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         if valuesFromDb is None:
@@ -48,8 +48,8 @@ class CheckItem(ServerElement):
         dbclient = DBClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif dbclient.pentestName != "":
-            self.pentest = dbclient.pentestName
+        elif dbclient.current_pentest != "":
+            self.pentest = dbclient.current_pentest
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         return self
@@ -154,7 +154,7 @@ def delete(iid):
     existing = CheckItem.fetchObject({"_id":ObjectId(iid)})
     if existing is None:
         return "Not found", 404
-    pentests = dbclient.listPentestNames()
+    pentests = dbclient.listPentestUuids()
     for pentest in pentests:
         dbclient.deleteFromDb(pentest, CheckItem.coll_name, {"check_iid":ObjectId(iid)}, many=True, notify=True)
     res = dbclient.deleteFromDb("pollenisator", CheckItem.coll_name, {"_id":ObjectId(iid)}, many=False, notify=True)

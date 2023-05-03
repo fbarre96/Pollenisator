@@ -52,7 +52,7 @@ def update(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in dbclient.listPentestNames():
+    elif pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 403
     
     dbclient.updateInDb(pentest, collection, pipeline, updatePipeline, body["many"], body["notify"], body.get("upsert", False))
@@ -68,7 +68,7 @@ def insert(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in dbclient.listPentestNames():
+    elif pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 403
     res = dbclient.insertInDb(pentest, collection, pipeline, body["parent"], body["notify"])
     return str(res.inserted_id)
@@ -83,7 +83,7 @@ def find(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in dbclient.listPentestNames():
+    elif pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 403
     res = dbclient.findInDb(pentest, collection, pipeline, body.get("many", True), body.get("skip", None), body.get("limit", None))
     if isinstance(res, dict):
@@ -102,7 +102,7 @@ def search(pentest, s):
     """Use a parser to convert the search query into mongo queries and returns all matching objects
     """
     searchQuery = s
-    if pentest not in dbclient.listPentestNames():
+    if pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 400
     try:
         parser = Parser(searchQuery)
@@ -192,7 +192,7 @@ def count(pentest, collection, body):
             return "Collection argument is not a valid pollenisator collection", 403
     if not isinstance(pipeline, dict):
         return "Pipeline argument was not valid", 400
-    elif pentest not in dbclient.listPentestNames():
+    elif pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 403
     res = dbclient.countInDb(pentest, collection, pipeline)
     return res
@@ -210,7 +210,7 @@ def aggregate(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in dbclient.listPentestNames():
+    elif pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 403
     res = dbclient.aggregateFromDb(pentest, collection, body)
     for r in res:
@@ -227,7 +227,7 @@ def delete(pentest, collection, body):
     if pentest == "pollenisator":
         if collection not in validCollections:
             return "Collection argument is not a valid pollenisator collection", 403
-    elif pentest not in dbclient.listPentestNames():
+    elif pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 403
     res = dbclient.deleteFromDb(pentest, collection, pipeline, body["many"], body["notify"])
     if res is None:
@@ -244,7 +244,7 @@ def bulk_delete(pentest, body):
         return "body was not a valid dictionnary", 400
     if pentest == "pollenisator":
         return "Impossible to bulk delete in this database", 403
-    elif pentest not in dbclient.listPentestNames():
+    elif pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 403
     deleted = 0
     for obj_type in data:
@@ -319,7 +319,8 @@ def registerPentest(pentest, body, **kwargs):
     if ret:
         #token = connectToPentest(pentest, **kwargs)
         #kwargs["token_info"] = decode_token(token[0])
-        preparePentest(pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username, **kwargs)
+        uuid = msg
+        preparePentest(uuid, pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username, **kwargs)
         return msg
     else:
         return msg, 403
@@ -349,11 +350,12 @@ def getPentestInfo(pentest, **kwargs):
     ret["checks_total"] = dbclient.countInDb(pentest, "cheatsheet", {})
     return ret
 
-def preparePentest(dbName, pentest_type, start_date, end_date, scope, settings, pentesters, owner, **kwargs):
+def preparePentest(pentest, pentest_name, pentest_type, start_date, end_date, scope, settings, pentesters, owner, **kwargs):
     """
     Initiate a pentest database with wizard info
     Args:
-        dbName: the database name
+        pentest: the pentest (pentest uuid)
+        pentest_name : the pentest name
         pentest_type: a pentest type choosen from settings pentest_types. Used to select commands that will be launched by default
         start_date: a begining date and time for the pentest
         end_date: ending date and time for the pentest
@@ -365,35 +367,35 @@ def preparePentest(dbName, pentest_type, start_date, end_date, scope, settings, 
     """
     user = kwargs["token_info"]["sub"]
     dbclient = DBClient.getInstance()
-    dbclient.insertInDb(dbName, "settings", {"key":"pentest_type", "value":pentest_type}, notify=False)
-    dbclient.insertInDb(dbName, "settings", {"key":"include_domains_with_ip_in_scope", "value": settings['Add domains whose IP are in scope'] == 1}, notify=False)
-    dbclient.insertInDb(dbName, "settings", {"key":"include_domains_with_topdomain_in_scope", "value":settings["Add domains who have a parent domain in scope"] == 1}, notify=False)
-    dbclient.insertInDb(dbName, "settings", {"key":"include_all_domains", "value":settings["Add all domains found"] == 1}, notify=False)
+    dbclient.insertInDb(pentest, "settings", {"key":"pentest_type", "value":pentest_type}, notify=False)
+    dbclient.insertInDb(pentest, "settings", {"key":"include_domains_with_ip_in_scope", "value": settings['Add domains whose IP are in scope'] == 1}, notify=False)
+    dbclient.insertInDb(pentest, "settings", {"key":"include_domains_with_topdomain_in_scope", "value":settings["Add domains who have a parent domain in scope"] == 1}, notify=False)
+    dbclient.insertInDb(pentest, "settings", {"key":"include_all_domains", "value":settings["Add all domains found"] == 1}, notify=False)
     pentester_list = list(map(lambda x: x.strip(), pentesters.replace("\n",",").split(",")))
     pentester_list.insert(0, owner)
-    dbclient.insertInDb(dbName, "settings", {"key":"pentesters", "value": pentester_list}, notify=False)
-    addUserCommandsToPentest(dbName, user)  
-    #addCheckInstancesToPentest(dbName, pentest_type)
+    dbclient.insertInDb(pentest, "settings", {"key":"pentesters", "value": pentester_list}, notify=False)
+    addUserCommandsToPentest(pentest, user)  
+    #addCheckInstancesToPentest(pentest, pentest_type)
     # Duplicate all commands in local database
     # allcommands = ServerCommand.fetchObjects({})
     # for command in allcommands:
-    #     command.indb = dbName
+    #     command.indb = pentest
     #     insert_command(command.indb, CommandController(command).getData(), **kwargs)
-    commands = ServerCommand.getList({}, targetdb=dbName)
+    commands = ServerCommand.getList({}, targetdb=pentest)
     if not commands:
         commands = []
-    wave_o = ServerWave(dbName).initialize(dbName, commands)
-    result_wave = insert_wave(dbName, WaveController(wave_o).getData())
-    interval_o = ServerInterval(dbName).initialize(dbName, start_date, end_date)
-    insert_interval(dbName, IntervalController(interval_o).getData())
+    wave_o = ServerWave(pentest).initialize("Main", commands)
+    result_wave = insert_wave(pentest, WaveController(wave_o).getData())
+    interval_o = ServerInterval(pentest).initialize(wave_o.wave, start_date, end_date)
+    insert_interval(pentest, IntervalController(interval_o).getData())
     scope = scope.replace("https://", "").replace("http://","")
     scope = scope.replace("\n", ",").split(",")
     for scope_item in scope:
         if scope_item.strip() != "":
             if isIp(scope_item.strip()):
-                insert_scope(dbName, {"wave":dbName, "scope":scope_item.strip()+"/32"})
+                insert_scope(pentest, {"wave":"Main", "scope":scope_item.strip()+"/32"})
             else:
-                insert_scope(dbName, {"wave":dbName, "scope":scope_item.strip()})
+                insert_scope(pentest, {"wave":"Main", "scope":scope_item.strip()})
     
 
 @permission("user")
@@ -500,7 +502,7 @@ def dumpDb(dbName, collection=""):
         dbName: the database name to dump
         collection: (Opt.) the collection to dump.
     """
-    if dbName != "pollenisator" and dbName not in dbclient.listPentestNames():
+    if dbName != "pollenisator" and dbName not in dbclient.listPentestUuids():
         return "Database not found", 404
 
     if collection != "" and collection not in dbclient.db.collection_names():

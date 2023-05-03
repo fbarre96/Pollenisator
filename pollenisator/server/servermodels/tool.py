@@ -23,8 +23,8 @@ class ServerTool(Tool, ServerElement):
         dbclient = DBClient.getInstance()
         if pentest != "":
             self.pentest = pentest
-        elif dbclient.pentestName != "":
-            self.pentest = dbclient.pentestName
+        elif dbclient.current_pentest != "":
+            self.pentest = dbclient.current_pentest
         else:
             raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         super().__init__(*args, **kwargs)
@@ -621,7 +621,7 @@ def getDetailedString(pentest, tool_iid):
         return "Tool not found", 404
     return tool.getDetailedString()
 
-def getNbOfLaunchedCommand(pentestName, worker, command_iid):
+def getNbOfLaunchedCommand(pentest, worker, command_iid):
     """
     Get the total number of running commands which have the given command name
 
@@ -632,7 +632,7 @@ def getNbOfLaunchedCommand(pentestName, worker, command_iid):
         Return the total of running tools with this command's name as an integer.
     """
     dbclient = DBClient.getInstance()
-    t = dbclient.countInDb(pentestName, "tools", {"command_iid": str(command_iid), "scanner_ip": worker, "dated": {
+    t = dbclient.countInDb(pentest, "tools", {"command_iid": str(command_iid), "scanner_ip": worker, "dated": {
                             "$ne": "None"}, "datef": "None"})
     if t is not None:
         return t

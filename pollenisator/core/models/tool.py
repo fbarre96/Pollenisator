@@ -143,17 +143,17 @@ class Tool(Element):
         var_to_path = var_to_path.replace(":", "_")
         return var_to_path
 
-    def getOutputDir(self, pentestName):
+    def getOutputDir(self, pentest_uuid):
         """
         Get the tool required output directory path.
         Args:
-            pentestName: the pentest database name
+            pentest_uuid: the pentest database uuid
         Return:
             Returns the output directory of this tool instance.
         """
         # get command needed directory
         output_dir = Tool.__sanitize(
-            pentestName)+"/"+Tool.__sanitize(self.name)+"/"
+            pentest_uuid)+"/"+Tool.__sanitize(self.name)+"/"
         if self.wave != "" and self.wave is not None:
             output_dir += Tool.__sanitize(self.wave)+"/"
         if self.scope != "" and self.scope is not None:

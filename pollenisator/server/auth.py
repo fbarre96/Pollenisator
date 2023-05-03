@@ -126,8 +126,12 @@ def connectToPentest(pentest, body, **kwargs):
     username = kwargs["token_info"]["sub"]
     addDefaultCommands = body.get("addDefaultCommands", False)
     dbclient = DBClient.getInstance()
-    if pentest not in dbclient.listPentestNames():
+    if pentest not in dbclient.listPentestUuids():
         return "Pentest not found", 404
+    pentest_rec = dbclient.findInDb("pollenisator", "pentests", {"uuid":pentest}, False)
+    if pentest_rec is None:
+        return "Pentest not found", 404
+    pentest_name =  pentest_rec["nom"]
     testers = dbclient.getPentestUsers(pentest)
     token = kwargs.get("token_info", {})
     try:
@@ -136,12 +140,13 @@ def connectToPentest(pentest, body, **kwargs):
                 doImportCheatsheet,(f.read(), username)
     except FileNotFoundError:
         pass
+    
     if "admin" in token.get("scope", []):
-        return getTokenFor(username, pentest, True), 200
+        return {"token":getTokenFor(username, pentest, True), "pentest_name":pentest_name}, 200
     else:
         
         owner = dbclient.getPentestOwner(pentest)
         testers.append(owner)
         if username not in testers:
             return "Forbidden", 403
-        return getTokenFor(username, pentest, owner == username), 200
+        return {"token":getTokenFor(username, pentest, owner == username), "pentest_name":pentest_name}, 200

@@ -72,7 +72,7 @@ def doDelete(pentest, command):
     #TODO : delete from checks
     # Remove from all waves this command.
     if command.indb == "pollenisator":
-        pentests = dbclient.listPentestNames()
+        pentests = dbclient.listPentestUuids()
     else:
         pentests = [command.indb]
     for pentest in pentests:

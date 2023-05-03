@@ -2,6 +2,7 @@
 import os
 import ssl
 import datetime
+from uuid import uuid4
 from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError, OperationFailure
 import pollenisator.core.components.utils as utils
@@ -37,7 +38,7 @@ class DBClient:
             user: a user login to the database
             password: a password corresponding with the user to connect to the database
             ssl: Absolute path to the folder containing client.pem and ca.pem or empty if ssl is disabled
-            pentestName: the pentest name the db has connected to. Or None if not connected to any pentest.
+            current_pentest: the pentest  the db has connected to. Or None if not connected to any pentest.
             ssldir: The string path to a folder where all the ssl certificates are to be found.
             db: The database to the client last connected.
             forbiddenNames: A list of names forbidden for pentests because they are reserved by mongo, this application. ("admin", "config", "local", "broker_pollenisator", "pollenisator")
@@ -54,7 +55,7 @@ class DBClient:
             self.user = ""
             self.ssl = ""
             self.port = ""
-            self.pentestName = None
+            self.current_pentest = None
             self.ssldir = ""
             self.db = None
             self.forbiddenNames = ["admin", "config", "local",
@@ -145,7 +146,7 @@ class DBClient:
             connectionString = ""
             if self.user != "":
                 connectionString = self.user+':'+self.password+'@'
-            self.pentestName = None
+            self.current_pentest = None
             try:
                 if cfg["ssl"].strip() != "":
 
@@ -172,21 +173,21 @@ class DBClient:
         Returns: bool"""
         return self.listPentests() is not None
 
-    def connectToDb(self, pentestName):
+    def connectToDb(self, pentest_uuid):
         """
-        Connect to the pentest database given by pentestName (pentestName).
+        Connect to the pentest database given by pentest_uuid (pentest_uuid).
 
         Args:
-            pentestName: the pentest name to which you want to connect
+            pentest_uuid: the pentest uuid to which you want to connect
         """
         try:
             if self.client is None:
                 self.connect()
                 if self.client is None:
                     raise IOError()
-            self.pentestName = pentestName
-            if pentestName is not None:
-                self.db = self.client[pentestName]
+            self.current_pentest = pentest_uuid
+            if pentest_uuid is not None:
+                self.db = self.client[pentest_uuid]
                 
         except IOError as e:
             print("Failed to connect." + str(e))
@@ -203,7 +204,7 @@ class DBClient:
             "name": worker_name}, False, True)
 
     def resetRunningTools(self):
-        dbs = self.listPentestNames()
+        dbs = self.listPentestUuids()
         for db in dbs:
             self.updateInDb(db, "tools", {"datef": "None", "scanner_ip": {"$ne": "None"}}, {"$set":{"dated":"None", "datef":"None", "scanner_ip":"None"}, "$pull":{"status":"running"}})
             self.updateInDb(db, "tools", {"datef": "None", "dated": {"$ne": "None"}}, {"$set":{"dated":"None", "datef":"None", "scanner_ip":"None"}, "$pull":{"status":"running"}})
@@ -259,7 +260,7 @@ class DBClient:
         Returns:
             Return the pymongo result of the update or update_many function.
         """
-        return self._update(self.pentestName, collection, pipeline, updatePipeline, many=many, notify=notify, upsert=upsert)
+        return self._update(self.current_pentest, collection, pipeline, updatePipeline, many=many, notify=notify, upsert=upsert)
 
     def updateInDb(self, db, collection, pipeline, updatePipeline, many=False, notify=True, upsert=False):
         """
@@ -325,7 +326,7 @@ class DBClient:
         """
         if values.get("parent", None) is None:
             values["parent"] = parent
-        ret = self._insert(self.pentestName, collection, values, notify, parent)
+        ret = self._insert(self.current_pentest, collection, values, notify, parent)
         return ret
 
     def insertInDb(self, db, collection, values, _parent='', notify=True):
@@ -521,7 +522,7 @@ class DBClient:
         Returns:
             Return the pymongo result of the delete_one or delete_many function.
         """
-        return self._delete(self.pentestName, collection, pipeline, many, True)
+        return self._delete(self.current_pentest, collection, pipeline, many, True)
 
     def deleteFromDb(self, db, collection, pipeline, many=False, notify=True):
         """
@@ -586,7 +587,7 @@ class DBClient:
             try:
                 for pentest in pentests:
                     if username is not None:
-                        res = self.findInDb(pentest["nom"], "settings", {"key":"pentesters", "value":username}, False)
+                        res = self.findInDb(pentest["uuid"], "settings", {"key":"pentesters", "value":username}, False)
                         if res is not None or username == pentest.get("owner"):
                             ret.append(pentest)
                     else:
@@ -616,6 +617,21 @@ class DBClient:
         for cal in cals:
             ret.append(cal["nom"])
         return ret
+    
+    def listPentestUuids(self, username=None):
+        """Return the list of pollenisator databases.
+        Raises:
+            Raise Exception if client is not connected to database
+        Returns:
+            None if the server connection is not established. A list of string with pollenisator databases.
+        """
+        cals = self.listPentests(username)
+        if cals is None:
+            return None
+        ret = []
+        for cal in cals:
+            ret.append(cal["uuid"])
+        return ret
 
     def hasAPentestOpen(self):
         """
@@ -624,20 +640,20 @@ class DBClient:
         Returns:
             Return True if a pentest is open, False otherwise.
         """
-        return self.pentestName is not None
+        return self.current_pentest is not None
 
-    def doDeletePentest(self, pentestName):
+    def doDeletePentest(self, pentest_uuid):
         """
-        Remove the given pentest name from the database.
+        Remove the pentest uuid from the database.
 
         Args:
-            pentestName: the pentest name to delete.
+            pentest_uuid: the pentest uuid to delete.
         """
         result = self.deleteFromDb(
-            "pollenisator", "pentests", {"nom": pentestName})
+            "pollenisator", "pentests", {"uuid": pentest_uuid})
         if result is not None:
             if result.deleted_count == 1:
-                self.client.drop_database(pentestName)
+                self.client.drop_database(pentest_uuid)
                 return True
 
         return False
@@ -651,12 +667,6 @@ class DBClient:
         # check for forbidden names
         if pentestName.strip().lower() in self.forbiddenNames:
             msg = "This name is forbidden."
-            return False, msg
-        elif "." in pentestName.strip():
-            msg = "The name cannot contain a dot (.)."
-            return False, msg
-        elif " " in pentestName.strip():
-            msg = "The name cannot contain a space."
             return False, msg
         pentests = self.listPentestNames()
         if pentests is None:
@@ -681,7 +691,8 @@ class DBClient:
         Returns:
             Returns True if pentest was successfully registered, False otherwise.
         """
-        oldConnection = self.pentestName
+        
+        oldConnection = self.current_pentest
         authorized, msg = self.validatePentestName(saveAsName.strip().lower())
         # check for forbidden names
         if not authorized:
@@ -689,18 +700,21 @@ class DBClient:
             return False, msg
         # check if already exists
         self.connectToDb("pollenisator")
+        uuid = str(uuid4())
+        while self.db.pentests.find_one({"uuid": uuid}) is not None:
+            uuid = str(uuid4())
         if self.db.pentests.find_one({"nom": saveAsName.strip()}) is not None and askDeleteIfExists:
             msg = "The database has not been overwritten choose a different name to save it."
             return False, msg
         # insert in database  pentests
         self.connectToDb("pollenisator")
-        self.db.pentests.insert_one({"nom": saveAsName.strip(), "owner":owner, "creation_date": datetime.datetime.now()})
-        self.connectToDb(saveAsName.strip())
+        self.db.pentests.insert_one({"uuid":uuid, "nom": saveAsName.strip(), "owner":owner, "creation_date": datetime.datetime.now()})
+        self.connectToDb(uuid)
         if autoconnect:
-            self.connectToDb(saveAsName.strip())
+            self.connectToDb(uuid)
         else:
             self.connectToDb(oldConnection)
-        return True, "Success"
+        return True, str(uuid)
 
     def getPentestUsers(self, pentest):
         pentesters = self.findInDb(pentest, "settings", {"key":"pentesters"}, False)
@@ -721,7 +735,7 @@ class DBClient:
                 del ret["hash"]
         return ret
 
-    def copyDb(self, fromCopyName, toCopyName):
+    def copyDb(self, fromCopy, toCopy, checkPentestName=True):
         """
         Copy a database.
 
@@ -729,27 +743,27 @@ class DBClient:
             toCopyName: the output pentest will have this name. If default empty string is given, a user window prompt will be used.
             fromCopyName: the pentest name to be copied. If default empty string is given, the opened pentest will be used.
         """
-        if fromCopyName == "":
+        if fromCopy == "":
             return "database to copy : empty name", 400
-        if toCopyName == "":
+        if toCopy == "":
             return "database destination name is empty", 400
-        if fromCopyName not in self.listPentestNames():
+        if fromCopy not in self.listPentestUuids() and checkPentestName:
             return "database to copy : not found", 404
         
         major_version = ".".join(self.client.server_info()["version"].split(".")[:2])
         if float(major_version) < 4.2:
-            succeed, msg = self.registerPentest(self.getPentestOwner(fromCopyName),
-                toCopyName, True, True)
+            succeed, msg = self.registerPentest(self.getPentestOwner(fromCopy),
+                toCopy, True, True)
             if succeed:
                 self.client.admin.command('copydb',
-                                          fromdb=fromCopyName,
-                                          todb=toCopyName)
+                                          fromdb=fromCopy,
+                                          todb=toCopy)
             else:
                 return msg, 403
             return "Success", 200
         else:
-            outpath = self.dumpDb(fromCopyName)
-            return self.importDatabase(self.getPentestOwner(fromCopyName), outpath, nsFrom=fromCopyName, nsTo=toCopyName)
+            outpath = self.dumpDb(fromCopy)
+            return self.importDatabase(self.getPentestOwner(fromCopy), outpath, nsFrom=fromCopy, nsTo=toCopy)
 
     def dumpDb(self, dbName, collection=""):
         """
