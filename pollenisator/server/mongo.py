@@ -27,7 +27,7 @@ operato_trans = {
 
 def status():
     dbclient.connect()
-    return dbclient.client != None
+    return dbclient.client is not None
 
 def getVersion():
     # TODO : return connexion openapi version instead
