@@ -131,6 +131,8 @@ def migrate():
         version = migrate_1()
     if version == "1.1":
         version = migrate_1_1()
+    if version == "1.1":
+        version = migrate_2_5()
         
 def migrate_1():
     dbclient = DBClient.getInstance()
@@ -151,6 +153,11 @@ def migrate_1_1():
             return dbclient.importDatabase(dbclient.getPentestOwner(pentest["nom"]), outpath, nsFrom=pentest["nom"], nsTo=pentest["uuid"])
     dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"1.2"}})
     return "1.2"
+
+def migrate_2_5():
+    dbclient = DBClient.getInstance()
+    dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"1.2"}})
+    return "2.5"
 
 def init():
     """Initialize empty databases or remaining tmp data from last run
