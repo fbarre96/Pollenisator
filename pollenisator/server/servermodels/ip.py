@@ -168,7 +168,7 @@ class ServerIp(Ip, ServerElement):
         return insert(self.pentest, IpController(self).getData())
 
     def update(self):
-        return update("ips", self._id, IpController(self).getData())
+        return update(self.pentest, self._id, IpController(self).getData())
 
 @permission("pentester")
 def delete(pentest, ip_iid):
@@ -222,7 +222,7 @@ def update(pentest, ip_iid, body):
     dbclient = DBClient.getInstance()
     old = ServerIp.fetchObject(pentest, {"_id":ObjectId(ip_iid)})
     dbclient.updateInDb(pentest, "ips", {"_id":ObjectId(ip_iid)}, {"$set":body}, False, True)
-    new = old = ServerIp.fetchObject(pentest, {"_id":ObjectId(ip_iid)})
+    new = ServerIp.fetchObject(pentest, {"_id":ObjectId(ip_iid)})
     if not old.in_scopes and new.in_scopes:
         new.addChecks(["ip:onAdd"])
     return True

@@ -48,7 +48,7 @@ class Nuclei(Plugin):
         Returns:
             string
         """
-        return " -json -o "
+        return " -j -o "
 
     def getFileOutputExt(self):
         """Returns the expected file extension for this command result file
