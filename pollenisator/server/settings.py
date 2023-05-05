@@ -12,8 +12,9 @@ def upsert(pentest, body):
     if key == "" or not isinstance(key, str):
         return "Key argument was not valid", 400
     res = dbclient.updateInDb(pentest, "settings", {"key":key}, {"$set":{"value":value}}, notify=False, upsert=True)
-    if key.startswith("include_"):
-        ServerScope.updateScopesSettings(pentest)
+    if res.acknowledged and res.matched_count == 1: # update success
+        if key.startswith("include_") and res.modified_count == 1:  # updated value is different
+            ServerScope.updateScopesSettings(pentest)
     return True
 
 @permission("pentester")

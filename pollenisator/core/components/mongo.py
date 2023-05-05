@@ -845,6 +845,9 @@ class DBClient:
         tags = self.findInDb(pentest,"settings", {"key":"tags"}, False)
         if tags is None:
             return []
+        tags = tags.get("value", {})
+        if isinstance(tags, str):
+            tags = json.loads(tags)
         pentest_tags = list(tags.keys())
         global_tags = list(self.getGlobalTags().keys())
         return global_tags+pentest_tags
@@ -857,7 +860,10 @@ class DBClient:
                 return tags["value"]
             elif isinstance(tags["value"], str):
                 try:
-                    return json.loads(tags["value"])
+                    t = json.loads(tags["value"])
+                    if isinstance(t, str): # double stringified bug ...
+                        t = json.loads(t)
+                    return t
                 except:
                     pass
         return {"todo":"orange", "unscanned":"yellow", "pwned":"red", "Interesting":"dark green", "Uninteresting":"sky blue", "neutral":"transparent"}
