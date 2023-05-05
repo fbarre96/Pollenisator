@@ -1599,10 +1599,16 @@ paths:
                       type: integer
                       minimum: 0
                       maximum: 1
+                    mission_name:
+                      type: string
+                    client_name:
+                      type: string
                   required:
                     - Add domains whose IP are in scope
                     - Add domains who have a parent domain in scope
                     - Add all domains found
+                    - mission_name
+                    - client_name
       responses:
         "200":
           description: Successful creation
@@ -1628,6 +1634,32 @@ paths:
         '200':
           description: OK
       description: Get pentest infos
+    put:
+      operationId: pollenisator.server.mongo.editPentest
+      tags:
+        - pentest
+      summary: Edit a pentest
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pentest_name:
+                  type: string
+                  required:
+                    - pentest_name
+
+      responses:
+        "200":
+          description: Successful edition
+       
   "/notification/{pentest}":
     get:
       operationId: pollenisator.server.mongo.fetchNotifications

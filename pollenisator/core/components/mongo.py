@@ -665,6 +665,8 @@ class DBClient:
         Check existing pollenisator pentest database names.
         Returns: a boolean"""
         # check for forbidden names
+        if pentestName.strip() == "":
+            return False, "Name cannot be empty."
         if pentestName.strip().lower() in self.forbiddenNames:
             msg = "This name is forbidden."
             return False, msg
@@ -676,6 +678,24 @@ class DBClient:
             msg = "A database with the same name already exists."
             return False, msg
         return True, ""
+    
+    def editPentest(self, pentest, new_pentest_name):
+        """
+        Edit pentest data
+
+        Args:
+            pentest: the pentest
+            new_pentest_name:new pentest name
+        Returns:
+            Returns True if pentest was successfully edited, False otherwise.
+        """
+        res, msg = self.validatePentestName(new_pentest_name)
+        if not res:
+            return res, msg
+        res = self.updateInDb("pollenisator", "pentests", {"uuid": pentest}, {"$set": {"nom": new_pentest_name}})
+        if res.acknowledged:
+            return True, ""
+        return False, "Failed to edit pentest name."
 
     def registerPentest(self, owner, saveAsName, askDeleteIfExists=True, autoconnect=True):
         """

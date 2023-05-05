@@ -8,11 +8,9 @@ from pollenisator.server.servermodels.scope import ServerScope
 def upsert(pentest, body):
     dbclient = DBClient.getInstance()
     key = body.get("key", "")
-    value = body.get("value", "")
+    value = json.loads(body.get("value", ""))
     if key == "" or not isinstance(key, str):
         return "Key argument was not valid", 400
-    if not isinstance(value, str):
-        return "value argument was not valid", 400
     res = dbclient.updateInDb(pentest, "settings", {"key":key}, {"$set":{"value":value}}, notify=False, upsert=True)
     if key.startswith("include_"):
         ServerScope.updateScopesSettings(pentest)

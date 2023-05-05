@@ -324,6 +324,15 @@ def registerPentest(pentest, body, **kwargs):
         return msg
     else:
         return msg, 403
+    
+@permission("owner")
+def editPentest(pentest, body, **kwargs):
+    dbclient = DBClient.getInstance()
+    pentest_name = body.get("pentest_name")
+    res, msg = dbclient.editPentest(pentest, pentest_name)
+    if not res:
+        return {"message": msg, "error": "Invalid name"}, 403
+    return {"message": "Pentest name changed"}
 
 @permission("pentester")
 def getPentestInfo(pentest, **kwargs):
@@ -371,6 +380,8 @@ def preparePentest(pentest, pentest_name, pentest_type, start_date, end_date, sc
     dbclient.insertInDb(pentest, "settings", {"key":"include_domains_with_ip_in_scope", "value": settings['Add domains whose IP are in scope'] == 1}, notify=False)
     dbclient.insertInDb(pentest, "settings", {"key":"include_domains_with_topdomain_in_scope", "value":settings["Add domains who have a parent domain in scope"] == 1}, notify=False)
     dbclient.insertInDb(pentest, "settings", {"key":"include_all_domains", "value":settings["Add all domains found"] == 1}, notify=False)
+    dbclient.insertInDb(pentest, "settings", {"key":"client_name", "value":settings["client_name"]}, notify=False)
+    dbclient.insertInDb(pentest, "settings", {"key":"mission_name", "value":settings["mission_name"]}, notify=False)
     pentester_list = list(map(lambda x: x.strip(), pentesters.replace("\n",",").split(",")))
     pentester_list.insert(0, owner)
     dbclient.insertInDb(pentest, "settings", {"key":"pentesters", "value": pentester_list}, notify=False)
