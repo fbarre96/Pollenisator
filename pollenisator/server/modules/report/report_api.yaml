@@ -256,18 +256,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: contractName
-          in: query
-          description: template name to generate from
-          required: true
-          schema:
-            type: string
-        - name: clientName
-          in: query
-          description: template name to generate from
-          required: true
-          schema:
-            type: string
+        
         - name: mainRedactor
           in: query
           description: template name to generate from

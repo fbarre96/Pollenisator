@@ -6,6 +6,7 @@ from flask import send_file
 import pollenisator.core.reporting.wordexport as wordexport
 import pollenisator.core.reporting.powerpointexport as powerpointexport
 import pollenisator.core.reporting.excelexport as excelexport
+from pollenisator.server import settings
 from pollenisator.server.servermodels.defect import getGlobalDefects
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.utils import JSONEncoder, loadServerConfig, getMainDir
@@ -83,13 +84,22 @@ def uploadTemplate(upfile, lang):
 
 
 @permission("user")
-def generateReport(pentest, templateName, clientName, contractName, mainRedactor, lang):
+def generateReport(pentest, templateName,  mainRedactor, lang):
     if not templateName.endswith(".pptx") and not templateName.endswith(".docx") and not templateName.endswith(".xlsx"):
         return "Invalid extension for template, must be pptx, xlsx or docx", 400
-    
+    client_name = settings.find(pentest, "client_name")
+    mission_name = settings.find(pentest, "mission_name")
+    if client_name is None:
+        client_name = ""
+    else:
+        client_name = client_name.get("value")
+    if mission_name is None:
+        mission_name = ""
+    else:
+        mission_name = mission_name.get("value")
     timestr = datetime.now().strftime("%Y%m%d-%H%M%S")
     ext = os.path.splitext(templateName)[-1]
-    basename = clientName.strip() + "_"+contractName.strip()
+    basename = client_name.strip() + "_"+mission_name.strip()
     out_name = str(timestr)+"_"+basename
     templateName = os.path.basename(templateName)
     lang = os.path.basename(lang)
@@ -104,7 +114,7 @@ def generateReport(pentest, templateName, clientName, contractName, mainRedactor
     with open(lang_file) as f:
         lang_translation = json.loads(f.read())
     context = craftContext(pentest, mainRedac=mainRedactor,
-                           client=clientName.strip(), contract=contractName.strip())
+                           client=client_name.strip(), contract=mission_name.strip())
     manager = Manager()
     return_dict = manager.dict()
     p = Process(target=_generateDoc, args=(ext, context, template_to_use_path, out_name, lang_translation, return_dict))
