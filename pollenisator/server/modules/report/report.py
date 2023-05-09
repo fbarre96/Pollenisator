@@ -97,10 +97,10 @@ def generateReport(pentest, templateName,  mainRedactor, lang):
         mission_name = ""
     else:
         mission_name = mission_name.get("value")
-    timestr = datetime.now().strftime("%Y%m%d-%H%M%S")
+    timestr = datetime.now().strftime("%Y%m")
     ext = os.path.splitext(templateName)[-1]
-    basename = client_name.strip() + "_"+mission_name.strip()
-    out_name = str(timestr)+"_"+basename
+    basename = client_name.strip() + " - "+mission_name.strip()
+    out_name = str(timestr)+" - "+basename
     templateName = os.path.basename(templateName)
     lang = os.path.basename(lang)
     if not validate_lang(lang):
