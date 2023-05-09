@@ -336,7 +336,7 @@ def createReport(context, template, out_name, **kwargs):
     translation = kwargs.get("translation")
     SLD_LAYOUT_TO_COPY = document.slide_layouts.get_by_name("TO_COPY")
     if SLD_LAYOUT_TO_COPY is None:
-        raise Exception("The pptx template does not contain a TO_COPY layout")
+        return False, "The pptx template does not contain a TO_COPY layout"
     client_name = context.get("client", "").strip()
     total_len = len(context["defects"])
     nb_steps = total_len # 1 step by defect
@@ -366,4 +366,4 @@ def createReport(context, template, out_name, **kwargs):
     out_path = os.path.join(dir_path, "../../exports/", out_name+".pptx")
     document.save(out_path)
     logger.info("Generated report at "+str(out_path))
-    return out_path
+    return True, out_path

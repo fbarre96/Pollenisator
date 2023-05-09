@@ -120,6 +120,8 @@ def generateReport(pentest, templateName,  mainRedactor, lang):
     p = Process(target=_generateDoc, args=(ext, context, template_to_use_path, out_name, lang_translation, return_dict))
     p.start()
     p.join()
+    if "res" not in return_dict:
+        return "An error occured while generating the report.", 500
     if return_dict["res"] == True:
         try:
             return send_file(return_dict["msg"], attachment_filename=out_name+ext)
@@ -140,12 +142,12 @@ def _generateDoc(ext, context, template_to_use_path, out_name, translation, retu
         return
 
     elif ext == ".pptx":
-        outfile = powerpointexport.createReport(
+        res, msg = powerpointexport.createReport(
             context, template_to_use_path, out_name, translation=translation)
-        return_dict["res"] = True
-        return_dict["msg"] = outfile
+        return_dict["res"] = res
+        return_dict["msg"] = msg
     elif ext == ".xlsx":
-        res, msg = outfile = excelexport.createReport(
+        res, msg = excelexport.createReport(
             context, template_to_use_path, out_name, translation=translation)
         return_dict["res"] = res
         return_dict["msg"] = msg
