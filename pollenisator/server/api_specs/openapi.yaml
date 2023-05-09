@@ -1603,6 +1603,8 @@ paths:
                       type: string
                     client_name:
                       type: string
+                    lang:
+                      type: string
                   required:
                     - Add domains whose IP are in scope
                     - Add domains who have a parent domain in scope

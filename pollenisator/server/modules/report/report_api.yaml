@@ -416,6 +416,10 @@ paths:
                   enum:
                     - defect
                     - remark
+                perimeter:
+                  type: string
+                lang:
+                  type: string
       responses:
         "200":
           description: Success

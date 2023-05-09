@@ -160,6 +160,7 @@ def search(body):
     type = body.get("type", "")
     terms = body.get("terms", "")
     lang = body.get("language", "")
+    perimeter = body.get("perimeter", "")
     errors = []
     if type == "remark":
         coll = "remarks"
@@ -171,6 +172,8 @@ def search(body):
     p = {"title":re.compile(terms, re.IGNORECASE)}
     if lang != "":
         p["language"] = lang
+    if perimeter != "":
+        p["perimeter"] = re.compile(perimeter, re.IGNORECASE)
     res = dbclient.findInDb("pollenisator", coll, p, True)
     ret = []
     for x in res:
@@ -180,7 +183,7 @@ def search(body):
     if api_url == "":
         return ret
     try:
-        resp = requests.get(api_url, params=body, timeout=3)
+        resp = requests.get(api_url, params=body, timeout=10)
         if resp.status_code != 200:
             errors += ["The knowledge dabatase encountered an issue : "+resp.text]
         if not errors:

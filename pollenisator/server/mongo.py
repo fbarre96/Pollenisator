@@ -382,6 +382,7 @@ def preparePentest(pentest, pentest_name, pentest_type, start_date, end_date, sc
     dbclient.insertInDb(pentest, "settings", {"key":"include_all_domains", "value":settings["Add all domains found"] == 1}, notify=False)
     dbclient.insertInDb(pentest, "settings", {"key":"client_name", "value":settings["client_name"]}, notify=False)
     dbclient.insertInDb(pentest, "settings", {"key":"mission_name", "value":settings["mission_name"]}, notify=False)
+    dbclient.insertInDb(pentest, "settings", {"key":"lang", "value":settings["lang"]}, notify=False)
     pentester_list = list(map(lambda x: x.strip(), pentesters.replace("\n",",").split(",")))
     pentester_list.insert(0, owner)
     dbclient.insertInDb(pentest, "settings", {"key":"pentesters", "value": pentester_list}, notify=False)
