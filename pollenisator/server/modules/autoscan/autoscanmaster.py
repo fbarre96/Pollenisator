@@ -136,7 +136,7 @@ def findLaunchableTools(pentest):
 
         check_instances = CheckInstance.fetchObjects(pentest, {"check_iid":str(check_item._id)})
         for check_instance in check_instances:
-            notDoneToolsInCheck = getNotDoneTools(pentest, check_instance)
+            notDoneToolsInCheck = getNotDoneToolsPerScope(pentest, check_instance)
             count_running_tools += dbclient.countInDb(pentest, "tools", {"check_iid":str(check_instance._id), "status":"running"})
             
             for toolId, toolModel in notDoneToolsInCheck.items():
@@ -167,7 +167,7 @@ def searchForAddressCompatibleWithTime(pentest):
             waves_to_launch.add(intervalModel.wave)
     return waves_to_launch
 
-def getNotDoneTools(pentest, check_instance):
+def getNotDoneToolsPerScope(pentest, check_instance):
     """Returns a set of tool mongo ID that are not done yet.
     """
     #
