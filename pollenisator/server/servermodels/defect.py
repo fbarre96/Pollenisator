@@ -51,6 +51,7 @@ def getProofPath(pentest, defect_iid):
     local_path = os.path.join(getMainDir(), "files")
 
     return os.path.join(local_path, pentest, "proof", str(defect_iid))
+
 @permission("pentester")
 def delete(pentest, defect_iid):
     dbclient = DBClient.getInstance()
@@ -83,6 +84,8 @@ def delete(pentest, defect_iid):
 @permission("pentester")
 def insert(pentest, body):
     dbclient = DBClient.getInstance()
+    if "creation_date" in body:
+        del body["creation_date"]
     defect_o = ServerDefect(pentest, body)
     base = defect_o.getDbKey()
     existing = dbclient.findInDb(pentest, "defects", base, False)

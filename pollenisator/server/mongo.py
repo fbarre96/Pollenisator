@@ -320,7 +320,9 @@ def registerPentest(pentest, body, **kwargs):
         #token = connectToPentest(pentest, **kwargs)
         #kwargs["token_info"] = decode_token(token[0])
         uuid = msg
-        preparePentest(uuid, pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username, **kwargs)
+        msg, success = preparePentest(uuid, pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username, **kwargs)
+        if not success:
+            return 400, msg
         return msg
     else:
         return msg, 403
@@ -383,6 +385,7 @@ def preparePentest(pentest, pentest_name, pentest_type, start_date, end_date, sc
     dbclient.insertInDb(pentest, "settings", {"key":"client_name", "value":settings["client_name"]}, notify=False)
     dbclient.insertInDb(pentest, "settings", {"key":"mission_name", "value":settings["mission_name"]}, notify=False)
     dbclient.insertInDb(pentest, "settings", {"key":"lang", "value":settings["lang"]}, notify=False)
+    dbclient.insertInDb(pentest, "settings", {"key":"autoscan_threads", "value":4}, notify=False)
     pentester_list = list(map(lambda x: x.strip(), pentesters.replace("\n",",").split(",")))
     pentester_list.insert(0, owner)
     dbclient.insertInDb(pentest, "settings", {"key":"pentesters", "value": pentester_list}, notify=False)
@@ -399,7 +402,9 @@ def preparePentest(pentest, pentest_name, pentest_type, start_date, end_date, sc
     wave_o = ServerWave(pentest).initialize("Main", commands)
     result_wave = insert_wave(pentest, WaveController(wave_o).getData())
     interval_o = ServerInterval(pentest).initialize(wave_o.wave, start_date, end_date)
-    insert_interval(pentest, IntervalController(interval_o).getData())
+    msg, status = insert_interval(pentest, IntervalController(interval_o).getData())
+    if status != 200:
+        return msg, False
     scope = scope.replace("https://", "").replace("http://","")
     scope = scope.replace("\n", ",").split(",")
     for scope_item in scope:
@@ -408,7 +413,7 @@ def preparePentest(pentest, pentest_name, pentest_type, start_date, end_date, sc
                 insert_scope(pentest, {"wave":"Main", "scope":scope_item.strip()+"/32"})
             else:
                 insert_scope(pentest, {"wave":"Main", "scope":scope_item.strip()})
-    
+    return "", True
 
 @permission("user")
 def getSettings():

@@ -170,8 +170,11 @@ def stringToDate(datestring):
     ret = None
     if isinstance(datestring, str):
         if datestring != "None":
-            ret = datetime.strptime(
-                datestring, '%d/%m/%Y %H:%M:%S')
+            try:
+                ret = datetime.strptime(
+                    datestring, '%d/%m/%Y %H:%M:%S')
+            except ValueError as e:
+                raise(e)
     return ret
 
 
@@ -184,8 +187,11 @@ def fitNowTime(dated, datef):
         True if the current time is between the given interval. False otherwise.
         If one of the args is None, returns False."""
     today = datetime.now()
-    date_start = stringToDate(dated)
-    date_end = stringToDate(datef)
+    try:
+        date_start = stringToDate(dated)
+        date_end = stringToDate(datef)
+    except ValueError:
+        return False
     if date_start is None or date_end is None:
         return False
     return today > date_start and date_end > today

@@ -2916,12 +2916,13 @@ paths:
               examples:
                 Unknown tool:
                   value: '"The given iid does not match an existing tool"'
-  "/tools/{pentest}/launchTask/{tool_iid}":
-    post:
-      operationId: pollenisator.server.servermodels.tool.launchTask
+
+  "/tools/{pentest}/getQueue":
+    get:
+      operationId: pollenisator.server.servermodels.tool.getQueue
       tags:
         - Tools
-      summary: Try to launch a tool on any worker
+      summary: list tools in queue
       parameters:
         - name: pentest
           in: path
@@ -2929,22 +2930,36 @@ paths:
           required: true
           schema:
             type: string
-        - name: tool_iid
+      responses:
+        "200":
+          description: get the queue list
+          content:
+            application/json:
+              examples:
+                Success :
+                  value: '["tool1", "tool2]'
+
+  "/tools/{pentest}/queueTasks":
+    post:
+      operationId: pollenisator.server.servermodels.tool.queueTasks
+      tags:
+        - Tools
+      summary: queue a tool to run on any worker
+      parameters:
+        - name: pentest
           in: path
-          description: tool id to launch
+          description: pentest name
           required: true
           schema:
             type: string
-      # requestBody:
-      #   content:
-      #     application/json:
-      #       schema:
-      #         type: object
-      #         properties:
-      #           group_id:
-      #             type: string
-      #           group_name:
-      #             type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+
       responses:
         "200":
           description: Successfully launched task

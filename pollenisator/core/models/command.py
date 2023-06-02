@@ -24,9 +24,10 @@ class Command(Element):
         super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None),  valuesFromDb.get(
             "tags", []), valuesFromDb.get("infos", {}))
         self.initialize(valuesFromDb.get("name", ""), valuesFromDb.get("bin_path", ""), valuesFromDb.get("plugin", ""), 
-                        valuesFromDb.get("text", ""), valuesFromDb.get("indb", "pollenisator"), valuesFromDb.get("owners", []), valuesFromDb.get("timeout", 300), valuesFromDb.get("infos", {}))
+                        valuesFromDb.get("text", ""), valuesFromDb.get("indb", "pollenisator"),
+                        valuesFromDb.get("original_iid"), valuesFromDb.get("owners", []), valuesFromDb.get("timeout", 300), valuesFromDb.get("infos", {}))
 
-    def initialize(self, name, bin_path, plugin="Default", text="", indb=False, owners=[], timeout=300, infos=None):
+    def initialize(self, name, bin_path, plugin="Default", text="", indb=False, original_iid=None, owners=[], timeout=300, infos=None):
         """Set values of command
         Args:
             name: the command name
@@ -44,6 +45,7 @@ class Command(Element):
         self.bin_path = bin_path
         self.plugin = plugin
         self.text = text
+        self.original_iid = original_iid
         self.infos = infos if infos is not None else {}
         self.indb = indb
         self.owners = owners

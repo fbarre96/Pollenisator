@@ -84,6 +84,9 @@ class CheckInstance(ServerElement):
         dbclient = DBClient.getInstance()
         return dbclient.findInDb(self.pentest, target_class.coll_name, {
                                         "_id": ObjectId(self.target_iid)}, False)
+    
+    def getCheckItem(self):
+        return CheckItem.fetchObject({"_id": ObjectId(self.check_iid)})
 
     def getData(self):
         return {"_id": self._id, "type": self.type, "check_iid": self.check_iid, "target_iid": self.target_iid, "target_type": self.target_type, "parent": self.parent, "status": self.status, "notes": self.notes}
@@ -167,14 +170,16 @@ def doInsert(pentest, data, checkItem=None, toolInfos=None):
     target = dbclient.findInDb(pentest, target_class.coll_name, {
                                     "_id": ObjectId(data["target_iid"])}, False)
     if target is None:
-        return "Invalid target not found", 404
+        return "Invalid target, not found", 404
     if checkItem is None:
         return "Check Item not found", 404
     for command in checkItem.commands:
         command_pentest = ServerCommand.fetchObject({"original_iid": str(command)}, pentest)
         if command_pentest is not None:
-            ServerTool(pentest).initialize(str(command_pentest._id), str(iid), target.get("wave", ""), None, target.get("scope", ""), target.get("ip", ""), target.get("port", ""),
+            tool = ServerTool(pentest)
+            tool.initialize(str(command_pentest._id), str(iid), target.get("wave", ""), None, target.get("scope", ""), target.get("ip", ""), target.get("port", ""),
                                         target.get("proto", ""), checkItem.lvl, infos=toolInfos).addInDb()
+            tool.addToQueue()
 
     return {"res": True, "iid": iid}
     

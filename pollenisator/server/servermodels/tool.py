@@ -7,7 +7,7 @@ from pollenisator.server.servermodels.command import ServerCommand
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.core.components.socketmanager import SocketManager
 from pollenisator.core.components.utils import JSONEncoder, JSONDecoder
-
+import json
 from pollenisator.core.components.utils import  checkCommandService, isNetworkIp, loadPlugin
 from datetime import datetime
 import os
@@ -46,7 +46,9 @@ class ServerTool(Tool, ServerElement):
             update(pentest, self._id, {"status": self.status})
     
     def addInDb(self, check=True, base=None):
-        return do_insert(self.pentest, ToolController(self).getData(), check=check, base=base)
+        ret = do_insert(self.pentest, ToolController(self).getData(), check=check, base=base)
+        self._id = ret["iid"]
+        return ret
 
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
@@ -72,6 +74,11 @@ class ServerTool(Tool, ServerElement):
         commandTemplate = dbclient.findInDb(self.pentest,
                                                  "commands", {"_id": ObjectId(self.command_iid)}, False)
         return commandTemplate
+    
+    def getCheckItem(self):
+        from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
+        check = CheckInstance.fetchObject(self.pentest, {"_id":ObjectId(self.check_iid)})
+        return check.getCheckItem()
 
     def setInScope(self):
         """Set this tool as out of scope (not matching any scope in wave)
@@ -96,7 +103,6 @@ class ServerTool(Tool, ServerElement):
         delete(self.pentest, self._id)
 
     def getParentId(self):
-        dbclient = DBClient.getInstance()
         try:
             if self.check_iid is not None:
                 return self.check_iid
@@ -105,6 +111,44 @@ class ServerTool(Tool, ServerElement):
         except TypeError:
             # None type returned:
             return None
+        
+    def findQueueIndexFromPrio(self, queue):
+        priority = self.getCheckItem().priority
+        i=0
+        for tool in queue:
+            tool = ServerTool.fetchObject(self.pentest, {"_id":ObjectId(tool)})
+            tool_check = tool.getCheckItem()
+            if tool_check.priority > priority:
+                return i
+            i+=1
+        return i
+        
+    def addToQueue(self, index=None):
+        dbclient = DBClient.getInstance()
+        queue = dbclient.findInDb(self.pentest, "autoscan", {"type":"queue"}, False) 
+        if queue is None:
+            queue = list()
+            dbclient.insertInDb(self.pentest, "autoscan", {"type":"queue", "tools":[]}) 
+        else:
+            queue = list(queue["tools"])
+        if self.getId() in queue:
+            return False, "Already in queue"
+        if index is None:
+            index=self.findQueueIndexFromPrio(queue)
+            queue.insert(index, self.getId())
+        else:
+            try:
+                queue.insert(index, self.getId())
+            except IndexError:
+                return False, "Index error"
+        dbclient.updateInDb(self.pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":queue}})
+        return True, "Added to queue"
+    
+    def removeFromQueue(self):
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb(self.pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":self.getId()}})
+        return True, "remove from to queue"
+        
         
     def getCommandToExecute(self, command_o):
         """
@@ -491,10 +535,39 @@ def importResult(pentest, tool_iid, upfile, body):
         raise Exception(msg)
     return "Success"
 
+
 @permission("pentester")
-def launchTask(pentest, tool_iid, **kwargs):
+def queueTasks(pentest, body, **kwargs):
+    logger.debug("Queue tasks : "+str(body))
+    count = 0
+    tools_iid = body
+    for tool_iid in tools_iid:
+        if isinstance(tool_iid, str) and tool_iid.startswith("ObjectId|"):
+            tool_iid = tool_iid.replace("ObjectId|", "")
+        tool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
+        command_o = ServerCommand.fetchObject({"_id": ObjectId(tool.command_iid)}, pentest)
+        if tool is None:
+            logger.debug("Error in launch task : not found :"+str(tool_iid))
+            continue
+        if command_o is None:
+            logger.debug("Error in launch task : command for tool not found :"+str(tool_iid))
+            continue
+        res, msg = tool.addToQueue()
+        if res:
+            count += 1
+    return count
+
+@permission("pentester")
+def getQueue(pentest):
+    dbclient = DBClient.getInstance()
+    res = []
+    queue = dbclient.findInDb(pentest, "autoscan", {"type":"queue"}, False)
+    if queue is not None:
+        res = queue["tools"]
+    return res
+
+def isLaunchable(pentest, tool_iid):
     logger.debug("launch task : "+str(tool_iid))
-    worker_token = kwargs.get("worker_token") if kwargs.get("worker_token") else encode_token(kwargs.get("token_info"))
     dbclient = DBClient.getInstance()
     launchableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     command_o = ServerCommand.fetchObject({"_id": ObjectId(launchableTool.command_iid)}, pentest)
@@ -516,23 +589,19 @@ def launchTask(pentest, tool_iid, **kwargs):
                 choosenWorker = owner
     if choosenWorker == "":
         logger.debug("Error in launch task : no worker available:"+str(tool_iid))
-        return "No worker available", 404
+        return "No worker available", 504
     logger.debug(f"Choosen worker for tool_iid {tool_iid} is {str(choosenWorker)}")
     workerName = choosenWorker
     socket = dbclient.findInDb("pollenisator", "sockets", {"user":workerName}, False)
     if socket is None:
         logger.debug(f"Error in launching {tool_iid} : socket not found to contact {workerName}")
         return "Socket not found", 503
-    launchableToolId = launchableTool.getId()
-    # launchableTool.markAsRunning(workerName, body.get("group_id"), body.get("group_name"))
-    # logger.debug(f"Mark as running tool_iid {tool_iid}")
-    # update(pentest, tool_iid, ToolController(launchableTool).getData())
-    # Mark the tool as running (scanner_ip is set and dated is set, datef is "None")
-    # Use socket sid as room so that only this worker will receive this task
-    
+    return str(socket['sid']),200
+
+def launchTask(pentest, tool_iid, socket_sid, worker_token):
     sm = SocketManager.getInstance()
-    logger.debug(f"Launch task to worker {workerName} : emit  {str(socket['sid'])} toolid:{str(launchableToolId)})")
-    sm.socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(launchableToolId)}, room=socket["sid"])
+    logger.debug(f"Launch task  : emit  {str(socket_sid)} toolid:{str(tool_iid)})")
+    sm.socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(tool_iid)}, room=socket_sid)
     
     return "Success ", 200
 

@@ -11,7 +11,7 @@ from pollenisator.server.servermodels.interval import ServerInterval
 from pollenisator.server.servermodels.command import ServerCommand
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
-from pollenisator.server.servermodels.tool import ServerTool, launchTask, stopTask
+from pollenisator.server.servermodels.tool import ServerTool, launchTask, stopTask, isLaunchable, queueTasks
 from pollenisator.server.servermodels.scope import ServerScope
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.permission import permission
@@ -29,6 +29,9 @@ def startAutoScan(pentest, **kwargs):
         return "No worker registered for this pentest", 404
     dbclient.insertInDb(pentest, "autoscan", {"start":datetime.now(), "special":True})
     encoded = encode_token(kwargs["token_info"])
+    # queue auto commands
+    tools_lauchable = findLaunchableTools(pentest)
+    queueTasks(pentest, [tool_model["tool"].getId() for tool_model in tools_lauchable])
     autoscan = Thread(target=autoScan, args=(pentest, encoded))
     try:
         logger.debug("Autoscan : start")
@@ -49,22 +52,47 @@ def autoScan(pentest, endoded_token):
     check = True
     try:
         while check:
+            autoscan_threads = dbclient.findInDb(pentest, "settings", {"key":"autoscan_threads"}, False)
+            autoscan_threads = 4 if autoscan_threads is None else int(autoscan_threads["value"])
+
+            running_tools_count = dbclient.countInDb(pentest, "tools", {"status":"running"})
             logger.debug("Autoscan : loop")
             #check_on_running_tools(pentest)
-            queue = [] # reinit queue each time as some tools may be finished / canceled / errored
-            launchableTools = findLaunchableTools(pentest)
+            if autoscan_threads - running_tools_count <= 0:
+                time.sleep(6)
+                logger.debug("Autoscan : skip round because too many running tools ")
+                check = getAutoScanStatus(pentest)
+                continue
+            launchableTools = []
+            queue = dbclient.findInDb(pentest, "autoscan", {"type":"queue"}, False)
+            if queue is None:
+                launchableTools = []
+            else:
+                launchableTools = queue["tools"]
             logger.debug("Autoscan : launchable tools: "+str(len(launchableTools)))
-            launchableTools.sort(key=lambda tup: (int(tup["timedout"]), int(tup["priority"])))
+            #launchableTools.sort(key=lambda tup: (int(tup["timedout"]), int(tup["priority"])))
+            toLaunch = []
+            
             for launchableTool in launchableTools:
                 logger.debug("Autoscan : loop")
                 check = getAutoScanStatus(pentest)
                 if not check:
                     break
-                if str(launchableTool["tool"].getId()) not in queue:
-                    queue.append(str(launchableTool["tool"].getId()))
-                    logger.debug("Autoscan : launch task tools: "+str(launchableTool["tool"].getId()))
-                    res, statuscode = launchTask(pentest, launchableTool["tool"].getId(),  worker_token=endoded_token)
-                
+                if autoscan_threads - len(toLaunch) - running_tools_count <= 0:
+                    break
+                logger.debug("Autoscan : launch task tools: "+str(launchableTool))
+                msg, statuscode = isLaunchable(pentest, launchableTool)
+                if statuscode == 404:
+                    dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":launchableTool}})
+                    tool_o = ServerTool.fetchObject(pentest, {"_id":ObjectId(launchableTool)})
+                    if tool_o is not None:
+                        tool_o.markAsError()
+                elif statuscode == 200:
+                    dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":launchableTool}})
+                    toLaunch.append([launchableTool, msg])
+                    # the tool will be launched, we can remove it from the queue, let the worker set it as running
+            for tool in toLaunch:
+                launchTask(pentest, tool[0], tool[1], endoded_token)
             check = getAutoScanStatus(pentest)
             time.sleep(6)
     except(KeyboardInterrupt, SystemExit):
@@ -122,34 +150,16 @@ def findLaunchableTools(pentest):
     dbclient = DBClient.getInstance()
     check_items = list(CheckItem.fetchObjects({"type":"auto_commands"}))
     check_items.sort(key=lambda c: c.priority)
-    
-    authorized_diff_of_prio = 2 #TODO not hardcode  parameter
-
     #get not done tools inside wave
-    first_command_group_launched_prio = None
     for check_item in check_items:
-        if first_command_group_launched_prio is not None and \
-            check_item.priority > first_command_group_launched_prio+ authorized_diff_of_prio: # take only prio and prio+1
-            break
-        launched = 0
-        count_running_tools = 0
-
         check_instances = CheckInstance.fetchObjects(pentest, {"check_iid":str(check_item._id)})
         for check_instance in check_instances:
             notDoneToolsInCheck = getNotDoneToolsPerScope(pentest, check_instance)
-            count_running_tools += dbclient.countInDb(pentest, "tools", {"check_iid":str(check_instance._id), "status":"running"})
-            
             for toolId, toolModel in notDoneToolsInCheck.items():
-                if count_running_tools + launched >= check_item.max_thread:
-                    logger.info(f"Can't launch anymore of check {check_item.title}")
-                    break
                 if "error" in toolModel.status:
                     continue
                 toolsLaunchable.append(
                     {"tool": toolModel, "name": str(toolModel), "priority":int(check_item.priority), "timedout":"timedout" in toolModel.status})
-                launched += 1
-        if launched > 0 or count_running_tools > 0 and first_command_group_launched_prio is None:
-            first_command_group_launched_prio = check_item.priority
     return toolsLaunchable
     
 

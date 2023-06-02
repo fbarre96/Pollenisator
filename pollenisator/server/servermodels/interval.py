@@ -3,7 +3,7 @@ from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.interval import Interval
 from pollenisator.server.servermodels.tool import ServerTool
 from pollenisator.server.servermodels.element import ServerElement
-from pollenisator.core.components.utils import JSONEncoder, fitNowTime
+from pollenisator.core.components.utils import JSONEncoder, fitNowTime, stringToDate
 import json
 from pollenisator.server.permission import permission
 
@@ -23,6 +23,7 @@ class ServerInterval(Interval, ServerElement):
         """Get all OOT (Out of Time) tools in this wave and checks if this Interval makes them in time. 
         If it is the case, set them in time.
         """
+        
         if fitNowTime(self.dated, self.datef):
             tools = ServerTool.fetchObjects(self.pentest, {"wave": self.wave, "status": "OOT"})
             for tool in tools:
@@ -87,10 +88,15 @@ def insert(pentest, body):
         del body["_id"]
     interval_o = ServerInterval(pentest, body)
     parent = interval_o.getParentId()
+    try:
+        stringToDate(body.get("dated"))
+        stringToDate(body.get("datef"))
+    except ValueError as e:
+        return "Invalid date format, expected '%d/%m/%Y %H:%M:%S'", 400
     ins_result = dbclient.insertInDb(pentest, "intervals", body, parent)
     interval_o.setToolsInTime()
     iid = ins_result.inserted_id
-    return {"res":True, "iid":iid}
+    return {"res":True, "iid":iid}, 200
 
 @permission("pentester")
 def update(pentest, interval_iid, body):

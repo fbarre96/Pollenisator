@@ -121,7 +121,7 @@ class DefectController(ControllerElement):
         return {"title": self.model.title, "synthesis":self.model.synthesis, "description":self.model.description, "ease": self.model.ease, "impact": self.model.impact,
                 "risk": self.model.risk, "redactor": self.model.redactor, "type": self.model.mtype, "language":self.model.language, "notes": self.model.notes,
                 "ip": self.model.ip, "port": self.model.port, "proto": self.model.proto, "index":self.model.index,
-                "proofs": self.model.proofs, "fixes":self.model.fixes, "_id": self.model.getId(), "tags": self.model.tags, "infos": self.model.infos}
+                "proofs": self.model.proofs, "creation_time": self.model.creation_time, "fixes":self.model.fixes, "_id": self.model.getId(), "tags": self.model.tags, "infos": self.model.infos}
 
     def getType(self):
         """Returns a string describing the type of object

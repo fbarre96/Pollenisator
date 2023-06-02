@@ -1,5 +1,6 @@
 """Defect Model."""
 
+from datetime import datetime
 import os
 from bson.objectid import ObjectId
 from pollenisator.core.models.element import Element
@@ -20,7 +21,7 @@ class Defect(Element):
             valueFromDb: a dict holding values to load into the object. A mongo fetched defect is optimal.
                         possible keys with default values are : _id (None), parent (None), tags([]), infos({}),
                         ip(""), port(""), proto(""), title(""), synthesis(""), description(""), ease(""), impact(""), risk(""),
-                        redactor("N/A"), type([]),  language(""), notes(""), proofs([]), fixes([]), index(None)
+                        redactor("N/A"), type([]),  language(""), notes(""), proofs([]), fixes([]), creation_time, infos, index(None)
         """
         if valuesFromDb is None:
             valuesFromDb = {}
@@ -37,11 +38,11 @@ class Defect(Element):
                         valuesFromDb.get("language", ""),
                         valuesFromDb.get("notes", ""), valuesFromDb.get(
                             "proofs", []),
-                        valuesFromDb.get("fixes", []),
+                        valuesFromDb.get("fixes", []), valuesFromDb.get("creation_time", None),
                         valuesFromDb.get("infos", {}),
                         valuesFromDb.get("index", 0))
 
-    def initialize(self, ip, port, proto, title="", synthesis="", description="", ease="", impact="", risk="", redactor="N/A", mtype=None, language="", notes="", proofs=None, fixes=None, infos=None, index=0):
+    def initialize(self, ip, port, proto, title="", synthesis="", description="", ease="", impact="", risk="", redactor="N/A", mtype=None, language="", notes="", proofs=None, fixes=None, creation_time=None, infos=None, index=0):
         """Set values of defect
         Args:
             ip: defect will be assigned to this IP, can be empty
@@ -59,6 +60,7 @@ class Defect(Element):
             notes: notes took by pentesters
             proofs: a list of proof files, default to None.
             fixes: a list of fixes for this defect, default to empty list
+            creation_time: the time this defect was created. Default to None, will be auto filled if None.
             infos: a dictionnary with key values as additional information. Default to None
             index: the index of this defect in global defect table (only for unassigned defect)
         Returns:
@@ -81,6 +83,7 @@ class Defect(Element):
         self.proofs = proofs if proofs is not None else []
         self.fixes = fixes if fixes is not None else []
         self.index = index
+        self.creation_time = datetime.now() if creation_time is None else creation_time
         return self
 
     @classmethod
