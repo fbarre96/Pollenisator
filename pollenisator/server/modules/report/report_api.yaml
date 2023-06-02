@@ -162,6 +162,26 @@ paths:
               examples:
                 Success:
                   value: "True"
+  "/report/DefectTemplates/export":
+    get:
+      operationId:  pollenisator.server.servermodels.defect.exportDefectTemplates
+      tags:
+        - Defect Template
+      summary: Return defect templates as json
+      responses:
+        "200":
+          description:  content
+          content:
+              application/json:
+                schema:
+                  type: string
+        '503':
+          description: Failed to create an export
+          content:
+            application/json:
+              examples:
+                Server issue:
+                  value: 'Failed to export'
   "/report/DefectTemplates/insert":
     post:
       operationId: pollenisator.server.servermodels.defect.insertDefectTemplate

@@ -1103,6 +1103,7 @@ paths:
               examples:
                 Server issue:
                   value: 'Failed to export'
+                  
   "/exportCheatsheet":
     get:
       operationId: pollenisator.server.mongo.exportCheatsheet

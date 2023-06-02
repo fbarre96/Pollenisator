@@ -182,7 +182,7 @@ def search(body):
     config = loadServerConfig()
     api_url = config.get('knowledge_api_url', '')
     if api_url == "" or not check_api:
-        return ret
+        return {"errors": errors , "answers":ret}
     try:
         resp = requests.get(api_url, params=body, timeout=10)
         if resp.status_code != 200:

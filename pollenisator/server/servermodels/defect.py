@@ -222,6 +222,17 @@ def importDefectTemplates(upfile):
     return True
 
 @permission("user")
+def exportDefectTemplates(**kwargs):
+    dbclient = DBClient.getInstance()
+    templates = dbclient.findInDb("pollenisator", "defects", {}, True)
+    res = []
+    for template in templates:
+        t = template
+        del t['_id']
+        res.append(t)
+    return res
+
+@permission("user")
 def insertDefectTemplate(body):
     return insert("pollenisator", body)
 
