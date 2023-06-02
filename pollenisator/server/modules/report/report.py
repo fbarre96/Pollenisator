@@ -161,6 +161,7 @@ def search(body):
     terms = body.get("terms", "")
     lang = body.get("language", "")
     perimeter = body.get("perimeter", "")
+    check_api = body.get("check_api", True)
     errors = []
     if type == "remark":
         coll = "remarks"
@@ -180,7 +181,7 @@ def search(body):
         ret.append(x)
     config = loadServerConfig()
     api_url = config.get('knowledge_api_url', '')
-    if api_url == "":
+    if api_url == "" or not check_api:
         return ret
     try:
         resp = requests.get(api_url, params=body, timeout=10)

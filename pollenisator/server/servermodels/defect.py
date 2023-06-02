@@ -85,56 +85,62 @@ def delete(pentest, defect_iid):
 @permission("pentester")
 def insert(pentest, body):
     sem.acquire()
-    dbclient = DBClient.getInstance()
-    if "creation_date" in body:
-        del body["creation_date"]
-    defect_o = ServerDefect(pentest, body)
-    base = defect_o.getDbKey()
-    existing = dbclient.findInDb(pentest, "defects", base, False)
-    if existing is not None:
-        return {"res":False, "iid":existing["_id"]}
-    if defect_o.ip.strip() == "" and defect_o.port.strip() != "":
-        return "If a port is specified, an ip should be specified to", 400
-    parent = defect_o.getParentId()
-    if "_id" in body:
-        del body["_id"]
-    if not defect_o.isAssigned():
-        insert_pos = findInsertPosition(pentest, body["risk"])
-        save_insert_pos = insert_pos
-        defects_to_edit = []
-        
-        defect_to_edit_o = ServerDefect.fetchObject(pentest, {"ip":"", "index":str(insert_pos)})
-        if defect_to_edit_o is not None:
-            defects_to_edit.append(defect_to_edit_o)
-        while defect_to_edit_o is not None:
-            insert_pos+=1
-            defect_to_edit_o = ServerDefect.fetchObject(pentest, {"ip":"",  "index":str(insert_pos)})
+    try:
+        dbclient = DBClient.getInstance()
+        if "creation_date" in body:
+            del body["creation_date"]
+        defect_o = ServerDefect(pentest, body)
+        base = defect_o.getDbKey()
+        existing = dbclient.findInDb(pentest, "defects", base, False)
+        if existing is not None:
+            sem.release()
+            return {"res":False, "iid":existing["_id"]}
+        if defect_o.ip.strip() == "" and defect_o.port.strip() != "":
+            sem.release()
+            return "If a port is specified, an ip should be specified to", 400
+        parent = defect_o.getParentId()
+        if "_id" in body:
+            del body["_id"]
+        if not defect_o.isAssigned():
+            insert_pos = findInsertPosition(pentest, body["risk"])
+            save_insert_pos = insert_pos
+            defects_to_edit = []
+            
+            defect_to_edit_o = ServerDefect.fetchObject(pentest, {"ip":"", "index":str(insert_pos)})
             if defect_to_edit_o is not None:
                 defects_to_edit.append(defect_to_edit_o)
-            
-        for defect_to_edit in defects_to_edit:
-            update(pentest, defect_to_edit.getId(), {"index":str(int(defect_to_edit.index)+1)})
-        body["index"] = str(save_insert_pos)
-    else:
-        if "description" in body:
-            del body["description"]
-        if "synthesis" in body:
-            del body["synthesis"]
-        if "fixes" in body:
-            del body["fixes"]
-    ins_result = dbclient.insertInDb(pentest, "defects", body, parent)
-    iid = ins_result.inserted_id
-    defect_o._id = iid
+            while defect_to_edit_o is not None:
+                insert_pos+=1
+                defect_to_edit_o = ServerDefect.fetchObject(pentest, {"ip":"",  "index":str(insert_pos)})
+                if defect_to_edit_o is not None:
+                    defects_to_edit.append(defect_to_edit_o)
+                
+            for defect_to_edit in defects_to_edit:
+                update(pentest, defect_to_edit.getId(), {"index":str(int(defect_to_edit.index)+1)})
+            body["index"] = str(save_insert_pos)
+        else:
+            if "description" in body:
+                del body["description"]
+            if "synthesis" in body:
+                del body["synthesis"]
+            if "fixes" in body:
+                del body["fixes"]
+        ins_result = dbclient.insertInDb(pentest, "defects", body, parent)
+        iid = ins_result.inserted_id
+        defect_o._id = iid
 
-    if defect_o.isAssigned():
-        # Edit to global defect and insert it
-        defect_o.ip = ""
-        defect_o.port = ""
-        defect_o.proto = ""
-        defect_o.parent = ""
-        defect_o.notes = ""
-        insert_res = insert(pentest, DefectController(defect_o).getData())
-        dbclient.updateInDb(pentest, "defects", {"_id":ObjectId(iid)}, {"$set":{"global_defect": insert_res["iid"]}})
+        if defect_o.isAssigned():
+            # Edit to global defect and insert it
+            defect_o.ip = ""
+            defect_o.port = ""
+            defect_o.proto = ""
+            defect_o.parent = ""
+            defect_o.notes = ""
+            insert_res = insert(pentest, DefectController(defect_o).getData())
+            dbclient.updateInDb(pentest, "defects", {"_id":ObjectId(iid)}, {"$set":{"global_defect": insert_res["iid"]}})
+    except Exception as e:
+        sem.release()
+        raise(e)
     sem.release()
     return {"res":True, "iid":iid}
 
