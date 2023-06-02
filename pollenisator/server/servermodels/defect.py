@@ -5,9 +5,10 @@ from pollenisator.core.controllers.defectcontroller import DefectController
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.permission import permission
 from pollenisator.core.components.utils import getMainDir
-
+import threading
 import os
 import json
+sem = threading.Semaphore() 
 
 class ServerDefect(Defect, ServerElement):
     def __init__(self, pentest="", *args, **kwargs):
@@ -83,6 +84,7 @@ def delete(pentest, defect_iid):
 
 @permission("pentester")
 def insert(pentest, body):
+    sem.acquire()
     dbclient = DBClient.getInstance()
     if "creation_date" in body:
         del body["creation_date"]
@@ -133,6 +135,7 @@ def insert(pentest, body):
         defect_o.notes = ""
         insert_res = insert(pentest, DefectController(defect_o).getData())
         dbclient.updateInDb(pentest, "defects", {"_id":ObjectId(iid)}, {"$set":{"global_defect": insert_res["iid"]}})
+    sem.release()
     return {"res":True, "iid":iid}
 
 @permission("pentester")
