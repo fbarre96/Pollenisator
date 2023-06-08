@@ -178,6 +178,7 @@ def search(body):
     res = dbclient.findInDb("pollenisator", coll, p, True)
     ret = []
     for x in res:
+        x["source"] = "local"
         ret.append(x)
     config = loadServerConfig()
     api_url = config.get('knowledge_api_url', '')
@@ -189,6 +190,8 @@ def search(body):
             errors += ["The knowledge dabatase encountered an issue : "+resp.text]
         if not errors:
             answer = json.loads(resp.text)
+            for ans in answer:
+                ans["source"] = "api"
             ret += answer
     except json.JSONDecodeError as e:
         errors += ["The knowledge database returned invalid json"]
