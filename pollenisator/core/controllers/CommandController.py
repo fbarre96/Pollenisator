@@ -9,11 +9,11 @@ class CommandController(ControllerElement):
     def getData(self):
         """Return command attributes as a dictionnary matching Mongo stored commands
         Returns:
-            dict with keys name,  text,  max_thread, types, _id, tags and infos
+            dict with keys name,  text,  max_thread, types, _id, infos
         """
         return {"name": self.model.name, "bin_path":self.model.bin_path, "plugin":self.model.plugin,  "text": self.model.text,
                 "timeout": self.model.timeout,
-                "indb":self.model.indb, "_id": self.model.getId(), "tags": self.model.tags, "infos": self.model.infos}
+                "indb":self.model.indb, "_id": self.model.getId(), "infos": self.model.infos}
 
     def getType(self):
         """Return a string describing the type of object

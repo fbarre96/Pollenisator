@@ -115,11 +115,11 @@ class HttpMethods(Plugin):
         p_o.updateInfos({"Methods": ", ".join(supported_methods)})
         targets[str(p_o.getId())] = {"ip": host, "port": port, "proto": proto}
         if "TRACE" in risky_methods:
-            p_o.addTag("HTTP-TRACE")
+            p_o.addTag(("HTTP-TRACE", None, "low"))
             risky_methods.remove("TRACE")
         if len(risky_methods) > 0:
             notes = "RISKY HTTP METHODS ALLOWED : " + " ".join(risky_methods)
             tags = []
-            p_o.addTag("RISKY-HTTP-METHODS")
+            p_o.addTag(("RISKY-HTTP-METHODS", None, "low"))
             tags.append("info-http-risky-methods")
         return notes, tags, "port", targets

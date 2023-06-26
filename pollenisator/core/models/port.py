@@ -19,19 +19,18 @@ class Port(Element):
         """Constructor
         Args:
             valueFromDb: a dict holding values to load into the object. A mongo fetched interval is optimal.
-                        possible keys with default values are : _id (None), parent (None), tags([]), infos({}),
+                        possible keys with default values are : _id (None), parent (None), infos({}),
                         ip(""), port(""), proto("tcp"), service(""), product(""), notes("")
         """
         if valuesFromDb is None:
             valuesFromDb = {}
-        super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None), valuesFromDb.get(
-            "tags", []), valuesFromDb.get("infos", {}))
+        super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None), valuesFromDb.get("infos", {}))
         self.initialize(valuesFromDb.get("ip", ""), valuesFromDb.get("port", ""),
                         valuesFromDb.get("proto", "tcp"), valuesFromDb.get(
                             "service", ""), valuesFromDb.get("product", ""),
-                        valuesFromDb.get("notes", ""), valuesFromDb.get("tags", []), valuesFromDb.get("infos", {}))
+                        valuesFromDb.get("notes", ""),  valuesFromDb.get("infos", {}))
 
-    def initialize(self, ip, port="", proto="tcp", service="", product="", notes="", tags=None, infos=None):
+    def initialize(self, ip, port="", proto="tcp", service="", product="", notes="", infos=None):
         """Set values of port
         Args:
             ip: the parent host (ip or domain) where this port is open
@@ -39,7 +38,6 @@ class Port(Element):
             proto: a protocol to reach this port ("tcp" by default, send "udp" if udp port.) Default "tcp"
             service: the service running behind this port. Can be "unknown". Default ""
             notes: notes took by a pentester regarding this port. Default ""
-            tags: a list of tag. Default is None (empty array)
             infos: a dictionnary of additional info. Default is None (empty dict)
         Returns:
             this object
@@ -51,7 +49,6 @@ class Port(Element):
         self.product = product
         self.notes = notes
         self.infos = infos if infos is not None else {}
-        self.tags = tags if tags is not None else []
         return self
 
 

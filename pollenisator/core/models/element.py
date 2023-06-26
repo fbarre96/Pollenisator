@@ -11,19 +11,17 @@ class Element(object):
     """
     coll_name = None
 
-    def __init__(self, _id, parent, tags, infos):
+    def __init__(self, _id, parent, infos):
         """
         Constructor to be inherited. Child model will all use this constructor.
 
         Args:
             _id: mongo database id
             parent: a parent mongo id object for this model.
-            tags: a list of tags applied on this object
             infos: a dicitonnary of custom information 
         """
         # Initiate a cachedIcon for a model, not a class.
         self._id = _id
-        self.tags = tags
         self.parent = parent
         self.infos = infos
         self.cachedIcon = None

@@ -30,13 +30,12 @@ class ServerIp(Ip, ServerElement):
         super().__init__(*args, **kwargs)
 
 
-    def initialize(self, ip="", notes="", in_scopes=None, tags=None, infos=None):
+    def initialize(self, ip="", notes="", in_scopes=None, infos=None):
         """Set values of ip
         Args:
             ip: the host (ip or domain) to represent
             notes: notes concerning this IP (opt). Default to ""
             in_scopes: a list of scopes that matches this host. If empty this IP will be OOS (Out of Scope). Default to None
-            tags: a list of tags. Default to None
             infos: a dictionnary of additional info
         Returns:
             this object
@@ -44,7 +43,6 @@ class ServerIp(Ip, ServerElement):
         self.ip = ip
         self.notes = notes
         self.in_scopes = in_scopes if in_scopes is not None else self.getScopesFittingMe()
-        self.tags = tags if tags is not None else []
         self.infos = infos if infos is not None else {}
         return self
     

@@ -31,6 +31,8 @@ class ServerElement(metaclass=MetaElement):
     @classmethod
     def classFactory(cls, name):
         for class_name in REGISTRY.keys():
+            if name.endswith("s"):
+                name = name[:-1]
             if class_name.lower().replace("server","") == name.lower():
                 return REGISTRY[class_name]
 
@@ -88,37 +90,7 @@ class ServerElement(metaclass=MetaElement):
             return None
         return cls(pentest, d) 
     
-    def addTag(self, newTag, overrideGroupe=True):
-        """Add the given tag to this object.
-        Args:
-            newTag: a new tag as a string to be added to this model tags
-            overrideGroupe: Default to True. If newTag is in a group with a tag already assigned to this object, it will replace this old tag.
-        """
-        tags = self.tags
-        if isinstance(newTag, tuple):
-            newTagColor = newTag[1]
-            newTag = newTag[0]
-        else:
-            newTagColor = "transparent"
-        if newTag not in self.tags:
-            dbclient = DBClient.getInstance()
-            for group in dbclient.getTagsGroups():
-                if newTag in group:
-                    i = 0
-                    len_tags = len(tags)
-                    while i < len_tags:
-                        if tags[i] in group:
-                            if overrideGroupe:
-                                tags.remove(tags[i])
-                                i -= 1
-                            else:
-                                continue
-                        len_tags = len(tags)
-                        i += 1
-            tags.append(newTag)
-            self.tags = tags
-            dbclient.doRegisterTag(self.pentest, newTag, newTagColor)
-            dbclient.updateInDb(self.pentest, self.__class__.coll_name, {"_id":ObjectId(self.getId())}, {"$set":{"tags":tags}})
+
 
     def updateInfos(self, newInfos):
         """Change all infos stores in self.infos with the given new ones and update database.

@@ -64,7 +64,7 @@ def parseWarnings(pentest, file_opened):
                     "ip": ip, "port": port, "proto": "tcp"}
                 missconfiguredHosts[ip][port].sort()
                 notes = "\n".join(missconfiguredHosts[ip][port])
-                p_o.addTag("SSL/TLS-flaws")
+                p_o.addTag(("SSL/TLS-flaws",None,"low"))
                 p_o.updateInfos({"compliant": "False"})
         if firstLine:
             return None, None

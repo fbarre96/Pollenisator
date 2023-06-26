@@ -76,8 +76,7 @@ class EternalBlue(Plugin):
             targets[str(p_o.getId())] = {
                 "ip": ip, "port": port, "proto": proto}
         if "VULNERABLE" in notes:
-            tags=["pwned-eternalblue"]
+            tags=["pwned-eternalblue", "red", "high"]
             if res_insert is not None:
-                p_o.addTag("pwned")
-                p_o.addTag("eternalblue")
+                p_o.addTag(("eternalblue", "red", "high"))
         return notes, tags, "port", targets

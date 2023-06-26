@@ -19,7 +19,6 @@ class IpController(ControllerElement):
             The mongo ObjectId _id of the updated Ip document.
         """
         self.model.notes = values.get("Notes", self.model.notes)
-        self.model.tags = values.get("Tags", self.model.tags)
         self.model.infos = values.get("Infos", self.model.infos)
         for info in self.model.infos:
             self.model.infos[info] = self.model.infos[info][0]
@@ -63,9 +62,9 @@ class IpController(ControllerElement):
     def getData(self):
         """Returns ip attributes as a dictionnary matching Mongo stored ips
         Returns:
-            dict with keys ip, in_scopes, notes, _id, tags and infos
+            dict with keys ip, in_scopes, notes, _id, infos
         """
-        return {"ip": self.model.ip, "in_scopes": self.model.in_scopes, "notes": self.model.notes, "_id": self.model.getId(), "tags": self.model.tags, "infos": self.model.infos}
+        return {"ip": self.model.ip, "in_scopes": self.model.in_scopes, "notes": self.model.notes, "_id": self.model.getId(), "infos": self.model.infos}
 
     def getDefects(self):
         """Return ip assigned defects as a list of mongo fetched defects dict

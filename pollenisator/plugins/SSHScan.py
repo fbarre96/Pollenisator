@@ -77,13 +77,13 @@ class SSHScan(Plugin):
                         "ip": ip, "port": port, "proto": "tcp"}
                     oneScanIsValid = True
                     if "nopassword" in scan["auth_methods"]:
-                        tags = ["pwned-ssh-nopassword"]
+                        tags = ["pwned-ssh-nopassword", "red", "high"]
                     # Will not exit if port was not ssh
                     is_ok = scan["compliance"]["compliant"]
                     if str(is_ok) == "False":
                         port_o.updateInfos({"compliant": "False"})
                         port_o.updateInfos({"auth_methods": scan["auth_methods"]})
-                        port_o.addTag("SSH-flaw")
+                        port_o.addTag(("SSH-flaw", None, "low"))
             except KeyError:
                 continue
         if not oneScanIsValid:

@@ -214,7 +214,7 @@ def editScopeIPs(pentest, hostsInfos):
                 infos["machine_name"] + "\n"+infos.get("os", "")
             if infos["type"] == "success":
                 if infos.get("powned", False):
-                    ip_m.addTag("pwned")
+                    ip_m.addTag(("pwned", "red", "high"))
             host = str(infos["ip"])
             port = str(infos["port"])
             proto = "tcp"
@@ -224,7 +224,7 @@ def editScopeIPs(pentest, hostsInfos):
             port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
 
             if infos.get("powned", False):
-                port_m.addTag("pwned")
+                port_m.addTag(("pwned", "red", "high"))
             computer_m = Computer.fetchObject(pentest, {"ip":port_m.ip})
             if computer_m is not None: 
                 creds = infosToAdd.get("users", [])
@@ -297,14 +297,14 @@ class CME(Plugin):
         hostsInfos, countPwnd,  countSuccess, notes, secrets, lsassy = getInfos(file_opened)
         if countPwnd is not None:
             if int(countPwnd) > 0:
-                tags = [("pwned-cme", "red")]
+                tags = [("pwned-cme", "red", "high")]
         if countSuccess is not None:
             if int(countSuccess) > 0:
-                tags += [("info-cme-connection-success", "green")]
+                tags += [("info-cme-connection-success", "green", "info")]
             if len(secrets) > 0:
-                tags += [("todo-cme-secrets-dump","red")]
+                tags += [("todo-cme-secrets-dump","red", "todo")]
             if lsassy:
-                tags += [("todo-lsassy-success","red")]
+                tags += [("todo-lsassy-success","red", "todo")]
         if hostsInfos is None:
             return None, None, None, None
         targets = editScopeIPs(pentest, hostsInfos)

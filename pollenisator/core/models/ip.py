@@ -22,23 +22,21 @@ class Ip(Element):
         """Constructor
         Args:
             valueFromDb: a dict holding values to load into the object. A mongo fetched interval is optimal.
-                        possible keys with default values are : _id (None), parent (None), tags([]), infos({}),
+                        possible keys with default values are : _id (None), parent (None),  infos({}),
                         ip(""), notes(""), in_scopes(None)
         """
         if valuesFromDb is None:
             valuesFromDb = {}
-        super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None), valuesFromDb.get(
-            "tags", []), valuesFromDb.get("infos", {}))
+        super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None), valuesFromDb.get("infos", {}))
         self.initialize(valuesFromDb.get("ip", ""), valuesFromDb.get("notes", ""),
-                        valuesFromDb.get("in_scopes", None), tags=valuesFromDb.get("tags", []), infos=valuesFromDb.get("infos", {}))
+                        valuesFromDb.get("in_scopes", None),  infos=valuesFromDb.get("infos", {}))
 
-    def initialize(self, ip="", notes="", in_scopes=None, tags=None, infos=None):
+    def initialize(self, ip="", notes="", in_scopes=None, infos=None):
         """Set values of ip
         Args:
             ip: the host (ip or domain) to represent
             notes: notes concerning this IP (opt). Default to ""
             in_scopes: a list of scopes that matches this host. If empty this IP will be OOS (Out of Scope). Default to None
-            tags: a list of tags. Default to None
             infos: a dictionnary of additional info
         Returns:
             this object
@@ -46,7 +44,6 @@ class Ip(Element):
         self.ip = ip
         self.notes = notes
         self.in_scopes = in_scopes if in_scopes is not None else self.getScopesFittingMe()
-        self.tags = tags if tags is not None else []
         self.infos = infos if infos is not None else {}
         return self
 

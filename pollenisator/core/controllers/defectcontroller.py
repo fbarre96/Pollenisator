@@ -114,14 +114,14 @@ class DefectController(ControllerElement):
     def getData(self):
         """Return defect attributes as a dictionnary matching Mongo stored defects
         Returns:
-            dict with keys title, ease, ipact, risk, redactor, type, notes, ip, port, proto, proofs, _id, tags, infos
+            dict with keys title, ease, ipact, risk, redactor, type, notes, ip, port, proto, proofs, _id, infos
         """
         if self.model is None:
             return None
         return {"title": self.model.title, "synthesis":self.model.synthesis, "description":self.model.description, "ease": self.model.ease, "impact": self.model.impact,
                 "risk": self.model.risk, "redactor": self.model.redactor, "type": self.model.mtype, "language":self.model.language, "notes": self.model.notes,
                 "ip": self.model.ip, "port": self.model.port, "proto": self.model.proto, "index":self.model.index,
-                "proofs": self.model.proofs, "creation_time": self.model.creation_time, "fixes":self.model.fixes, "_id": self.model.getId(), "tags": self.model.tags, "infos": self.model.infos}
+                "proofs": self.model.proofs, "creation_time": self.model.creation_time, "fixes":self.model.fixes, "_id": self.model.getId(), "infos": self.model.infos}
 
     def getType(self):
         """Returns a string describing the type of object

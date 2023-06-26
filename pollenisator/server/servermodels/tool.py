@@ -398,7 +398,6 @@ def do_insert(pentest, body, **kwargs):
     base["text"] = body.get("text", "")
     base["status"] = body.get("status", [])
     base["notes"] = body.get("notes", "")
-    base["tags"] = body.get("tags", [])
     base["infos"] = body.get("infos", {})
     res_insert = dbclient.insertInDb(pentest, "tools", base, parent)
     ret = res_insert.inserted_id
@@ -409,9 +408,7 @@ def do_insert(pentest, body, **kwargs):
 @permission("pentester")
 def update(pentest, tool_iid, body):
     dbclient = DBClient.getInstance()
-    tags = body.get("tags", [])
-    for tag in tags:
-        dbclient.doRegisterTag(pentest, tag)
+    
     orig = dbclient.findInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, False)
     res = dbclient.updateInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
     from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
@@ -517,14 +514,14 @@ def importResult(pentest, tool_iid, upfile, body):
             # if the success is validated, mark tool as done
             toolModel.notes = notes
             for tag in tags:
-                toolModel.addTag(tag)
+                ToolController(toolModel).addTag(tag)
             toolModel.markAsDone(filepath)
             # And update the tool in database
             update(pentest, tool_iid, ToolController(toolModel).getData())
             # Upload file to SFTP
             msg = "TASK SUCCESS : "+toolModel.name
         except IOError as e:
-            toolModel.addTag("no-output")
+            toolModel.addTag(("no-output", None, "error"))
             toolModel.notes = "Failed to read results file"
             toolModel.markAsDone()
             update(pentest, tool_iid, ToolController(toolModel).getData())

@@ -1,3 +1,4 @@
+from datetime import datetime
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.defect import Defect
@@ -84,13 +85,16 @@ def delete(pentest, defect_iid):
 
 @permission("pentester")
 def insert(pentest, body):
-    sem.acquire()
+    
     try:
         dbclient = DBClient.getInstance()
-        if "creation_date" in body:
-            del body["creation_date"]
+        if "creation_time" in body:
+            del body["creation_time"]
         defect_o = ServerDefect(pentest, body)
+        if not defect_o.isAssigned():
+            sem.acquire()
         base = defect_o.getDbKey()
+
         existing = dbclient.findInDb(pentest, "defects", base, False)
         if existing is not None:
             sem.release()
@@ -125,6 +129,7 @@ def insert(pentest, body):
                 del body["synthesis"]
             if "fixes" in body:
                 del body["fixes"]
+        body["creation_time"] = datetime.now()
         ins_result = dbclient.insertInDb(pentest, "defects", body, parent)
         iid = ins_result.inserted_id
         defect_o._id = iid

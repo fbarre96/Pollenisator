@@ -13,6 +13,7 @@ from pollenisator.core.controllers.wavecontroller import WaveController
 from pollenisator.core.controllers.intervalcontroller import IntervalController
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem, doInsert as check_insert
 from pollenisator.server.servermodels.command import ServerCommand, addUserCommandsToPentest, doInsert as command_insert
+from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.servermodels.wave import ServerWave, insert as insert_wave
 from pollenisator.server.servermodels.interval import ServerInterval, insert as insert_interval
 from pollenisator.server.servermodels.scope import insert as insert_scope
@@ -30,8 +31,7 @@ def status():
     return dbclient.client is not None
 
 def getVersion():
-    # TODO : return connexion openapi version instead
-    return "2.5.0"
+    return dbclient.findInDb("pollenisator","infos",{"key":"version"}, False)["value"]
 
 @permission("user")
 def getUser(pentest, **kwargs):
@@ -322,7 +322,7 @@ def registerPentest(pentest, body, **kwargs):
         uuid = msg
         msg, success = preparePentest(uuid, pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username, **kwargs)
         if not success:
-            return 400, msg
+            return msg, 400
         return msg
     else:
         return msg, 403
@@ -349,11 +349,17 @@ def getPentestInfo(pentest, **kwargs):
     if ret["autoscan_status"] is None:
         ret["autoscan_status"] = False
     all_tags = dbclient.getRegisteredTags(pentest)
-    ret["tags"] = {}
-    for tag in all_tags:
-        ret["tags"] = 0
-        for collection in dbclient.listCollections(pentest):
-            ret["tags"] += dbclient.countInDb(pentest, collection, {"tags":tag})
+    ret["tagged"] = []
+    tag_cursor = dbclient.findInDb(pentest, "tags", {}, True)
+    for tagged in tag_cursor:
+        infos = {}
+        infos["_id"] = str(tagged["_id"])
+        infos["date"] = tagged.get("date")
+        infos["name"] = tagged.get("tags")[0]
+        class_element = ServerElement.classFactory(tagged.get("item_type"))
+        elem = class_element.fetchObject(pentest, tagged.get("item_id"))
+        infos["detailed_string"] = elem.getDetailedString()
+        ret["tagged"].append(infos)
     ret["hosts_count"] = dbclient.countInDb(pentest, "ips")
     ret["tools_done_count"] = dbclient.countInDb(pentest, "tools", {"status":"done"})
     ret["tools_count"] = dbclient.countInDb(pentest, "tools", {})
@@ -453,8 +459,9 @@ def updateSetting(body):
 def registerTag(body):
     name = body["name"]
     color = body["color"]
+    level = body["level"]
     pentest = body["pentest"]
-    return dbclient.doRegisterTag(pentest, name, color)
+    return dbclient.doRegisterTag(pentest, name, color, level)
 
 @permission("pentester", "body.pentest")
 def unregisterTag(body):
@@ -476,16 +483,14 @@ def unregisterTag(body):
             if val is None:
                 return 404, "Not found"
             dbclient.updateInDb(pentest, "settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
-            dbclient.updateInDb(pentest, "scopes", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
-            dbclient.updateInDb(pentest, "ips", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
-            dbclient.updateInDb(pentest, "ports", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
-            dbclient.updateInDb(pentest, "tools", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
+            dbclient.updateInDb(pentest, "tags", {"tags":name}, {"$pull": {"tags":name}}, notify=True)
     return True
 
 @permission("pentester")
 def updatePentestTag(pentest, body):
     name = body["name"]
     color = body["color"]
+    level = body["level"]
     
     tags = dbclient.findInDb(pentest, "settings", {"key":"tags"}, False)
     if tags is None:
@@ -494,17 +499,18 @@ def updatePentestTag(pentest, body):
         tags = tags.get("value", {})
         if name not in tags:
             return  "Not found", 404
-        tags[name] = color
+        tags[name] = {"color":color, "level":level}
         dbclient.updateInDb(pentest, "settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
 
 @permission("user")
 def updateTag(body):
     name = body["name"]
     color = body["color"]
+    level = body["level"]
     tags = json.loads(dbclient.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=JSONDecoder)
     if name not in tags:
         return "Not found", 404
-    tags[name] = color
+    tags[name] = {"color":color, "level":level}
     dbclient.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=JSONEncoder)}}, many=False, notify=True)
 
     return True

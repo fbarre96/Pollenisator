@@ -10,6 +10,7 @@ from datetime import datetime
 from pollenisator.core.components.utils import listPlugin, loadPlugin
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.utils import JSONDecoder, getMainDir
+from pollenisator.core.controllers.toolcontroller import ToolController
 from pollenisator.server.permission import permission
 
 dbclient = DBClient.getInstance()
@@ -87,12 +88,14 @@ def importExistingFile(pentest, upfile, body, **kwargs):
             targets["default"] = default_target
         for tag in tags:
             if isinstance(tag, tuple):
-                color = tag[1]
+                level = tag[2] if tag[2] is not None else "info"
+                color = tag[1] if tag[1] is not None else "transparent"
                 tag_name = tag[0]
             else:
                 color = "transparent"
+                level = "info"
                 tag_name = tag
-            res = dbclient.doRegisterTag(pentest, tag_name, color)
+            res = dbclient.doRegisterTag(pentest, tag_name, color, level)
 
 
         # ADD THE RESULTING TOOL TO AFFECTED
@@ -118,8 +121,9 @@ def importExistingFile(pentest, upfile, body, **kwargs):
             if dbclient.findInDb(pentest, "waves", {"wave":wave}, False) is None:
                 dbclient.insertInDb(pentest, "waves", {"wave":wave, "wave_commands":[]})
             tool_m = ServerTool(pentest).initialize("", check_iid, wave, name=toolName, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
-                                        dated=date, datef=date, scanner_ip=user, status=["done"], notes=notes, tags=tags)
+                                        dated=date, datef=date, scanner_ip=user, status=["done"], notes=notes)
             ret = tool_m.addInDb()
+            ToolController(tool_m).setTags(tags)
             upfile.stream.seek(0)
             msg, status, filepath = dbclient.do_upload(pentest, str(ret["iid"]), "result", upfile)
             if status == 200:

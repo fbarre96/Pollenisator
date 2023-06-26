@@ -20,7 +20,6 @@ class ScopeController(ControllerElement):
             The mongo ObjectId _id of the updated Scope document.
         """
         self.model.notes = values.get("Notes", self.model.notes)
-        self.model.tags = values.get("Tags", self.model.tags)
         self.model.update()
 
     def doInsert(self, values):
@@ -79,9 +78,9 @@ class ScopeController(ControllerElement):
     def getData(self):
         """Return scope attributes as a dictionnary matching Mongo stored scopes
         Returns:
-            dict with keys wave, scope, notes, _id, tags and infos
+            dict with keys wave, scope, notes, _id, infos
         """
-        return {"wave": self.model.wave, "scope": self.model.scope, "notes": self.model.notes, "_id": self.model.getId(), "tags": self.model.tags, "infos": self.model.infos}
+        return {"wave": self.model.wave, "scope": self.model.scope, "notes": self.model.notes, "_id": self.model.getId(), "infos": self.model.infos}
 
     def getTools(self):
         """Return scope assigned tools as a list of mongo fetched tools dict

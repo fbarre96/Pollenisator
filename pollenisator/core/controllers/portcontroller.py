@@ -20,7 +20,6 @@ class PortController(ControllerElement):
         self.model.service = values.get("Service", self.model.service)
         self.model.product = values.get("Product", self.model.product)
         self.model.notes = values.get("Notes", self.model.notes)
-        self.model.tags = values.get("Tags", self.model.tags)
         self.model.infos = values.get("Infos", self.model.infos)
         for info in self.model.infos:
             self.model.infos[info] = self.model.infos[info][0]
@@ -53,12 +52,12 @@ class PortController(ControllerElement):
     def getData(self):
         """Return port attributes as a dictionnary matching Mongo stored ports
         Returns:
-            dict with keys ip, port, proto, service, product, notes, _id, tags and infos
+            dict with keys ip, port, proto, service, product, notes, _id,  infos
         """
         if self.model is None:
             return None
         return {"ip": self.model.ip, "port": self.model.port, "proto": self.model.proto,
-                "service": self.model.service, "product": self.model.product, "notes": self.model.notes, "_id": self.model.getId(), "tags": self.model.tags, "infos": self.model.infos}
+                "service": self.model.service, "product": self.model.product, "notes": self.model.notes, "_id": self.model.getId(), "infos": self.model.infos}
 
     # def addCustomTool(self, toolname):
     #     """Add tool name to the model 

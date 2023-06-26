@@ -866,7 +866,7 @@ class DBClient:
                     return t
                 except:
                     pass
-        return {"todo":"orange", "unscanned":"yellow", "pwned":"red", "Interesting":"dark green", "Uninteresting":"sky blue", "neutral":"transparent"}
+        return {}
         
     def getTagsGroups(self):
         """Returns groups of tags that may not be applied at the same time
@@ -877,7 +877,7 @@ class DBClient:
         return [tags, ["hidden"]]
 
 
-    def doRegisterTag(self, pentest, name, color="transparent"):
+    def doRegisterTag(self, pentest, name, color="transparent", level="info"):
         if name in self.getRegisteredTags(pentest):
             return False
         if pentest == "pollenisator":
@@ -886,11 +886,11 @@ class DBClient:
         else:
             tags = self.findInDb(pentest, "settings", {"key":"tags"}, False)
             if tags is None:
-                self.insertInDb(pentest, "settings", {"key":"tags", "value":{name:color}})
+                self.insertInDb(pentest, "settings", {"key":"tags", "value":{name:{"color":color, "level":level}}})
             else:
                 tags = tags.get("value", {})
                 if name not in tags:
-                    tags[name] = color
+                    tags[name] = {"color":color, "level":level}
                     self.updateInDb(pentest, "settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
         return True    
 

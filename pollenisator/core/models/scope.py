@@ -21,13 +21,12 @@ class Scope(Element):
         """Constructor
         Args:
             valueFromDb: a dict holding values to load into the object. A mongo fetched interval is optimal.
-                        possible keys with default values are : _id (None), parent (None), tags([]), infos({}),
+                        possible keys with default values are : _id (None), parent (None),  infos({}),
                         wave(""), scope(""), notes("")
         """
         if valuesFromDb is None:
             valuesFromDb = {}
-        super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None), valuesFromDb.get(
-            "tags", []), valuesFromDb.get("infos", {}))
+        super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None), valuesFromDb.get("infos", {}))
         self.initialize(valuesFromDb.get("wave", ""), valuesFromDb.get("scope", ""),
                         valuesFromDb.get("notes", ""), valuesFromDb.get("infos", {}))
 

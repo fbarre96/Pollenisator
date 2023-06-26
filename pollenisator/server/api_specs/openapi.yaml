@@ -53,6 +53,56 @@ components:
           schema:
             $ref: "#/components/schemas/DefectTemplate"
       required: true
+    Tags:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Tags"
+
+    addTag:
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - tag
+              - item_type
+            properties:
+              item_type:
+                type: string
+              tag:
+                type: string
+              overrideGroups:
+                type: boolean
+                default: false
+    delTag:
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - tag
+              - item_type
+            properties:
+              item_type:
+                type: string
+              tag:
+                type: string
+    setTags:
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - tags
+              - item_type
+            properties:
+              item_type:
+                type: string
+              tags:
+                type: array
+                items:
+                  type: string
     
     # binary_upfile:
     #   content:
@@ -224,16 +274,24 @@ components:
           type: string
         value:
           type: string
+    Tags:
+      properties:
+        item_id:
+          type: string
+        item_type:
+          type: string
+        tag:
+          type: array
+          items:
+            type: string
+        date:
+          type: string
     Ips:
       properties:
         ip:
           type: string
         notes:
           type: string
-        tags:
-          type: array
-          items:
-            type: string
         in_scopes:
           type: array
           items:
@@ -256,10 +314,7 @@ components:
           type: string
         notes:
           type: string
-        tags:
-          type: array
-          items:
-            type: string
+        
     Scopes:
       properties:
         wave:
@@ -1630,6 +1685,12 @@ paths:
                   value: '"*{Reason of failure, invalid name, or database already exist..}*"'
     get:
       summary: 'get general information about pentest'
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
       tags:
         - pentest
       operationId: pollenisator.server.mongo.getPentestInfo
@@ -1745,7 +1806,7 @@ paths:
                   value: '{
     "_id": "ObjectId|5fa5819aed75191f22168a40",
     "key": "tags",
-    "value": "{\"todo\": \"orange\", \"unscanned\": \"yellow\", \"pwned\": \"red\", \"Interesting\": \"dark green\", \"Uninteresting\": \"sky blue\", \"Neutral\": \"white\"}"
+    "value": {"todo":{"color":"orange", "level":"todo"}, "pwned":{"color":"red", "level":"high"}, "Interesting":{"color":"dark green", "level":"medium"}, "Uninteresting":{"color":"sky blue", "level":"low"}, "neutral":{"color":"transparent", "level":"info"}}
   }'
   /settings:
     get:
@@ -1764,7 +1825,7 @@ paths:
   {
     "_id": "ObjectId|5fa5819aed75191f22168a40",
     "key": "tags",
-    "value": "{\"todo\": \"orange\", \"unscanned\": \"yellow\", \"pwned\": \"red\", \"Interesting\": \"dark green\", \"Uninteresting\": \"sky blue\", \"Neutral\": \"white\"}"
+    "value": "{"todo":{"color":"orange", "level":"todo"}, "pwned":{"color":"red", "level":"high"}, "Interesting":{"color":"dark green", "level":"medium"}, "Uninteresting":{"color":"sky blue", "level":"low"}, "neutral":{"color":"transparent", "level":"info"}}"
   },
   {
     "_id": "ObjectId|5fbb793bed75195fe4274412",
@@ -1786,11 +1847,14 @@ paths:
               required:
                 - name
                 - color
+                - level
                 - pentest
               properties:
                 name:
                   type: string
                 color:
+                  type: string
+                level:
                   type: string
                 pentest:
                   type: string
@@ -1843,10 +1907,13 @@ paths:
               required:
                 - name
                 - color
+                - level
               properties:
                 name:
                   type: string
                 color:
+                  type: string
+                level:
                   type: string
                 global:
                   type: boolean
@@ -1881,10 +1948,13 @@ paths:
               required:
                 - name
                 - color
+                - level
               properties:
                 name:
                   type: string
                 color:
+                  type: string
+                level:
                   type: string
              
       responses:
@@ -2677,6 +2747,93 @@ paths:
             application/json:
               schema:
                 type: integer
+
+  "/tags/{pentest}/addTag/{item_id}":
+    put:
+      operationId: pollenisator.server.servermodels.tag.addTag
+      tags:
+        - Tags
+      summary: "Add a tag to an item"
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: item_id
+          in: path
+          description: item id to tag
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/addTag"
+      responses:
+        "200":
+          description: tag added with success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: true
+  "/tags/{pentest}/delTag/{item_id}":
+    put:
+      operationId: pollenisator.server.servermodels.tag.delTag
+      tags:
+        - Tags
+      summary: "Remove a tag from an item"
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: item_id
+          in: path
+          description: item id to remove tag from
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/delTag"
+      responses:
+        "200":
+          description: tag deleted with success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: true
+
+  "/tags/{pentest}/setTags/{item_id}":
+    put:
+      operationId: pollenisator.server.servermodels.tag.setTags
+      tags:
+        - Tags
+      summary: "Set tags for an item"
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: item_id
+          in: path
+          description: item id to set tags for
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/setTags"
+      responses:
+        "200":
+          description: tag setted with success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: true
+
   '/settings/{pentest}':
     post:
       operationId: pollenisator.server.settings.upsert

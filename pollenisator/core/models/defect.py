@@ -19,15 +19,14 @@ class Defect(Element):
         """Constructor
         Args:
             valueFromDb: a dict holding values to load into the object. A mongo fetched defect is optimal.
-                        possible keys with default values are : _id (None), parent (None), tags([]), infos({}),
+                        possible keys with default values are : _id (None), parent (None), infos({}),
                         ip(""), port(""), proto(""), title(""), synthesis(""), description(""), ease(""), impact(""), risk(""),
                         redactor("N/A"), type([]),  language(""), notes(""), proofs([]), fixes([]), creation_time, infos, index(None)
         """
         if valuesFromDb is None:
             valuesFromDb = {}
         self.proofs = []
-        super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None), valuesFromDb.get(
-            "tags", []), valuesFromDb.get("infos", {}))
+        super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None), valuesFromDb.get("infos", {}))
         self.initialize(valuesFromDb.get("ip", ""), valuesFromDb.get("port", ""),
                         valuesFromDb.get(
                             "proto", ""), valuesFromDb.get("title", ""), valuesFromDb.get("synthesis", ""), valuesFromDb.get("description", ""),

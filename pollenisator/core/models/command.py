@@ -16,13 +16,12 @@ class Command(Element):
         """Constructor
         Args:
             valueFromDb: a dict holding values to load into the object. A mongo fetched command is optimal.
-                        possible keys with default values are : _id (None), parent (None), tags([]), infos({}), name(""), 
+                        possible keys with default values are : _id (None), parent (None), infos({}), name(""), 
                          text(""), lvl("network"), ports(""), safe(True), types([]), indb="pollenisator", owners="",timeout="300"
         """
         if valuesFromDb is None:
             valuesFromDb = dict()
-        super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None),  valuesFromDb.get(
-            "tags", []), valuesFromDb.get("infos", {}))
+        super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None), valuesFromDb.get("infos", {}))
         self.initialize(valuesFromDb.get("name", ""), valuesFromDb.get("bin_path", ""), valuesFromDb.get("plugin", ""), 
                         valuesFromDb.get("text", ""), valuesFromDb.get("indb", "pollenisator"),
                         valuesFromDb.get("original_iid"), valuesFromDb.get("owners", []), valuesFromDb.get("timeout", 300), valuesFromDb.get("infos", {}))

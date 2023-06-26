@@ -122,7 +122,7 @@ class SmbMap(Plugin):
                 interesting_files[interesting_file_type] = interesting_files.get(interesting_file_type, [])
                 interesting_files[interesting_file_type].append(', '.join(row))
                 isInteresting = True
-                tags=[("todo-smbmap-interesting", "green")]
+                tags=[("todo-smbmap-interesting", "green", "medium")]
             else:
                 less_interesting_notes += ", ".join(row)+"\n"
             shares[target] = shares.get(target, {}) #{"<ip>":{"<shareName">:set(<tuple>)}}

@@ -73,7 +73,7 @@ class SearchSploit(Plugin):
             elif not re.match(r"\d", jsonFile["SEARCH"]):
                 return notes, tags, "wave", {"wave": None}
             else:     
-                tags.append("todo-searchsploit")
+                tags.append(("todo-searchsploit", None, "todo"))
                 for exploit in jsonFile["RESULTS_EXPLOIT"]:
                     notes += exploit["Date"] + " - " + exploit["Title"] + "\n"
                     notes += "Exploitdb path : " + exploit["Path"] + "\n"

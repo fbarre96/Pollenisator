@@ -2,6 +2,8 @@
 
 from bson.objectid import ObjectId
 
+from pollenisator.core.components.mongo import DBClient
+from datetime import datetime
 
 class ControllerElement:
     """Controller for model object. Mostly handles conversion between mongo data and python objects"""
@@ -71,21 +73,30 @@ class ControllerElement:
         """
         if self.model is None:
             return
-        return self.model.tags
+        dbclient = DBClient.getInstance()
+        tags = dbclient.findInDb(self.model.pentest, "tags", {"item_id": ObjectId(self.model.getId())}, False)
+        if tags is None:
+            return []
+        return tags["tags"]
 
     def setTags(self, tags):
         """Set the model tags to given tags
         Args:
             tags: a list of string describing tags.
         """
-        self.model.setTags(tags)
+        dbclient = DBClient.getInstance()
+        for tag in tags:
+            dbclient.doRegisterTag(self.model.pentest, tag)
+        tags = dbclient.updateInDb(self.model.pentest, "tags", {"item_id": ObjectId(self.model.getId())}, {"$set":{"tags":tags, "date": datetime.now(), "item_id":ObjectId(self.model.getId()), "item_type":self.model.__class__.coll_name}}, upsert=True)
 
     def delTag(self, tag):
         """Delete the given tag name in model if it has it
         Args:
             tag: astring describing a tag.
         """
-        self.model.delTag(tag)
+        dbclient = DBClient.getInstance()
+        tags = dbclient.updateInDb(self.model.pentest, "tags", {"item_id": ObjectId(self.model.getId())}, {"$pull":{"tags":tag}})
+        
 
     def addTag(self, newTag, override=True):
         """Add the given tag name in model if it has it
@@ -94,7 +105,33 @@ class ControllerElement:
             override: if True (default), will force add of the new tag and remove tag of the same tag group.
                       if False, will not add this tag.
         """
-        self.model.addTag(newTag, override)
+        tags = self.getTags()
+        if isinstance(newTag, tuple):
+            newTagLevel = newTag[2] if newTag[2] is not None else "info"
+            newTagColor = newTag[1] if newTag[1] is not None else "transparent"
+            newTag = newTag[0]
+        else:
+            newTagColor = "transparent"
+            newTagLevel = "info"
+        if newTag not in tags:
+            dbclient = DBClient.getInstance()
+            for group in dbclient.getTagsGroups():
+                if newTag in group:
+                    i = 0
+                    len_tags = len(tags)
+                    while i < len_tags:
+                        if tags[i] in group:
+                            if override:
+                                tags.remove(tags[i])
+                                i -= 1
+                            else:
+                                continue
+                        len_tags = len(tags)
+                        i += 1
+            tags.append(newTag)
+            self.setTags(tags)
+            dbclient.doRegisterTag(self.model.pentest, newTag, newTagColor, newTagLevel)
+            
 
     def getDetailedString(self):
         """Return a string describing the model with more info than getModelRepr. E.G a port goes from "tcp/80" to "IP.IP.IP.IP tcp/80"

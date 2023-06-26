@@ -48,9 +48,9 @@ class WaveController(ControllerElement):
     def getData(self):
         """Return wave attributes as a dictionnary matching Mongo stored waves
         Returns:
-            dict with keys wave, wave_commands, tags and infos
+            dict with keys wave, wave_commands, infos
         """
-        return {"wave": self.model.wave, "wave_commands": self.model.wave_commands, "_id": self.model.getId(), "tags": self.model.tags, "infos": self.model.infos}
+        return {"wave": self.model.wave, "wave_commands": self.model.wave_commands, "_id": self.model.getId(), "infos": self.model.infos}
 
     def getIntervals(self):
         """Return scope assigned intervals as a list of mongo fetched intervals dict

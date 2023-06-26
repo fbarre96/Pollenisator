@@ -77,16 +77,15 @@ class BlueKeep(Plugin):
                 targets[str(p_o.getId())] = {"ip": ip, "port": kwargs.get(
                     "port", None), "proto": kwargs.get("proto", None)}
             if "VULNERABLE" in line:
-                tags=[("pwned-bluekeep", "red")]
+                tags=[("pwned-bluekeep", "red", "high")]
                 if p_o is not None:
-                    p_o.addTag("pwned")
-                    p_o.addTag("bluekeep")
+                    p_o.addTag(("pwned-bluekeep", "red", "high"))
                 ip_o = ServerIp.fetchObject(pentest, {"ip": ip})
                 if ip_o is not None:
-                    ip_o.addTag("pwned")
-                    ip_o.addTag("bluekeep")
+                    ip_o.addTag(("pwned-bluekeep", "red", "high"))
+                  
             elif "UNKNOWN" in line:
-                tags = ["todo-bluekeep"]
+                tags = ["todo-bluekeep", None, "todo"]
             notes += line
         if not success:
             return None, None, None, None
