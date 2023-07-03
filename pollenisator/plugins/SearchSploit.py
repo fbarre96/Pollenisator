@@ -5,6 +5,8 @@ from pollenisator.plugins.plugin import Plugin
 import json
 
 class SearchSploit(Plugin):
+    default_bin_names = ["searchsploit"]
+
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:
@@ -18,7 +20,7 @@ class SearchSploit(Plugin):
             string
         """
         return ".json"
-
+    
     def getFileOutputPath(self, commandExecuted):
         """Returns the output file path given in the executed command using getFileOutputArg
         Args:

@@ -31,6 +31,8 @@ def parse_knockpy_line(line):
 
 
 class Knockpy(Plugin):
+    default_bin_names = ["knockpy.py","knock.py","knock","knockpy"]
+
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:

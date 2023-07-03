@@ -8,6 +8,8 @@ from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
 
 class WhatWeb(Plugin):
+    default_bin_names = ["whatweb", "whatweb.rb"]
+
     def __init__(self):
         self.toolmodel = None
 

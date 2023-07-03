@@ -7,7 +7,7 @@ from flask import send_file
 import hashlib
 from pollenisator.core.components.logger_config import logger
 from datetime import datetime
-from pollenisator.core.components.utils import listPlugin, loadPlugin
+from pollenisator.core.components.utils import listPlugin, loadPlugin, detectPlugins
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.utils import JSONDecoder, getMainDir
 from pollenisator.core.controllers.toolcontroller import ToolController
@@ -51,84 +51,86 @@ def importExistingFile(pentest, upfile, body, **kwargs):
     name = upfile.filename.replace("/", "_")
     toolName = os.path.splitext(os.path.basename(name))[
         0] + md5File[:6]
-    results = {}
+    results_count = {}
+    plugin_results = []
     error_msg = None
     ext = os.path.splitext(upfile.filename)[-1]
     if plugin == "auto-detect":
         # AUTO DETECT
-        foundPlugin = "Ignored"
-        for pluginName in listPlugin():
-            if foundPlugin != "Ignored":
-                break
-            mod = loadPlugin(pluginName)
-            if mod.autoDetectEnabled():
-                notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline, ext=ext, filename=upfile.filename)
-                upfile.stream.seek(0)
-                if notes is not None and tags is not None:
-                    foundPlugin = pluginName
-        results[foundPlugin] = results.get(
-            foundPlugin, 0) + 1
+        plugin_results = detectPlugins(pentest, upfile, cmdline, ext)
+        for result in plugin_results:
+            foundPlugin = result.get("plugin", None)
+            if foundPlugin is not None:
+                results_count[foundPlugin] = results_count.get(
+                    foundPlugin, 0) + 1
     else:
         # SET PLUGIN 
         mod = loadPlugin(plugin)
         try:
             logger.info("PLUGIN for cmdline "+str(cmdline))
             notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline, ext=ext,filename=upfile.filename)
-            results[plugin] = results.get(
-                plugin, 0) + 1
+            if notes is not None and tags is not None:
+                results_count[plugin] = results_count.get(plugin, 0) + 1
+                plugin_results.append({"plugin":plugin, "notes":notes, "tags":tags, "lvl":lvl, "targets":targets})
+            else:
+                results_count[plugin] = results_count.get(plugin, 0)
         except Exception as e:
             error_msg = e
             logger.error("Plugin exception : "+str(e))
             notes = tags = lvl = targets = None
     if error_msg:
         return str(error_msg)
-    # IF PLUGIN FOUND SOMETHING
-    if notes is not None and tags is not None:
-        if default_target:
-            targets["default"] = default_target
-        for tag in tags:
-            if isinstance(tag, tuple):
-                level = tag[2] if tag[2] is not None else "info"
-                color = tag[1] if tag[1] is not None else "transparent"
-                tag_name = tag[0]
-            else:
-                color = "transparent"
-                level = "info"
-                tag_name = tag
-            res = dbclient.doRegisterTag(pentest, tag_name, color, level)
+    # IF PLUGIN FOUND NOTHING, notes and tags are None
+    for result in plugin_results:
+        notes = result.get('notes')
+        tags = result.get('tags')
+        lvl = result.get('lvl')
+        targets = result.get('targets')
+        if notes is not None and tags is not None:
+            if default_target:
+                targets["default"] = default_target
+            for tag in tags:
+                if isinstance(tag, tuple):
+                    level = tag[2] if tag[2] is not None else "info"
+                    color = tag[1] if tag[1] is not None else "transparent"
+                    tag_name = tag[0]
+                else:
+                    color = "transparent"
+                    level = "info"
+                    tag_name = tag
+                res = dbclient.doRegisterTag(pentest, tag_name, color, level)
 
-
-        # ADD THE RESULTING TOOL TO AFFECTED
-        for target in targets.values():
-            date = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-            if target is None:
-                wave = None
-                scope = None
-                ip = None
-                port = None
-                proto = None
-                check_iid = None
-            else:
-                lvl = target.get("lvl", lvl)
-                wave = target.get("wave", None)
-                scope = target.get("scope", None)
-                ip = target.get("ip", None)
-                port = target.get("port", None)
-                proto = target.get("proto", None)
-                check_iid = target.get("check_iid", None)
-            if wave is None:
-                wave = "Imported"
-            if dbclient.findInDb(pentest, "waves", {"wave":wave}, False) is None:
-                dbclient.insertInDb(pentest, "waves", {"wave":wave, "wave_commands":[]})
-            tool_m = ServerTool(pentest).initialize("", check_iid, wave, name=toolName, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
-                                        dated=date, datef=date, scanner_ip=user, status=["done"], notes=notes)
-            ret = tool_m.addInDb()
-            ToolController(tool_m).setTags(tags)
-            upfile.stream.seek(0)
-            msg, status, filepath = dbclient.do_upload(pentest, str(ret["iid"]), "result", upfile)
-            if status == 200:
-                dbclient.updateInDb(pentest, "tools", {"_id":ObjectId(ret["iid"])}, {"$set":{"resultfile":  filepath, "plugin_used":plugin}})
-    return results
+            # ADD THE RESULTING TOOL TO AFFECTED
+            for target in targets.values():
+                date = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                if target is None:
+                    wave = None
+                    scope = None
+                    ip = None
+                    port = None
+                    proto = None
+                    check_iid = None
+                else:
+                    lvl = target.get("lvl", lvl)
+                    wave = target.get("wave", None)
+                    scope = target.get("scope", None)
+                    ip = target.get("ip", None)
+                    port = target.get("port", None)
+                    proto = target.get("proto", None)
+                    check_iid = target.get("check_iid", None)
+                if wave is None:
+                    wave = "Imported"
+                if dbclient.findInDb(pentest, "waves", {"wave":wave}, False) is None:
+                    dbclient.insertInDb(pentest, "waves", {"wave":wave, "wave_commands":[]})
+                tool_m = ServerTool(pentest).initialize("", check_iid, wave, name=toolName, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
+                                            dated=date, datef=date, scanner_ip=user, status=["done"], notes=notes)
+                ret = tool_m.addInDb()
+                ToolController(tool_m).setTags(tags)
+                upfile.stream.seek(0)
+                msg, status, filepath = dbclient.do_upload(pentest, str(ret["iid"]), "result", upfile)
+                if status == 200:
+                    dbclient.updateInDb(pentest, "tools", {"_id":ObjectId(ret["iid"])}, {"$set":{"resultfile":  filepath, "plugin_used":plugin}})
+    return results_count
 
 @permission("pentester")
 def listFiles(pentest, attached_iid, filetype):

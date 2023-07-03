@@ -48,6 +48,8 @@ def getUserInfoFromCmdLine(cmdline=None):
     return domain, user, password
 
 class SmbMap(Plugin):
+    default_bin_names = ["smbmap","smbmap.py"]
+
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:

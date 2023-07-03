@@ -94,6 +94,7 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
 
 
 class Nmap(Plugin):
+    default_bin_names = ["nmap"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:

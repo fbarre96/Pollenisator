@@ -9,6 +9,7 @@ from pollenisator.server.servermodels.port import ServerPort
 
 class Gowitness(Plugin):
     autoDetect = False
+    default_bin_names = ["gowitness"]
     def __init__(self):
         self.toolmodel = None
 

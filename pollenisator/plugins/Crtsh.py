@@ -23,7 +23,7 @@ def parse_crtsh_line(line):
 
 
 class Crtsh(Plugin):
-
+    default_bin_names = ["crtsh", "crtsh.py"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:

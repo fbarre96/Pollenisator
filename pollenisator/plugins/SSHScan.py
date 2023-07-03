@@ -7,6 +7,8 @@ from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.server.servermodels.defect import ServerDefect
 
 class SSHScan(Plugin):
+    default_bin_names = ["ssh-scan", "ssh_scan"]
+
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:

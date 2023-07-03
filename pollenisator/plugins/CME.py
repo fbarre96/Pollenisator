@@ -253,7 +253,7 @@ def editScopeIPs(pentest, hostsInfos):
 class CME(Plugin):
     """Inherits Plugin
     A plugin to parse a crackmapexec scan"""
-
+    default_bin_names = ["cme", "crackmapexec"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:

@@ -23,7 +23,7 @@ def parse_reverse_dig(result_dig):
 
 
 class DigReverseLookup(Plugin):
-
+    default_bin_names = ["dig"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:

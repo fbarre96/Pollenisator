@@ -38,6 +38,8 @@ def parse_nikto_plain_text(output):
 
 class Nikto(Plugin):
 
+    default_bin_names = ["nikto", "nikto.pl"]
+
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:

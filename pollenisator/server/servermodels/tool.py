@@ -8,7 +8,7 @@ from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.core.components.socketmanager import SocketManager
 from pollenisator.core.components.utils import JSONEncoder, JSONDecoder
 import json
-from pollenisator.core.components.utils import  checkCommandService, isNetworkIp, loadPlugin
+from pollenisator.core.components.utils import  checkCommandService, isNetworkIp, loadPlugin, detectPluginsWithCmd
 from datetime import datetime
 import os
 import sys
@@ -465,9 +465,17 @@ def completeDesiredOuput(pentest, tool_iid, plugin, command_line_options):
 def getDesiredOutputForPlugin(body):
     cmdline = body.get("cmdline")
     plugin = body.get("plugin")
-    mod = loadPlugin(plugin)
-    comm = mod.changeCommand(cmdline, "|outputDir|", "")
-    return {"command_line_options":comm, "ext":mod.getFileOutputExt()}
+    plugin_results = {}
+    if plugin == "auto-detect":
+        plugins_detected = detectPluginsWithCmd(cmdline)
+    else:
+        plugins_detected = [plugin]
+    comm = cmdline
+    for plugin in plugins_detected:
+        mod = loadPlugin(plugin)
+        comm = mod.changeCommand(comm, f"|{plugin}.outputDir|", "")
+        plugin_results[plugin] = mod.getFileOutputExt()
+    return {"command_line_options":comm, "plugin_results":plugin_results}
 
 @permission("user")
 def listPlugins():

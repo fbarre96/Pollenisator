@@ -26,7 +26,7 @@ def parse_host_plain_text(text):
 
 
 class Host(Plugin):
-
+    default_bin_names = ["host"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:

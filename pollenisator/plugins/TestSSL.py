@@ -72,6 +72,7 @@ def parseWarnings(pentest, file_opened):
 
 
 class TestSSL(Plugin):
+    default_bin_names = ["testssl", "testssl.sh"]
     def getFileOutputArg(self):
         """
         Return the expected argument for the tool that will create an output file.

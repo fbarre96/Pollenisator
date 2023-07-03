@@ -8,6 +8,7 @@ from pollenisator.plugins.plugin import Plugin
 
 
 class dnsrecon(Plugin):
+    default_bin_names = ["dnsrecon", "dnsrecon.py"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:

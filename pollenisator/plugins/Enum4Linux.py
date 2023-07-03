@@ -115,7 +115,7 @@ def updateDatabase(pentest, enum_infos):
 class Enum4Linux(Plugin):
     """Inherits Plugin
     A plugin to parse a enum4linux scan"""
-
+    default_bin_names = ["enum4linux","enum4linux.pl","enum4linux-ng"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:

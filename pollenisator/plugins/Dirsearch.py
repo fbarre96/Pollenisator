@@ -70,6 +70,7 @@ def parse_dirsearch_file(notes):
 
 
 class Dirsearch(Plugin):
+    default_bin_names = ["dirsearch","dirsearch.py"]
 
     def __init__(self):
         """Constructor"""

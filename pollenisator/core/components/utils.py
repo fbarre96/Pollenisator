@@ -87,6 +87,35 @@ def listPlugin():
         ".py") and x != "__pycache__" and x != "__init__.py" and x != "plugin.py"]
     return plugin_list
 
+def detectPlugins(pentest, upfile, cmdline, ext):
+    foundPlugin = "Ignored"
+    results = []
+    for pluginName in listPlugin():
+        result = {"tags":[]}
+        mod = loadPlugin(pluginName)
+        if mod.autoDetectEnabled():
+            notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline, ext=ext, filename=upfile.filename)
+            upfile.stream.seek(0)
+            if notes is not None and tags is not None:
+                foundPlugin = pluginName
+                result["tags"] = tags
+                result["notes"] = notes
+                result["lvl"] = lvl
+                result["targets"] = targets
+                result["plugin"] = pluginName
+                results.append(result)
+    return results
+
+def detectPluginsWithCmd(cmdline):
+    foundPlugins = []
+    for pluginName in listPlugin():
+        mod = loadPlugin(pluginName)
+        if mod.autoDetectEnabled():
+            if mod.detect_cmdline(cmdline):
+                foundPlugins.append(pluginName)
+    if not foundPlugins:
+        return ["Default"]
+    return foundPlugins
 
 def isIp(domain_or_networks):
     """

@@ -24,6 +24,7 @@ def parseContent(file_opened):
     return ret
 
 class Sublist3r(Plugin):
+    default_bin_names = ["sublister", "sublister.py","sublist3r", "sublist3r.py"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:

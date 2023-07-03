@@ -86,6 +86,7 @@ def updateDatabase(pentest, users, computers):
 class BloodHound(Plugin):
     """Inherits Plugin
     """
+    default_bin_names = ["bloodhound-python", "bloodhound.py"]
 
     def changeCommand(self, command, outputDir, toolname):
         """
@@ -125,7 +126,6 @@ class BloodHound(Plugin):
             string: the path to file created
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
-
 
 
     def Parse(self, pentest, file_opened, **kwargs):

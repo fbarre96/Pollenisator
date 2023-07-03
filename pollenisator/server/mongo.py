@@ -320,9 +320,9 @@ def registerPentest(pentest, body, **kwargs):
         #token = connectToPentest(pentest, **kwargs)
         #kwargs["token_info"] = decode_token(token[0])
         uuid = msg
-        msg, success = preparePentest(uuid, pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username, **kwargs)
+        msgerror, success = preparePentest(uuid, pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username, **kwargs)
         if not success:
-            return msg, 400
+            return msgerror, 400
         return msg
     else:
         return msg, 403
@@ -355,7 +355,10 @@ def getPentestInfo(pentest, **kwargs):
         infos = {}
         infos["_id"] = str(tagged["_id"])
         infos["date"] = tagged.get("date")
-        infos["name"] = tagged.get("tags")[0]
+        try:
+            infos["name"] = tagged.get("tags", [])[0]
+        except IndexError:
+            continue
         class_element = ServerElement.classFactory(tagged.get("item_type"))
         elem = class_element.fetchObject(pentest, tagged.get("item_id"))
         infos["detailed_string"] = elem.getDetailedString()

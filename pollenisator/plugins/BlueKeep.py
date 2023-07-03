@@ -6,6 +6,7 @@ from pollenisator.server.servermodels.port import ServerPort
 class BlueKeep(Plugin):
     """Inherits Plugin
     A plugin to parse a bluekeep scan : rdpscan"""
+    default_bin_names = ["bluekeep", "rdpscan"]
 
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file

@@ -112,7 +112,7 @@ def editScopeIPs(pentest, hostsInfos):
 class RunFinger(Plugin):
     """Inherits Plugin
     A plugin to parse a runfinger scan"""
-
+    default_bin_names = ["runfinger", "runfinger.py"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:

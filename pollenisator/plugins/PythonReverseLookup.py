@@ -27,6 +27,7 @@ def parse_reverse_python(result_socket):
 
 
 class PythonReverseLookup(Plugin):
+    default_bin_names = ["python", "python3"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:
@@ -40,6 +41,18 @@ class PythonReverseLookup(Plugin):
             string
         """
         return ".log.txt"
+    
+    def detect_cmdline(self, cmdline):
+        """Returns a boolean indicating if this plugin is able to recognize a command line as likely to output results for it.
+        Args:
+            cmdline: the command line to test
+        Returns:
+            bool
+        """
+        result = super().detect_cmdline(cmdline)
+        if result and ".gethostbyaddr" in cmdline:
+            return True
+        return False
 
     def getFileOutputPath(self, commandExecuted):
         """Returns the output file path given in the executed command using getFileOutputArg
