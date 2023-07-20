@@ -344,7 +344,16 @@ def delete(pentest, tool_iid):
     dbclient = DBClient.getInstance()
     if not dbclient.isUserConnected():
         return "Not connected", 503
+    tool_existing = dbclient.findInDb(pentest,"tools",{"_id":ObjectId(tool_iid)}, False)
+    if tool_existing is None:
+        return "Not found", 404
     res = dbclient.deleteFromDb(pentest, "tools", {"_id": ObjectId(tool_iid)}, False)
+    
+    if tool_existing.get("check_iid") is not None and tool_existing.get("check_iid", "") != "":
+        from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
+        check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(tool_existing.get("check_iid"))})
+        if check is not None:
+            check.updateInfos()
     if res is None:
         return 0
     else:
@@ -402,6 +411,11 @@ def do_insert(pentest, body, **kwargs):
     res_insert = dbclient.insertInDb(pentest, "tools", base, parent)
     ret = res_insert.inserted_id
     tool_o._id = ret
+    if base["check_iid"] != "":
+        from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
+        check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(base["check_iid"])})
+        if check is not None:
+            check.updateInfos()
     # adding the appropriate tools for this scope.
     return {"res":True, "iid":ret}
 

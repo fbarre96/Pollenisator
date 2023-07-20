@@ -89,6 +89,7 @@ def importExistingFile(pentest, upfile, body, **kwargs):
         if notes is not None and tags is not None:
             if default_target:
                 targets["default"] = default_target
+                dbclient.send_notify(pentest, "Cheatsheet", default_target, "notif_terminal")
             for tag in tags:
                 if isinstance(tag, tuple):
                     level = tag[2] if tag[2] is not None else "info"
