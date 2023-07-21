@@ -209,12 +209,12 @@ class DBClient:
             self.updateInDb(db, "tools", {"datef": "None", "scanner_ip": {"$ne": "None"}}, {"$set":{"dated":"None", "datef":"None", "scanner_ip":"None"}, "$pull":{"status":"running"}})
             self.updateInDb(db, "tools", {"datef": "None", "dated": {"$ne": "None"}}, {"$set":{"dated":"None", "datef":"None", "scanner_ip":"None"}, "$pull":{"status":"running"}})
     
-    def registerWorker(self, worker_name, binaries):
+    def registerWorker(self, worker_name, supported_plugins):
         """Register a worker in the database.
     
         Args:
             worker_name (str): The name of the worker.
-            binaries (list): A list of strings representing the known commands of the worker.
+            supported_plugins (list): A list of supported_plugins representing the plugins for which the worker should be capable of running.
     
         Returns:
             bool: True if the worker was successfully registered, False otherwise.
@@ -227,10 +227,10 @@ class DBClient:
                     raise IOError("Failed to register Worker")
             res = self.findInDb("pollenisator", "workers", {"name": worker_name}, False)
             if res is None:
-                self.insertInDb("pollenisator", "workers", {"name": worker_name, "pentest": "", "known_commands":binaries}, '', notify=True)
+                self.insertInDb("pollenisator", "workers", {"name": worker_name, "pentest": "", "supported_plugins":supported_plugins}, '', notify=True)
             else:
                 self.updateInDb("pollenisator", "workers", {"name": worker_name},
-                    {"$set":{"last_heartbeat":datetime.datetime.now(), "known_commands":binaries,  "pentest":""}}, notify=True)
+                    {"$set":{"last_heartbeat":datetime.datetime.now(), "supported_plugins":supported_plugins,  "pentest":""}}, notify=True)
                 doSetInclusion(worker_name,  res["pentest"], True)
             logger.info("Registered worker "+str(worker_name))
             return True

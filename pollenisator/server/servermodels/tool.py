@@ -502,10 +502,15 @@ def listPlugins():
     path = os.path.join(dir_path, "../../plugins/")
     # Load plugins
     sys.path.insert(0, path)
+    results = []
     plugin_list = os.listdir(path)
     plugin_list = [x[:-3] for x in plugin_list if x.endswith(
         ".py") and x != "__pycache__" and x != "__init__.py" and x != "plugin.py"]
-    return plugin_list
+    for plugin in plugin_list:
+        mod = loadPlugin(plugin)
+        default_bin_names = mod.default_bin_names
+        results.append({"plugin":plugin, "default_bin_names":default_bin_names})
+    return results
     
 @permission("pentester")
 def importResult(pentest, tool_iid, upfile, body):
@@ -598,14 +603,15 @@ def isLaunchable(pentest, tool_iid):
         return "Command associated not found", 404
     
     # Find a worker that can launch the tool without breaking limitations
-    workers = [x["name"] for x in dbclient.getWorkers({"pentest":pentest})]
-    logger.debug(f"Available workers are {str(workers)}, (tool id {tool_iid})")
+    valid_workers = dbclient.findInDb("pollenisator", "workers", {"pentest": pentest, "supported_plugins":plugin_to_run}, many=True)
+
+    logger.debug(f"Available workers are {str(valid_workers)}, (tool id {tool_iid})")
     choosenWorker = ""
-    for owner in command_o.owners:
-        if owner in workers:
-            running_tools = dbclient.countInDb(pentest,"tools",{"status":"running", "scanner_ip":owner})
-            if running_tools <= 5: # TODO not hardcode this parameter
-                choosenWorker = owner
+    plugin_to_run = command_o.plugin
+    for worker in valid_workers:
+        running_tools = dbclient.countInDb(pentest,"tools",{"status":"running", "scanner_ip":worker["name"]})
+        if running_tools <= 5: # TODO not hardcode this parameter
+            choosenWorker = worker["name"]
     if choosenWorker == "":
         logger.debug("Error in launch task : no worker available:"+str(tool_iid))
         return "No worker available", 504

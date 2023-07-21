@@ -2562,8 +2562,8 @@ paths:
           content:
             application/json:
               examples:
-                List of plugins available:
-                  value: '["Nmap.py", "WhatWeb.py", ...]'
+                List of plugins available and default bins:
+                  value: '[{"plugin":"Nmap.py", "default_bin_names":["nmap"]}, {"plugin":"WhatWeb.py", "default_bin_names":["whatweb","whatweb.rb"]}, ...]'
   "/tools/{pentest}":
     post:
       operationId: pollenisator.server.servermodels.tool.insert

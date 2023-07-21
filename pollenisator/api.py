@@ -230,14 +230,14 @@ def create_app():
         """
         dbclient = DBClient.getInstance()
         workerName = data.get("name")
-        binaries = data.get("binaries", [])
+        supported_plugins = data.get("supported_plugins", [])
         
         socket = dbclient.findInDb("pollenisator","sockets", {"user":workerName}, False)
         if socket is None:
             dbclient.insertInDb("pollenisator", "sockets", {"sid":request.sid, "user":workerName, "pentest":""}, notify=False)
         else:
             dbclient.updateInDb("pollenisator", "sockets", {"user":workerName}, {"$set":{"sid":request.sid, "pentest":""}}, notify=False)
-        dbclient.registerWorker(workerName, binaries)
+        dbclient.registerWorker(workerName, supported_plugins)
 
     @sm.socketio.event
     def registerForNotifications(data):
