@@ -217,7 +217,7 @@ class ServerTool(Tool, ServerElement):
         dbclient = DBClient.getInstance()
         dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
 
-    def markAsError(self):
+    def markAsError(self, msg=""):
         """Set this tool status as not done by removing "done" or "running" and adding an error status.
         Also resets starting and ending date as well as worker name
         """
@@ -230,6 +230,7 @@ class ServerTool(Tool, ServerElement):
             self.status.remove("done")
         if "running" in self.status:
             self.status.remove("running")
+        self.notes = msg
         self.status.append("error")
 
     def markAsTimedout(self):
@@ -312,7 +313,25 @@ class ServerTool(Tool, ServerElement):
         if class_element is None:
             return str(self.name)
         return class_element.completeDetailedString(self.getData()) + str(self.name)
-        
+    
+    def _setStatus(self, new_status, arg):
+        if "done" in new_status:
+            if arg == "":
+                arg = None
+            self.markAsDone(arg)
+        elif "running" in new_status:
+            self.markAsRunning(arg)
+        elif "not_done" in new_status:
+            self.markAsNotDone()
+        elif "ready" in new_status:
+            self.markAsNotDone()
+        elif "error" in new_status:
+            self.markAsError(arg)
+        elif "timedout" in new_status:
+            self.markAsTimedout()
+        elif len(new_status) == 0:
+            self.markAsNotDone()
+        return update(self.pentest, self.getId(), ToolController(self).getData())
     
 @permission("pentester")
 def setStatus(pentest, tool_iid, body):
@@ -321,23 +340,7 @@ def setStatus(pentest, tool_iid, body):
     tool_o = ServerTool.fetchObject(pentest, {"_id":ObjectId(tool_iid)})
     if tool_o is None:
         return "Tool not found", 404
-    if "done" in newStatus:
-        if arg == "":
-            arg = None
-        tool_o.markAsDone(arg)
-    elif "running" in newStatus:
-        tool_o.markAsRunning(arg)
-    elif "not_done" in newStatus:
-        tool_o.markAsNotDone()
-    elif "ready" in newStatus:
-        tool_o.markAsNotDone()
-    elif "error" in newStatus:
-        tool_o.markAsError()
-    elif "timedout" in newStatus:
-        tool_o.markAsTimedout()
-    elif len(newStatus) == 0:
-        tool_o.markAsNotDone()
-    return update(pentest, tool_o.getId(), ToolController(tool_o).getData())
+    tool_o._setStatus(newStatus, arg)
 
 @permission("pentester")
 def delete(pentest, tool_iid):
@@ -425,10 +428,12 @@ def update(pentest, tool_iid, body):
     
     orig = dbclient.findInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, False)
     res = dbclient.updateInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
-    from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
-    check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(orig.get("check_iid"))})
-    if check is not None:
-        check.updateInfos()
+    if orig.get("check_iid") is not None and orig.get("check_iid", "") != "":
+        from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
+        check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(orig.get("check_iid"))})
+        if check is not None:
+            check.updateInfos()
+
     return True
     
 @permission("pentester")
@@ -461,7 +466,7 @@ def craftCommandLine(pentest, tool_iid, commandline_options=""):
     # craft outputfile name
     comm_complete = mod.changeCommand(comm, "|outputDir|", mod.getFileOutputExt())
     ext = mod.getFileOutputExt()
-    return {"comm":comm_complete, "ext":ext, "comm_with_output":comm}
+    return {"comm":comm, "ext":ext, "comm_with_output":comm_complete}
 
 @permission("pentester")
 def completeDesiredOuput(pentest, tool_iid, plugin, command_line_options):
@@ -563,7 +568,7 @@ def importResult(pentest, tool_iid, upfile, body):
 @permission("pentester")
 def queueTasks(pentest, body, **kwargs):
     logger.debug("Queue tasks : "+str(body))
-    count = 0
+    results = {"successes":[], "failures":[]}
     tools_iid = body
     for tool_iid in tools_iid:
         if isinstance(tool_iid, str) and tool_iid.startswith("ObjectId|"):
@@ -578,8 +583,10 @@ def queueTasks(pentest, body, **kwargs):
             continue
         res, msg = tool.addToQueue()
         if res:
-            count += 1
-    return count
+            results["successes"].append({"tool_iid":tool_iid})
+        else:
+            results["failures"].append({"tool_iid":tool_iid, "error":msg})
+    return results
 
 @permission("pentester")
 def getQueue(pentest):
@@ -587,7 +594,16 @@ def getQueue(pentest):
     res = []
     queue = dbclient.findInDb(pentest, "autoscan", {"type":"queue"}, False)
     if queue is not None:
-        res = queue["tools"]
+        tools = queue["tools"]
+        for tool in tools:
+            tool_data = {}
+            tool = ServerTool.fetchObject(pentest, {"_id":ObjectId(tool)})
+            tool_data = ToolController(tool).getData()
+            if tool.text == "":
+                command = tool.getCommand()
+                if command is not None:
+                    tool_data["text"] = command.get("text","")
+            res.append(tool_data)
     return res
 
 def isLaunchable(pentest, tool_iid):
@@ -601,13 +617,13 @@ def isLaunchable(pentest, tool_iid):
     if command_o is None:
         logger.debug("Error in launch task : command for tool not found :"+str(tool_iid))
         return "Command associated not found", 404
+    plugin_to_run = command_o.plugin
     
     # Find a worker that can launch the tool without breaking limitations
-    valid_workers = dbclient.findInDb("pollenisator", "workers", {"pentest": pentest, "supported_plugins":plugin_to_run}, many=True)
+    valid_workers = dbclient.findInDb("pollenisator", "workers", {"pentest": pentest, "supported_plugins":plugin_to_run}, True)
 
     logger.debug(f"Available workers are {str(valid_workers)}, (tool id {tool_iid})")
     choosenWorker = ""
-    plugin_to_run = command_o.plugin
     for worker in valid_workers:
         running_tools = dbclient.countInDb(pentest,"tools",{"status":"running", "scanner_ip":worker["name"]})
         if running_tools <= 5: # TODO not hardcode this parameter
@@ -627,7 +643,8 @@ def launchTask(pentest, tool_iid, socket_sid, worker_token):
     sm = SocketManager.getInstance()
     logger.debug(f"Launch task  : emit  {str(socket_sid)} toolid:{str(tool_iid)})")
     sm.socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(tool_iid)}, room=socket_sid)
-    
+    dbclient = DBClient.getInstance()
+    dbclient.send_notify(pentest, "tools", tool_iid, "tool_start")
     return "Success ", 200
 
 @permission("pentester")

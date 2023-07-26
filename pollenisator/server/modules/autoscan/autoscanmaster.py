@@ -5,6 +5,7 @@ import time
 from threading import Thread
 from datetime import datetime
 from bson.objectid import ObjectId
+from bson.errors import InvalidId
 import pollenisator.core.components.utils as utils
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.server.servermodels.interval import ServerInterval
@@ -19,15 +20,21 @@ from pollenisator.server.token import encode_token
 
     
 @permission("pentester")
-def startAutoScan(pentest, **kwargs):
+def startAutoScan(pentest, body, **kwargs):
     dbclient = DBClient.getInstance()
+    authorized_commands = body.get("command_iids", [])
+    for authorized_command in authorized_commands:
+        try:
+            iid = ObjectId(authorized_command)
+        except InvalidId:
+            return "Invalid command id", 400
     autoscanRunning = dbclient.findInDb(pentest, "autoscan", {"special":True}, False) is not None
     if autoscanRunning:
         return "An auto scan is already running", 403
     workers = dbclient.getWorkers({"pentest":pentest})
     if workers is None:
         return "No worker registered for this pentest", 404
-    dbclient.insertInDb(pentest, "autoscan", {"start":datetime.now(), "special":True})
+    dbclient.insertInDb(pentest, "autoscan", {"start":datetime.now(), "special":True, "authorized_commands":authorized_commands})
     encoded = encode_token(kwargs["token_info"])
     # queue auto commands
     tools_lauchable = findLaunchableTools(pentest)
@@ -148,13 +155,17 @@ def findLaunchableTools(pentest):
     if time_compatible_waves_id is None:
         return toolsLaunchable
     dbclient = DBClient.getInstance()
+    autoscan_enr = dbclient.findInDb(pentest, "autoscan", {"special":True}, False)
+    if autoscan_enr is None:
+        return toolsLaunchable
+    authorized_commands = autoscan_enr["authorized_commands"]
     check_items = list(CheckItem.fetchObjects({"type":"auto_commands"}))
     check_items.sort(key=lambda c: c.priority)
     #get not done tools inside wave
     for check_item in check_items:
         check_instances = CheckInstance.fetchObjects(pentest, {"check_iid":str(check_item._id)})
         for check_instance in check_instances:
-            notDoneToolsInCheck = getNotDoneToolsPerScope(pentest, check_instance)
+            notDoneToolsInCheck = getNotDoneToolsPerScope(pentest, check_instance, authorized_commands)
             for toolId, toolModel in notDoneToolsInCheck.items():
                 if "error" in toolModel.status:
                     continue
@@ -177,13 +188,13 @@ def searchForAddressCompatibleWithTime(pentest):
             waves_to_launch.add(intervalModel.wave)
     return waves_to_launch
 
-def getNotDoneToolsPerScope(pentest, check_instance):
+def getNotDoneToolsPerScope(pentest, check_instance, authorized_commands):
     """Returns a set of tool mongo ID that are not done yet.
     """
     #
     notDoneTools = dict()
     # get not done tools that are not IP based (scope)
-    tools = ServerTool.fetchObjects(pentest, {"check_iid":str(check_instance._id), "ip":"", "dated": "None", "datef": "None"})
+    tools = ServerTool.fetchObjects(pentest, {"check_iid":str(check_instance._id), "command_iid":{ "$in": authorized_commands }, "ip":"", "dated": "None", "datef": "None"})
     for tool in tools:
         notDoneTools[tool.getId()] = tool
     # fetch scopes to get IPs in scope
@@ -194,7 +205,7 @@ def getNotDoneToolsPerScope(pentest, check_instance):
         ips = ServerIp.getIpsInScope(pentest, scopeId)
         for ip in ips:
             # fetch IP level and below (e.g port) tools
-            tools = ServerTool.fetchObjects(pentest, {"check_iid":str(check_instance._id), "ip": ip.ip, "dated": "None", "datef": "None"})
+            tools = ServerTool.fetchObjects(pentest, {"check_iid":str(check_instance._id), "command_iid":{ "$in": authorized_commands }, "ip": ip.ip, "dated": "None", "datef": "None"})
             for tool in tools:
                 notDoneTools[tool.getId()] = tool
     return notDoneTools

@@ -13,6 +13,18 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - command_iids
+              properties:
+                command_iids:
+                  type: array
+                  items:
+                    type: string
       responses:
         "200":
           description: Successfully started auto scan

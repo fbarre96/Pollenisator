@@ -1806,7 +1806,7 @@ paths:
                   value: '{
     "_id": "ObjectId|5fa5819aed75191f22168a40",
     "key": "tags",
-    "value": {"todo":{"color":"orange", "level":"todo"}, "pwned":{"color":"red", "level":"high"}, "Interesting":{"color":"dark green", "level":"medium"}, "Uninteresting":{"color":"sky blue", "level":"low"}, "neutral":{"color":"transparent", "level":"info"}}
+    "value": {"todo":{"color":"orange", "level":"todo"}, "pwned":{"color":"red", "level":"high"}, "Interesting":{"color":"dark green", "level":"medium"}, "Uninteresting":{"color":"sky blue", "level":"low"}, "neutral":{"color":"transparent", "level":""}}
   }'
   /settings:
     get:
@@ -1825,7 +1825,7 @@ paths:
   {
     "_id": "ObjectId|5fa5819aed75191f22168a40",
     "key": "tags",
-    "value": "{"todo":{"color":"orange", "level":"todo"}, "pwned":{"color":"red", "level":"high"}, "Interesting":{"color":"dark green", "level":"medium"}, "Uninteresting":{"color":"sky blue", "level":"low"}, "neutral":{"color":"transparent", "level":"info"}}"
+    "value": "{"todo":{"color":"orange", "level":"todo"}, "pwned":{"color":"red", "level":"high"}, "Interesting":{"color":"dark green", "level":"medium"}, "Uninteresting":{"color":"sky blue", "level":"low"}, "neutral":{"color":"transparent", "level":""}}"
   },
   {
     "_id": "ObjectId|5fbb793bed75195fe4274412",
@@ -3120,12 +3120,12 @@ paths:
 
       responses:
         "200":
-          description: Successfully launched task
+          description: Successfully queued tasks
           content:
             application/json:
               examples:
                 Success :
-                  value: '"Success"'
+                  value: '{"successes":[{"tool_iid":123123123}, "failures":[{"tool_iid":123123124,"msg":"Already in queue"}]}'
         "404":
           description: Not found
           content:

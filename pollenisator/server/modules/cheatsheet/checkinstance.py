@@ -118,6 +118,7 @@ class CheckInstance(ServerElement):
         data["check_item"] = check_item_data
         data["tools_status"] = {}
         data["tools_not_done"] = {}
+        data["tools_error"] = {}
         all_complete = True
         at_least_one = False
         total = 0
@@ -130,6 +131,9 @@ class CheckInstance(ServerElement):
                     at_least_one = True
                 elif "running" in tool.getStatus():
                     at_least_one = True
+                elif "error" in tool.getStatus():
+                    data["tools_error"][str(
+                        tool.getId())] = tool.getDetailedString()
                 else:
                     data["tools_not_done"][str(
                         tool.getId())] = tool.getDetailedString()
@@ -179,7 +183,7 @@ def doInsert(pentest, data, checkItem=None, toolInfos=None):
             tool = ServerTool(pentest)
             tool.initialize(str(command_pentest._id), str(iid), target.get("wave", ""), None, target.get("scope", ""), target.get("ip", ""), target.get("port", ""),
                                         target.get("proto", ""), checkItem.lvl, infos=toolInfos).addInDb()
-            tool.addToQueue()
+            tool.addToQueue() #TODO : SETTINGS TO ENABLE/DISABLE AUTOSCAN AUTO ADD
 
     return {"res": True, "iid": iid}
     
@@ -259,6 +263,7 @@ def getInformations(pentest, iid):
     data["tools_done"] = {}
     data["tools_running"] = {}
     data["tools_not_done"] = {}
+    data["tools_error"] = {}
     all_complete = True
     at_least_one = False
     total = 0
@@ -274,6 +279,9 @@ def getInformations(pentest, iid):
                 at_least_one = True
                 data["tools_running"][str(
                     tool.getId())] = tool.getDetailedString()
+            elif "error" in tool.getStatus():
+                data["tools_error"][str(
+                    tool.getId())] = tool.getData()
             else:
                 data["tools_not_done"][str(
                     tool.getId())] = tool.getDetailedString()
