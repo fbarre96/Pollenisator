@@ -180,7 +180,7 @@ class ServerTool(Tool, ServerElement):
         command = ServerElement.replaceAllCommandVariables(self.pentest, command, data)
         tool_infos = self.infos
         for info in tool_infos:
-            command = command.replace("|tool.infos."+str(info)+"|", str(tool_infos[info]))
+            command = command.replace("|tool.infos."+str(info)+"|", str(tool_infos.get(info, '')))
         if isinstance(command_o, str):
             return command
         return command
@@ -606,11 +606,13 @@ def getQueue(pentest):
             res.append(tool_data)
     return res
 
-def isLaunchable(pentest, tool_iid):
+def isLaunchable(pentest, tool_iid, authorized_commands):
     logger.debug("launch task : "+str(tool_iid))
     dbclient = DBClient.getInstance()
     launchableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     command_o = ServerCommand.fetchObject({"_id": ObjectId(launchableTool.command_iid)}, pentest)
+    if str(command_o.getId()) not in authorized_commands:
+        return "Command not authorized for autoscan", 403
     if launchableTool is None:
         logger.debug("Error in launch task : not found :"+str(tool_iid))
         return "Tool not found", 404

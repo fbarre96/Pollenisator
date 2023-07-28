@@ -9,7 +9,7 @@ python-docx>=0.8.10
 python-pptx>=0.6.8
 requests>=2.18.4
 connexion
-flask>=2.0.0
+flask==2.2.3
 lark-parser
 eventlet
 bcrypt

@@ -11,9 +11,7 @@ else:
     
 # ENABLE LOGGING EARLY ON
 from pollenisator.core.components.logger_config import logger
-
 from pollenisator.server.permission import permission
-
 
 from flask_cors import CORS
 from getpass import getpass

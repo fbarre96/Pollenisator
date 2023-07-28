@@ -21,31 +21,31 @@ def getInfos(cme_file):
     File example:
 
 EMPTY :
-[1m[34mSMB[0m         10.10.11.152    445    DC01             [1m[34m[*][0m Windows 10.0 Build 17763 x64 (name:DC01) (domain:timelapse.htb) (signing:True) (SMBv1:False)
+\x1b[1m\x1b[34mSMB\x1b[0m          10.10.11.152    445    DC01             [1m[34m[*][0m Windows 10.0 Build 17763 x64 (name:DC01) (domain:timelapse.htb) (signing:True) (SMBv1:False)
 
 POWNED EXEMPLE:
-\x1b[1m\x1b[34mCME\x1b[0m          10.10.10.254:445 HAGRID          \x1b[1m\x1b[34m[*]\x1b[0m Windows 6.3 Build 9600 (name:HAGRID) (domain:POUDLARD)
-\x1b[1m\x1b[34mCME\x1b[0m          10.10.10.254:445 HAGRID          \x1b[1m\x1b[32m[+]\x1b[0m POUDLARD\Administrateur:Algo_LAB_2012* \x1b[1m\x1b[33m(Pwn3d!)\x1b[0m
+\x1b[1m\x1b[34mSMB\x1b[0m          10.10.10.254:445 HAGRID          \x1b[1m\x1b[34m[*]\x1b[0m Windows 6.3 Build 9600 (name:HAGRID) (domain:POUDLARD)
+\x1b[1m\x1b[34mSMB\x1b[0m          10.10.10.254:445 HAGRID          \x1b[1m\x1b[32m[+]\x1b[0m POUDLARD\Administrateur:Algo_LAB_2012* \x1b[1m\x1b[33m(Pwn3d!)\x1b[0m
 \x1b[1m\x1b[34m[*]\x1b[0m KTHXBYE!
 
 NOT POWNED:
-\x1b[1m\x1b[34mCME\x1b[0m          10.10.10.11:445 DOBBY-PC        \x1b[1m\x1b[34m[*]\x1b[0m Windows 6.1 Build 0 (name:DOBBY-PC) (domain:POUDLARD)
-\x1b[1m\x1b[34mCME\x1b[0m          10.10.10.254:445 HAGRID          \x1b[1m\x1b[34m[*]\x1b[0m Windows 6.3 Build 9600 (name:HAGRID) (domain:POUDLARD)
+\x1b[1m\x1b[34mSMB\x1b[0m          10.10.10.11:445 DOBBY-PC        \x1b[1m\x1b[34m[*]\x1b[0m Windows 6.1 Build 0 (name:DOBBY-PC) (domain:POUDLARD)
+\x1b[1m\x1b[34mSMB\x1b[0m          10.10.10.254:445 HAGRID          \x1b[1m\x1b[34m[*]\x1b[0m Windows 6.3 Build 9600 (name:HAGRID) (domain:POUDLARD)
 \x1b[1m\x1b[34m[*]\x1b[0m KTHXBYE!
 
-[1m[34mSMB[0m         10.10.11.152    445    DC01             [1m[34m[*][0m Windows 10.0 Build 17763 x64 (name:DC01) (domain:timelapse) (signing:True) (SMBv1:False)
-[1m[34mSMB[0m         10.10.11.152    445    DC01             [1m[35m[-][0m timelapse\admin:admin STATUS_ACCESS_DENIED 
+\x1b[1m\x1b[34mSMB\x1b[0m          10.10.11.152    445    DC01             [1m[34m[*][0m Windows 10.0 Build 17763 x64 (name:DC01) (domain:timelapse) (signing:True) (SMBv1:False)
+\x1b[1m\x1b[34mSMB\x1b[0m         10.10.11.152    445    DC01             [1m[35m[-][0m timelapse\admin:admin STATUS_ACCESS_DENIED 
 
 CONNECTED
-^[[1m^[[34mCME^[[0m          10.0.0.86:445 ALGOSECURE-VM   ^[[1m^[[34m[*]^[[0m Windows 10.0 Build 18362 (name:ALGOSECURE-VM) (domain:ALGOSECURE-VM)
-^[[1m^[[34mCME^[[0m          10.0.0.86:445 ALGOSECURE-VM   ^[[1m^[[32m[+]^[[0m ALGOSECURE-VM\algosecure:Alg123!*
+\x1b[1m\x1b[34mSMB\x1b[0m          10.0.0.86:445 ALGOSECURE-VM   ^[[1m^[[34m[*]^[[0m Windows 10.0 Build 18362 (name:ALGOSECURE-VM) (domain:ALGOSECURE-VM)
+\x1b[1m\x1b[34mSMB\x1b[0m           10.0.0.86:445 ALGOSECURE-VM   ^[[1m^[[32m[+]^[[0m ALGOSECURE-VM\algosecure:Alg123!*
 """
     retour = []
-    regex_info = re.compile(r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+\S+\s+\S+\[\*\]\S+\s+([^\(]+)\(name:(.+)\) \(domain:(.+)\) \(signing:(True|False)\) \(SMBv1:(False|True)\)$", re.MULTILINE)
+    regex_info = re.compile(r"^\S+(?:LDAP|SMB)\S+\s+(\S+)\s+(\d+)\s+\S+\s+\S+\[\*\]\S+\s+([^\(]+)\(name:(.*)\) \(domain:(.*)\) \(signing:(True|False)\) \(SMBv1:(False|True)\)$", re.MULTILINE)
     regex_logon_failed = re.compile(
-        r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[\-\]\S+ ([^\\]+)\\([^:]+):(.*?) STATUS_LOGON_FAILURE\s*$", re.MULTILINE)
+        r"^\S+(?:LDAP|SMB)\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[\-\]\S+ ([^\\]+)\\([^:]+):(.*?) STATUS_LOGON_FAILURE\s*$", re.MULTILINE)
     regex_success = re.compile(
-        r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[\+\]\S+ ([^\\]+)\\([^:]+):(.*?)(?= \x1b)(.+)$", re.MULTILINE)
+        r"^\S+(?:LDAP|SMB)\S+\s+(\S+)[\s+:](\d+)\s+(\S+)\s+\S+\[\+\]\S+ ([^\\]+)\\([^:]+):(.*?)(?= \x1b|$)(.*)$", re.MULTILINE)
     regex_module_lsassy = re.compile(r"^\S+LSASSY\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[33m([^\\]+)\\(\S+)\s+(\S+)(?=\x1b).+$")
     regex_module_ntds = re.compile(r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[33m(.+)\x1b\S*$")
     notes = ""

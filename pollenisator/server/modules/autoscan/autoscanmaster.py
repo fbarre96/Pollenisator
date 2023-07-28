@@ -72,6 +72,10 @@ def autoScan(pentest, endoded_token):
                 continue
             launchableTools = []
             queue = dbclient.findInDb(pentest, "autoscan", {"type":"queue"}, False)
+            autoscan_state = dbclient.findInDb(pentest, "autoscan", {"special":True}, False)
+            if autoscan_state is None:
+                continue
+            authorized_commands = autoscan_state["authorized_commands"]
             if queue is None:
                 launchableTools = []
             else:
@@ -88,12 +92,14 @@ def autoScan(pentest, endoded_token):
                 if autoscan_threads - len(toLaunch) - running_tools_count <= 0:
                     break
                 logger.debug("Autoscan : launch task tools: "+str(launchableTool))
-                msg, statuscode = isLaunchable(pentest, launchableTool)
+                msg, statuscode = isLaunchable(pentest, launchableTool, authorized_commands)
                 if statuscode == 404:
                     dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":launchableTool}})
                     tool_o = ServerTool.fetchObject(pentest, {"_id":ObjectId(launchableTool)})
                     if tool_o is not None:
-                        tool_o.markAsError()
+                        tool_o.markAsError(msg)
+                elif statuscode == 403:
+                    dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":launchableTool}})
                 elif statuscode == 200:
                     dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":launchableTool}})
                     toLaunch.append([launchableTool, msg])

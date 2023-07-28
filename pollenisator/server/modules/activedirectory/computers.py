@@ -118,7 +118,7 @@ class Computer(ServerElement):
         """
         return ["AD:onFirstUserOnDC", "AD:onFirstAdminOnDC",  "AD:onNewUserOnDC", "AD:onNewAdminOnDC", 
                             "AD:onFirstUserOnComputer", "AD:onFirstAdminOnComputer", "AD:onNewUserOnComputer", "AD:onNewAdminOnComputer",
-                            "AD:onNewDomainDiscovered"]
+                            "AD:onNewDomainDiscovered", "AD:onNewDC"]
 
 
     @property
@@ -181,7 +181,7 @@ class Computer(ServerElement):
         
     def addCheck(self, lvl, info):
         checks = CheckItem.fetchObjects({"lvl":lvl})
-        if lvl == "AD:onNewDomainDiscovered":
+        if lvl in ["AD:onNewDomainDiscovered", "AD:onNewDC"]:
             infos = {"domain":info.get("domain")}
         else:
             user_o = User.fetchObject(self.pentest, {"_id":ObjectId(info.get("user"))})
@@ -236,6 +236,8 @@ def update(pentest, computer_iid, body):  # noqa: E501
     computer = Computer(pentest, body) 
     dbclient = DBClient.getInstance()
     existing = Computer.fetchObject(pentest, {"_id": ObjectId(computer_iid)})
+    if existing is None:
+        return "not found", 404
     if computer.ip != existing.ip:
         return "Forbidden", 403
     if "type" in body:
@@ -256,6 +258,7 @@ def update(pentest, computer_iid, body):  # noqa: E501
             existing.addCheck("AD:onFirstUserOnDC", {"user":existing.users[-1]})
         for user in existing.users:
             existing.addCheck("AD:onNewUserOnDC", {"user":user[-1]})
+        existing.addCheck("AD:onNewDC", { "domain":domain})
 
     dbclient.updateInDb(pentest, "ActiveDirectory", {"_id": ObjectId(computer_iid), "type":"computer"}, {"$set": body}, False, True)
     return True
