@@ -63,7 +63,6 @@ def createReport(context, template, out_name, **kwargs):
     dir_path = os.path.dirname(os.path.realpath(__file__))
     out_path = os.path.join(dir_path, "../../exports/", out_name+".docx")
     doc.save(out_path)
-    doc.save("/home/barre/dir_win/generated.docx")
     logger.info("Converting Markdown of "+str(out_path))
     result, msg = convertMarkdownInFile(out_path, out_path, {"Header":"Sous-défaut"})
     if not result:
