@@ -111,6 +111,7 @@ def importExistingFile(pentest, upfile, body, **kwargs):
                 port = None
                 proto = None
                 check_iid = None
+                tool_iid = None
             else:
                 lvl = target.get("lvl", lvl)
                 wave = target.get("wave", None)
