@@ -137,11 +137,11 @@ class DBClient:
             return
         cfg = config if config is not None else utils.loadServerConfig()
         try:
-            self.host = str(cfg["host"])
-            self.port = str(cfg.get("mongo_port", 27017))
-            self.password = str(cfg["password"])
-            self.user = str(cfg["user"])
-            self.ssl = str(cfg["ssl"])
+            self.host = os.environ.get("MONGODB_HOST", str(cfg["host"]))
+            self.port = os.environ.get("MONGODB_PORT",str(cfg.get("mongo_port", 27017)))
+            self.password = os.environ.get("MONGODB_PASSWORD",str(cfg["password"]))
+            self.user = os.environ.get("MONGODB_USER",str(cfg["user"]))
+            self.ssl = os.environ.get("MONGODB_SSL",str(cfg["ssl"]))
 
             connectionString = ""
             if self.user != "":

@@ -70,11 +70,13 @@ def getCommands(body):
 def doDelete(pentest, command):
     dbclient = DBClient.getInstance()
     #TODO : delete from checks
+    pentests = set(pentest)
     # Remove from all waves this command.
     if command.indb == "pollenisator":
-        pentests = dbclient.listPentestUuids()
+        pentests.union(dbclient.listPentestUuids())
     else:
-        pentests = [command.indb]
+        pentests.add(command.indb)
+    
     for pentest in pentests:
         waves = dbclient.findInDb(pentest, "waves")
         for wave in waves:

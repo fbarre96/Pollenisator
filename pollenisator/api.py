@@ -81,7 +81,7 @@ def home():
     return "Api working"
 
 
-def createAdmin(username="", password=""):
+def create_admin(username="", password=""):
     """Prompts the user to enter a username and password and creates a new admin account with those credentials.
 
     Args:
@@ -189,16 +189,16 @@ def init():
             if arg == "--non-interactive":
                 noninteractive = True
         if noninteractive:
-            createAdmin("admin", "admin")
+            create_admin("admin", "admin")
         else:
-            createAdmin()
+            create_admin()
         #createWorker()
     migrate()
     removeWorkers()
     dbclient.resetRunningTools()
     conf = loadServerConfig()
-    port = int(conf.get("api_port", 5000))
-    https = conf.get("https", "false").lower() == "true"
+    port = int(os.environ.get("POLLENISATOR_PORT", conf.get("api_port", 5000)))
+    https = os.environ.get("POLLENISATOR_SSL",conf.get("https", "false").lower() == "true")
     if https:
         ssl_context = "adhoc"
     else:
@@ -378,7 +378,7 @@ def run(flask_app):
     sm = SocketManager.getInstance()
     port = init()
     try:
-        sm.socketio.run(flask_app, host='0.0.0.0', port=port,
+        sm.socketio.run(flask_app, host=os.environ.get("POLLENISATOR_BIND_IP", '0.0.0.0'), port=port,
                      debug=debug, use_reloader=False, )
     except KeyboardInterrupt:
         pass

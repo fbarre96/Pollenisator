@@ -1,0 +1,21 @@
+version: '3'
+services:
+  pollenisator-server:
+    build: ./  # Specify the path to your Flask app's Dockerfile
+    ports:
+      - "5000:5000"     # Map container port to host port
+    depends_on:
+      - mongodb         # Ensure MongoDB container is up before starting Flask app
+    volumes:
+      - ./:/opt/pollenisator  # share source
+    command: pollenisator --non-interactive
+    env_file: .env
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"   # Map container port to host port
+    volumes:
+      - mongodb_data:/data/db  # Persist MongoDB data
+
+volumes:
+  mongodb_data:
