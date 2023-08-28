@@ -121,10 +121,12 @@ def migrate():
     dbclient = DBClient.getInstance()
     version = dbclient.findInDb("pollenisator","infos",{"key":"version"}, False)
     if version is None:
-        dbclient.insertInDb("pollenisator","infos",{"key":"version","value":"1"})
-        version = "1"
+        dbclient.insertInDb("pollenisator","infos",{"key":"version","value":"0"})
+        version = "0"
     else:
         version = version["value"]
+    if version == "0":
+        version = migrate_0()
     if version == "1":
         version = migrate_1()
     if version == "1.1":
@@ -134,7 +136,10 @@ def migrate():
     if version == "2.5":
         version = migrate_2_6()
 
-        
+def migrate_0():
+    dbclient = DBClient.getInstance()
+    dbclient.client.renameCollection("calendars", "pentests")
+
 def migrate_1():
     dbclient = DBClient.getInstance()
     pentests = dbclient.findInDb("pollenisator","pentests",{}, True)
