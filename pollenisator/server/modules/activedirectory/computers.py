@@ -131,6 +131,38 @@ class Computer(ServerElement):
         """
         return self._infos
 
+    def checkAllTriggers(self):
+        self.add_dc_checks()
+        self.add_user_checks()
+        self.add_admin_checks()
+        self.add_domain_checks()
+
+    def add_domain_checks(self):
+        if self.infos.id_dc:
+            self.addCheck("AD:onNewDC", { "domain":self.domain})
+
+    def add_dc_checks(self):
+        if len(self.users) > 0:
+            self.addCheck("AD:onFirstUserOnDC", {"user":self.users[0]})
+        if len(self.admins) > 0:
+            self.addCheck("AD:onFirstAdminOnDC", {"user":self.admins[0]})
+
+    def add_user_checks(self):
+        if len(self.users) == 1:
+            if self.infos.is_dc:
+                self.addCheck("AD:onFirstUserOnDC", {"user":self.users[-1]})
+                self.addCheck("AD:onNewUserOnDC", {"user":self.users[-1]})
+            self.addCheck("AD:onFirstUserOnComputer", {"user":self.users[-1]})
+        self.addCheck("AD:onNewUserOnComputer", {"user":self.users[-1]})
+
+    def add_admin_checks(self):
+        if len(self.admins) == 1:
+            if self.infos.is_dc:
+                self.addCheck("AD:onFirstAdminOnDC", {"user":self.admins[-1]})
+                self.addCheck("AD:onNewAdminOnDC", {"user":self.admins[-1]})
+            self.addCheck("AD:onFirstAdminOnComputer", {"user":self.admins[-1]})
+        self.addCheck("AD:onNewAdminOnComputer", {"user":self.admins[-1]})
+
     @infos.setter
     def infos(self, infos):
         """Sets the infos of this Computer.
@@ -141,10 +173,7 @@ class Computer(ServerElement):
         """
         #keeping clarity with explicit checks
         if self.infos.get("is_dc", False) == False and infos.get("is_dc", False) == True:
-            if len(self.users) > 0:
-                self.addCheck("AD:onFirstUserOnDC", {"user":self.users[0]})
-            if len(self.admins) > 0:
-                self.addCheck("AD:onFirstAdminOnDC", {"user":self.admins[0]})
+            self.add_dc_checks()
         self._infos = infos
 
     def add_user(self, domain, username, password):
@@ -152,12 +181,8 @@ class Computer(ServerElement):
         res = user_m.addInDb()
         if str(res["iid"]) not in self.users and password.strip() != "":
             self.users.append(str(res["iid"]))
-            if len(self.users) == 1:
-                if self.infos.is_dc:
-                    self.addCheck("AD:onFirstUserOnDC", {"user":self.users[-1]})
-                    self.addCheck("AD:onNewUserOnDC", {"user":self.users[-1]})
-                self.addCheck("AD:onFirstUserOnComputer", {"user":self.users[-1]})
-            self.addCheck("AD:onNewUserOnComputer", {"user":self.users[-1]})
+            self.add_user_checks()
+            
             
         self.update()
 
@@ -166,12 +191,7 @@ class Computer(ServerElement):
         res = user_m.addInDb()
         if str(res["iid"]) not in self.admins:
             self.admins.append(str(res["iid"]))
-            if len(self.admins) == 1:
-                if self.infos.is_dc:
-                    self.addCheck("AD:onFirstAdminOnDC", {"user":self.admins[-1]})
-                    self.addCheck("AD:onNewAdminOnDC", {"user":self.admins[-1]})
-                self.addCheck("AD:onFirstAdminOnComputer", {"user":self.admins[-1]})
-            self.addCheck("AD:onNewAdminOnComputer", {"user":self.admins[-1]})
+            self.add_admin_checks()
         self.update()
 
     @classmethod
@@ -254,11 +274,8 @@ def update(pentest, computer_iid, body):  # noqa: E501
         if existingDomain is None:
             computer.addCheck("AD:onNewDomainDiscovered", {"domain":domain})
     if existing.infos.is_dc != computer.infos.is_dc:
-        if existing.users:
-            existing.addCheck("AD:onFirstUserOnDC", {"user":existing.users[-1]})
-        for user in existing.users:
-            existing.addCheck("AD:onNewUserOnDC", {"user":user[-1]})
-        existing.addCheck("AD:onNewDC", { "domain":domain})
+        existing.add_user_checks()
+        existing.add_domain_checks()
 
     dbclient.updateInDb(pentest, "ActiveDirectory", {"_id": ObjectId(computer_iid), "type":"computer"}, {"$set": body}, False, True)
     return True

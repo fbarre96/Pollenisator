@@ -94,8 +94,15 @@ class CheckItem(ServerElement):
 
     def addInDb(self):
         return doInsert(self.pentest, self.getData())
-
     
+
+    def apply_retroactively(self, pentest):
+        class_registered = ServerElement.getClassWithTrigger(self.lvl)
+        if class_registered is None:
+            return
+        all_objects = class_registered.fetchObjects(pentest, {})
+        for obj in all_objects:
+            obj.checkAllTriggers()
 
 
 
@@ -112,17 +119,6 @@ def doInsert(pentest, data):
     """
     if "_id" in data:
         del data["_id"]
-    # if data.get("parent") is not None:
-    #     parent_iid = ObjectId(data.get("parent"))
-    #     parent_m = CheckItem.fetchObject({"_id":parent_iid})
-    #     if parent_m is None:
-    #         return "Parent not found", 404
-    #     brothers = list(CheckItem.fetchObjects({"parent":str(parent_iid)}))
-    #     if len(brothers) > 0:
-    #         step = max([x.step for x in brothers])+1
-    #     else:
-    #         step = 1
-    #     data["step"] = step
     dbclient = DBClient.getInstance()
     data["type"] = "checkitem"
     existing = CheckItem.fetchObject({"title":data["title"]})
@@ -162,8 +158,6 @@ def delete(iid):
         return 0
     return res.deleted_count
 
-
-
 @permission("user")
 def update(iid, body):
     # Check if the checkitem to update exists
@@ -198,3 +192,13 @@ def find(body):
     if many:
         return [x for x in results]
     return results
+
+@permission("pentester")
+def applyToPentest(pentest, iid, body):
+    dbclient = DBClient.getInstance()
+    check_item = CheckItem.fetchObject({"_id":ObjectId(iid)})
+    if check_item is None:
+        return "Not found", 404
+    data = check_item.getData()
+    check_item.apply_retroactively(pentest)
+    return {"res": True}

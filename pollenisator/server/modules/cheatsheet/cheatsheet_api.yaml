@@ -129,6 +129,14 @@ paths:
         '200':
           description: OK
       description: Delete checkinstance item
+    post:
+      summary: "Apply the checkitem to the pentest"
+      tags:
+        - Cheatsheet
+      operationId: pollenisator.server.modules.cheatsheet.cheatsheet.applyToPentest
+      responses:
+        '200':
+          description: OK
     put:
       summary: ''
       tags:

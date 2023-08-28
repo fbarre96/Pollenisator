@@ -138,6 +138,13 @@ class ServerIp(Ip, ServerElement):
             update(self.pentest, self._id, {"parent": self.parent})
             return ip_in_db["_id"]
         return None
+    
+    def checkAllTriggers(self):
+        self.add_ip_checks()
+
+    def add_ip_checks(self):
+        if self.in_scopes:
+            self.addChecks(["ip:onAdd"])
 
     def addChecks(self, lvls):
         """
@@ -211,8 +218,7 @@ def insert(pentest, body):
     ins_result = dbclient.insertInDb(pentest, "ips", body, parent)
     iid = ins_result.inserted_id
     ip_o._id = iid
-    if ip_o.in_scopes:
-        ip_o.addChecks(["ip:onAdd"])
+    ip_o.add_ip_checks()
     return {"res":True, "iid":iid}
 
 @permission("pentester")
@@ -221,7 +227,6 @@ def update(pentest, ip_iid, body):
     old = ServerIp.fetchObject(pentest, {"_id":ObjectId(ip_iid)})
     dbclient.updateInDb(pentest, "ips", {"_id":ObjectId(ip_iid)}, {"$set":body}, False, True)
     new = ServerIp.fetchObject(pentest, {"_id":ObjectId(ip_iid)})
-    if not old.in_scopes and new.in_scopes:
-        new.addChecks(["ip:onAdd"])
+    new.add_ip_checks()
     return True
 

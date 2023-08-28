@@ -27,6 +27,11 @@ class ServerWave(Wave, ServerElement):
     def replaceCommandVariables(cls, pentest, command, data):
         return command.replace("|wave|", data.get("wave", ""))
 
+    def checkAllTriggers(self):
+        self.add_wave_checks()
+
+    def add_wave_checks(self):
+        self.addChecks(["wave:onAdd"])
 
     def addChecks(self, lvls):
         """
@@ -104,7 +109,7 @@ def insert(pentest, body):
     res_insert = dbclient.insertInDb(pentest, "waves", {"wave": wave_o.wave, "wave_commands": list(wave_o.wave_commands)})
     ret = res_insert.inserted_id
     wave_o._id = ret
-    wave_o.addChecks(["wave:onAdd"])
+    wave_o.add_wave_checks()
     return {"res":True, "iid":ret}
 
 @permission("pentester")

@@ -112,6 +112,15 @@ class User(ServerElement):
         command = command.replace("|password|", data.get("password", ""))
         return command
 
+    def checkAllTriggers(self):
+        self.add_user_checks()
+        
+    def add_user_checks(self):
+        if self.password.strip() != "":
+            self.addCheck("AD:onNewValidUser", {"user":self})
+        else:
+            self.addCheck("AD:onNewUserFound", {"user":self})
+
     def addCheck(self, lvl, info):
         checks = CheckItem.fetchObjects({"lvl":lvl})
         user_o = info.get("user")
@@ -308,10 +317,7 @@ def insert(pentest, body):
         "ActiveDirectory", body, True)
     iid = ins_result.inserted_id
     user._id = iid
-    if password.strip() != "":
-        user.addCheck("AD:onNewValidUser", {"user":user})
-    else:
-        user.addCheck("AD:onNewUserFound", {"user":user})
+    user.add_user_checks()
     
     return {"res": True, "iid": iid}
 

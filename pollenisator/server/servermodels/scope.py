@@ -67,6 +67,15 @@ class ServerScope(Scope, ServerElement):
         Return the list of trigger declared here
         """
         return ["scope:onRangeAdd", "scope:onDomainAdd", "scope:onAdd"]
+    
+    def checkAllTriggers(self):
+        self.add_scope_checks()
+
+    def add_scope_checks(self):
+        if isNetworkIp(self.scope):
+            self.addChecks(["scope:onRangeAdd", "scope:onAdd"])
+        else:
+            self.addChecks(["scope:onDomainAdd", "scope:onAdd"])
 
     def addChecks(self, lvls):
         """
@@ -154,10 +163,7 @@ def insert(pentest, body):
     scope_o._id = ret
     # adding the appropriate checks for this scope.
     
-    if isNetworkIp(scope_o.scope):
-        scope_o.addChecks(["scope:onRangeAdd", "scope:onAdd"])
-    else:
-        scope_o.addChecks(["scope:onDomainAdd", "scope:onAdd"])
+    scope_o.add_scope_checks()
         
     _updateIpsScopes(pentest, scope_o)
     return {"res":True, "iid":ret}

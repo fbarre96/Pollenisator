@@ -32,6 +32,12 @@ class ServerPort(Port, ServerElement):
     def getParentId(self):
         dbclient = DBClient.getInstance()
         return dbclient.findInDb(self.pentest, "ips", {"ip": self.ip}, False)["_id"]
+    
+    def checkAllTriggers(self):
+        self.add_port_checks()
+
+    def add_port_checks(self):
+        self.addChecks(["port:onServiceUpdate"])
 
     def addChecks(self, lvls):
         """
@@ -131,7 +137,8 @@ def insert(pentest, body):
             comp = Computer.fetchObject(pentest, {"_id":ObjectId(res["iid"])})
             comp.infos.is_dc = True
             comp.update()
-    port_o.addChecks(["port:onServiceUpdate"])
+    port_o.add_port_checks()
+    
     return {"res":True, "iid":iid}
 
 @permission("pentester")
@@ -151,6 +158,6 @@ def update(pentest, port_iid, body):
                                 "lvl": "port:onServiceUpdate", "ip": oldPort.ip, "port": oldPort.port, "proto": oldPort.proto, "status":{"$ne":"done"}}, many=True)
         dbclient.deleteFromDb(pentest, "cheatsheet", {
                                 "lvl": "port:onServiceUpdate", "ip": oldPort.ip, "port": oldPort.port, "proto": oldPort.proto, "status":{"$ne":"done"}}, many=True)     
-        port_o.addChecks(["port:onServiceUpdate"])
+        port_o.add_port_checks()
     return True
    
