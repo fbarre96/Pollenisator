@@ -2,7 +2,7 @@
 
 # 1. Imports
 import re
-from pollenisator.server.ServerModels.Ip import ServerIp
+from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.plugins.plugin import Plugin
 
 def parse_crtsh_line(line):
@@ -23,7 +23,7 @@ def parse_crtsh_line(line):
 
 
 class Crtsh(Plugin):
-
+    default_bin_names = ["crtsh", "crtsh.py"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:
@@ -92,5 +92,5 @@ class Crtsh(Plugin):
         if notes.strip() == "":
             return None, None, None, None
         elif countInserted != 0:
-            tags.append("found-domains-info")
+            tags.append("info-found-domains")
         return notes, tags, "wave", {"wave": None}

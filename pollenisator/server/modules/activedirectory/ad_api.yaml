@@ -1,0 +1,308 @@
+openapi: 3.0.0
+info:
+  description: Pollenisator index api file
+  version: 1.2.0
+  title: Swagger REST Article
+
+paths:
+  '/ActiveDirectory/users/{pentest}':
+    post:
+      summary: insert user
+      operationId: pollenisator.server.modules.activedirectory.users.insert
+      responses:
+        '200':
+          description: OK
+      description: Add an Active Directory user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+        description: ''
+      tags:
+        - Active Directory
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+        description: pentest name
+  '/ActiveDirectory/computers/{pentest}':
+    post:
+      summary: insert computer
+      operationId: pollenisator.server.modules.activedirectory.computers.insert
+      responses:
+        '200':
+          description: OK
+      description: Add an Active Directory computer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Computer'
+        description: ''
+      tags:
+        - Active Directory
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+        description: pentest name
+  '/ActiveDirectory/shares/{pentest}':
+    post:
+      summary: insert share
+      operationId: pollenisator.server.modules.activedirectory.shares.insert
+      responses:
+        '200':
+          description: OK
+      description: Add an Active Directory computer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Share'
+        description: ''
+      tags:
+        - Active Directory
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+        description: pentest name
+
+    
+  '/ActiveDirectory/users/{pentest}/{user_iid}':
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+      - schema:
+          type: string
+        name: user_iid
+        in: path
+        required: true
+    put:
+      summary: update user
+      operationId: pollenisator.server.modules.activedirectory.users.update
+      responses:
+        '200':
+          description: OK
+      description: Update an Active Directory user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+        description: ''
+      tags:
+        - Active Directory
+    delete:
+      summary: delete user
+      operationId: pollenisator.server.modules.activedirectory.users.delete
+      responses:
+        '200':
+          description: OK
+      description: Delete an Active Directory user
+      tags:
+        - Active Directory
+  '/ActiveDirectory/computers/{pentest}/{computer_iid}':
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+      - schema:
+          type: string
+        name: computer_iid
+        in: path
+        required: true
+    put:
+      summary: update computer
+      operationId: pollenisator.server.modules.activedirectory.computers.update
+      responses:
+        '200':
+          description: OK
+      description: Update an Active Directory computer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Computer'
+        description: ''
+      tags:
+        - Active Directory
+    delete:
+      summary: Delete computer
+      operationId: pollenisator.server.modules.activedirectory.computers.delete
+      responses:
+        '200':
+          description: OK
+      description: Delete an active Directory Computer
+      tags:
+        - Active Directory
+  '/ActiveDirectory/shares/{pentest}/{share_iid}':
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+      - schema:
+          type: string
+        name: share_iid
+        in: path
+        required: true
+    put:
+      summary: Update Share
+      operationId: pollenisator.server.modules.activedirectory.shares.update
+      responses:
+        '200':
+          description: OK
+      description: Update an Active Directory computer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Share'
+        description: ''
+      tags:
+        - Active Directory
+    delete:
+      summary: Delete Share
+      operationId: pollenisator.server.modules.activedirectory.shares.delete
+      responses:
+        '200':
+          description: OK
+      description: Delete an Active Directory Share
+      tags:
+        - Active Directory
+  '/ActiveDirectory/computers/{pentest}/{computer_iid}/getUsers':
+    get:
+      summary: get computers allowed users
+      operationId: pollenisator.server.modules.activedirectory.computers.getUsers
+      responses:
+        '200':
+          description: OK
+      description: get  users of given computer id
+      tags:
+        - Active Directory
+    parameters:
+      - schema:
+          type: string
+        in: path
+        name: pentest
+        description: pentest
+        required: true
+      - schema:
+          type: string
+        in: path
+        name: computer_iid
+        description: computer db id
+        required: true
+components:
+  schemas:
+    User:
+      title: User
+      x-stoplight:
+        id: qldvwo547gvlm
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        domain:
+          type: string
+        groups:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+      required:
+        - username
+        - password
+        - domain
+    Computer:
+      title: Computer
+      x-stoplight:
+        id: 3uvdgutrtjig7
+      type: object
+      x-internal: false
+      properties:
+        name:
+          type: string
+        ip:
+          type: string
+        domain:
+          type: string
+        admins:
+          type: array
+          items:
+            type: string
+        users:
+          type: array
+          items:
+            type: string
+        infos:
+          type: object
+          properties:
+            os:
+              type: string
+            signing:
+              type: boolean
+            smbv1:
+              type: boolean
+            is_dc:
+              type: boolean
+            secrets:
+              type: array
+              items:
+                type: string
+      required:
+        - name
+        - ip
+        - domain
+    Share:
+      title: Share
+      x-stoplight:
+        id: ok71csaaph1of
+      type: object
+      properties:
+        ip:
+          type: string
+        share:
+          type: string
+        files:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+              size:
+                type: string
+              flagged:
+                type: boolean
+              users:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    priv:
+                      type: string
+                    domain:
+                      type: string
+                    user:
+                      type: string
+      required:
+        - ip
+        - share

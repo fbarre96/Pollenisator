@@ -1,8 +1,8 @@
 """A plugin to parse nmap scan"""
 
 import re
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.plugins.plugin import Plugin
 
 
@@ -94,6 +94,7 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
 
 
 class Nmap(Plugin):
+    default_bin_names = ["nmap"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:

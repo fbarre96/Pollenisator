@@ -1,9 +1,9 @@
 """A plugin to parse a CrackMapExex scan"""
 
 import re
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
-from pollenisator.server.modules.ActiveDirectory.computers import Computer
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
+from pollenisator.server.modules.activedirectory.computers import Computer
 
 from pollenisator.plugins.plugin import Plugin
 
@@ -21,31 +21,31 @@ def getInfos(cme_file):
     File example:
 
 EMPTY :
-[1m[34mSMB[0m         10.10.11.152    445    DC01             [1m[34m[*][0m Windows 10.0 Build 17763 x64 (name:DC01) (domain:timelapse.htb) (signing:True) (SMBv1:False)
+\x1b[1m\x1b[34mSMB\x1b[0m          10.10.11.152    445    DC01             [1m[34m[*][0m Windows 10.0 Build 17763 x64 (name:DC01) (domain:timelapse.htb) (signing:True) (SMBv1:False)
 
 POWNED EXEMPLE:
-\x1b[1m\x1b[34mCME\x1b[0m          10.10.10.254:445 HAGRID          \x1b[1m\x1b[34m[*]\x1b[0m Windows 6.3 Build 9600 (name:HAGRID) (domain:POUDLARD)
-\x1b[1m\x1b[34mCME\x1b[0m          10.10.10.254:445 HAGRID          \x1b[1m\x1b[32m[+]\x1b[0m POUDLARD\Administrateur:Algo_LAB_2012* \x1b[1m\x1b[33m(Pwn3d!)\x1b[0m
+\x1b[1m\x1b[34mSMB\x1b[0m          10.10.10.254:445 HAGRID          \x1b[1m\x1b[34m[*]\x1b[0m Windows 6.3 Build 9600 (name:HAGRID) (domain:POUDLARD)
+\x1b[1m\x1b[34mSMB\x1b[0m          10.10.10.254:445 HAGRID          \x1b[1m\x1b[32m[+]\x1b[0m POUDLARD\Administrateur:Algo_LAB_2012* \x1b[1m\x1b[33m(Pwn3d!)\x1b[0m
 \x1b[1m\x1b[34m[*]\x1b[0m KTHXBYE!
 
 NOT POWNED:
-\x1b[1m\x1b[34mCME\x1b[0m          10.10.10.11:445 DOBBY-PC        \x1b[1m\x1b[34m[*]\x1b[0m Windows 6.1 Build 0 (name:DOBBY-PC) (domain:POUDLARD)
-\x1b[1m\x1b[34mCME\x1b[0m          10.10.10.254:445 HAGRID          \x1b[1m\x1b[34m[*]\x1b[0m Windows 6.3 Build 9600 (name:HAGRID) (domain:POUDLARD)
+\x1b[1m\x1b[34mSMB\x1b[0m          10.10.10.11:445 DOBBY-PC        \x1b[1m\x1b[34m[*]\x1b[0m Windows 6.1 Build 0 (name:DOBBY-PC) (domain:POUDLARD)
+\x1b[1m\x1b[34mSMB\x1b[0m          10.10.10.254:445 HAGRID          \x1b[1m\x1b[34m[*]\x1b[0m Windows 6.3 Build 9600 (name:HAGRID) (domain:POUDLARD)
 \x1b[1m\x1b[34m[*]\x1b[0m KTHXBYE!
 
-[1m[34mSMB[0m         10.10.11.152    445    DC01             [1m[34m[*][0m Windows 10.0 Build 17763 x64 (name:DC01) (domain:timelapse) (signing:True) (SMBv1:False)
-[1m[34mSMB[0m         10.10.11.152    445    DC01             [1m[35m[-][0m timelapse\admin:admin STATUS_ACCESS_DENIED 
+\x1b[1m\x1b[34mSMB\x1b[0m          10.10.11.152    445    DC01             [1m[34m[*][0m Windows 10.0 Build 17763 x64 (name:DC01) (domain:timelapse) (signing:True) (SMBv1:False)
+\x1b[1m\x1b[34mSMB\x1b[0m         10.10.11.152    445    DC01             [1m[35m[-][0m timelapse\admin:admin STATUS_ACCESS_DENIED 
 
 CONNECTED
-^[[1m^[[34mCME^[[0m          10.0.0.86:445 ALGOSECURE-VM   ^[[1m^[[34m[*]^[[0m Windows 10.0 Build 18362 (name:ALGOSECURE-VM) (domain:ALGOSECURE-VM)
-^[[1m^[[34mCME^[[0m          10.0.0.86:445 ALGOSECURE-VM   ^[[1m^[[32m[+]^[[0m ALGOSECURE-VM\algosecure:Alg123!*
+\x1b[1m\x1b[34mSMB\x1b[0m          10.0.0.86:445 ALGOSECURE-VM   ^[[1m^[[34m[*]^[[0m Windows 10.0 Build 18362 (name:ALGOSECURE-VM) (domain:ALGOSECURE-VM)
+\x1b[1m\x1b[34mSMB\x1b[0m           10.0.0.86:445 ALGOSECURE-VM   ^[[1m^[[32m[+]^[[0m ALGOSECURE-VM\algosecure:Alg123!*
 """
     retour = []
-    regex_info = re.compile(r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+\S+\s+\S+\[\*\]\S+\s+([^\(]+)\(name:(.+)\) \(domain:(.+)\) \(signing:(True|False)\) \(SMBv1:(False|True)\)$", re.MULTILINE)
+    regex_info = re.compile(r"^\S+(?:LDAP|SMB)\S+\s+(\S+)\s+(\d+)\s+\S+\s+\S+\[\*\]\S+\s+([^\(]+)\(name:(.*)\) \(domain:(.*)\) \(signing:(True|False)\) \(SMBv1:(False|True)\)$", re.MULTILINE)
     regex_logon_failed = re.compile(
-        r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[\-\]\S+ ([^\\]+)\\([^:]+):(.*?) STATUS_LOGON_FAILURE\s*$", re.MULTILINE)
+        r"^\S+(?:LDAP|SMB)\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[\-\]\S+ ([^\\]+)\\([^:]+):(.*?) STATUS_LOGON_FAILURE\s*$", re.MULTILINE)
     regex_success = re.compile(
-        r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[\+\]\S+ ([^\\]+)\\([^:]+):(.*?)(?= \x1b)(.+)$", re.MULTILINE)
+        r"^\S+(?:LDAP|SMB)\S+\s+(\S+)[\s+:](\d+)\s+(\S+)\s+\S+\[\+\]\S+ ([^\\]+)\\([^:]+):(.*?)(?= \x1b|$)(.*)$", re.MULTILINE)
     regex_module_lsassy = re.compile(r"^\S+LSASSY\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[33m([^\\]+)\\(\S+)\s+(\S+)(?=\x1b).+$")
     regex_module_ntds = re.compile(r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[33m(.+)\x1b\S*$")
     notes = ""
@@ -214,7 +214,7 @@ def editScopeIPs(pentest, hostsInfos):
                 infos["machine_name"] + "\n"+infos.get("os", "")
             if infos["type"] == "success":
                 if infos.get("powned", False):
-                    ip_m.addTag("pwned")
+                    ip_m.addTag(("pwned", "red", "high"))
             host = str(infos["ip"])
             port = str(infos["port"])
             proto = "tcp"
@@ -224,7 +224,7 @@ def editScopeIPs(pentest, hostsInfos):
             port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
 
             if infos.get("powned", False):
-                port_m.addTag("pwned")
+                port_m.addTag(("pwned", "red", "high"))
             computer_m = Computer.fetchObject(pentest, {"ip":port_m.ip})
             if computer_m is not None: 
                 creds = infosToAdd.get("users", [])
@@ -253,7 +253,7 @@ def editScopeIPs(pentest, hostsInfos):
 class CME(Plugin):
     """Inherits Plugin
     A plugin to parse a crackmapexec scan"""
-
+    default_bin_names = ["cme", "crackmapexec"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:
@@ -297,14 +297,14 @@ class CME(Plugin):
         hostsInfos, countPwnd,  countSuccess, notes, secrets, lsassy = getInfos(file_opened)
         if countPwnd is not None:
             if int(countPwnd) > 0:
-                tags = ["cme-pwned"]
+                tags = [("pwned-cme", "red", "high")]
         if countSuccess is not None:
             if int(countSuccess) > 0:
-                tags += ["cme-connection-success"]
+                tags += [("info-cme-connection-success", "green", "info")]
             if len(secrets) > 0:
-                tags += ["cme-secrets-dump"]
+                tags += [("todo-cme-secrets-dump","red", "todo")]
             if lsassy:
-                tags += ["lsassy-success"]
+                tags += [("todo-lsassy-success","red", "todo")]
         if hostsInfos is None:
             return None, None, None, None
         targets = editScopeIPs(pentest, hostsInfos)

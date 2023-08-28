@@ -1,7 +1,7 @@
 """A plugin to parse sublist3r"""
 
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.ServerModels.Ip import ServerIp
+from pollenisator.server.servermodels.ip import ServerIp
 import re
 
 def parseContent(file_opened):
@@ -24,6 +24,7 @@ def parseContent(file_opened):
     return ret
 
 class Sublist3r(Plugin):
+    default_bin_names = ["sublister", "sublister.py","sublist3r", "sublist3r.py"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:
@@ -64,7 +65,7 @@ class Sublist3r(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         notes = ""
-        tags = ["found-domains-info"]
+        tags = ["info-domains-sublist3r"]
         ret = parseContent(file_opened)
         if ret is None:
             return None, None, None, None

@@ -64,7 +64,6 @@ pollenisator/ssl/*
 !pollenisator/ssl/initServerSSL.ssh
 pollenisator/exports/*
 !pollenisator/exports/pollenisator_commands.gz
-!pollenisator/exports/pollenisator_group_commands.gz
 pollenisator/config/tools.d/*
 !pollenisator/config/tools.d/tools.json
 .vscode

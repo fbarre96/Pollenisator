@@ -1,11 +1,12 @@
 """A plugin to parse a bluekeep scan : rdpscan"""
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
 
 class BlueKeep(Plugin):
     """Inherits Plugin
     A plugin to parse a bluekeep scan : rdpscan"""
+    default_bin_names = ["bluekeep", "rdpscan"]
 
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
@@ -53,6 +54,7 @@ class BlueKeep(Plugin):
         notes = ""
         tags = ["neutral"]
         targets = {}
+        success = False
         for line in file_opened:
             # Auto Detect
             try:
@@ -68,6 +70,7 @@ class BlueKeep(Plugin):
                 return None, None, None, None
             # Parse
             ip = line.split(" ")[0].strip()
+            success = True
             ServerIp(pentest).initialize(ip, infos={"plugin":BlueKeep.get_name()}).addInDb()
             p_o = ServerPort.fetchObject(pentest, {"ip": ip, "port": kwargs.get(
                 "port", None), "proto": kwargs.get("proto", None)})
@@ -75,15 +78,16 @@ class BlueKeep(Plugin):
                 targets[str(p_o.getId())] = {"ip": ip, "port": kwargs.get(
                     "port", None), "proto": kwargs.get("proto", None)}
             if "VULNERABLE" in line:
-                tags=["pwned", "bluekeep"]
+                tags=[("pwned-bluekeep", "red", "high")]
                 if p_o is not None:
-                    p_o.addTag("pwned")
-                    p_o.addTag("bluekeep")
+                    p_o.addTag(("pwned-bluekeep", "red", "high"))
                 ip_o = ServerIp.fetchObject(pentest, {"ip": ip})
                 if ip_o is not None:
-                    ip_o.addTag("pwned")
-                    ip_o.addTag("bluekeep")
+                    ip_o.addTag(("pwned-bluekeep", "red", "high"))
+                  
             elif "UNKNOWN" in line:
-                tags = ["todo-bluekeep"]
+                tags = ["todo-bluekeep", None, "todo"]
             notes += line
+        if not success:
+            return None, None, None, None
         return notes, tags, "port", targets

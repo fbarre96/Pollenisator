@@ -1,13 +1,14 @@
 """A plugin to parse namp script ms17-010 scan"""
 
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.ServerModels.Defect import ServerDefect
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
+from pollenisator.server.servermodels.defect import ServerDefect
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
 import re
 
 
 class EternalBlue(Plugin):
+    default_bin_names = ["nmap"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:
@@ -21,6 +22,18 @@ class EternalBlue(Plugin):
             string
         """
         return ".log.txt"
+    
+    def detect_cmdline(self, cmdline):
+        """Returns a boolean indicating if this plugin is able to recognize a command line as likely to output results for it.
+        Args:
+            cmdline: the command line to test
+        Returns:
+            bool
+        """
+        result = super().detect_cmdline(cmdline)
+        if result and "ms17-010" in cmdline:
+            return True
+        return False
 
     def getFileOutputPath(self, commandExecuted):
         """Returns the output file path given in the executed command using getFileOutputArg
@@ -76,8 +89,7 @@ class EternalBlue(Plugin):
             targets[str(p_o.getId())] = {
                 "ip": ip, "port": port, "proto": proto}
         if "VULNERABLE" in notes:
-            tags=["pwned", "eternalblue"]
+            tags=["pwned-eternalblue", "red", "high"]
             if res_insert is not None:
-                p_o.addTag("pwned")
-                p_o.addTag("eternalblue")
+                p_o.addTag(("eternalblue", "red", "high"))
         return notes, tags, "port", targets

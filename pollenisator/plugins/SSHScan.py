@@ -2,11 +2,13 @@
 
 import json
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
-from pollenisator.server.ServerModels.Defect import ServerDefect
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
+from pollenisator.server.servermodels.defect import ServerDefect
 
 class SSHScan(Plugin):
+    default_bin_names = ["ssh-scan", "ssh_scan"]
+
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:
@@ -47,7 +49,7 @@ class SSHScan(Plugin):
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
             return None, None, None, None
         notes = ""
-        tags = []
+        tags = ["info-sshscan"]
         content = file_opened.read().decode("utf-8")
         targets = {}
         try:
@@ -77,13 +79,13 @@ class SSHScan(Plugin):
                         "ip": ip, "port": port, "proto": "tcp"}
                     oneScanIsValid = True
                     if "nopassword" in scan["auth_methods"]:
-                        tags = ["pwned"]
+                        tags = ["pwned-ssh-nopassword", "red", "high"]
                     # Will not exit if port was not ssh
                     is_ok = scan["compliance"]["compliant"]
                     if str(is_ok) == "False":
                         port_o.updateInfos({"compliant": "False"})
                         port_o.updateInfos({"auth_methods": scan["auth_methods"]})
-                        port_o.addTag("SSH-flaw")
+                        port_o.addTag(("SSH-flaw", None, "low"))
             except KeyError:
                 continue
         if not oneScanIsValid:

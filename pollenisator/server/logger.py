@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
-from pollenisator.core.Components.Utils import getMainDir
+from pollenisator.core.components.utils import getMainDir
+
 def report(body):
     local_path = os.path.join(getMainDir(), "logs/clients/")
     try:

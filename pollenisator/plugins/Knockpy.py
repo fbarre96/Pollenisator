@@ -1,7 +1,7 @@
 """A plugin to parse knockpy scan"""
 
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.ServerModels.Ip import ServerIp
+from pollenisator.server.servermodels.ip import ServerIp
 import re
 
 
@@ -31,6 +31,8 @@ def parse_knockpy_line(line):
 
 
 class Knockpy(Plugin):
+    default_bin_names = ["knockpy.py","knock.py","knock","knockpy"]
+
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:
@@ -69,7 +71,7 @@ class Knockpy(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         notes = ""
-        tags = ["found-domains-info"]
+        tags = ["info-domains-knockpy"]
         marker = "IpaddressCodeSubdomainServerRealhostname"
         markerFound = False
         countFound = 0

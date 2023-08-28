@@ -1,13 +1,13 @@
 """A plugin to parse smbmap scan"""
 
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
-from pollenisator.server.modules.ActiveDirectory.computers import Computer
-from pollenisator.server.modules.ActiveDirectory.shares import Share
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
+from pollenisator.server.modules.activedirectory.computers import Computer
+from pollenisator.server.modules.activedirectory.shares import Share
 
 import shlex
-from pollenisator.core.Components.logger_config import logger
+from pollenisator.core.components.logger_config import logger
 
 
 def smbmap_format(row):
@@ -48,6 +48,8 @@ def getUserInfoFromCmdLine(cmdline=None):
     return domain, user, password
 
 class SmbMap(Plugin):
+    default_bin_names = ["smbmap","smbmap.py"]
+
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:
@@ -122,7 +124,7 @@ class SmbMap(Plugin):
                 interesting_files[interesting_file_type] = interesting_files.get(interesting_file_type, [])
                 interesting_files[interesting_file_type].append(', '.join(row))
                 isInteresting = True
-                tags=["smbmap-interesting"]
+                tags=[("todo-smbmap-interesting", "green", "medium")]
             else:
                 less_interesting_notes += ", ".join(row)+"\n"
             shares[target] = shares.get(target, {}) #{"<ip>":{"<shareName">:set(<tuple>)}}
@@ -155,7 +157,7 @@ class SmbMap(Plugin):
             if computer_m is not None:
                 computer_m.add_user(domain, user, password)
             for share_name in share_dict:
-                share_m = Share().initialize(pentest, None, host, share_name, infos={"plugin":SmbMap.get_name()})
+                share_m = Share().initialize(pentest, None, host, share_name)
                 for share_info in share_dict[share_name]:
                     #share_info[] = path, isInteresting, privs, fileSize, domain, user
                     share_m.add_file(path=share_info[0], flagged=share_info[1], priv=share_info[2], size=share_info[3], domain=share_info[4], user=share_info[5])
@@ -164,7 +166,7 @@ class SmbMap(Plugin):
                     share_m.update(res["iid"])
 
             if password == "":
-                tags += ["anon-share-found"]
+                tags += [("todo-anon-share-found", "green")]
         if notes.strip() != "" and not tags:
-            tags = ["smbmap-todo"]
+            tags = [("todo-smbmap", "blue")]
         return notes, tags, "port", targets

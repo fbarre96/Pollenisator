@@ -1,9 +1,9 @@
 """A plugin to parse a CrackMapExex scan"""
 
 import re
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
-from pollenisator.server.modules.ActiveDirectory.computers import Computer
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
+from pollenisator.server.modules.activedirectory.computers import Computer
 from pollenisator.plugins.plugin import Plugin
 
 
@@ -24,7 +24,9 @@ def getInfos(runfinger_file):
     
     notes = ""
     countFound = 0
+    oneLine = False
     for line in runfinger_file:
+        oneLine = True
         if isinstance(line, bytes):
             try:
                 line = line.decode("utf-8")
@@ -45,7 +47,8 @@ def getInfos(runfinger_file):
         toAdd["rdp"] = infos.group(6)
         toAdd["smbv1"] = infos.group(7)
         retour.append(toAdd)
-           
+    if not oneLine:
+        return None, None
     notes = f"Host found : {len(retour)}\n"+notes
     return retour,  notes
 
@@ -109,7 +112,7 @@ def editScopeIPs(pentest, hostsInfos):
 class RunFinger(Plugin):
     """Inherits Plugin
     A plugin to parse a runfinger scan"""
-
+    default_bin_names = ["runfinger", "runfinger.py"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:
@@ -148,12 +151,12 @@ class RunFinger(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
-        notes = ""
+        notes = None
         tags = []
         hostsInfos, notes = getInfos(file_opened)
         if hostsInfos is None:
             return None, None, None, None
         if hostsInfos:
-            tags += ["runfinger-infos"]
+            tags += ["info-runfinger"]
         targets = editScopeIPs(pentest, hostsInfos)
         return notes, tags, "ports", targets

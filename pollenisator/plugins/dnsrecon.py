@@ -3,11 +3,12 @@
 # 1. Imports
 import re
 import json
-from pollenisator.server.ServerModels.Ip import ServerIp
+from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.plugins.plugin import Plugin
 
 
 class dnsrecon(Plugin):
+    default_bin_names = ["dnsrecon", "dnsrecon.py"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:
@@ -112,5 +113,6 @@ class dnsrecon(Plugin):
                     ip_m.updateInfos(infosToAdd)
                 else:
                     countInserted += 1
+                    tags = ["info-dnsrecon"]
                     notes += name+" inserted.\n"
         return notes, tags, "wave", {"wave": None}

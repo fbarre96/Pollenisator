@@ -17,6 +17,13 @@
 Everything is the [wiki](https://github.com/AlgoSecure/Pollenisator/wiki/_Sidebar), including [installation](https://github.com/Algosecure/Pollenisator/wiki/Overview)
 (Running on python3.7+ and tkinter)
 
+## Docker Quickstart
+
+**Warning , this generate a default user admin with WEAK password admin and the server is not production ready**
+
+`docker compose up -d`
+
+
 ## Features ##
 
   * Register your own tools

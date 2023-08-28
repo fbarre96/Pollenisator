@@ -1,5 +1,6 @@
 # ENABLE debug mode early because evenlet monkey patch other libs
 import os
+import uuid
 debug = os.environ.get("FLASK_DEBUG", False)
 if debug:
     async_mode = "threading" # Be aware thats sockets does not seems to work when debugging
@@ -9,30 +10,27 @@ else:
     async_mode = "eventlet"
     
 # ENABLE LOGGING EARLY ON
-from pollenisator.core.Components.logger_config import logger
-
+from pollenisator.core.components.logger_config import logger
 from pollenisator.server.permission import permission
-
 
 from flask_cors import CORS
 from getpass import getpass
 from bson import ObjectId
 from pollenisator.server.token import verifyToken, decode_token
-from pollenisator.core.Components.Utils import JSONEncoder, loadServerConfig
-from pollenisator.core.Components.SocketManager import SocketManager
-from pollenisator.server.modules.Worker.worker import doSetInclusion
+from pollenisator.core.components.utils import JSONEncoder, loadServerConfig
+from pollenisator.core.components.socketmanager import SocketManager
+from pollenisator.server.modules.worker.worker import doSetInclusion
 from flask import request
 import sys
 import bcrypt
 import json
 
-from pollenisator.core.Components.mongo import MongoCalendar
-from pollenisator.server.modules.Worker.worker import removeWorkers, unregister
+from pollenisator.core.components.mongo import DBClient
+from pollenisator.server.modules.worker.worker import removeWorkers, unregister
 import connexion
 from pathlib import Path
 import ruamel.yaml
-from ruamel.yaml.comments import CommentedSeq, CommentedMap
-from collections import OrderedDict
+from flask_socketio import join_room, leave_room
 
 # Create the application instance
 server_folder = os.path.join(os.path.dirname(
@@ -83,14 +81,7 @@ def home():
     return "Api working"
 
 
-# def createWorker():
-#     salt = bcrypt.gensalt()
-#     mongoInstance = MongoCalendar.getInstance()
-#     mongoInstance.insertInDb("pollenisator", "users", {
-#                              "username": "Worker", "hash": bcrypt.hashpw("".encode(), salt), "scope": ["worker"]})
-
-
-def createAdmin(username="", password=""):
+def create_admin(username="", password=""):
     """Prompts the user to enter a username and password and creates a new admin account with those credentials.
 
     Args:
@@ -109,8 +100,8 @@ def createAdmin(username="", password=""):
             print("Password cannot be empty")
             password = getpass("password: ")
     salt = bcrypt.gensalt()
-    mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.insertInDb("pollenisator", "users", {"username": username, "hash": bcrypt.hashpw(
+    dbclient = DBClient.getInstance()
+    dbclient.insertInDb("pollenisator", "users", {"username": username, "hash": bcrypt.hashpw(
         password.encode(), salt), "scope": ["admin", "user"]})
     print("Administrator created")
 
@@ -118,23 +109,73 @@ def createAdmin(username="", password=""):
 def notify_clients(notif):
     """Notify clients websockets
     """
-    mongoInstance = MongoCalendar.getInstance()
+    dbclient = DBClient.getInstance()
     sm = SocketManager.getInstance()
-    sockets = mongoInstance.findInDb("pollenisator","sockets",{}, True)
+    #sockets = dbclient.findInDb("pollenisator","sockets",{}, True)
     if notif["db"] == "pollenisator":
         sm.socketio.emit("notif", json.dumps(notif, cls=JSONEncoder))
     else:
-        for socket in sockets:
-            if socket["pentest"] == notif["db"]:
-                sm.socketio.emit("notif", json.dumps(notif, cls=JSONEncoder), to=socket["sid"])
+        sm.socketio.emit("notif", json.dumps(notif, cls=JSONEncoder), to=notif["db"])
 
+def migrate():
+    dbclient = DBClient.getInstance()
+    version = dbclient.findInDb("pollenisator","infos",{"key":"version"}, False)
+    if version is None:
+        dbclient.insertInDb("pollenisator","infos",{"key":"version","value":"1"})
+        version = "1"
+    else:
+        version = version["value"]
+    if version == "1":
+        version = migrate_1()
+    if version == "1.1":
+        version = migrate_1_1()
+    if version == "1.2":
+        version = migrate_2_5()
+    if version == "2.5":
+        version = migrate_2_6()
+
+        
+def migrate_1():
+    dbclient = DBClient.getInstance()
+    pentests = dbclient.findInDb("pollenisator","pentests",{}, True)
+    for pentest in pentests:
+        dbclient.updateInDb("pollenisator", "pentests", {"_id":ObjectId(pentest["_id"])}, {"$set":{"uuid":str(uuid.uuid4())}})
+    dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"1.1"}})
+    return "1.1"
+
+def migrate_1_1():
+    dbclient = DBClient.getInstance()
+    pentests = dbclient.findInDb("pollenisator","pentests",{}, True)
+    dbs = dbclient.client.list_database_names()
+    for pentest in pentests:
+        if pentest["uuid"] not in dbs:
+            print("missing pentest uuid, exporting it:")
+            outpath = dbclient.dumpDb(pentest["nom"])
+            return dbclient.importDatabase(dbclient.getPentestOwner(pentest["nom"]), outpath, nsFrom=pentest["nom"], nsTo=pentest["uuid"])
+    dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"1.2"}})
+    return "1.2"
+
+def migrate_2_5():
+    dbclient = DBClient.getInstance()
+    dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.5"}})
+    return "2.5"
+
+def migrate_2_6():
+    dbclient = DBClient.getInstance()
+    dbclient.deleteFromDb("pollenisator","settings",{"key":"tags"})
+    dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.6"}})
+    pentests = dbclient.findInDb("pollenisator","pentests",{}, True)
+    for pentest in pentests:
+        dbclient.updateInDb(pentest["uuid"], "settings", {"key":"tags"}, {"$set":{"key":"tags", "value":{}}})
+    
+    dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.6"}})
 
 def init():
     """Initialize empty databases or remaining tmp data from last run
     """
-    mongoInstance = MongoCalendar.getInstance()
-    mongoInstance.deleteFromDb("pollenisator", "sockets", {}, many=True, notify=False)
-    any_user = mongoInstance.findInDb("pollenisator", "users", {}, False)
+    dbclient = DBClient.getInstance()
+    dbclient.deleteFromDb("pollenisator", "sockets", {}, many=True, notify=False)
+    any_user = dbclient.findInDb("pollenisator", "users", {}, False)
     noninteractive = False
     if any_user is None:
         for arg in sys.argv:
@@ -148,21 +189,21 @@ def init():
             if arg == "--non-interactive":
                 noninteractive = True
         if noninteractive:
-            createAdmin("admin", "admin")
+            create_admin("admin", "admin")
         else:
-            createAdmin()
+            create_admin()
         #createWorker()
+    migrate()
     removeWorkers()
-    mongoInstance.resetRunningTools()
+    dbclient.resetRunningTools()
     conf = loadServerConfig()
-    port = int(conf.get("api_port", 5000))
-    https = conf.get("https", "false").lower() == "true"
+    port = int(os.environ.get("POLLENISATOR_PORT", conf.get("api_port", 5000)))
+    https = os.environ.get("POLLENISATOR_SSL",conf.get("https", "false").lower() == "true")
     if https:
         ssl_context = "adhoc"
     else:
         ssl_context = None
     return port
-
 
 def create_app():
     """Loads all API ymal modules and init the App with SocketIO + Connexion + Flask
@@ -185,16 +226,16 @@ def create_app():
         Args:
             data: A dictionary containing the worker's name and list of supported binaries.
         """
-        mongoInstance = MongoCalendar.getInstance()
+        dbclient = DBClient.getInstance()
         workerName = data.get("name")
-        binaries = data.get("binaries", [])
+        supported_plugins = data.get("supported_plugins", [])
         
-        socket = mongoInstance.findInDb("pollenisator","sockets", {"user":workerName}, False)
+        socket = dbclient.findInDb("pollenisator","sockets", {"user":workerName}, False)
         if socket is None:
-            mongoInstance.insertInDb("pollenisator", "sockets", {"sid":request.sid, "user":workerName, "pentest":""}, notify=False)
+            dbclient.insertInDb("pollenisator", "sockets", {"sid":request.sid, "user":workerName, "pentest":""}, notify=False)
         else:
-            mongoInstance.updateInDb("pollenisator", "sockets", {"user":workerName}, {"$set":{"sid":request.sid, "pentest":""}}, notify=False)
-        mongoInstance.registerWorker(workerName, binaries)
+            dbclient.updateInDb("pollenisator", "sockets", {"user":workerName}, {"$set":{"sid":request.sid, "pentest":""}}, notify=False)
+        dbclient.registerWorker(workerName, supported_plugins)
 
     @sm.socketio.event
     def registerForNotifications(data):
@@ -208,20 +249,23 @@ def create_app():
             Returns:
                 None
         """
+        logger.info("Registering socket for notifications "+str(data))
         sid = request.sid
         token = str(data.get("token", ""))
         pentest = str(data.get("pentest", ""))
         res = verifyToken(token)
-        token_info = decode_token(token)
         if res:
+            token_info = decode_token(token)
             if pentest in token_info["scope"]:
-                mongoInstance = MongoCalendar.getInstance()
-                socket = mongoInstance.findInDb("pollenisator", "sockets", {"sid":sid}, False)
+                dbclient = DBClient.getInstance()
+                socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid}, False)
                 if socket is None:
-                    mongoInstance.insertInDb("pollenisator", "sockets", {"sid":sid, "pentest":pentest}, False)
+                    dbclient.insertInDb("pollenisator", "sockets", {"sid":sid, "pentest":pentest}, False)
                 else:
-                    mongoInstance.updateInDb("pollenisator", "sockets", {"sid":sid}, {"$set":{"pentest":pentest}}, notify=False)
-    
+                    leave_room(pentest)
+                    dbclient.updateInDb("pollenisator", "sockets", {"sid":sid}, {"$set":{"pentest":pentest}}, notify=False)
+                join_room(pentest)
+
     @sm.socketio.event
     def keepalive(data):
         """Keep the worker alive and update the running tasks.
@@ -236,14 +280,16 @@ def create_app():
         """
         running_tasks = data.get("running_tasks", [])
         workerName = data.get("name")
-        mongoInstance = MongoCalendar.getInstance()        
-        worker = mongoInstance.findInDb("pollenisator","workers", {"name":workerName}, False)
+        dbclient = DBClient.getInstance()        
+        worker = dbclient.findInDb("pollenisator","workers", {"name":workerName}, False)
         if worker is None:
-            sm.socketio.emit("deleteWorker", room=request.sid)
+            sm.socketio.emit("deleteWorker", to=request.sid)
             return
         pentest = worker.get("pentest", "")
+        if pentest == "":
+            return
         for tool_iid in running_tasks:
-            tool_d = mongoInstance.findInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, False)
+            tool_d = dbclient.findInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, False)
             if tool_d is None:
                 sm.socketio.emit("stopCommand", {"tool_iid":str(tool_iid), "pentest":pentest}, room=request.sid)
             else:
@@ -259,15 +305,65 @@ def create_app():
         """
         sid = request.sid
         todel = None
-        mongoInstance = MongoCalendar.getInstance()
-        todel = mongoInstance.findInDb("pollenisator", "sockets", {"sid":sid}, False)
+        dbclient = DBClient.getInstance()
+        todel = dbclient.findInDb("pollenisator", "sockets", {"sid":sid}, False)
         if todel:
-            unregister(todel)
-            mongoInstance.deleteFromDb("pollenisator", "sockets", {"sid":sid}, False)
+            unregister(todel.get("worker"))
+            dbclient.deleteFromDb("pollenisator", "sockets", {"sid":sid}, False)
+
+    @sm.socketio.event
+    def test(data):
+        logger.info("TEST received : "+str(data))
+        logger.debug(data)
+        sm.socketio.emit("test", {"test":"HELLO"}, to=data.get("pentest"))
+        
+    @sm.socketio.on('get-document')
+    def get_document(data):
+        sid = request.sid
+        dbclient = DBClient.getInstance()
+        socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid}, False)
+        if socket is None:
+            return {"error":"Forbidden"}
+        if not(socket["pentest"] == data.get("pentest") and data.get("pentest") is not None):
+            return {"error":"Forbidden"}
+        pentest = data.get("pentest","")
+        doc = dbclient.findInDb(pentest, "documents", {"pentest":pentest}, False)
+        if doc is None:
+            ins_result = dbclient.insertInDb(pentest, "documents", {"data":{}, "pentest":pentest})
+            if ins_result is None:
+                return {"error": "Document could not be created"}
+            res = ins_result.inserted_id
+            doc = {}
+        sm.socketio.emit("load-document", doc.get("data", {}), room=request.sid)
+    
+    @sm.socketio.on("send-delta")
+    def send_delta(delta):
+        sid = request.sid
+        dbclient = DBClient.getInstance()
+        socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid}, False)
+        if socket is None:
+            return {"error":"Forbidden"}
+        if socket["pentest"] == "":
+            return {"error":"Forbidden"}
+        pentest = socket["pentest"]
+        sm.socketio.emit("received-delta", delta, room=pentest, include_self=False)
+    @sm.socketio.on("save-document")
+    def save_document(data):
+        dbclient = DBClient.getInstance()
+        sid = request.sid
+        socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid}, False)
+        if socket is None:
+            return {"error":"Forbidden"}
+        if socket["pentest"] == "":
+            return {"error":"Forbidden"}
+        pentest = socket["pentest"]
+        dbclient.updateInDb(pentest, "documents", {"pentest":pentest}, {"$set":{"data":data}})
 
     flask_app.json_encoder = JSONEncoder
     CORS(flask_app)
     return flask_app
+
+    
 
 def main():
     """Create the app and run it
@@ -282,7 +378,7 @@ def run(flask_app):
     sm = SocketManager.getInstance()
     port = init()
     try:
-        sm.socketio.run(flask_app, host='0.0.0.0', port=port,
+        sm.socketio.run(flask_app, host=os.environ.get("POLLENISATOR_BIND_IP", '0.0.0.0'), port=port,
                      debug=debug, use_reloader=False, )
     except KeyboardInterrupt:
         pass
@@ -291,3 +387,5 @@ def run(flask_app):
 # If we're running in stand alone mode, run the application
 if __name__ == '__main__':
     main()
+
+

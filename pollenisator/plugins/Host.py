@@ -1,10 +1,10 @@
 """A plugin to parse nikto scan"""
 
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
-from pollenisator.server.modules.ActiveDirectory.computers import Computer
-from pollenisator.core.Components.mongo import MongoCalendar
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
+from pollenisator.server.modules.activedirectory.computers import Computer
+from pollenisator.core.components.mongo import DBClient
 import re
 
 def parse_host_plain_text(text):
@@ -26,7 +26,7 @@ def parse_host_plain_text(text):
 
 
 class Host(Plugin):
-
+    default_bin_names = ["host"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:
@@ -63,7 +63,7 @@ class Host(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
-        tags = ["host-todo"]
+        tags = ["info-host"]
         targets = {}
         try:
             notes = file_opened.read().decode("utf-8")

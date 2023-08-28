@@ -1,8 +1,8 @@
 """A plugin to parse nmap httpmethods scan"""
 
-from pollenisator.server.ServerModels.Defect import ServerDefect
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
+from pollenisator.server.servermodels.defect import ServerDefect
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.plugins.plugin import Plugin
 import re
 
@@ -58,6 +58,8 @@ Nmap done: 1 IP address (1 host up) scanned in 0.95 seconds
 
 
 class HttpMethods(Plugin):
+    default_bin_names = ["nmap"]
+
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:
@@ -71,6 +73,18 @@ class HttpMethods(Plugin):
             string
         """
         return ".log.txt"
+    
+    def detect_cmdline(self, cmdline):
+        """Returns a boolean indicating if this plugin is able to recognize a command line as likely to output results for it.
+        Args:
+            cmdline: the command line to test
+        Returns:
+            bool
+        """
+        result = super().detect_cmdline(cmdline)
+        if result and "http-methods" in cmdline:
+            return True
+        return False
 
     def getFileOutputPath(self, commandExecuted):
         """Returns the output file path given in the executed command using getFileOutputArg
@@ -115,11 +129,11 @@ class HttpMethods(Plugin):
         p_o.updateInfos({"Methods": ", ".join(supported_methods)})
         targets[str(p_o.getId())] = {"ip": host, "port": port, "proto": proto}
         if "TRACE" in risky_methods:
-            p_o.addTag("HTTP-TRACE")
+            p_o.addTag(("HTTP-TRACE", None, "low"))
             risky_methods.remove("TRACE")
         if len(risky_methods) > 0:
             notes = "RISKY HTTP METHODS ALLOWED : " + " ".join(risky_methods)
             tags = []
-            p_o.addTag("RISKY-HTTP-METHODS")
-            tags.append("Interesting")
+            p_o.addTag(("RISKY-HTTP-METHODS", None, "low"))
+            tags.append("info-http-risky-methods")
         return notes, tags, "port", targets

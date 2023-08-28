@@ -29,6 +29,12 @@ components:
           schema:
             $ref: "#/components/schemas/Ips"
       required: true
+    Settings:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Settings"
+      required: true
     Ports:
       content:
         application/json:
@@ -47,6 +53,56 @@ components:
           schema:
             $ref: "#/components/schemas/DefectTemplate"
       required: true
+    Tags:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Tags"
+
+    addTag:
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - tag
+              - item_type
+            properties:
+              item_type:
+                type: string
+              tag:
+                type: string
+              overrideGroups:
+                type: boolean
+                default: false
+    delTag:
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - tag
+              - item_type
+            properties:
+              item_type:
+                type: string
+              tag:
+                type: string
+    setTags:
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - tags
+              - item_type
+            properties:
+              item_type:
+                type: string
+              tags:
+                type: array
+                items:
+                  type: string
     
     # binary_upfile:
     #   content:
@@ -79,12 +135,7 @@ components:
           schema:
             $ref: "#/components/schemas/Commands"
       required: true
-    CommandGroups:
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/CommandGroups"
-      required: true
+   
     Intervals:
       content:
         application/json:
@@ -108,11 +159,7 @@ components:
       properties:
         name:
           type: string
-        lvl:
-          type: string
         text:
-          type: string
-        ports:
           type: string
         owners:
           type: array
@@ -128,22 +175,7 @@ components:
           type: string
         timeout:
           type: integer
-    CommandGroups:
-      properties:
-        name:
-          type: string
-        priority:
-          type: integer
-          minimum: 0
-          maximum: 99
-        max_thread:
-          type: integer
-        indb:
-          type: string
-        commands:
-          type: array
-          items:
-            type: string
+
     Defects:
       properties:
         ip:
@@ -236,16 +268,30 @@ components:
           type: string
         datef:
           type: string
+    Settings:
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+    Tags:
+      properties:
+        item_id:
+          type: string
+        item_type:
+          type: string
+        tag:
+          type: array
+          items:
+            type: string
+        date:
+          type: string
     Ips:
       properties:
         ip:
           type: string
         notes:
           type: string
-        tags:
-          type: array
-          items:
-            type: string
         in_scopes:
           type: array
           items:
@@ -268,10 +314,7 @@ components:
           type: string
         notes:
           type: string
-        tags:
-          type: array
-          items:
-            type: string
+        
     Scopes:
       properties:
         wave:
@@ -282,6 +325,10 @@ components:
           type: string
     Tools:
       properties:
+        command_iid:
+          type: string
+        check_iid:
+          type: string
         wave:
           type: string
         scope:
@@ -388,9 +435,8 @@ paths:
           description: Successful read status operation
           content:
             application/json:
-              examples:
-                Status:
-                  value: 'true'
+              schema:
+                type: boolean
   /version:
     get:
       operationId: pollenisator.server.mongo.getVersion
@@ -411,6 +457,17 @@ paths:
       operationId: pollenisator.server.mongo.getUser
       tags:
         - Other
+      summary: Get current user
+      security: []
+      responses:
+        '200':
+          description: Successful read user
+    
+  /getTriggerLevels:
+    get:
+      operationId: pollenisator.server.servermodels.element.getTriggerLevels
+      tags:
+        - Modules
       summary: Get current user
       security: []
       responses:
@@ -740,7 +797,7 @@ paths:
             application/json:
               examples:
                 Success:
-                  value: '"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjY3MDE0MjcsImV4cCI6MTYyNjcwNTAyNywic3ViIjoiYWRtaW4iLCJzY29wZSI6WyJhZG1pbiIsInVzZXIiXX0.Tmv96VqKyqBa_xYjnfOqM7deKn6-UKmTB-rY9IrKX1M"'
+                  value: '"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjY3MDE0MjcsImV4cCI6MTYyNjcwNTAyNywic3ViIjoiYWRtaW4iLCJzY29wZSI6WyJhZG1pbiIsInVzZXIiXX0.tmv96VqKyqBa_xYjnfOqM7deKn6-UKmTB-rY9IrKX1M"'
         '400':
           description: Missing parameters
           content:
@@ -783,7 +840,7 @@ paths:
             application/json:
               examples:
                 Success:
-                  value: '"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjY3MDI2NzQsImV4cCI6MTYyNjcwNjI3NCwic3ViIjoiYWRtaW4iLCJzY29wZSI6WyJhZG1pbiIsInVzZXIiLCJUZXN0aW5hIiwib3duZXIiLCJwZW50ZXN0ZXIiXX0.PxLT9qfHAsoebokDIU34cmUWWmzSxkTXWV2nBJayzq8"'
+                  value: '"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjY3MDI2NzQsImV4cCI6MTYyNjcwNjI3NCwic3ViIjoiYWRtaW4iLCJzY29wZSI6WyJhZG1pbiIsInVzZXIiLCJUZXN0aW5hIiwib3duZXIiLCJwZW50ZXN0ZXIiXX0.pxLT9qfHAsoebokDIU34cmUWWmzSxkTXWV2nBJayzq8"'
         '403':
           description: Forbidden
           content:
@@ -897,7 +954,7 @@ paths:
                   default: false
       responses:
         "200":
-          description: successfully inserted an item in db, return its ObjectId (bson.ObjectId type)
+          description: successfully inserted an item in db, return its ObjectId (bson.objectid type)
           content:
             application/json:
               examples:
@@ -1021,8 +1078,8 @@ paths:
           content:
             application/json:
               examples:
-                toto tata:
-                  value: '"Unexpected token Token(''STRING'', ''toto'') at line 1, column 4."'
+                Failure:
+                  value: "Unexpected token Token('STRING', 'toto') at line 1, column 4."
         '403':
           description: Unknown pentest value given
           content:
@@ -1101,6 +1158,27 @@ paths:
               examples:
                 Server issue:
                   value: 'Failed to export'
+                  
+  "/exportCheatsheet":
+    get:
+      operationId: pollenisator.server.mongo.exportCheatsheet
+      tags:
+        - Cheatsheet
+      summary: Return user checkitems as json
+      responses:
+        "200":
+          description:  content
+          content:
+              application/json:
+                schema:
+                  type: string
+        '503':
+          description: Failed to create an export
+          content:
+            application/json:
+              examples:
+                Server issue:
+                  value: 'Failed to export'
  
   "/dumpDb/{dbName}":
     get:
@@ -1148,6 +1226,12 @@ paths:
       tags:
         - Mongo
       summary: Import an existing database file
+      parameters:
+        - name: orig_name
+          in: query
+          required: True
+          schema:
+            type: string
       requestBody:
         content:
           multipart/form-data:
@@ -1189,7 +1273,32 @@ paths:
               examples:
                 Success:
                   value: 'true'
-
+  /importCheatsheet:
+    post:
+      operationId: pollenisator.server.mongo.importCheatsheet
+      tags:
+        - Cheatsheet
+      summary: Import an existing cheatsheet database file
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                upfile:
+                  description: The file to upload
+                  type: string
+                  format: binary
+              required:
+                - upfile
+      responses:
+        "200":
+          description: Successfully imported the file
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
   /copyDb:
     post:
       operationId: pollenisator.server.mongo.copyDb
@@ -1395,9 +1504,8 @@ paths:
       operationId: pollenisator.server.mongo.bulk_delete_commands
       tags:
         - Commands
-        - CommandGroup
-      summary: Delete many commmands and group of commands in db
-      description: Delete many commmands and group of commands in db
+      summary: Delete many commmands in db
+      description: Delete many commmands in db
       requestBody:
         content:
           application/json:
@@ -1408,10 +1516,7 @@ paths:
                   type: array
                   items:
                     type: string
-                group_commands:
-                  type: array
-                  items:
-                    type: string
+              
       responses:
         "200":
           description: Successful bulk delete
@@ -1433,7 +1538,7 @@ paths:
             application/json:
               examples:
                 invalid collection in body:
-                  value: 'You can delete only commands and group_commands'
+                  value: 'You can delete only commands'
   /pentests:
     get:
       operationId: pollenisator.server.mongo.listPentests
@@ -1500,7 +1605,7 @@ paths:
                   value: '"Forbidden"'
   "/pentest/{pentest}":
     post:
-      operationId: pollenisator.server.mongo.registerCalendar
+      operationId: pollenisator.server.mongo.registerPentest
       tags:
         - pentest
       summary: Create a pentest
@@ -1550,10 +1655,18 @@ paths:
                       type: integer
                       minimum: 0
                       maximum: 1
+                    mission_name:
+                      type: string
+                    client_name:
+                      type: string
+                    lang:
+                      type: string
                   required:
                     - Add domains whose IP are in scope
                     - Add domains who have a parent domain in scope
                     - Add all domains found
+                    - mission_name
+                    - client_name
       responses:
         "200":
           description: Successful creation
@@ -1570,6 +1683,47 @@ paths:
               examples:
                 Reason:
                   value: '"*{Reason of failure, invalid name, or database already exist..}*"'
+    get:
+      summary: 'get general information about pentest'
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      tags:
+        - pentest
+      operationId: pollenisator.server.mongo.getPentestInfo
+      responses:
+        '200':
+          description: OK
+      description: Get pentest infos
+    put:
+      operationId: pollenisator.server.mongo.editPentest
+      tags:
+        - pentest
+      summary: Edit a pentest
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pentest_name:
+                  type: string
+                  required:
+                    - pentest_name
+
+      responses:
+        "200":
+          description: Successful edition
+       
   "/notification/{pentest}":
     get:
       operationId: pollenisator.server.mongo.fetchNotifications
@@ -1652,7 +1806,7 @@ paths:
                   value: '{
     "_id": "ObjectId|5fa5819aed75191f22168a40",
     "key": "tags",
-    "value": "{\"todo\": \"orange\", \"unscanned\": \"yellow\", \"pwned\": \"red\", \"Interesting\": \"dark green\", \"Uninteresting\": \"sky blue\", \"Neutral\": \"white\"}"
+    "value": {"todo":{"color":"orange", "level":"todo"}, "pwned":{"color":"red", "level":"high"}, "Interesting":{"color":"dark green", "level":"medium"}, "Uninteresting":{"color":"sky blue", "level":"low"}, "neutral":{"color":"transparent", "level":""}}
   }'
   /settings:
     get:
@@ -1671,7 +1825,7 @@ paths:
   {
     "_id": "ObjectId|5fa5819aed75191f22168a40",
     "key": "tags",
-    "value": "{\"todo\": \"orange\", \"unscanned\": \"yellow\", \"pwned\": \"red\", \"Interesting\": \"dark green\", \"Uninteresting\": \"sky blue\", \"Neutral\": \"white\"}"
+    "value": "{"todo":{"color":"orange", "level":"todo"}, "pwned":{"color":"red", "level":"high"}, "Interesting":{"color":"dark green", "level":"medium"}, "Uninteresting":{"color":"sky blue", "level":"low"}, "neutral":{"color":"transparent", "level":""}}"
   },
   {
     "_id": "ObjectId|5fbb793bed75195fe4274412",
@@ -1693,11 +1847,14 @@ paths:
               required:
                 - name
                 - color
+                - level
                 - pentest
               properties:
                 name:
                   type: string
                 color:
+                  type: string
+                level:
                   type: string
                 pentest:
                   type: string
@@ -1750,10 +1907,13 @@ paths:
               required:
                 - name
                 - color
+                - level
               properties:
                 name:
                   type: string
                 color:
+                  type: string
+                level:
                   type: string
                 global:
                   type: boolean
@@ -1788,10 +1948,13 @@ paths:
               required:
                 - name
                 - color
+                - level
               properties:
                 name:
                   type: string
                 color:
+                  type: string
+                level:
                   type: string
              
       responses:
@@ -1805,7 +1968,7 @@ paths:
 
   "/commands/find":
     post:
-      operationId: pollenisator.server.ServerModels.Command.getCommands
+      operationId: pollenisator.server.servermodels.command.getCommands
       tags:
         - Commands
       summary: "Return all exisiting"
@@ -1828,7 +1991,7 @@ paths:
                   value: '[{"_id": "60a3aaa129926f9ad7197919", "parent": "ObjectId|60a3aaa129926f9ad7197915",  "scope": "test",   "wave": "Testina" },  { "_id": "60f58598d8357e0f40e7fa66","scope": "test.fr" }]'
   "/commands/delete/{command_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Command.deleteCommand
+      operationId: pollenisator.server.servermodels.command.deleteCommand
       tags:
         - Mongo
       summary: Delete something in db
@@ -1855,38 +2018,10 @@ paths:
               examples:
                 pipeline is not a dict:
                   value: '"Pipeline argument was not a valid dictionnary"'
-  "/group_commands/delete/{command_group_iid}":
-    delete:
-      operationId: pollenisator.server.ServerModels.CommandGroup.deleteCommandGroup
-      tags:
-        - Mongo
-      summary: Delete something in db
-      description: Delete something in db
-      parameters:
-        - name: command_group_iid
-          in: path
-          description: group command iid to delete
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successful delete command group
-          content:
-            application/json:
-              examples:
-                Deleted count:
-                  value: '1'
-        '400':
-          description: Invalid parameters
-          content:
-            application/json:
-              examples:
-                pipeline is not a dict:
-                  value: '"Pipeline argument was not a valid dictionnary"'
+  
   "/commands/addToMyCommands/{command_iid}":
     post:
-      operationId: pollenisator.server.ServerModels.Command.addToMyCommands
+      operationId: pollenisator.server.servermodels.command.addToMyCommands
       tags:
         - Commands
       summary: "Mark this command as used by the current user"
@@ -1908,7 +2043,7 @@ paths:
   
   "/commands/{pentest}":
     post:
-      operationId: pollenisator.server.ServerModels.Command.insert
+      operationId: pollenisator.server.servermodels.command.insert
       tags:
         - Commands
       summary: Insert a command or return the conflicting existing one
@@ -1932,7 +2067,7 @@ paths:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/commands/update/{pentest}/{command_iid}":
     put:
-      operationId: pollenisator.server.ServerModels.Command.update
+      operationId: pollenisator.server.servermodels.command.update
       tags:
         - Commands
       summary: "Update a command "
@@ -1960,7 +2095,7 @@ paths:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/commands/{pentest}/{command_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Command.delete
+      operationId: pollenisator.server.servermodels.command.delete
       tags:
         - Commands
       summary: Delete a command and dependencies
@@ -1984,110 +2119,10 @@ paths:
             application/json:
               schema:
                 type: integer
-  "/group_commands/find":
-    post:
-      operationId: pollenisator.server.ServerModels.CommandGroup.getCommandGroups
-      tags:
-        - CommandGroup
-      summary: "Return all existing"
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                pipeline:
-                  type: string
-                  example: "{}"
-      responses:
-        "200":
-          description: successful find command with parameters
-          content:
-            application/json:
-              examples:
-                success:
-                  value: '[{"_id": "60a3aaa129926f9ad7197919", "name":"Nmaps", "owner":"user1", commands:["5f9150fbed75193ef71ba47f"]}]'
-  "/group_commands/{pentest}/{command_group_iid}":
-    delete:
-      operationId: pollenisator.server.ServerModels.CommandGroup.delete
-      tags:
-        - CommandGroup
-      summary: Delete a group of command
-      parameters:
-        - name: pentest
-          in: path
-          description: pentest name
-          required: true
-          schema:
-            type: string
-        - name: command_group_iid
-          in: path
-          description: group of command iid to delete
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Get a delete count
-          content:
-            application/json:
-              schema:
-                type: integer
-  "/group_commands/{pentest}":
-    post:
-      operationId: pollenisator.server.ServerModels.CommandGroup.insert
-      tags:
-        - CommandGroup
-      summary: Insert a group of command or return the conflicting existing one
-      parameters:
-        - name: pentest
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        $ref: "#/components/requestBodies/CommandGroups"
-      responses:
-        "200":
-          description: command group insertion success or already existing object
-          content:
-            application/json:
-              examples:
-                Success:
-                  value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
-                Already exist:
-                  value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
-  "/group_commands/update/{pentest}/{command_group_iid}":
-    put:
-      operationId: pollenisator.server.ServerModels.CommandGroup.update
-      tags:
-        - CommandGroup
-      summary: "Update a group of command "
-      parameters:
-        - name: pentest
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: command_group_iid
-          in: path
-          description: group of command iid to delete
-          required: true
-          schema:
-            type: string
-      requestBody:
-        $ref: "#/components/requestBodies/CommandGroups"
-      responses:
-        "200":
-          description: command group update success
-          content:
-            application/json:
-              examples:
-                success:
-                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+  
   "/defects/{pentest}":
     post:
-      operationId: pollenisator.server.ServerModels.Defect.insert
+      operationId: pollenisator.server.servermodels.defect.insert
       tags:
         - Defects
       summary: Insert a defect or return the conflicting existing one
@@ -2111,7 +2146,7 @@ paths:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/defects/update/{pentest}/{defect_iid}":
     put:
-      operationId: pollenisator.server.ServerModels.Defect.update
+      operationId: pollenisator.server.servermodels.defect.update
       tags:
         - Defects
       summary: "Update a defect "
@@ -2139,7 +2174,7 @@ paths:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/defects/{pentest}/{defect_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Defect.delete
+      operationId: pollenisator.server.servermodels.defect.delete
       tags:
         - Defects
       summary: Delete a defect and dependencies
@@ -2165,7 +2200,7 @@ paths:
                 type: integer
   "/intervals/{pentest}":
     post:
-      operationId: pollenisator.server.ServerModels.Interval.insert
+      operationId: pollenisator.server.servermodels.interval.insert
       tags:
         - Intervals
       summary: Insert an interval or return the conflicting existing one
@@ -2189,7 +2224,7 @@ paths:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/intervals/update/{pentest}/{interval_iid}":
     put:
-      operationId: pollenisator.server.ServerModels.Interval.update
+      operationId: pollenisator.server.servermodels.interval.update
       tags:
         - Intervals
       summary: "Update an interval "
@@ -2217,7 +2252,7 @@ paths:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/intervals/{pentest}/{interval_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Interval.delete
+      operationId: pollenisator.server.servermodels.interval.delete
       tags:
         - Intervals
       summary: Delete an interval and dependencies
@@ -2243,7 +2278,7 @@ paths:
                 type: integer
   "/ips/{pentest}":
     post:
-      operationId: pollenisator.server.ServerModels.Ip.insert
+      operationId: pollenisator.server.servermodels.ip.insert
       tags:
         - Ips
       summary: Insert an ip or return the conflicting existing one
@@ -2267,7 +2302,7 @@ paths:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/ips/update/{pentest}/{ip_iid}":
     put:
-      operationId: pollenisator.server.ServerModels.Ip.update
+      operationId: pollenisator.server.servermodels.ip.update
       tags:
         - Ips
       summary: "Update an ip "
@@ -2295,7 +2330,7 @@ paths:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/ips/{pentest}/{ip_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Ip.delete
+      operationId: pollenisator.server.servermodels.ip.delete
       tags:
         - Ips
       summary: Delete an ip and dependencies
@@ -2321,7 +2356,7 @@ paths:
                 type: integer
   "/ports/{pentest}":
     post:
-      operationId: pollenisator.server.ServerModels.Port.insert
+      operationId: pollenisator.server.servermodels.port.insert
       tags:
         - Ports
       summary: Insert an port or return the conflicting existing one
@@ -2345,7 +2380,7 @@ paths:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/ports/update/{pentest}/{port_iid}":
     put:
-      operationId: pollenisator.server.ServerModels.Port.update
+      operationId: pollenisator.server.servermodels.port.update
       tags:
         - Ports
       summary: Update a port
@@ -2373,7 +2408,7 @@ paths:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/ports/{pentest}/{port_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Port.delete
+      operationId: pollenisator.server.servermodels.port.delete
       tags:
         - Ports
       summary: Delete a port and dependencies
@@ -2397,49 +2432,49 @@ paths:
             application/json:
               schema:
                 type: integer
-  "/ports/{pentest}/{port_iid}/addCustomTool/":
-    post:
-      operationId: pollenisator.server.ServerModels.Port.addCustomTool
-      tags:
-        - Ports
-      summary: Add a tool manually to a port in the Custom Tools wave
-      parameters:
-        - name: pentest
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: port_iid
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - command_iid
-              properties:
-                tool_name:
-                  type: string
-                command_iid:
-                  type: string
-        required: true
-      responses:
-        "504":
-          description: Empty response is good
-        "503":
-          description: Not connected
-          content:
-            application/json:
-              examples:
-                Not connected:
-                  value: '"Not connected"'
+  # "/ports/{pentest}/{port_iid}/addCustomTool/":
+  #   post:
+  #     operationId: pollenisator.server.servermodels.port.addCustomTool
+  #     tags:
+  #       - Ports
+  #     summary: Add a tool manually to a port in the Custom Tools wave
+  #     parameters:
+  #       - name: pentest
+  #         in: path
+  #         required: true
+  #         schema:
+  #           type: string
+  #       - name: port_iid
+  #         in: path
+  #         required: true
+  #         schema:
+  #           type: string
+  #     requestBody:
+  #       content:
+  #         application/json:
+  #           schema:
+  #             type: object
+  #             required:
+  #               - command_iid
+  #             properties:
+  #               tool_name:
+  #                 type: string
+  #               command_iid:
+  #                 type: string
+  #       required: true
+  #     responses:
+  #       "504":
+  #         description: Empty response is good
+  #       "503":
+  #         description: Not connected
+  #         content:
+  #           application/json:
+  #             examples:
+  #               Not connected:
+  #                 value: '"Not connected"'
   "/scopes/{pentest}":
     post:
-      operationId: pollenisator.server.ServerModels.Scope.insert
+      operationId: pollenisator.server.servermodels.scope.insert
       tags:
         - Scopes
       summary: Insert a scope or return the conflicting existing one
@@ -2463,7 +2498,7 @@ paths:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/scopes/update/{pentest}/{scope_iid}":
     put:
-      operationId: pollenisator.server.ServerModels.Scope.update
+      operationId: pollenisator.server.servermodels.scope.update
       tags:
         - Scopes
       summary: Update a scope
@@ -2491,7 +2526,7 @@ paths:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/scopes/{pentest}/{scope_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Scope.delete
+      operationId: pollenisator.server.servermodels.scope.delete
       tags:
         - Scopes
       summary: Delete a scope and dependencies
@@ -2517,7 +2552,7 @@ paths:
                 type: integer
   /tools/plugins:
     get:
-      operationId: pollenisator.server.ServerModels.Tool.listPlugins
+      operationId: pollenisator.server.servermodels.tool.listPlugins
       tags:
         - Tools
       summary: Get a list of existing plugins
@@ -2527,11 +2562,11 @@ paths:
           content:
             application/json:
               examples:
-                List of plugins available:
-                  value: '["Nmap.py", "WhatWeb.py", ...]'
+                List of plugins available and default bins:
+                  value: '[{"plugin":"Nmap.py", "default_bin_names":["nmap"]}, {"plugin":"WhatWeb.py", "default_bin_names":["whatweb","whatweb.rb"]}, ...]'
   "/tools/{pentest}":
     post:
-      operationId: pollenisator.server.ServerModels.Tool.insert
+      operationId: pollenisator.server.servermodels.tool.insert
       tags:
         - Tools
       summary: Insert a tool or return the conflicting existing one
@@ -2555,7 +2590,7 @@ paths:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/tools/update/{pentest}/{tool_iid}":
     put:
-      operationId: pollenisator.server.ServerModels.Tool.update
+      operationId: pollenisator.server.servermodels.tool.update
       tags:
         - Tools
       summary: Update a tool
@@ -2583,7 +2618,7 @@ paths:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/tools/{pentest}/{tool_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Tool.delete
+      operationId: pollenisator.server.servermodels.tool.delete
       tags:
         - Tools
       summary: Delete a tool and dependencies
@@ -2607,9 +2642,36 @@ paths:
             application/json:
               schema:
                 type: integer
+  "/tools/{pentest}/{tool_iid}/getDetailedString":
+    get:
+      operationId: pollenisator.server.servermodels.tool.getDetailedString
+      tags:
+        - Tools
+      summary: get a tool DetailedString
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: tool_iid
+          in: path
+          description: tool iid to get
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A detailed string describing the tool
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'ip:port name'
   "/waves/{pentest}":
     post:
-      operationId: pollenisator.server.ServerModels.Wave.insert
+      operationId: pollenisator.server.servermodels.wave.insert
       tags:
         - Waves
       summary: Insert a wave or return the conflicting existing one
@@ -2633,7 +2695,7 @@ paths:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
   "/waves/update/{pentest}/{wave_iid}":
     put:
-      operationId: pollenisator.server.ServerModels.Wave.update
+      operationId: pollenisator.server.servermodels.wave.update
       tags:
         - Waves
       summary: Update a wave
@@ -2661,7 +2723,7 @@ paths:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
   "/waves/{pentest}/{wave_iid}":
     delete:
-      operationId: pollenisator.server.ServerModels.Wave.delete
+      operationId: pollenisator.server.servermodels.wave.delete
       tags:
         - Waves
       summary: Delete a wave and dependencies
@@ -2685,10 +2747,139 @@ paths:
             application/json:
               schema:
                 type: integer
-  
+
+  "/tags/{pentest}/addTag/{item_id}":
+    put:
+      operationId: pollenisator.server.servermodels.tag.addTag
+      tags:
+        - Tags
+      summary: "Add a tag to an item"
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: item_id
+          in: path
+          description: item id to tag
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/addTag"
+      responses:
+        "200":
+          description: tag added with success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: true
+  "/tags/{pentest}/delTag/{item_id}":
+    put:
+      operationId: pollenisator.server.servermodels.tag.delTag
+      tags:
+        - Tags
+      summary: "Remove a tag from an item"
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: item_id
+          in: path
+          description: item id to remove tag from
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/delTag"
+      responses:
+        "200":
+          description: tag deleted with success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: true
+
+  "/tags/{pentest}/setTags/{item_id}":
+    put:
+      operationId: pollenisator.server.servermodels.tag.setTags
+      tags:
+        - Tags
+      summary: "Set tags for an item"
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: item_id
+          in: path
+          description: item id to set tags for
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/setTags"
+      responses:
+        "200":
+          description: tag setted with success
+          content:
+            application/json:
+              examples:
+                success:
+                  value: true
+
+  '/settings/{pentest}':
+    post:
+      operationId: pollenisator.server.settings.upsert
+      tags:
+        - Settings
+      summary: Insert or update a settings
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: '#/components/requestBodies/Settings'
+      responses:
+        '200':
+          description: Successful settings insertion
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"res":true, "key":"<key>"}'
+    get:
+      summary: ''
+      operationId: pollenisator.server.settings.find
+      tags:
+        - Settings
+      responses:
+        '200':
+          description: OK
+      description: ''
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - schema:
+            type: string
+          in: query
+          name: key
+          description: the setting key to retrieve
+                
   "/tools/{pentest}/craftCommandLine/{tool_iid}":
     get:
-      operationId: pollenisator.server.ServerModels.Tool.craftCommandLine
+      operationId: pollenisator.server.servermodels.tool.craftCommandLine
       tags:
         - Tools
       summary: Get the command line to execute the tool (using plugin + parameters) a
@@ -2706,10 +2897,16 @@ paths:
           required: true
           schema:
             type: string
+        - name: commandline_options
+          schema:
+            type: string
+            default: ''
+          in: query
+          description: change command default options
       responses:
         "200":
-          description: The command line to execute with a marker for |outputDir| to be
-            replaced
+          description: 'The command line to execute (if add_output_dir : with a marker for |outputDir| to be
+            replaced)'
           content:
             application/json:
               examples:
@@ -2730,7 +2927,7 @@ paths:
                   value: '"An empty command line was crafted"'
   "/tools/{pentest}/completeDesiredOuput/{tool_iid}":
     get:
-      operationId: pollenisator.server.ServerModels.Tool.completeDesiredOuput
+      operationId: pollenisator.server.servermodels.tool.completeDesiredOuput
       tags:
         - Tools
       summary: add the plugin desired output option in the command (using plugin + parameters) a
@@ -2782,7 +2979,7 @@ paths:
                   value: '"An empty command line was crafted"'
   "/tools/getDesiredOutputForPlugin":
     post:
-      operationId: pollenisator.server.ServerModels.Tool.getDesiredOutputForPlugin
+      operationId: pollenisator.server.servermodels.tool.getDesiredOutputForPlugin
       tags:
         - Tools
       summary: add the plugin desired output option in the command (using plugin + parameters) a
@@ -2823,7 +3020,7 @@ paths:
                   value: '"An empty command line was crafted"'
   "/tools/{pentest}/importResult/{tool_iid}":
     post:
-      operationId: pollenisator.server.ServerModels.Tool.importResult
+      operationId: pollenisator.server.servermodels.tool.importResult
       tags:
         - Tools
       summary: Upload a tool result file
@@ -2877,12 +3074,13 @@ paths:
               examples:
                 Unknown tool:
                   value: '"The given iid does not match an existing tool"'
-  "/tools/{pentest}/launchTask/{tool_iid}":
-    post:
-      operationId: pollenisator.server.ServerModels.Tool.launchTask
+
+  "/tools/{pentest}/getQueue":
+    get:
+      operationId: pollenisator.server.servermodels.tool.getQueue
       tags:
         - Tools
-      summary: Try to launch a tool on any worker
+      summary: list tools in queue
       parameters:
         - name: pentest
           in: path
@@ -2890,9 +3088,25 @@ paths:
           required: true
           schema:
             type: string
-        - name: tool_iid
+      responses:
+        "200":
+          description: get the queue list
+          content:
+            application/json:
+              examples:
+                Success :
+                  value: '["tool1", "tool2]'
+
+  "/tools/{pentest}/queueTasks":
+    post:
+      operationId: pollenisator.server.servermodels.tool.queueTasks
+      tags:
+        - Tools
+      summary: queue a tool to run on any worker
+      parameters:
+        - name: pentest
           in: path
-          description: tool id to launch
+          description: pentest name
           required: true
           schema:
             type: string
@@ -2900,20 +3114,18 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                group_id:
-                  type: string
-                group_name:
-                  type: string
+              type: array
+              items:
+                type: string
+
       responses:
         "200":
-          description: Successfully launched task
+          description: Successfully queued tasks
           content:
             application/json:
               examples:
                 Success :
-                  value: '"Success"'
+                  value: '{"successes":[{"tool_iid":123123123}, "failures":[{"tool_iid":123123124,"msg":"Already in queue"}]}'
         "404":
           description: Not found
           content:
@@ -2925,7 +3137,7 @@ paths:
                   value: '"No worker available"'
   "/tools/{pentest}/stopTask/{tool_iid}":
     post:
-      operationId: pollenisator.server.ServerModels.Tool.stopTask
+      operationId: pollenisator.server.servermodels.tool.stopTask
       tags:
         - Tools
       summary: Try to stop a tool
@@ -2985,7 +3197,7 @@ paths:
 
   "/tools/{pentest}/getProgress/{tool_iid}":
     get:
-      operationId: pollenisator.server.ServerModels.Tool.getProgress
+      operationId: pollenisator.server.servermodels.tool.getProgress
       tags:
         - Tools
       summary: Try to get progress of a tool
@@ -3031,7 +3243,7 @@ paths:
 
   "/tools/{pentest}/{tool_iid}/changeStatus":
     post:
-      operationId: pollenisator.server.ServerModels.Tool.setStatus
+      operationId: pollenisator.server.servermodels.tool.setStatus
       tags:
         - Tools
       summary: Update a tool staus
@@ -3083,7 +3295,7 @@ paths:
     
   "/workers/{name}/setInclusion":
     post:
-      operationId: pollenisator.server.modules.Worker.worker.setInclusion
+      operationId: pollenisator.server.modules.worker.worker.setInclusion
       tags:
         - Worker
       summary: Set a worker exclusion from database
@@ -3126,300 +3338,3 @@ paths:
               examples:
                 success:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
-  # # autoscan
-  # "/autoscan/{pentest}/start":
-  #   post:
-  #     operationId: pollenisator.server.modules.AutoScan.AutoScanMaster.startAutoScan
-  #     tags:
-  #       - Auto scan
-  #     summary: Start an automatic scan
-  #     parameters:
-  #       - name: pentest
-  #         in: path
-  #         description: pentest name
-  #         required: true
-  #         schema:
-  #           type: string
-  #     responses:
-  #       "200":
-  #         description: Successfully started auto scan
-  #         content:
-  #           application/json:
-  #             examples:
-  #               Success:
-  #                 value: '"Success"'
-  #       "403":
-  #         description: Autoscan already running
-  #         content:
-  #           application/json:
-  #             examples:
-  #              Already running:
-  #                 value: '"An autoscan is already running"'
-  #       "404":
-  #         description: No worker available/found
-  #         content:
-  #           application/json:
-  #             examples:
-  #               No worker available:
-  #                 value: '"No worker registered for this pentest"'
-            
-  # "/autoscan/{pentest}/status":
-  #   get:
-  #     operationId: pollenisator.server.modules.AutoScan.AutoScanMaster.getAutoScanStatus
-  #     tags:
-  #       - Auto scan
-  #     summary: Returns status of automatic scan
-  #     parameters:
-  #       - name: pentest
-  #         in: path
-  #         description: pentest name
-  #         required: true
-  #         schema:
-  #           type: string
-  #     responses:
-  #       "200":
-  #         description: Successfully returned status of auto scan
-  #         content:
-  #           application/json:
-  #             schema:
-  #               type: boolean
-
-  # "/autoscan/{pentest}/stop":
-  #   post:
-  #     operationId: pollenisator.server.modules.AutoScan.AutoScanMaster.stopAutoScan
-  #     tags:
-  #       - Auto scan
-  #     summary: Stop an automatic scan
-  #     parameters:
-  #       - name: pentest
-  #         in: path
-  #         description: pentest name
-  #         required: true
-  #         schema:
-  #           type: string
-  #     responses:
-  #       "200":
-  #         description: Successfully stoped auto scan
-  #         content:
-  #           application/json:
-  #             examples:
-  #               Success:
-  #                 value: '"Success"'
-  # #file manager
-  # "/files/{pentest}/upload/proof/{defect_iid}":
-  #   post:
-  #     operationId: pollenisator.server.modules.FileManager.FileManager.upload
-  #     tags:
-  #       - FileManager
-  #     summary: Upload a file
-  #     parameters:
-  #       - name: pentest
-  #         in: path
-  #         description: pentest name
-  #         required: true
-  #         schema:
-  #           type: string
-  #       - name: defect_iid
-  #         in: path
-  #         description: file will be tied to given iid
-  #         required: true
-  #         schema:
-  #           type: string
-  #     requestBody:
-  #       content:
-  #         multipart/form-data:
-  #           schema:
-  #             type: object
-  #             properties:
-  #               upfile:
-  #                 description: The file to upload
-  #                 type: string
-  #                 format: binary
-  #             required:
-  #               - upfile
-  #     responses:
-  #       "200":
-  #         description: Successfully uploaded file
-  #         content:
-  #           application/json:
-  #             examples:
-  #               Successful:
-  #                 value: '"{filename} was successfully uploaded"'
-  #       "404":
-  #         description: defect not found
-  #         content:
-  #           application/json:
-  #             examples:
-  #               Unknown defect:
-  #                 value: '"The given iid does not match an existing defect"'
-  # "/files/{pentest}/download/{filetype}/{attached_iid}":
-  #   get:
-  #     operationId: pollenisator.server.modules.FileManager.FileManager.listFiles
-  #     tags:
-  #       - FileManager
-  #     summary: Lists attached to given iid
-  #     parameters:
-  #       - name: pentest
-  #         in: path
-  #         description: pentest name
-  #         required: true
-  #         schema:
-  #           type: string
-  #       - name: attached_iid
-  #         in: path
-  #         description: file will be tied to given iid
-  #         required: true
-  #         schema:
-  #           type: string
-  #       - name: filetype
-  #         in: path
-  #         required: true
-  #         schema:
-  #           type: string
-  #           enum:
-  #             - result
-  #             - proof
-  #     responses:
-  #       "200":
-  #         description: Successfully listed files
-  #         content:
-  #           application/json:
-  #             schema:
-  #               type: array
-  #               items:
-  #                 type: string
-  # "/files/{pentest}/download/{filetype}/{attached_iid}/{filename}":
-  #   get:
-  #     operationId: pollenisator.server.modules.FileManager.FileManager.download
-  #     tags:
-  #       - FileManager
-  #     summary: Download a file
-  #     parameters:
-  #       - name: pentest
-  #         in: path
-  #         description: pentest name
-  #         required: true
-  #         schema:
-  #           type: string
-  #       - name: attached_iid
-  #         in: path
-  #         description: file will be tied to given iid
-  #         required: true
-  #         schema:
-  #           type: string
-  #       - name: filetype
-  #         in: path
-  #         required: true
-  #         schema:
-  #           type: string
-  #           enum:
-  #             - result
-  #             - proof
-  #       - name: filename
-  #         in: path
-  #         required: true
-  #         schema:
-  #           type: string
-  #     responses:
-  #       "200":
-  #         description: Successfully downloaded file
-  #         content:
-  #           application/octet-steam:
-  #             schema:
-  #               type: string
-  #               format: binary
-                
-  #       "404":
-  #         description: File not found
-  #         content:
-  #           application/json:
-  #             examples:
-  #               file not found:
-  #                 value: '"File not found"'
-  # "/files/{pentest}/{defect_iid}/{filename}":
-  #   delete:
-  #     operationId: pollenisator.server.modules.FileManager.FileManager.rmProof
-  #     tags:
-  #       - FileManager
-  #     summary: Remove a proof file
-  #     parameters:
-  #       - name: pentest
-  #         in: path
-  #         description: pentest name
-  #         required: true
-  #         schema:
-  #           type: string
-  #       - name: defect_iid
-  #         in: path
-  #         description: object iid which have the file to delete
-  #         required: true
-  #         schema:
-  #           type: string
-  #       - name: filename
-  #         in: path
-  #         required: true
-  #         schema:
-  #           type: string
-  #     responses:
-  #       "200":
-  #         description: Successfully deleted the file
-  #         content:
-  #           application/json:
-  #             examples:
-  #               Successful:
-  #                 value: '"Successfully deleted {filename}"'
-  #       "404":
-  #         description: File not found
-  #         content:
-  #           application/json:
-  #             examples:
-  #               file not found:
-  #                 value: '"File not found"'
-
-  # "/files/{pentest}/import":
-  #   post:
-  #     operationId: pollenisator.server.modules.FileManager.FileManager.importExistingFile
-  #     tags:
-  #       - FileManager
-  #     summary: Import an existing tool file
-  #     parameters:
-  #       - name: pentest
-  #         in: path
-  #         description: pentest name
-  #         required: true
-  #         schema:
-  #           type: string
-  #     requestBody:
-  #       content:
-  #         multipart/form-data:
-  #           schema:
-  #             type: object
-  #             properties:
-  #               upfile:
-  #                 description: The file to upload
-  #                 type: string
-  #                 format: binary
-  #               plugin:
-  #                 description: plugin name to use or auto-detect
-  #                 type: string
-  #               default_target:
-  #                 description: Default pentest object to affect to
-  #                 type: string
-  #                 default: ""
-  #               cmdline:
-  #                 description: command line used if knowingly
-  #                 type: string
-  #                 default: ""
-  #             required:
-  #               - upfile
-  #               - plugin
-  #     responses:
-  #       "200":
-  #         description: Successfully imported file
-  #         content:
-  #           application/json:
-  #             examples:
-  #               successful import of nmap file:
-  #                 value: '{
-  #                   "Nmap.py": 1
-  #                   }'

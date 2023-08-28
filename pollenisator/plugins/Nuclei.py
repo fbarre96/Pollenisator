@@ -1,8 +1,8 @@
 """A plugin to parse nuclei results"""
 
-from pollenisator.server.ServerModels.Defect import ServerDefect
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.ServerModels.Port import ServerPort
+from pollenisator.server.servermodels.defect import ServerDefect
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.plugins.plugin import Plugin
 import json
 
@@ -23,16 +23,12 @@ def parse(opened_file):
         try:
             data = json.loads(line)
             if "template-id" in data and "info" in data and "name" in data["info"] and "author" in data["info"] and "tags" in data["info"]:
-                host = data["host"]
-                if data["type"] == "network":
-                    parts = data["host"].split(":")
-                    if len(parts) == 2:
-                        host = parts[0]
-                elif data["type"] == "http":
-                    host = host.split("://")[-1]
-                    parts = host.split(":")
-                    if len(parts) == 2:
-                        host = parts[0]
+                host = data.get("host", "")
+                host = host.split("://")[-1]
+                parts = host.split(":")
+                if len(parts) == 2:
+                    host = parts[0]
+                
                 ret[host] = ret.get(host,[]) + [data]
             else:
                 return None
@@ -47,12 +43,13 @@ def parse(opened_file):
 
 
 class Nuclei(Plugin):
+    default_bin_names = ["nuclei", "nuclei.py"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:
             string
         """
-        return " -json -o "
+        return " -j -o "
 
     def getFileOutputExt(self):
         """Returns the expected file extension for this command result file
@@ -99,8 +96,10 @@ class Nuclei(Plugin):
             for finding in findings:
                 notes += finding["info"]["name"]+" ("+finding["info"]["severity"]+") "+finding["info"].get("description", "")+"\n"
             for finding in findings:
-                if finding["info"]["severity"] in ["medium", "high", "critical"]:
-                    tags = ["interesting-nuclei"]
+                if finding["info"]["severity"] in ["medium"]:
+                    tags = [("todo-nuclei-severity","orange", "medium")]
+                if finding["info"]["severity"] in ["critical","high"]:
+                    tags = [("todo-high-nuclei-severity","red", "high")]
             ip_o = ServerIp(pentest).initialize(host, notes, infos={"plugin":Nuclei.get_name()})
             inserted = ip_o.addInDb()
             if not inserted["res"]:

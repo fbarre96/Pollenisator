@@ -1,9 +1,9 @@
 """A plugin to parse a bloodhound scan """
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.ServerModels.Ip import ServerIp
-from pollenisator.server.modules.ActiveDirectory.users import User
-from pollenisator.server.modules.ActiveDirectory.computers import Computer
-from pollenisator.core.Components.Utils import performLookUp
+from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.modules.activedirectory.users import User
+from pollenisator.server.modules.activedirectory.computers import Computer
+from pollenisator.core.components.utils import performLookUp
 from zipfile import ZipFile
 from io import BytesIO
 import json
@@ -86,6 +86,7 @@ def updateDatabase(pentest, users, computers):
 class BloodHound(Plugin):
     """Inherits Plugin
     """
+    default_bin_names = ["bloodhound-python", "bloodhound.py"]
 
     def changeCommand(self, command, outputDir, toolname):
         """
@@ -127,8 +128,21 @@ class BloodHound(Plugin):
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
 
-
     def Parse(self, pentest, file_opened, **kwargs):
+        """
+        Parse a opened file to extract information
+        Example file:
+      
+        Args:
+            file_opened: the open file
+            kwargs: port("") and proto("") are valid
+        Returns:
+            a tuple with 4 values (All set to None if Parsing wrong file): 
+                0. notes: notes to be inserted in tool giving direct info to pentester
+                1. tags: a list of tags to be added to tool 
+                2. lvl: the level of the command executed to assign to given targets
+                3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
+        """
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
             return None, None, None, None
         path = kwargs.get("filename")

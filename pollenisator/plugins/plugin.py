@@ -1,5 +1,7 @@
 """A registry for all subclasses of Plugin"""
 REGISTRY = {}
+import shlex
+import os
 
 def register_class(target_class):
     """Register the given class
@@ -23,6 +25,7 @@ class Plugin(metaclass=MetaPlugin):
         autoDetect: indicating to auto-detect that this plugin is able to auto detect.
     """
     autoDetect = True  # Authorize parsing function be used for autodetection
+    default_bin_names = ["default"]
 
     def autoDetectEnabled(self):
         """Returns a boolean indicating if this plugin is able to recognize a file to be parsed by it.
@@ -72,6 +75,20 @@ class Plugin(metaclass=MetaPlugin):
             string: the path to file created
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip()
+    
+    def detect_cmdline(self, cmdline):
+        """Returns a boolean indicating if this plugin is able to recognize a command line as likely to output results for it.
+        Args:
+            cmdline: the command line to test
+        Returns:
+            bool
+        """
+        cmd_args = shlex.split(cmdline)
+        if not cmd_args:
+            return False
+        if os.path.basename(cmd_args[0].lower()) in self.__class__.default_bin_names:
+            return True
+        return False
 
     def Parse(self, pentest, file_opened, **_kwargs):
         """
