@@ -176,14 +176,15 @@ class Computer(ServerElement):
             self.add_dc_checks()
         self._infos = infos
 
-    def add_user(self, domain, username, password):
-        user_m = User().initialize(self.pentest, None, domain, username, password)
+    def add_user(self, domain, username, password, infos=None):
+        user_m = User().initialize(self.pentest, None, domain, username, password, infos=infos)
         res = user_m.addInDb()
+        if not res["res"]:
+            user_m = User.fetchObject(self.pentest, {"_id":ObjectId(res["iid"])})
+            user_m.updateInfos(infos)
         if str(res["iid"]) not in self.users and password.strip() != "":
             self.users.append(str(res["iid"]))
             self.add_user_checks()
-            
-            
         self.update()
 
     def add_admin(self, domain, username, password):

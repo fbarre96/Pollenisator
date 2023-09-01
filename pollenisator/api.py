@@ -138,7 +138,9 @@ def migrate():
 
 def migrate_0():
     dbclient = DBClient.getInstance()
-    dbclient.client.renameCollection("calendars", "pentests")
+    dbclient.client["pollenisator"]["calendars"].rename("pentests")
+    dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"1"}})
+    return "1"
 
 def migrate_1():
     dbclient = DBClient.getInstance()
@@ -156,7 +158,7 @@ def migrate_1_1():
         if pentest["uuid"] not in dbs:
             print("missing pentest uuid, exporting it:")
             outpath = dbclient.dumpDb(pentest["nom"])
-            return dbclient.importDatabase(dbclient.getPentestOwner(pentest["nom"]), outpath, nsFrom=pentest["nom"], nsTo=pentest["uuid"])
+            dbclient.importDatabase(dbclient.getPentestOwner(pentest["nom"]), outpath, nsFrom=pentest["nom"], nsTo=pentest["uuid"])
     dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"1.2"}})
     return "1.2"
 

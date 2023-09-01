@@ -91,6 +91,8 @@ def importExistingFile(pentest, upfile, body, **kwargs):
             targets["default"] = default_target
             dbclient.send_notify(pentest, "Cheatsheet", default_target, "notif_terminal")
         for tag in tags:
+            if isinstance(tag, list):
+                tag = tuple(tag)
             if isinstance(tag, tuple):
                 level = tag[2] if tag[2] is not None else "info"
                 color = tag[1] if tag[1] is not None else "transparent"

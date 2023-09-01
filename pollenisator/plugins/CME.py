@@ -5,6 +5,7 @@ from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.server.modules.activedirectory.computers import Computer
 
+from pollenisator.server.modules.activedirectory.users import User
 from pollenisator.plugins.plugin import Plugin
 
 def getInfos(cme_file):
@@ -36,18 +37,18 @@ NOT POWNED:
 \x1b[1m\x1b[34mSMB\x1b[0m          10.10.11.152    445    DC01             [1m[34m[*][0m Windows 10.0 Build 17763 x64 (name:DC01) (domain:timelapse) (signing:True) (SMBv1:False)
 \x1b[1m\x1b[34mSMB\x1b[0m         10.10.11.152    445    DC01             [1m[35m[-][0m timelapse\admin:admin STATUS_ACCESS_DENIED 
 
-CONNECTED
-\x1b[1m\x1b[34mSMB\x1b[0m          10.0.0.86:445 ALGOSECURE-VM   ^[[1m^[[34m[*]^[[0m Windows 10.0 Build 18362 (name:ALGOSECURE-VM) (domain:ALGOSECURE-VM)
-\x1b[1m\x1b[34mSMB\x1b[0m           10.0.0.86:445 ALGOSECURE-VM   ^[[1m^[[32m[+]^[[0m ALGOSECURE-VM\algosecure:Alg123!*
+SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] north.sevenkingdoms.local\brandon.stark account vulnerable to asreproast attack 
+
 """
     retour = []
     regex_info = re.compile(r"^\S+(?:LDAP|SMB)\S+\s+(\S+)\s+(\d+)\s+\S+\s+\S+\[\*\]\S+\s+([^\(]+)\(name:(.*)\) \(domain:(.*)\) \(signing:(True|False)\) \(SMBv1:(False|True)\)$", re.MULTILINE)
     regex_logon_failed = re.compile(
-        r"^\S+(?:LDAP|SMB)\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[\-\]\S+ ([^\\]+)\\([^:]+):(.*?) STATUS_LOGON_FAILURE\s*$", re.MULTILINE)
+        r"^\S+(?:LDAP|SMB)\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[\-\]\S+ ([^\\]+)\\([^:\n]+):(.*?)$", re.MULTILINE)
     regex_success = re.compile(
         r"^\S+(?:LDAP|SMB)\S+\s+(\S+)[\s+:](\d+)\s+(\S+)\s+\S+\[\+\]\S+ ([^\\]+)\\([^:]+):(.*?)(?= \x1b|$)(.*)$", re.MULTILINE)
     regex_module_lsassy = re.compile(r"^\S+LSASSY\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[33m([^\\]+)\\(\S+)\s+(\S+)(?=\x1b).+$")
     regex_module_ntds = re.compile(r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[33m(.+)\x1b\S*$")
+    regex_module_asproast = re.compile(r"^\S+(?:LDAP|SMB)\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[\-\]\S+ ([^\\]+)\\([^:]+) (account vulnerable to asreproast attack)\s*$")
     notes = ""
     countFound = 0
     countPwn = 0
@@ -56,12 +57,13 @@ CONNECTED
     lsassy = False
     mode = ""
     secrets = []
+    tags = []
     for line in cme_file:
         if isinstance(line, bytes):
             try:
                 line = line.decode("utf-8")
             except UnicodeDecodeError:
-                return None, None, None, None, None, None
+                return None, None, None, None, None, None , None
         line=line.strip()
         # Search ip in file
         if "\x1b[1m\x1b[34mSMB\x1b[0m" in line:
@@ -105,7 +107,19 @@ CONNECTED
                     else:
                         toAdd["password"] = success_infos.group(6)
             else:
+                
                 res_infos = re.search(regex_info, line)
+                res_asrep = re.search(regex_module_asproast, line)
+                if res_asrep is not None:
+                    toAdd["type"] = "interesting"
+                    toAdd["ip"] = res_asrep.group(1)
+                    toAdd["port"] = res_asrep.group(2)
+                    toAdd["machine_name"] = res_asrep.group(3)
+                    toAdd["domain"] = res_asrep.group(4)
+                    toAdd["username"] = res_asrep.group(5)
+                    toAdd["reason"] = res_asrep.group(6).strip()
+                    tags.append(("asreproastable", "orange", "high"))
+                    notes += f"ASREPROASTABLE USER FOUND: "+str(toAdd)
                 if res_infos is not None:
                     toAdd["type"] = "info"
                     toAdd["ip"] = res_infos.group(1)
@@ -132,16 +146,16 @@ CONNECTED
                             countPwn += 1
                         else:
                             countSuccess += 1
-                    # else:
-                    #     failure_infos = re.search(regex_logon_failed, line)
-                    #     if failure_infos is not None:
-                    #         toAdd["type"] = "failure"
-                    #         toAdd["ip"] = failure_infos.group(1)
-                    #         toAdd["port"] = failure_infos.group(2)
-                    #         toAdd["machine_name"] = failure_infos.group(3)
-                    #         toAdd["domain"] = failure_infos.group(4)
-                    #         toAdd["username"] = failure_infos.group(5)
-                    #         toAdd["password"] = failure_infos.group(6)
+                    else:
+                        failure_infos = re.search(regex_logon_failed, line)
+                        if failure_infos is not None:
+                            toAdd["type"] = "failure"
+                            toAdd["ip"] = failure_infos.group(1)
+                            toAdd["port"] = failure_infos.group(2)
+                            toAdd["machine_name"] = failure_infos.group(3)
+                            toAdd["domain"] = failure_infos.group(4)
+                            toAdd["username"] = failure_infos.group(5)
+                            toAdd["reason"] = failure_infos.group(6).strip()
                         
             if toAdd.keys():
                 retour.append(toAdd)
@@ -161,11 +175,11 @@ CONNECTED
             if "toAdd" in locals():
                 toAdd["ntds"] = toAdd.get("ntds", []) + [module_infos.group(4)]
     if not cmeFound:
-        return None, None, None, None, None, None
+        return None, None, None, None, None, None, None
     if lsassy:
         notes = f"CME LSASSY Success"
     notes = f"Pwn3d count : {countPwn}\nConnection success count : {countSuccess}\nHost found : {countFound}\nSecrets found : {len(secrets)}\n"+ ("\n".join(secrets)) + notes
-    return retour, countPwn, countSuccess, notes, secrets, lsassy
+    return retour, countPwn, countSuccess, notes, secrets, lsassy, tags
 
 
 def editScopeIPs(pentest, hostsInfos):
@@ -195,7 +209,16 @@ def editScopeIPs(pentest, hostsInfos):
                 domain = infos.get("domain", "")
                 if domain != "":
                     infosToAdd["domain"] = domain
-            elif infos["type"] == "success" or infos["type"] == "failure":
+            elif infos["type"] == "failure":
+                if infos["reason"] in ["KDC_ERR_PREAUTH_FAILED", "KDC_ERR_CLIENT_REVOKED"]:
+                    user_model = User(pentest).initialize(pentest, None, infos.get("domain", ""), infos.get("username", ""), None)
+                    infosToAdd["users"] = infosToAdd.get("users", []) + [user_model]
+            elif infos["type"] == "interesting":
+                if "asreproast" in infos["reason"]:
+                    user_model = User(pentest).initialize(pentest, None, infos.get("domain", ""), infos.get("username", ""), infos={"asreproastable":True})
+                    infosToAdd["users"] = infosToAdd.get("users", []) + [user_model]
+                    
+            elif infos["type"] == "success":
                 powned = infos.get("powned", False)
                 creds = (infos.get("domain", ""), infos.get("username", ""), infos.get("password", infos.get("hashNT", "")))
                 infosToAdd["users"] = infosToAdd.get("users", []) + [creds]
@@ -227,9 +250,12 @@ def editScopeIPs(pentest, hostsInfos):
                 port_m.addTag(("pwned", "red", "high"))
             computer_m = Computer.fetchObject(pentest, {"ip":port_m.ip})
             if computer_m is not None: 
-                creds = infosToAdd.get("users", [])
-                for cred in creds:
-                    computer_m.add_user(cred[0], cred[1], cred[2])
+                users = infosToAdd.get("users", [])
+                for user in users:
+                    if isinstance(user, User):
+                        computer_m.add_user(user.domain, user.username, user.password, user.infos)
+                    else:
+                        computer_m.add_user(cred[0], cred[1], cred[2])
                 creds = infosToAdd.get("admins", [])
                 for cred in creds:
                     computer_m.add_admin(cred[0], cred[1], cred[2])
@@ -294,10 +320,10 @@ class CME(Plugin):
         """
         notes = ""
         tags = []
-        hostsInfos, countPwnd,  countSuccess, notes, secrets, lsassy = getInfos(file_opened)
+        hostsInfos, countPwnd,  countSuccess, notes, secrets, lsassy, tags = getInfos(file_opened)
         if countPwnd is not None:
             if int(countPwnd) > 0:
-                tags = [("pwned-cme", "red", "high")]
+                tags += [("pwned-cme", "red", "high")]
         if countSuccess is not None:
             if int(countSuccess) > 0:
                 tags += [("info-cme-connection-success", "green", "info")]

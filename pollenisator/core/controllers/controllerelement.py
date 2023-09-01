@@ -86,7 +86,10 @@ class ControllerElement:
         """
         dbclient = DBClient.getInstance()
         for tag in tags:
-            dbclient.doRegisterTag(self.model.pentest, tag)
+            if (isinstance(tag, tuple) or isinstance(tag, list)) and len(tag) == 3:
+                dbclient.doRegisterTag(self.model.pentest, name=tag[0], color=tag[1], level=tag[2])
+            else:
+                dbclient.doRegisterTag(self.model.pentest, tag)
         tags = dbclient.updateInDb(self.model.pentest, "tags", {"item_id": ObjectId(self.model.getId())}, {"$set":{"tags":tags, "date": datetime.now(), "item_id":ObjectId(self.model.getId()), "item_type":self.model.__class__.coll_name}}, upsert=True)
 
     def delTag(self, tag):

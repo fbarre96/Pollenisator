@@ -214,11 +214,11 @@ def craftContext(pentest, **kwargs):
     remarks = dbclient.findInDb(pentest, "remarks", {}, True)
     for remark in remarks:
         if remark["type"].lower() == "positive":
-            context["positive_remarks"].append(remark["description"])
+            context["positive_remarks"].append(remark.get("description", remark.get("title", "")))
         elif remark["type"].lower() == "negative":
-            context["negative_remarks"].append(remark["description"])
+            context["negative_remarks"].append(remark.get("description", remark.get("title", "")))
         elif remark["type"].lower() == "neutral":
-            context["neutral_remarks"].append(remark["description"])
+            context["neutral_remarks"].append(remark.get("description", remark.get("title", "")))
     context["colors"] = {
         "fix": {
             "Easy": "00B0F0",
