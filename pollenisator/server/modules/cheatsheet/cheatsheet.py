@@ -1,5 +1,8 @@
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
+from pollenisator.core.controllers.commandcontroller import CommandController
+from pollenisator.server.servermodels.command import ServerCommand
+from pollenisator.server.servermodels.command import doInsert as commandDoInsert
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.permission import permission
 from pollenisator.core.components.utils import JSONDecoder
@@ -194,11 +197,21 @@ def find(body):
     return results
 
 @permission("pentester")
-def applyToPentest(pentest, iid, body):
+def applyToPentest(pentest, iid, body, **kwargs):
+    user = kwargs["token_info"]["sub"]
     dbclient = DBClient.getInstance()
     check_item = CheckItem.fetchObject({"_id":ObjectId(iid)})
     if check_item is None:
         return "Not found", 404
-    data = check_item.getData()
+    for command in check_item.commands:
+        pentest_equiv_command = ServerCommand.fetchObject({"original_iid":str(command)}, pentest)
+        if pentest_equiv_command is None:
+            orig = ServerCommand.fetchObject({"_id":ObjectId(command)})
+            if orig:
+                mycommand =  CommandController(orig).getData()
+                mycommand["original_iid"] = str(mycommand["_id"])
+                mycommand["_id"] = None
+                mycommand["indb"] = pentest
+                res = commandDoInsert(pentest, mycommand, user)
     check_item.apply_retroactively(pentest)
     return {"res": True}

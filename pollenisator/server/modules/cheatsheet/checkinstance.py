@@ -256,7 +256,7 @@ def getInformations(pentest, iid):
         return "Not found", 404
     check_item = CheckItem.fetchObject({"_id": ObjectId(inst.check_iid)})
     if check_item is None:
-        return "Check item parent not found"
+        return "Check item parent not found", 404
     data = inst.getData()
     check_item_data = check_item.getData()
     data["check_item"] = check_item_data
