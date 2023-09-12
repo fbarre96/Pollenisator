@@ -12,11 +12,6 @@ import pollenisator.core.components.utils as utils
 import shutil
 import os
 import docker
-try:
-    import git
-    git_available = True
-except:
-    git_available = False
 
 dbclient = DBClient.getInstance()
 
@@ -93,18 +88,13 @@ def stop_docker(docker_id):
         return False, "Unable to stop docker "+str(e)
 
 def start_docker(force_reinstall, docker_id):
-    worker_subdir = os.path.join(utils.getMainDir(), "PollenisatorWorker")
-    if os.path.isdir(worker_subdir) and force_reinstall:
-        git.Git(worker_subdir).pull()
-    if not os.path.isdir(worker_subdir):
-        git.Git(utils.getMainDir()).clone("https://github.com/fbarre96/PollenisatorWorker.git")
     try:
         client = docker.from_env()
         clientAPI = docker.APIClient()
     except Exception as e:
         return False, "Unable to launch docker "+str(e)
     try:
-        log_generator = clientAPI.pull("algosecure/pollenisator-worker",stream=True,decode=True)
+        log_generator = clientAPI.pull("algosecure/pollenisator-worker:latest",stream=True,decode=True)
         for byte_log in log_generator:
             log_line = byte_log["status"].strip()
             logger.info(log_line)
@@ -116,7 +106,6 @@ def start_docker(force_reinstall, docker_id):
     network_mode = "host"
     container = client.containers.run(image=image[0], 
                     network_mode=network_mode,
-                    volumes={os.path.join(utils.getMainDir(), "PollenisatorWorker"):{'bind':'/home/Pollenisator', 'mode':'rw'}},
                     environment={"POLLENISATOR_WORKER_NAME":str(docker_id)},
                     detach=True)
     if container.logs() != b"":

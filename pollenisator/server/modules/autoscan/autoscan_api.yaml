@@ -90,3 +90,32 @@ paths:
               examples:
                 Success:
                   value: '"Success"'
+
+  "/tools/{pentest}/{tool_iid}/runTask":
+    post:
+      operationId: pollenisator.server.servermodels.tool.runTask
+      tags:
+        - Tools
+      summary: Run a task
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: tool_iid
+          in: path
+          description: tool id to stop
+          required: true
+          schema:
+            type: string
+      
+      responses:
+        "200":
+          description: Successfully updated tool status
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'

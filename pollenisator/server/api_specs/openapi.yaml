@@ -3097,6 +3097,68 @@ paths:
                 Success :
                   value: '["tool1", "tool2]'
 
+  "/tools/{pentest}/unqueueTasks":
+    post:
+      operationId: pollenisator.server.servermodels.tool.unqueueTasks
+      tags:
+        - Tools
+      summary: unqueue a tool to run on any worker
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+
+      responses:
+        "200":
+          description: Successfully queued tasks
+          content:
+            application/json:
+              examples:
+                Success :
+                  value: '{"successes":[{"tool_iid":123123123}, "failures":[{"tool_iid":123123124,"msg":"Not in queue"}]}'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              examples:
+                Tool not found:
+                  value: '"Tool not found"'
+                Worker not found:
+                  value: '"No worker available"'
+  "/tools/{pentest}/clearTasks":
+    post:
+      operationId: pollenisator.server.servermodels.tool.clearTasks
+      tags:
+        - Tools
+      summary: Clear queue
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+     
+      responses:
+        "200":
+          description: Successfully clearered tasks
+          content:
+            application/json:
+              examples:
+                Success :
+                  value: '{"successes":[{"tool_iid":123123123}, "failures":[{"tool_iid":123123124,"msg":"Not in queue"}]}'
+      
+
   "/tools/{pentest}/queueTasks":
     post:
       operationId: pollenisator.server.servermodels.tool.queueTasks
@@ -3292,6 +3354,7 @@ paths:
               examples:
                 Success:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+                  
     
   "/workers/{name}/setInclusion":
     post:

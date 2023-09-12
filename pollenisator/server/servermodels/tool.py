@@ -148,6 +148,12 @@ class ServerTool(Tool, ServerElement):
         dbclient = DBClient.getInstance()
         dbclient.updateInDb(self.pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":self.getId()}})
         return True, "remove from to queue"
+    
+    @staticmethod
+    def clearQueue(pentest):
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":[]}})
+        return True, "Cleared queue"
         
         
     def getCommandToExecute(self, command_o):
@@ -589,6 +595,28 @@ def queueTasks(pentest, body, **kwargs):
     return results
 
 @permission("pentester")
+def unqueueTasks(pentest, body, **kwargs):
+    logger.debug("Remove tasks : "+str(body))
+    results = {"successes":[], "failures":[]}
+    tools_iid = body
+    for tool_iid in tools_iid:
+        if isinstance(tool_iid, str) and tool_iid.startswith("ObjectId|"):
+            tool_iid = tool_iid.replace("ObjectId|", "")
+        tool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
+        if tool:
+            res, msg = tool.removeFromQueue()
+            if res:
+                results["successes"].append({"tool_iid":tool_iid})
+            else:
+                results["failures"].append({"tool_iid":tool_iid, "error":msg})
+    return results
+
+@permission("pentester")
+def clearTasks(pentest, **kwargs):
+    ServerTool.clearQueue(pentest)
+
+
+@permission("pentester")
 def getQueue(pentest):
     dbclient = DBClient.getInstance()
     res = []
@@ -611,7 +639,7 @@ def isLaunchable(pentest, tool_iid, authorized_commands):
     dbclient = DBClient.getInstance()
     launchableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     command_o = ServerCommand.fetchObject({"_id": ObjectId(launchableTool.command_iid)}, pentest)
-    if str(command_o.getId()) not in authorized_commands:
+    if authorized_commands is not None and str(command_o.getId()) not in authorized_commands:
         return "Command not authorized for autoscan", 403
     if launchableTool is None:
         logger.debug("Error in launch task : not found :"+str(tool_iid))
@@ -647,7 +675,16 @@ def launchTask(pentest, tool_iid, socket_sid, worker_token):
     sm.socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(tool_iid)}, room=socket_sid)
     dbclient = DBClient.getInstance()
     dbclient.send_notify(pentest, "tools", tool_iid, "tool_start")
-    return "Success ", 200
+    return "Success", 200
+
+@permission("pentester")
+def runTask(pentest, tool_iid, **kwargs):
+    msg, statuscode = isLaunchable(pentest, tool_iid, None)
+    if statuscode != 200:
+        return msg, statuscode
+    socket_sid = msg
+    encoded = encode_token(kwargs["token_info"])
+    return launchTask(pentest, tool_iid, socket_sid, encoded)
 
 @permission("pentester")
 def getProgress(pentest, tool_iid):
@@ -690,10 +727,8 @@ def getProgress(pentest, tool_iid):
             break
     if len(response) == 0 or response is None:
         return "Could not get worker progress", 404
-
-    
     logger.info('Received response:' +str(response))
-    if isinstance(response["result"], str):
+    if isinstance(response["result"], str) or  isinstance(response["result"], bool):
         return response["result"], 200
     return response["result"].decode(), 200
     
