@@ -355,10 +355,7 @@ def getPentestInfo(pentest, **kwargs):
         infos = {}
         infos["_id"] = str(tagged["_id"])
         infos["date"] = tagged.get("date")
-        try:
-            infos["name"] = tagged.get("tags", [])[0]
-        except IndexError:
-            continue
+        infos["tags"] = tagged.get("tags", [])
         class_element = ServerElement.classFactory(tagged.get("item_type"))
         elem = class_element.fetchObject(pentest, tagged.get("item_id"))
         infos["detailed_string"] = elem.getDetailedString()

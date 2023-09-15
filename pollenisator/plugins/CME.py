@@ -45,7 +45,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
     regex_logon_failed = re.compile(
         r"^\S+(?:LDAP|SMB)\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[\-\]\S+ ([^\\]+)\\([^:\n]+):(.*?)$", re.MULTILINE)
     regex_success = re.compile(
-        r"^\S+(?:LDAP|SMB)\S+\s+(\S+)[\s+:](\d+)\s+(\S+)\s+\S+\[\+\]\S+ ([^\\]+)\\([^:]+):(.*?)(?= \x1b|$)(.*)$", re.MULTILINE)
+        r"^\S+(?:LDAP|SMB)\S+\s+(\S+)(?:\s+|:)(\d+)\s+(\S+)\s+\S+\[\+\]\S+ ([^\\]+)\\([^:]+):(.*?)(?= \x1b|$)(.*)$", re.MULTILINE)
     regex_module_lsassy = re.compile(r"^\S+LSASSY\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[33m([^\\]+)\\(\S+)\s+(\S+)(?=\x1b).+$")
     regex_module_ntds = re.compile(r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[33m(.+)\x1b\S*$")
     regex_module_asproast = re.compile(r"^\S+(?:LDAP|SMB)\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[\-\]\S+ ([^\\]+)\\([^:]+) (account vulnerable to asreproast attack)\s*$")
@@ -255,7 +255,7 @@ def editScopeIPs(pentest, hostsInfos):
                     if isinstance(user, User):
                         computer_m.add_user(user.domain, user.username, user.password, user.infos)
                     else:
-                        computer_m.add_user(cred[0], cred[1], cred[2])
+                        computer_m.add_user(user[0], user[1], user[2])
                 creds = infosToAdd.get("admins", [])
                 for cred in creds:
                     computer_m.add_admin(cred[0], cred[1], cred[2])
