@@ -9,6 +9,7 @@ from pollenisator.server.permission import permission
 
 class Share(ServerElement):
     coll_name = "ActiveDirectory"
+    name = "Share"
     def __init__(self, pentest=None, valuesFromDb=None):
         if valuesFromDb is None:
             valuesFromDb = {}

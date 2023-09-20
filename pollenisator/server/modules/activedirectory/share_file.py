@@ -8,7 +8,9 @@ class ShareFile(ServerElement):
 
     Do not edit the class manually.
     """
-
+    coll_name = "ActiveDirectory"
+    name = "ShareFile"
+    
     def __init__(self, valuesFromDb=None):
         if valuesFromDb is None:
             valuesFromDb = {}

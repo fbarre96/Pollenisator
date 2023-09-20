@@ -32,6 +32,7 @@ class ServerScope(Scope, ServerElement):
     @classmethod
     def replaceCommandVariables(cls, pentest, command, data):
         scope = data.get("scope", "")
+        scope = "" if scope is None else scope
         command = command.replace("|scope|", scope)
         if not isNetworkIp(scope):
             depths = scope.split(".")

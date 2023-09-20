@@ -15,7 +15,7 @@ import pollenisator.server.modules.activedirectory.computers as Computer
 
 class User(ServerElement):
     coll_name = "ActiveDirectory"
-    
+    name = "User"
     def __init__(self, pentest=None, valuesFromDb=None):
         if valuesFromDb is None:
             valuesFromDb = {}

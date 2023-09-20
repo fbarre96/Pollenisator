@@ -103,6 +103,9 @@ class CheckItem(ServerElement):
         class_registered = ServerElement.getClassWithTrigger(self.lvl)
         if class_registered is None:
             return
+        elif class_registered == ServerElement:
+            ServerElement.apply_retroactively_custom(pentest, self)
+            return
         all_objects = class_registered.fetchObjects(pentest, {})
         for obj in all_objects:
             obj.checkAllTriggers()
@@ -169,8 +172,6 @@ def update(iid, body):
         return "Not found", 404
     # Check if the title of the checkitem to update is the same as the one provided in the body
     checkitem = CheckItem("pollenisator", body)
-    if checkitem.title != existing.title:
-        return "Forbidden", 403
     # Remove the type and _id from the body because they can't be updated
     if "type" in body:
         del body["type"]

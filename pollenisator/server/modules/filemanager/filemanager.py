@@ -150,7 +150,10 @@ def importExistingFile(pentest, upfile, body, **kwargs):
 @permission("pentester")
 def listFiles(pentest, attached_iid, filetype):
     filepath = os.path.join(local_path, pentest, filetype, attached_iid)
-    files = os.listdir(filepath)
+    try:
+        files = os.listdir(filepath)
+    except FileNotFoundError:
+        return "File not found", 404
     return files
 
 @permission("pentester")

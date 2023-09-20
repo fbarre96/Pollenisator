@@ -537,7 +537,11 @@ class DBClient:
             Return the pymongo result of the find command for the command collection
         """
         self.connect()
-        return self._delete(db, collection, pipeline, many, notify)
+        iids = self._delete(db, collection, pipeline, many, notify)
+        for iid in iids:
+            if db != "pollenisator":
+                self._delete(db, "tags", {"target_id":{ObjectId(iid)}}, False, True)
+        return iids
 
     def _delete(self, dbName, collection, pipeline, many=False, notify=True):
         """
@@ -555,19 +559,23 @@ class DBClient:
         self.connect()
         db = self.client[dbName]
         res = None
+        iids_deleted = []
         if many:
             elems = db[collection].find(pipeline)
             if notify:
                 for elem in elems:
+                    iids_deleted.append(elem["_id"])
                     self.send_notify(dbName, collection, elem["_id"], "delete")
             res = db[collection].delete_many(pipeline)
         else:
             elem = db[collection].find_one(pipeline)
             if elem is not None:
                 if notify:
+                    iids_deleted.append(elem["_id"])
                     self.send_notify(dbName, collection, elem["_id"], "delete")
                 res = db[collection].delete_one(pipeline)
-        return res
+
+        return iids_deleted
 
     def listPentests(self, username=None):
         """Return the list of pollenisator databases.

@@ -357,8 +357,15 @@ def getPentestInfo(pentest, **kwargs):
         infos["date"] = tagged.get("date")
         infos["tags"] = tagged.get("tags", [])
         class_element = ServerElement.classFactory(tagged.get("item_type"))
-        elem = class_element.fetchObject(pentest, tagged.get("item_id"))
-        infos["detailed_string"] = elem.getDetailedString()
+        if class_element is not None:
+            elem = class_element.fetchObject(pentest, {"_id":ObjectId(tagged.get("item_id"))})
+            if elem is not None:
+            
+                infos["detailed_string"] = elem.getDetailedString()
+            else:
+                infos["detailed_string"] = "Target not found"
+        else:
+            infos["detailed_string"] = "Target not found"
         ret["tagged"].append(infos)
     ret["hosts_count"] = dbclient.countInDb(pentest, "ips")
     ret["tools_done_count"] = dbclient.countInDb(pentest, "tools", {"status":"done"})

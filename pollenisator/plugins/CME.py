@@ -1,6 +1,8 @@
 """A plugin to parse a CrackMapExex scan"""
 
 import re
+
+from bson import ObjectId
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.server.modules.activedirectory.computers import Computer
@@ -118,7 +120,6 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                     toAdd["domain"] = res_asrep.group(4)
                     toAdd["username"] = res_asrep.group(5)
                     toAdd["reason"] = res_asrep.group(6).strip()
-                    tags.append(("asreproastable", "orange", "high"))
                     notes += f"ASREPROASTABLE USER FOUND: "+str(toAdd)
                 if res_infos is not None:
                     toAdd["type"] = "info"
@@ -215,7 +216,9 @@ def editScopeIPs(pentest, hostsInfos):
                     infosToAdd["users"] = infosToAdd.get("users", []) + [user_model]
             elif infos["type"] == "interesting":
                 if "asreproast" in infos["reason"]:
-                    user_model = User(pentest).initialize(pentest, None, infos.get("domain", ""), infos.get("username", ""), infos={"asreproastable":True})
+                    user_info = infos
+                    user_info["asreproastable"] = True
+                    user_model = User(pentest).initialize(pentest, None, infos.get("domain", ""), infos.get("username", ""), infos=user_info)
                     infosToAdd["users"] = infosToAdd.get("users", []) + [user_model]
                     
             elif infos["type"] == "success":
@@ -253,7 +256,11 @@ def editScopeIPs(pentest, hostsInfos):
                 users = infosToAdd.get("users", [])
                 for user in users:
                     if isinstance(user, User):
-                        computer_m.add_user(user.domain, user.username, user.password, user.infos)
+                        user_iid = computer_m.add_user(user.domain, user.username, user.password, user.infos )
+                        user_m = User.fetchObject(pentest, {"_id":ObjectId(user_iid)})
+                        if user.infos.get("asreproastable", False):
+                            user_m.addTag(("asreproastable", "orange", "high"), True)
+
                     else:
                         computer_m.add_user(user[0], user[1], user[2])
                 creds = infosToAdd.get("admins", [])

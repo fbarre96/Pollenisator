@@ -309,10 +309,13 @@ def getTargetRepr(pentest, body):
     ret = {}
     for data in checkinstances:
         class_element = ServerElement.classFactory(data["target_type"])
-        elem = class_element.fetchObject(pentest, {"_id": ObjectId(data["target_iid"])})
-        if elem is None:
-            ret_str = "Target not found"
+        if class_element is not None:
+            elem = class_element.fetchObject(pentest, {"_id": ObjectId(data["target_iid"])})
+            if elem is None:
+                ret_str = "Target not found"
+            else:
+                ret_str = elem.getDetailedString()
+            ret[str(data["_id"])] = ret_str
         else:
-            ret_str = elem.getDetailedString()
-        ret[str(data["_id"])] = ret_str
+            ret[str(data["_id"])] = "Target not found"
     return ret

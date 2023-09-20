@@ -78,6 +78,8 @@ class ServerTool(Tool, ServerElement):
     def getCheckItem(self):
         from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
         check = CheckInstance.fetchObject(self.pentest, {"_id":ObjectId(self.check_iid)})
+        if check is None:
+            return None
         return check.getCheckItem()
 
     def setInScope(self):
@@ -118,7 +120,7 @@ class ServerTool(Tool, ServerElement):
         for tool in queue:
             tool = ServerTool.fetchObject(self.pentest, {"_id":ObjectId(tool)})
             tool_check = tool.getCheckItem()
-            if tool_check.priority > priority:
+            if tool_check is not None and tool_check.priority > priority:
                 return i
             i+=1
         return i
@@ -185,12 +187,24 @@ class ServerTool(Tool, ServerElement):
                     data = target
         command = ServerElement.replaceAllCommandVariables(self.pentest, command, data)
         tool_infos = self.infos
-        for info in tool_infos:
-            command = command.replace("|tool.infos."+str(info)+"|", str(tool_infos.get(info, '')))
+        command = self.unpack_info(tool_infos, command, depth=0, max_depth=3)
+            
         if isinstance(command_o, str):
             return command
         return command
-
+    
+    def unpack_info(self, infos_dict: dict, command: str, depth=0, max_depth=3):
+        """Recursively unpack infos dict into command string
+        """
+        if depth > max_depth:
+            return
+        for key in infos_dict.keys():
+            if isinstance(infos_dict[key], dict):
+                command = self.unpack_info(infos_dict[key], command, depth+1, max_depth)
+            else:
+                command = command.replace("|tool.infos."+str(key)+"|", str(infos_dict.get(key, '')))
+        return command
+    
     def getPluginName(self):
         dbclient = DBClient.getInstance()
         if self.plugin_used != "":
