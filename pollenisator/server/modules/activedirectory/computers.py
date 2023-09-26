@@ -68,7 +68,7 @@ class Computer(ServerElement):
         Returns:
             Returns the defect +title.
         """
-        return self.domain+"\\"+self.name + " ("+self.ip+")"
+        return str(self.domain)+"\\"+str(self.name) + " ("+str(self.ip)+")"
 
     def getData(self):
         return {"_id": self._id, "name":self.name, "ip":self.ip, "domain":self.domain,
@@ -243,7 +243,7 @@ def delete(pentest, computer_iid):  # noqa: E501
     if res is None:
         return 0
     else:
-        return res.deleted_count
+        return res
 
 @permission("pentester")
 def update(pentest, computer_iid, body):  # noqa: E501

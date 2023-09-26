@@ -540,8 +540,8 @@ class DBClient:
         iids = self._delete(db, collection, pipeline, many, notify)
         for iid in iids:
             if db != "pollenisator":
-                self._delete(db, "tags", {"target_id":{ObjectId(iid)}}, False, True)
-        return iids
+                self._delete(db, "tags", {"target_id":ObjectId(iid)}, False, True)
+        return len(iids)
 
     def _delete(self, dbName, collection, pipeline, many=False, notify=True):
         """
@@ -869,7 +869,7 @@ class DBClient:
             elif isinstance(tags["value"], str):
                 try:
                     t = json.loads(tags["value"])
-                    if isinstance(t, str): # double stringified bug ...
+                    if isinstance(t, str): 
                         t = json.loads(t)
                     return t
                 except:

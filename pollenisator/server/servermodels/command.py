@@ -95,7 +95,7 @@ def doDelete(pentest, command):
     if res is None:
         return 0
     else:
-        return res.deleted_count
+        return res
 
 @permission("user")
 def deleteCommand(command_iid, **kwargs):

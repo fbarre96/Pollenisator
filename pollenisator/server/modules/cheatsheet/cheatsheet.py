@@ -162,7 +162,7 @@ def delete(iid):
     res = dbclient.deleteFromDb("pollenisator", CheckItem.coll_name, {"_id":ObjectId(iid)}, many=False, notify=True)
     if res is None:
         return 0
-    return res.deleted_count
+    return res
 
 @permission("user")
 def update(iid, body):

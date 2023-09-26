@@ -380,7 +380,7 @@ def delete(pentest, tool_iid):
     if res is None:
         return 0
     else:
-        return res.deleted_count
+        return res
 
 @permission("pentester")
 def insert(pentest, body, **kwargs):

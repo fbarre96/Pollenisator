@@ -281,7 +281,7 @@ def delete(pentest, user_iid):
     if res is None:
         return 0
     else:
-        return res.deleted_count
+        return res
 
 @permission("pentester")
 def insert(pentest, body):
@@ -302,7 +302,7 @@ def insert(pentest, body):
     username = user.username.lower() if user.username is not None else ""
     password = user.password if user.password is not None else ""
     existing = dbclient.findInDb(pentest, 
-        "ActiveDirectory", {"type":"user", "domain":domain, "username":username, "password":password}, False)
+        "ActiveDirectory", {"type":"user", "domain":domain, "username":username}, False)
     if existing is not None:
         if existing["password"] != "":
             return {"res": False, "iid": existing["_id"]}

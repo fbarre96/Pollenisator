@@ -233,7 +233,7 @@ def delete(pentest, collection, body):
     if res is None:
         return
     else:
-        return res.deleted_count
+        return res
 
 @permission("pentester")
 def bulk_delete(pentest, body):
@@ -254,7 +254,7 @@ def bulk_delete(pentest, body):
                     obj_id = ObjectId(obj_id.split("ObjectId|")[1])
             res = dbclient.deleteFromDb(pentest, obj_type, {"_id": ObjectId(obj_id)}, False, True)
             if res is not None:
-                deleted += res.deleted_count
+                deleted += res
     return deleted
 
 @permission("user")
@@ -275,7 +275,7 @@ def bulk_delete_commands(body, **kwargs):
                     obj_id = ObjectId(obj_id.split("ObjectId|")[1])
             res = dbclient.deleteFromDb("pollenisator", obj_type, {"_id": ObjectId(obj_id)}, False, True)
             if res is not None:
-                deleted += res.deleted_count
+                deleted += res
     return deleted
 
 @permission("user")
