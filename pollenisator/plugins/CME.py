@@ -10,6 +10,9 @@ from pollenisator.server.modules.activedirectory.computers import Computer
 from pollenisator.server.modules.activedirectory.users import User
 from pollenisator.plugins.plugin import Plugin
 
+def remove_term_colors(data):
+    return re.sub(r'\x1b\[[0-9;]+[a-zA-Z]', '', data)
+
 def getInfos(cme_file):
     r"""Read the given cme output file results and return a dictionnary with ips and a list of their open ports and infos.
         Args:
@@ -43,14 +46,14 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
 
 """
     retour = []
-    regex_info = re.compile(r"^\S+(?:LDAP|SMB)\S+\s+(\S+)\s+(\d+)\s+\S+\s+\S+\[\*\]\S+\s+([^\(]+)\(name:(.*)\) \(domain:(.*)\) \(signing:(True|False)\) \(SMBv1:(False|True)\)$", re.MULTILINE)
+    regex_info = re.compile(r"(?:LDAP|SMB)\s+(\S+)\s+(\d+)\s+\S+\s+\[\*\]\s*([^\(]+)\(name:(.*)\) \(domain:(.*)\) \(signing:(True|False)\) \(SMBv1:(False|True)\)$", re.MULTILINE)
     regex_logon_failed = re.compile(
-        r"^\S+(?:LDAP|SMB)\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[\-\]\S+ ([^\\]+)\\([^:\n]+):(.*?)$", re.MULTILINE)
+        r"(?:LDAP|SMB)\s+(\S+)\s+(\d+)\s+\S+\s+\[\-\]\s*([^\\]+)\\([^:\n]+):(.*?) [A-Z_]+$", re.MULTILINE)
     regex_success = re.compile(
-        r"^\S+(?:LDAP|SMB)\S+\s+(\S+)(?:\s+|:)(\d+)\s+(\S+)\s+\S+\[\+\]\S+ ([^\\]+)\\([^:]+):(.*?)(?= \x1b|$)(.*)$", re.MULTILINE)
-    regex_module_lsassy = re.compile(r"^\S+LSASSY\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[33m([^\\]+)\\(\S+)\s+(\S+)(?=\x1b).+$")
-    regex_module_ntds = re.compile(r"^\S+SMB\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[33m(.+)\x1b\S*$")
-    regex_module_asproast = re.compile(r"^\S+(?:LDAP|SMB)\S+\s+(\S+)\s+(\d+)\s+(\S+)\s+\S+\[\-\]\S+ ([^\\]+)\\([^:]+) (account vulnerable to asreproast attack)\s*$")
+        r"(?:LDAP|SMB)\s+(\S+)(?:\s+|:)(\d+)\s+(\S+)\s+\[\+\]\s*([^\\]+)\\([^:]+):(.*?)($|\(\S+\))$", re.MULTILINE)
+    regex_module_lsassy = re.compile(r"^LSASSY\s+(\S+)\s+(\d+)\s+(\S+)\s+([^\\]+)\\(\S+)\s+(\S+)$")
+    regex_module_secrets = re.compile(r"^(?:SMB|LDAP)\s+(\S+)\s+(\d+)\s+(\S+)\s+(.+)$")
+    regex_module_asproast = re.compile(r"^(?:LDAP|SMB)\s+(\S+)\s+(\d+)\s+(\S+)\s+\[[-+]\] ([^\\]+)\\([^:]+) (account vulnerable to asreproast attack)\s*$")
     notes = ""
     countFound = 0
     countPwn = 0
@@ -66,9 +69,11 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                 line = line.decode("utf-8")
             except UnicodeDecodeError:
                 return None, None, None, None, None, None , None
+                
         line=line.strip()
+        line = remove_term_colors(line)
         # Search ip in file
-        if "\x1b[1m\x1b[34mSMB\x1b[0m" in line:
+        if line.startswith("SMB") or line.startswith("LDAP"):
             cmeFound = True
         if "Dumping LSA secrets" in line:
             mode = "lsa"
@@ -112,6 +117,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                 
                 res_infos = re.search(regex_info, line)
                 res_asrep = re.search(regex_module_asproast, line)
+                res_secrets = re.search(regex_module_secrets, line)
                 if res_asrep is not None:
                     toAdd["type"] = "interesting"
                     toAdd["ip"] = res_asrep.group(1)
@@ -121,6 +127,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                     toAdd["username"] = res_asrep.group(5)
                     toAdd["reason"] = res_asrep.group(6).strip()
                     notes += f"ASREPROASTABLE USER FOUND: "+str(toAdd)
+                
                 if res_infos is not None:
                     toAdd["type"] = "info"
                     toAdd["ip"] = res_infos.group(1)
@@ -141,12 +148,30 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                         toAdd["domain"] = success_infos.group(4)
                         toAdd["username"] = success_infos.group(5)
                         toAdd["password"] = success_infos.group(6)
-                        pwned = "(Pwn3d!)" in success_infos.group(7)
+                        pwned = success_infos.group(7) != ""
                         toAdd["powned"] = pwned
                         if pwned:
                             countPwn += 1
                         else:
                             countSuccess += 1
+                    elif res_secrets is not None:
+                        toAdd["type"] = "success"
+                        toAdd["ip"] = res_secrets.group(1)
+                        toAdd["port"] = res_secrets.group(2)
+                        toAdd["machine_name"] = res_secrets.group(3)
+                        secret = res_secrets.group(4)
+                        if secret and secret != "":
+                            secrets.append(line)
+                            if secret.startswith("$krb5asrep$"):
+                                parts = secret.split("$")
+                                try:
+                                    data = parts[3]
+                                    data_parts = data.split(":")[0].split("@")
+                                    toAdd["username"] = "@".join(data_parts[0:-1])
+                                    toAdd["domain"] = data_parts[-1]
+                                    toAdd["secrets"] = [secret]
+                                except IndexError as e:
+                                    toAdd["secrets"] += [secret]
                     else:
                         failure_infos = re.search(regex_logon_failed, line)
                         if failure_infos is not None:
@@ -162,7 +187,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                 retour.append(toAdd)
         
         if mode == "lsa" or mode == "sam":
-            module_infos = re.search(regex_module_ntds, line)
+            module_infos = re.search(regex_module_secrets, line)
             if module_infos is None:
                 continue
             if toAdd.get("ip", None) is not None:
@@ -170,7 +195,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                     toAdd["secrets"] = toAdd.get("secrets", []) + [module_infos.group(4)]
             secrets.append(line)
         elif mode == "ntds":
-            module_infos = re.search(regex_module_ntds, line)
+            module_infos = re.search(regex_module_secrets, line)
             if module_infos is None:
                 continue
             if "toAdd" in locals():
@@ -223,14 +248,17 @@ def editScopeIPs(pentest, hostsInfos):
                     
             elif infos["type"] == "success":
                 powned = infos.get("powned", False)
-                creds = (infos.get("domain", ""), infos.get("username", ""), infos.get("password", infos.get("hashNT", "")))
-                infosToAdd["users"] = infosToAdd.get("users", []) + [creds]
-                if powned:
-                    infosToAdd["powned"] = powned
-                    infosToAdd["admins"] = infosToAdd.get("admins", []) + [creds]
+                user_info = infos
                 secrets = infos.get("secrets", [])
                 if secrets:
                     infosToAdd["secrets"] = infosToAdd.get("secrets", []) + secrets
+                    user_info["secrets"] = secrets
+                user_model = User(pentest).initialize(pentest, None, infos.get("domain", ""), infos.get("username", ""), infos.get("password", infos.get("hashNT", "")), infos=user_info)
+                infosToAdd["users"] = infosToAdd.get("users", []) + [user_model]
+                if powned:
+                    infosToAdd["powned"] = powned
+                    infosToAdd["admins"] = infosToAdd.get("admins", []) + [user_model]
+                
 
             ip_m = ServerIp(pentest).initialize(str(infos["ip"]), infos={"plugin":CME.get_name()})
             insert_ret = ip_m.addInDb()
@@ -260,7 +288,8 @@ def editScopeIPs(pentest, hostsInfos):
                         user_m = User.fetchObject(pentest, {"_id":ObjectId(user_iid)})
                         if user.infos.get("asreproastable", False):
                             user_m.addTag(("asreproastable", "orange", "high"), True)
-
+                        if user.infos.get("secrets", []):
+                            user_m.addTag(("user-secrets-found", "red", "high"), True)
                     else:
                         computer_m.add_user(user[0], user[1], user[2])
                 creds = infosToAdd.get("admins", [])
@@ -335,7 +364,7 @@ class CME(Plugin):
             if int(countSuccess) > 0:
                 tags += [("info-cme-connection-success", "green", "info")]
             if len(secrets) > 0:
-                tags += [("todo-cme-secrets-dump","red", "todo")]
+                tags += [("todo-cme-secrets-found","red", "todo")]
             if lsassy:
                 tags += [("todo-lsassy-success","red", "todo")]
         if hostsInfos is None:
