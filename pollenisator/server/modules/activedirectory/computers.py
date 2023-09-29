@@ -194,16 +194,15 @@ class Computer(ServerElement):
         return str(res["iid"])
 
     def add_admin(self, domain, username, password):
-        user_m = User().initialize(self.pentest, None, domain, username, password)
-        res = user_m.addInDb()
-        if str(res["iid"]) not in self.admins:
-            self.admins.append(str(res["iid"]))
+        res_iid = self.add_user(domain, username, password)
+        if res_iid not in self.admins:
+            self.admins.append(res_iid)
             self.add_admin_checks()
         self.update()
 
     @classmethod
     def replaceCommandVariables(cls, pentest, command, data):
-        command = command.replace("|domain|", data.get("domain", ""))
+        command = command.replace("|domain|", "" if data.get("domain", "") is None else data.get("domain", ""))
         return command
         
     def addCheck(self, lvl, info):

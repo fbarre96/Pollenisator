@@ -284,7 +284,7 @@ def editScopeIPs(pentest, hostsInfos):
                 users = infosToAdd.get("users", [])
                 for user in users:
                     if isinstance(user, User):
-                        user_iid = computer_m.add_user(user.domain, user.username, user.password, user.infos )
+                        user_iid = computer_m.add_user(user.domain, user.username, user.password, user.infos)
                         user_m = User.fetchObject(pentest, {"_id":ObjectId(user_iid)})
                         if user.infos.get("asreproastable", False):
                             user_m.addTag(("asreproastable", "orange", "high"), True)
@@ -292,9 +292,12 @@ def editScopeIPs(pentest, hostsInfos):
                             user_m.addTag(("user-secrets-found", "red", "high"), True)
                     else:
                         computer_m.add_user(user[0], user[1], user[2])
-                creds = infosToAdd.get("admins", [])
-                for cred in creds:
-                    computer_m.add_admin(cred[0], cred[1], cred[2])
+                admins = infosToAdd.get("admins", [])
+                for user in admins:
+                    if isinstance(user, User):
+                        user_iid = computer_m.add_admin(user.domain, user.username, user.password) 
+                    else:
+                        computer_m.add_admin(user[0], user[1], user[2])
                 computer_m.name = infos["machine_name"]
                 computer_m.domain = infos.get("domain")
                 d = computer_m.getData()

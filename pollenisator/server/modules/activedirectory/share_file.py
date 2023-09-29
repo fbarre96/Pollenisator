@@ -14,18 +14,19 @@ class ShareFile(ServerElement):
     def __init__(self, valuesFromDb=None):
         if valuesFromDb is None:
             valuesFromDb = {}
-        self.initialize(valuesFromDb.get("path"), valuesFromDb.get("flagged"), valuesFromDb.get("size") , valuesFromDb.get("users") )
+        self.initialize(valuesFromDb.get("path"), valuesFromDb.get("flagged"), valuesFromDb.get("size") , valuesFromDb.get("users"), valuesFromDb.get("infos") )
 
-    def initialize(self, path=None, flagged=None, size=None,  users=None): 
+    def initialize(self, path=None, flagged=None, size=None,  users=None, infos=None): 
         self.path = path
         self.flagged = flagged
         self.size = size
         self.users = users if users is not None else []
+        self.infos =  infos if infos is not None else {}
         return self
 
     def getData(self):
         return {"flagged": self.flagged, "path":self.path, "size":self.size,
-                 "users":self.users}
+                 "users":self.users, "infos":self.infos}
 
     def add_user(self, domain, user, priv):
         users = set(self.users)

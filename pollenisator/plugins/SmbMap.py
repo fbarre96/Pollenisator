@@ -158,10 +158,16 @@ class SmbMap(Plugin):
                 computer_m.add_user(domain, user, password)
             for share_name in share_dict:
                 share_m = Share().initialize(pentest, None, host, share_name)
+                flagged_files = []
                 for share_info in share_dict[share_name]:
                     #share_info[] = path, isInteresting, privs, fileSize, domain, user
                     share_m.add_file(path=share_info[0], flagged=share_info[1], priv=share_info[2], size=share_info[3], domain=share_info[4], user=share_info[5])
+                    if share_info[1]:
+                        flagged_files.append(share_info[0])
+                share_m.infos["flagged_files"] = flagged_files
                 res = share_m.addInDb()
+                if flagged_files:
+                    share_m.addTag(("interesting-share", "green", "medium"))
                 if not res["res"]:
                     share_m.update(res["iid"])
 

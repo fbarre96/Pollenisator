@@ -1,10 +1,12 @@
 """A plugin to parse a CrackMapExex scan"""
 
 import re
+
+from bson import ObjectId
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.server.modules.activedirectory.computers import Computer
-from pollenisator.server.modules.activedirectory.users import insert as user_insert, User
+from pollenisator.server.modules.activedirectory.users import insert as user_insert, update as user_update, User
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.core.components.utils import performLookUp
 import json
@@ -99,7 +101,8 @@ def updateDatabase(pentest, enum_infos):
         username = user_account.split("\\")[1]
         password = ""
         user_m = User(pentest).initialize(pentest, None, domain, username, password, user_add_infos.get("groups",[]), user_add_infos.get("desc"))
-        user_insert(pentest, user_m.getData())
+        res = user_insert(pentest, user_m.getData())
+        user_update(pentest, ObjectId(res["iid"]), user_m.getData())
     for computer, computer_infos in enum_infos.get("computers", {}).items():
         ip_m = ServerIp(pentest).initialize(str(computer_infos["ip"]), infos={"plugin":Enum4Linux.get_name()})
         insert_ret = ip_m.addInDb()

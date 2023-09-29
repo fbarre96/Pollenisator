@@ -14,9 +14,9 @@ class Share(ServerElement):
         if valuesFromDb is None:
             valuesFromDb = {}
         self.initialize(pentest, valuesFromDb.get("_id"),  valuesFromDb.get("ip"),
-         valuesFromDb.get("share"),  valuesFromDb.get("files"))
+         valuesFromDb.get("share"),  valuesFromDb.get("files"), valuesFromDb.get("infos"))
 
-    def initialize(self, pentest=None, _id=None, ip=None, share=None,  files=None): 
+    def initialize(self, pentest=None, _id=None, ip=None, share=None,  files=None, infos=None): 
         """
         :param ip: The ip of this Share. 
         :type ip: str
@@ -31,6 +31,7 @@ class Share(ServerElement):
         self.ip = ip
         self.share = share
         self.files = [] 
+        self.infos =  infos if infos is not None else {}
         if files is not None:
             for f in files:
                 if not isinstance(f, ShareFile):
@@ -46,10 +47,12 @@ class Share(ServerElement):
         return self
 
     def getData(self):
-        return {"_id": self._id, "ip":self.ip, "share": self.share,  "files":[f.getData() for f in self.files]}
+        return {"_id": self._id, "ip":self.ip, "share": self.share,  "files":[f.getData() for f in self.files], "infos":self.infos}
 
     def addInDb(self):
-        return insert(self.pentest, self.getData())
+        res = insert(self.pentest, self.getData())
+        self._id = ObjectId(res["iid"])
+        return res
 
     def update(self, iid=None):
         if iid is not None:
@@ -150,14 +153,14 @@ class Share(ServerElement):
         """
         self._files = files
 
-    def add_file(self, path, flagged, priv, size, domain, user):
+    def add_file(self, path, flagged, priv, size, domain, user, infos=None):
         found = False
         for f in self.files:
             if path == f.path:
                 found = True
                 f.add_user(domain, user, priv)
         if not found:
-            share_file = ShareFile().initialize(path, flagged, size)
+            share_file = ShareFile().initialize(path, flagged, size, infos=infos)
             share_file.add_user(domain, user, priv)
             self.files.append(share_file)
 

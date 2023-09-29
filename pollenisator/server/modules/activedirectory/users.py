@@ -108,7 +108,7 @@ class User(ServerElement):
     @classmethod
     def replaceCommandVariables(cls, pentest, command, data):
         command = command.replace("|username|", data.get("username", ""))
-        command = command.replace("|domain|", data.get("domain", ""))
+        command = command.replace("|domain|", "" if data.get("domain", "") is None else data.get("domain", ""))
         command = command.replace("|password|", data.get("password", ""))
         return command
 
@@ -347,5 +347,8 @@ def update(pentest, user_iid, body):
         del body["type"]
     if "_id" in body:
         del body["_id"]
+    if str(user.description) != "None" or str(user.description) != "":
+        del body["description"]
+
     dbclient.updateInDb(pentest, "ActiveDirectory", {"_id": ObjectId(user_iid), "type":"user"}, {"$set": body}, False, True)
     return True
