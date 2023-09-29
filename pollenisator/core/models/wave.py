@@ -45,6 +45,13 @@ class Wave(Element):
         self.infos = infos if infos is not None else {}
         return self
 
+    def getData(self):
+        """Return wave attributes as a dictionnary matching Mongo stored waves
+        Returns:
+            dict with keys wave, wave_commands, infos
+        """
+        return {"wave": self.wave, "wave_commands": self.wave_commands, "_id": self.getId(), "infos": self.infos}
+
 
     def __str__(self):
         """

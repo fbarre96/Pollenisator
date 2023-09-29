@@ -45,13 +45,7 @@ class WaveController(ControllerElement):
         # Update this instance.
         return ret, 0  # 0 erros
 
-    def getData(self):
-        """Return wave attributes as a dictionnary matching Mongo stored waves
-        Returns:
-            dict with keys wave, wave_commands, infos
-        """
-        return {"wave": self.model.wave, "wave_commands": self.model.wave_commands, "_id": self.model.getId(), "infos": self.model.infos}
-
+    
     def getIntervals(self):
         """Return scope assigned intervals as a list of mongo fetched intervals dict
         Returns:

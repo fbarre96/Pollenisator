@@ -114,7 +114,7 @@ class ServerElement(metaclass=MetaElement):
         else:
             newTagColor = "transparent"
             newTagLevel = "info"
-        if newTag not in tags:
+        if newTag not in [tag_name if isinstance(tag_name, str) else tag_name[0] for tag_name in tags ]:
             dbclient = DBClient.getInstance()
             for group in dbclient.getTagsGroups():
                 if newTag in group:

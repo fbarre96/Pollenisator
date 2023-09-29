@@ -46,6 +46,14 @@ class Ip(Element):
         self.in_scopes = in_scopes if in_scopes is not None else self.getScopesFittingMe()
         self.infos = infos if infos is not None else {}
         return self
+    
+    def getData(self):
+        """Returns ip attributes as a dictionnary matching Mongo stored ips
+        Returns:
+            dict with keys ip, in_scopes, notes, _id, infos
+        """
+        return {"ip": self.ip, "in_scopes": self.in_scopes, "notes": self.notes, "_id": self.getId(), "infos": self.infos}
+
 
     def fitInScope(self, scope):
         """Checks if this IP is the given scope.

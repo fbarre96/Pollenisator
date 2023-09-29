@@ -50,6 +50,11 @@ class Command(Element):
         self.owners = owners
         self.timeout = timeout
         return self
+    
+    def getData(self):
+        return {"name": self.name, "bin_path":self.bin_path, "plugin":self.plugin,  "text": self.text,
+                "timeout": self.timeout,
+                "indb":self.indb, "_id": self.getId(),  "infos": self.infos}
             
     def __str__(self):
         """

@@ -50,6 +50,15 @@ class Port(Element):
         self.notes = notes
         self.infos = infos if infos is not None else {}
         return self
+    
+    def getData(self):
+        """Return port attributes as a dictionnary matching Mongo stored ports
+        Returns:
+            dict with keys ip, port, proto, service, product, notes, _id,  infos
+        """
+        return {"ip": self.ip, "port": self.port, "proto": self.proto,
+                "service": self.service, "product": self.product, "notes": self.notes, "_id": self.getId(), "infos": self.infos}
+
 
 
     def __str__(self):

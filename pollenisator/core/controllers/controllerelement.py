@@ -101,6 +101,11 @@ class ControllerElement:
                       if False, will not add this tag.
         """
         self.model.addTag(newTag,override=override)
+
+    def getData(self):
+        if self.model is None:
+            return None
+        return self.model.getData()
             
 
     def getDetailedString(self):

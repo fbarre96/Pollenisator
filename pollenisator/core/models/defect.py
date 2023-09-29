@@ -84,6 +84,18 @@ class Defect(Element):
         self.index = index
         self.creation_time = datetime.now() if creation_time is None else creation_time
         return self
+    
+    def getData(self):
+        """Return defect attributes as a dictionnary matching Mongo stored defects
+        Returns:
+            dict with keys title, ease, ipact, risk, redactor, type, notes, ip, port, proto, proofs, _id, infos
+        """
+
+        return {"title": self.title, "synthesis":self.synthesis, "description":self.description, "ease": self.ease, "impact": self.impact,
+                "risk": self.risk, "redactor": self.redactor, "type": self.mtype, "language":self.language, "notes": self.notes,
+                "ip": self.ip, "port": self.port, "proto": self.proto, "index":self.index,
+                "proofs": self.proofs, "creation_time": self.creation_time, "fixes":self.fixes, "_id": self.getId(), "infos": self.infos}
+
 
     @classmethod
     def getRisk(cls, ease, impact):

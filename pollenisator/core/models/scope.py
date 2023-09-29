@@ -46,6 +46,13 @@ class Scope(Element):
         self.infos = infos if infos is not None else {}
         return self
 
+    def getData(self):
+        """Return scope attributes as a dictionnary matching Mongo stored scopes
+        Returns:
+            dict with keys wave, scope, notes, _id, infos
+        """
+        return {"wave": self.wave, "scope": self.scope, "notes": self.notes, "_id": self.getId(), "infos": self.infos}
+
 
 
     def __str__(self):

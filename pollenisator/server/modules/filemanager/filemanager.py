@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import traceback
 import connexion
 from bson import ObjectId
 from flask import send_file
@@ -74,6 +75,7 @@ def importExistingFile(pentest, upfile, body, **kwargs):
         except Exception as e:
             error_msg = e
             logger.error("Plugin exception : "+str(e))
+            traceback.print_exc()
             notes = tags = lvl = targets = None
     if error_msg:
         return str(error_msg)

@@ -48,14 +48,7 @@ class ToolController(ControllerElement):
         """
         return self.model.name
 
-    def getData(self):
-        """Return scope attributes as a dictionnary matching Mongo stored scopes
-        Returns:
-            dict with keys name, wave, scope, ip, port, proto, lvl, text, dated, datef, scanner_ip, notes, status, _id, infos
-        """
-        if self.model is None:
-            return None
-        return self.model.getData()
+    
         
     def getOutputDir(self, pentest):
         """Returns directory of the tool file output 
