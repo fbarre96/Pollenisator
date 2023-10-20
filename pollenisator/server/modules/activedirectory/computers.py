@@ -119,7 +119,7 @@ class Computer(ServerElement):
         """
         return ["AD:onFirstUserOnDC", "AD:onFirstAdminOnDC",  "AD:onNewUserOnDC", "AD:onNewAdminOnDC", 
                             "AD:onFirstUserOnComputer", "AD:onFirstAdminOnComputer", "AD:onNewUserOnComputer", "AD:onNewAdminOnComputer",
-                            "AD:onNewDomainDiscovered", "AD:onNewDC"]
+                            "AD:onNewDomainDiscovered", "AD:onNewDC", "AD:onNewSQLServer","AD:onFirstUserOnSQLServer", "AD:onFirstAdminOnSQLServer"]
 
 
     @property
@@ -134,6 +134,7 @@ class Computer(ServerElement):
 
     def checkAllTriggers(self):
         self.add_dc_checks()
+        self.add_sqlserver_checks()
         self.add_user_checks()
         self.add_admin_checks()
         self.add_domain_checks()
@@ -148,11 +149,21 @@ class Computer(ServerElement):
         if len(self.admins) > 0:
             self.addCheck("AD:onFirstAdminOnDC", {"user":self.admins[0]})
 
+    def add_sqlserver_checks(self):
+        if self.infos.is_sqlserver:
+            self.addCheck("AD:onNewSQLServer", { "domain":self.domain})
+            if len(self.users) > 0:
+                self.addCheck("AD:onFirstUserOnSQLServer", {"user":self.users[0]})
+            if len(self.admins) > 0:
+                self.addCheck("AD:onFirstAdminOnSQLServer", {"user":self.admins[0]})
+
     def add_user_checks(self):
         if len(self.users) == 1:
             if self.infos.is_dc:
                 self.addCheck("AD:onFirstUserOnDC", {"user":self.users[-1]})
                 self.addCheck("AD:onNewUserOnDC", {"user":self.users[-1]})
+            if self.infos.is_sqlserver:
+                self.addCheck("AD:onFirstUserOnSQLServer", {"user":self.users[-1]})
             self.addCheck("AD:onFirstUserOnComputer", {"user":self.users[-1]})
         if len(self.users) >= 1:
             self.addCheck("AD:onNewUserOnComputer", {"user":self.users[-1]})
@@ -162,6 +173,8 @@ class Computer(ServerElement):
             if self.infos.is_dc:
                 self.addCheck("AD:onFirstAdminOnDC", {"user":self.admins[-1]})
                 self.addCheck("AD:onNewAdminOnDC", {"user":self.admins[-1]})
+            if self.infos.is_sqlserver:
+                self.addCheck("AD:onFirstAdminOnSQLServer", {"user":self.admins[-1]})
             self.addCheck("AD:onFirstAdminOnComputer", {"user":self.admins[-1]})
         if len(self.admins) >= 1:
             self.addCheck("AD:onNewAdminOnComputer", {"user":self.admins[-1]})
@@ -207,7 +220,7 @@ class Computer(ServerElement):
         
     def addCheck(self, lvl, info):
         checks = CheckItem.fetchObjects({"lvl":lvl})
-        if lvl in ["AD:onNewDomainDiscovered", "AD:onNewDC"]:
+        if lvl in ["AD:onNewDomainDiscovered", "AD:onNewDC", "AD:onNewSQLServer"]:
             infos = {"domain":info.get("domain")}
         else:
             user_o = User.fetchObject(self.pentest, {"_id":ObjectId(info.get("user"))})
@@ -282,6 +295,8 @@ def update(pentest, computer_iid, body):  # noqa: E501
     if existing.infos.is_dc != computer.infos.is_dc:
         existing.add_dc_checks()
         existing.add_domain_checks()
+    if existing.infos.is_sqlserver != computer.infos.is_sqlserver:
+        existing.add_sqlserver_checks()
 
     dbclient.updateInDb(pentest, "ActiveDirectory", {"_id": ObjectId(computer_iid), "type":"computer"}, {"$set": body}, False, True)
     return True

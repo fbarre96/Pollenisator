@@ -137,6 +137,12 @@ def insert(pentest, body):
             comp = Computer.fetchObject(pentest, {"_id":ObjectId(res["iid"])})
             comp.infos.is_dc = True
             comp.update()
+    elif int(port_o.port) == 1433 or (port_o.service == "ms-sql" or port_o.service == "ms-sql"):
+        res = computer_insert(pentest, {"name":"", "ip":port_o.ip, "domain":"", "admins":[], "users":[], "infos":{"is_sqlserver":True}})
+        if not res["res"]:
+            comp = Computer.fetchObject(pentest, {"_id":ObjectId(res["iid"])})
+            comp.infos.is_sqlserver = True
+            comp.update()
     port_o.add_port_checks()
     
     return {"res":True, "iid":iid}

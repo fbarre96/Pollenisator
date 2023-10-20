@@ -13,25 +13,28 @@ class ComputerInfos():
         :type smbv1: boolean
         :param is_dc: The is_dc of this ComputerInfos.
         :type is_dc: boolean
+        :param is_sqlserver: The is_sqlserver of this ComputerInfos.
+        :type is_sqlserver: boolean
         :param secrets: The secrets of this ComputerInfos.
         :type secrets: List[str]
         """
         if valuesFromDb is None:
             valuesFromDb = {}
         self.initialize(valuesFromDb.get("os"), valuesFromDb.get("signing"),valuesFromDb.get("smbv1"), \
-             valuesFromDb.get("is_dc"), valuesFromDb.get("secrets"))
+             valuesFromDb.get("is_dc"), valuesFromDb.get("secrets"), valuesFromDb.get("is_sqlserver"))
         
 
-    def initialize(self, os=None, signing=None, smbv1=None, is_dc=None, secrets=None): 
+    def initialize(self, os=None, signing=None, smbv1=None, is_dc=None, secrets=None, is_sqlserver=None): 
         self.os = os
         self.signing = signing
         self.smbv1 = smbv1
         self.is_dc = is_dc
         self.secrets = secrets
+        self.is_sqlserver = is_sqlserver
         return self
 
     def getData(self):
-        return {"os":self.os, "signing": self.signing, "smbv1":self.smbv1, "is_dc":self.is_dc, "secrets":self.secrets}
+        return {"os":self.os, "signing": self.signing, "smbv1":self.smbv1, "is_dc":self.is_dc,  "is_sqlserver":self.is_sqlserver, "secrets":self.secrets}
     
     @property
     def os(self):
@@ -116,6 +119,25 @@ class ComputerInfos():
         """
 
         self._is_dc = is_dc
+
+    @property
+    def is_sqlserver(self):
+        """Gets the is_sqlserver of this ComputerInfos.
+
+
+        :return: The is_sqlserver of this ComputerInfos.
+        :rtype: bool
+        """
+        return self._is_sqlserver
+
+    @is_sqlserver.setter
+    def is_sqlserver(self, is_sqlserver):
+        """Sets the is_sqlserver of this ComputerInfos.
+        :param is_sqlserver: The is_sqlserver of this ComputerInfos.
+        :type is_sqlserver: bool
+        """
+
+        self._is_sqlserver = is_sqlserver
 
     @property
     def secrets(self):
