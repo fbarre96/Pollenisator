@@ -39,20 +39,16 @@ def createReport(context, template, out_name, **kwargs):
     jinja_env.filters['getInitials'] = getInitials
     for defect in context["defects"]:
         proofs = defect.get("proofs", [])
-        proofs_remaining = [x for x in proofs]
+        proofs_by_name = {}
+        for proof in proofs:
+            proofs_by_name[os.path.basename(proof)] = proof
         if proofs:
             for i, para in enumerate(defect.get("description_paragraphs", [])):
-                re_matches = re.search(r"\[Proof (\d+)\]", para.strip())
-                if re_matches is not None:
-                    ind = int(re_matches.group(1))
-                    if ind < len(proofs):
-                        defect["description_paragraphs"][i] = InlineImage(doc, proofs[ind], width=Cm(17))
-                        try:
-                            proofs_remaining.remove(proofs[ind])
-                        except ValueError:
-                            pass
-        for proof in proofs_remaining:
-            defect["description_paragraphs"].append(InlineImage(doc, proof, width=Cm(17)))
+                re_matches = re.finditer(r"!\[(.*)\]\(.*\)", para.strip())
+                for re_match in re_matches:
+                    if re_match.group(1).strip() in proofs_by_name:
+                        proof = proofs_by_name[re_match.group(1).strip()]
+                        defect["description_paragraphs"][i] = InlineImage(doc, proof, width=Cm(17))
         for instance in defect.get("instances", []):
             for i,proof in enumerate(instance.get("proofs", [])):
                 instance["proofs"][i] = InlineImage(doc, proof)

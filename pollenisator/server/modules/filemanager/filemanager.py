@@ -37,6 +37,9 @@ def md5(f):
 @permission("pentester")
 def upload(pentest, defect_iid, upfile):
     msg, status, filepath = dbclient.do_upload(pentest, defect_iid, "proof", upfile)
+    if status == 200:
+        name = upfile.filename.replace("/", "_")
+        return {"remote_path": f"files/{pentest}/download/proof/{defect_iid}/{name}", "msg":msg, "status":status}
     return msg, status
     
 @permission("pentester")

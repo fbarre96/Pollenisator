@@ -6,8 +6,10 @@ from pollenisator.core.controllers.defectcontroller import DefectController
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.permission import permission
 from pollenisator.core.components.utils import getMainDir
+from pollenisator.server.modules.filemanager.filemanager import listFiles, rmProof
 import threading
 import os
+import re
 import json
 sem = threading.Semaphore() 
 
@@ -45,9 +47,6 @@ class ServerDefect(Defect, ServerElement):
         if obj is None:
             return ""
         return obj.get("_id", None)
-
-
-
 
 def getProofPath(pentest, defect_iid):
     local_path = os.path.join(getMainDir(), "files")
@@ -162,6 +161,10 @@ def findInsertPosition(pentest, risk):
             highestInd = max(int(globalDefect.index)+1, highestInd)
     return highestInd
 
+def _findProofsInDescription(description):
+    regex_images = r"!\[.*\]\((.*)\)"
+    return re.finditer(regex_images, description)
+
 @permission("pentester")
 def update(pentest, defect_iid, body):
     dbclient = DBClient.getInstance()
@@ -180,6 +183,15 @@ def update(pentest, defect_iid, body):
                 moveDefect(pentest, defect_iid, defectTarget.getId())
             if "index" in body:
                 del body["index"]
+    body["proofs"] = []
+    proof_groups = _findProofsInDescription(body.get("description", ""))
+    existing_proofs_to_remove = listFiles(pentest, defect_iid, "proof")
+    for proof_group in proof_groups:
+        if proof_group.group(1) in existing_proofs_to_remove:
+            existing_proofs_to_remove.remove(proof_group.group(1))
+            body["proofs"].append(proof_group.group(1))
+    for proof_to_remove in existing_proofs_to_remove:
+        rmProof(pentest, defect_iid, proof_to_remove)
     res = dbclient.updateInDb(pentest, "defects", {"_id":ObjectId(defect_iid)}, {"$set":body}, False, True)
     return True
     
