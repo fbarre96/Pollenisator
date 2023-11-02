@@ -751,7 +751,7 @@ class DBClient:
         return pentesters["value"]
 
     def getPentestOwner(self, pentest):
-        pentest_data = self.findInDb("pollenisator", "pentests", {"nom":pentest}, False)
+        pentest_data = self.findInDb("pollenisator", "pentests", {"uuid":pentest}, False)
         if pentest_data is None:
             return "admin"
         return pentest_data.get("owner", "admin")
