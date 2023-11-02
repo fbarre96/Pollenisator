@@ -2,6 +2,7 @@
 
 # 1. Imports
 import re
+from pollenisator.core.components.tag import Tag
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.plugins.plugin import Plugin
 
@@ -46,6 +47,13 @@ class Crtsh(Plugin):
             string: the path to file created
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip()
+    
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"info-found-domains": Tag("info-found-domains")}
 
     def Parse(self, pentest, file_opened, **_kwargs):
         """
@@ -92,5 +100,5 @@ class Crtsh(Plugin):
         if notes.strip() == "":
             return None, None, None, None
         elif countInserted != 0:
-            tags.append("info-found-domains")
+            tags.append(Tag(self.getTags()["info-found-domains"], notes=str(countInserted)))
         return notes, tags, "wave", {"wave": None}

@@ -3,6 +3,7 @@
 import re
 
 from bson import ObjectId
+from pollenisator.core.components.tag import Tag
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.server.modules.activedirectory.computers import Computer
@@ -142,6 +143,12 @@ class Enum4Linux(Plugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"info-enum4linux-success": Tag("info-enum4linux-success")}
 
     def Parse(self, pentest, file_opened, **_kwargs):
         """
@@ -162,7 +169,7 @@ class Enum4Linux(Plugin):
         enum_infos = getInfos(file_opened)
         notes = json.dumps(enum_infos, indent=4)
         if enum_infos is not None and enum_infos.get("users") is not None:
-            tags = ["info-enum4linux-success"]
+            tags = [self.getTags()["info-enum4linux-success"]]
         elif enum_infos is None:
             return None, None, None, None
         targets = updateDatabase(pentest, enum_infos)

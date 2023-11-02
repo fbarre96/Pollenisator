@@ -1,5 +1,6 @@
 """A plugin to parse smbmap scan"""
 
+from pollenisator.core.components.tag import Tag
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
@@ -72,6 +73,15 @@ class SmbMap(Plugin):
             string: the path to file created
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
+    
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"interesting-share": Tag("interesting-share", "green", "medium"),
+                "todo-anon-share-found": Tag("todo-anon-share-found", "green"),
+                "todo-smbmap": Tag("todo-smbmap", "blue", "todo")}
 
 
     def Parse(self, pentest, file_opened, **kwargs):
@@ -167,12 +177,12 @@ class SmbMap(Plugin):
                 share_m.infos["flagged_files"] = flagged_files
                 res = share_m.addInDb()
                 if flagged_files:
-                    share_m.addTag(("interesting-share", "green", "medium"))
+                    share_m.addTag(Tag(self.getTags()["interesting-share"], notes="Flagged files: "+str(flagged_files)))
                 if not res["res"]:
                     share_m.update(res["iid"])
 
             if password == "":
-                tags += [("todo-anon-share-found", "green")]
+                tags += [Tag(self.getTags()["todo-anon-share-found"], notes="Anonymous share found")]
         if notes.strip() != "" and not tags:
-            tags = [("todo-smbmap", "blue")]
+            tags = [Tag(self.getTags()["todo-smbmap"], notes=notes)]
         return notes, tags, "port", targets

@@ -3,6 +3,8 @@ REGISTRY = {}
 import shlex
 import os
 
+from pollenisator.core.components.tag import Tag
+
 def register_class(target_class):
     """Register the given class
     Args:
@@ -76,6 +78,14 @@ class Plugin(metaclass=MetaPlugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip()
     
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"todo": Tag("todo", level="todo")}
+
+    
     def detect_cmdline(self, cmdline):
         """Returns a boolean indicating if this plugin is able to recognize a command line as likely to output results for it.
         Args:
@@ -104,7 +114,7 @@ class Plugin(metaclass=MetaPlugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         notes = ""
-        tags = ["todo"]
+        tags = [Tag("todo")]
         notes = file_opened.read().decode("utf-8")
         return notes, tags, "wave", {"wave": {"wave":"Imported"}}
 

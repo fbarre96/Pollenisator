@@ -3,6 +3,7 @@
 import re
 
 from bson import ObjectId
+from pollenisator.core.components.tag import Tag
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.server.modules.activedirectory.computers import Computer
@@ -268,7 +269,7 @@ def editScopeIPs(pentest, hostsInfos):
                 infos["machine_name"] + "\n"+infos.get("os", "")
             if infos["type"] == "success":
                 if infos.get("powned", False):
-                    ip_m.addTag(("pwned", "red", "high"))
+                    ip_m.addTag(Tag("pwned", "red", "high", notes=str(infos)))
             host = str(infos["ip"])
             port = str(infos["port"])
             proto = "tcp"
@@ -278,7 +279,7 @@ def editScopeIPs(pentest, hostsInfos):
             port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
 
             if infos.get("powned", False):
-                port_m.addTag(("pwned", "red", "high"))
+                port_m.addTag(Tag("pwned", "red", "high", notes=str(infos)), True)
             computer_m = Computer.fetchObject(pentest, {"ip":port_m.ip})
             if computer_m is not None: 
                 users = infosToAdd.get("users", [])
@@ -287,9 +288,9 @@ def editScopeIPs(pentest, hostsInfos):
                         user_iid = computer_m.add_user(user.domain, user.username, user.password, user.infos)
                         user_m = User.fetchObject(pentest, {"_id":ObjectId(user_iid)})
                         if user.infos.get("asreproastable", False):
-                            user_m.addTag(("asreproastable", "orange", "high"), True)
+                            user_m.addTag(Tag("asreproastable", "orange", "high", f"{user.domain}\\{user.username} is asreproastable"), True)
                         if user.infos.get("secrets", []):
-                            user_m.addTag(("user-secrets-found", "red", "high"), True)
+                            user_m.addTag(("user-secrets-found", "red", "high", f"{user.domain}\\{user.username} has secrets : {infos.get('secrets')}"), True)
                     else:
                         computer_m.add_user(user[0], user[1], user[2])
                 admins = infosToAdd.get("admins", [])
@@ -342,6 +343,19 @@ class CME(Plugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"pwned-cme" : Tag("pwned-cme", "red", "high"), 
+                "info-cme-connection-success": Tag("info-cme-connection-success", "green", "info"),
+                "todo-cme-secrets-found": Tag("todo-cme-secrets-found", "red", "todo"),
+                "todo-lsassy-success": Tag("todo-lsassy-success", "red", "todo"),
+                "user-secrets-found": Tag("user-secrets-found", "red", "high"),
+                "asreproastable": Tag("asreproastable", "orange", "high"),
+                "pwned": Tag("pwned", "red", "high")}
+
 
     def Parse(self, pentest, file_opened, **_kwargs):
         """
@@ -362,14 +376,14 @@ class CME(Plugin):
         hostsInfos, countPwnd,  countSuccess, notes, secrets, lsassy, tags = getInfos(file_opened)
         if countPwnd is not None:
             if int(countPwnd) > 0:
-                tags += [("pwned-cme", "red", "high")]
+                tags += [Tag(self.getTags()["pwned-cme"], notes=f"{countPwnd} hosts pwned")]
         if countSuccess is not None:
             if int(countSuccess) > 0:
-                tags += [("info-cme-connection-success", "green", "info")]
+                tags += [Tag(self.getTags()["info-cme-connection-success"], notes=f"{countSuccess} hosts connected")]
             if len(secrets) > 0:
-                tags += [("todo-cme-secrets-found","red", "todo")]
+                tags += [Tag(self.getTags()["todo-cme-secrets-found"], notes=f"{len(secrets)} secrets found")]
             if lsassy:
-                tags += [("todo-lsassy-success","red", "todo")]
+                tags += [Tag(self.getTags()["todo-lsassy-success"], notes=f"lsassy success")]
         if hostsInfos is None:
             return None, None, None, None
         targets = editScopeIPs(pentest, hostsInfos)

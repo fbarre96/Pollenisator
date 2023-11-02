@@ -3,6 +3,7 @@
 import json
 import re
 import webbrowser
+from pollenisator.core.components.tag import Tag
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
@@ -74,6 +75,12 @@ class Gowitness(Plugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"gowitness-done": Tag("gowitness-done", level="info")}
 
     def Parse(self, pentest, file_opened, **kwargs):
         """
@@ -90,7 +97,7 @@ class Gowitness(Plugin):
         """
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
             return None, None, None, None
-        tags = []
+        tags = [self.getTags()["gowitness-done"]]
         targets = {}
         notes = file_opened.read(2).decode("utf-8")
         if notes != "PK":

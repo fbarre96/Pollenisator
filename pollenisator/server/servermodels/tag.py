@@ -5,7 +5,6 @@ from pollenisator.core.components.utils import JSONEncoder
 from pollenisator.core.controllers.controllerelement import ControllerElement
 from pollenisator.server.permission import permission
 
-
 @permission("pentester")
 def addTag(pentest, item_id, body):
     item_type = body.get("item_type", "")

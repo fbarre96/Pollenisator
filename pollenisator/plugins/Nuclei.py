@@ -1,5 +1,6 @@
 """A plugin to parse nuclei results"""
 
+from pollenisator.core.components.tag import Tag
 from pollenisator.server.servermodels.defect import ServerDefect
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
@@ -13,8 +14,8 @@ def parse(opened_file):
         opened_file: maybe nuclei file
    
     Example of output :
-{"template-id":"mongodb-unauth","info":{"name":"Unauth MongoDB Disclosure","author":["pdteam"],"tags":["network","mongodb"],"reference":["https://github.com/orleven/tentacle"],"severity":"high"},"type":"network","host":"localhost:27017","matched-at":"localhost:27017","timestamp":"2021-11-09T11:34:57.756466525+01:00"}
-{"template-id":"phpinfo-files","info":{"name":"phpinfo Disclosure","author":["pdteam","daffainfo","meme-lord","dhiyaneshdk"],"tags":["config","exposure"],"reference":null,"severity":"low"},"type":"http","host":"http://localhost","matched-at":"http://localhost/phpinfo.php","extracted-results":["5.5.9"],"timestamp":"2021-11-09T11:34:58.860666065+01:00","curl-command":"curl -X 'GET' -d '' -H 'Accept: */*' -H 'Accept-Language: en' -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2866.71 Safari/537.36' 'http://localhost/phpinfo.php'"}
+{"template-id":"mongodb-unauth","info":{"name":"Unauth MongoDB Disclosure","author":["pdteam"],"tags":["network","mongodb"],"reference":["https://github.com/orleven/tentacle"],"level":"high"},"type":"network","host":"localhost:27017","matched-at":"localhost:27017","timestamp":"2021-11-09T11:34:57.756466525+01:00"}
+{"template-id":"phpinfo-files","info":{"name":"phpinfo Disclosure","author":["pdteam","daffainfo","meme-lord","dhiyaneshdk"],"tags":["config","exposure"],"reference":null,"level":"low"},"type":"http","host":"http://localhost","matched-at":"http://localhost/phpinfo.php","extracted-results":["5.5.9"],"timestamp":"2021-11-09T11:34:58.860666065+01:00","curl-command":"curl -X 'GET' -d '' -H 'Accept: */*' -H 'Accept-Language: en' -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2866.71 Safari/537.36' 'http://localhost/phpinfo.php'"}
     """
     ret = {}
     for line in opened_file:
@@ -38,7 +39,7 @@ def parse(opened_file):
         return None
     severities = ["info","low", "medium", "high", "critical"]
     for host, data in ret.items():
-        data.sort(key=lambda elem: severities.index(elem["info"]["severity"]), reverse=True)
+        data.sort(key=lambda elem: severities.index(elem["info"]["level"]), reverse=True)
     return ret
 
 
@@ -66,6 +67,15 @@ class Nuclei(Plugin):
             string: the path to file created
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
+    
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"info-nuclei": Tag("info-nuclei", level="info"),
+                "todo-nuclei-level": Tag("todo-nuclei-level", "orange", level="medium"),
+                "todo-high-nuclei-level": Tag("todo-high-nuclei-level", "red", level="high")}
 
     def Parse(self, pentest, file_opened, **kwargs):
         """
@@ -85,7 +95,7 @@ class Nuclei(Plugin):
         parsed_by_hosts = parse(file_opened)
         if parsed_by_hosts is None:
             return None, None, None, None
-        tags = ["info-nuclei"]
+        tags = [self.getTags()["info-nuclei"]]
         cumulative_notes = []
         targets = {}
         for parsed_host in parsed_by_hosts:
@@ -94,12 +104,12 @@ class Nuclei(Plugin):
             targets["ip"] = {"ip":host}
             notes = "host:"+str(host)+"\n"
             for finding in findings:
-                notes += finding["info"]["name"]+" ("+finding["info"]["severity"]+") "+finding["info"].get("description", "")+"\n"
+                notes += finding["info"]["name"]+" ("+finding["info"]["level"]+") "+finding["info"].get("description", "")+"\n"
             for finding in findings:
-                if finding["info"]["severity"] in ["medium"]:
-                    tags = [("todo-nuclei-severity","orange", "medium")]
-                if finding["info"]["severity"] in ["critical","high"]:
-                    tags = [("todo-high-nuclei-severity","red", "high")]
+                if finding["info"]["level"] in ["medium"]:
+                    tags = [self.getTags()["todo-nuclei-level"]]
+                if finding["info"]["level"] in ["critical","high"]:
+                    tags = [self.getTags()["todo-high-nuclei-level"]]
             ip_o = ServerIp(pentest).initialize(host, notes, infos={"plugin":Nuclei.get_name()})
             inserted = ip_o.addInDb()
             if not inserted["res"]:

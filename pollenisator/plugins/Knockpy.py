@@ -1,5 +1,6 @@
 """A plugin to parse knockpy scan"""
 
+from pollenisator.core.components.tag import Tag
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.server.servermodels.ip import ServerIp
 import re
@@ -56,7 +57,13 @@ class Knockpy(Plugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
-
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"info-domains-knockpy": Tag("info-domains-knockpy")}
+    
     def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
@@ -71,7 +78,7 @@ class Knockpy(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         notes = ""
-        tags = ["info-domains-knockpy"]
+        tags = [self.getTags()["info-domains-knockpy"]]
         marker = "IpaddressCodeSubdomainServerRealhostname"
         markerFound = False
         countFound = 0

@@ -1,6 +1,7 @@
 """A plugin to parse a CrackMapExex scan"""
 
 import re
+from pollenisator.core.components.tag import Tag
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.server.modules.activedirectory.computers import Computer
@@ -136,7 +137,13 @@ class RunFinger(Plugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
-
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"info-runfinger": Tag("info-runfinger")}
+    
     def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
@@ -157,6 +164,6 @@ class RunFinger(Plugin):
         if hostsInfos is None:
             return None, None, None, None
         if hostsInfos:
-            tags += ["info-runfinger"]
+            tags += [Tag(self.getTags()["info-runfinger"], notes=notes)]
         targets = editScopeIPs(pentest, hostsInfos)
         return notes, tags, "ports", targets

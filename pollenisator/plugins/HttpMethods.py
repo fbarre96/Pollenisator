@@ -1,5 +1,6 @@
 """A plugin to parse nmap httpmethods scan"""
 
+from pollenisator.core.components.tag import Tag
 from pollenisator.server.servermodels.defect import ServerDefect
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
@@ -94,6 +95,14 @@ class HttpMethods(Plugin):
             string: the path to file created
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
+    
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"HTTP-TRACE": Tag("HTTP-TRACE", level="low"),
+                "RISKY-HTTP-METHODS": Tag("RISKY-HTTP-METHODS", level="low")}
 
     def Parse(self, pentest, file_opened, **_kwargs):
         """
@@ -129,11 +138,10 @@ class HttpMethods(Plugin):
         p_o.updateInfos({"Methods": ", ".join(supported_methods)})
         targets[str(p_o.getId())] = {"ip": host, "port": port, "proto": proto}
         if "TRACE" in risky_methods:
-            p_o.addTag(("HTTP-TRACE", None, "low"))
+            p_o.addTag(Tag(self.getTags()["HTTP-TRACE"], notes="TRACE method allowed"))
             risky_methods.remove("TRACE")
         if len(risky_methods) > 0:
             notes = "RISKY HTTP METHODS ALLOWED : " + " ".join(risky_methods)
             tags = []
-            p_o.addTag(("RISKY-HTTP-METHODS", None, "low"))
-            tags.append("info-http-risky-methods")
+            p_o.addTag(Tag(self.getTags()["RISKY-HTTP-METHODS"], notes=notes))
         return notes, tags, "port", targets

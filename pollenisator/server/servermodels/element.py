@@ -2,9 +2,11 @@
 
 from datetime import datetime
 from pollenisator.core.components.mongo import DBClient
+from pollenisator.core.components.utils import JSONEncoder
 from bson import ObjectId
+from pollenisator.core.components.tag import Tag
 from pollenisator.server.permission import permission
-
+import json
 REGISTRY = {}
 
 def register_class(target_class):
@@ -105,18 +107,12 @@ class ServerElement(metaclass=MetaElement):
         tags = dbclient.findInDb(self.pentest, "tags", {"item_id": ObjectId(self.getId())}, False)
         if tags is None:
             return []
-        return tags["tags"]
+        return [Tag(tag) for tag in tags["tags"]]
     
     def addTag(self, newTag, override=True):
         tags = self.getTags()
-        if isinstance(newTag, tuple):
-            newTagLevel = newTag[2] if newTag[2] is not None else "info"
-            newTagColor = newTag[1] if newTag[1] is not None else "transparent"
-            newTag = newTag[0]
-        else:
-            newTagColor = "transparent"
-            newTagLevel = "info"
-        if newTag not in [tag_name if isinstance(tag_name, str) else tag_name[0] for tag_name in tags ]:
+        newTag = Tag(newTag)
+        if newTag.name not in [tag.name for tag in tags]:
             dbclient = DBClient.getInstance()
             for group in dbclient.getTagsGroups():
                 if newTag in group:
@@ -131,37 +127,36 @@ class ServerElement(metaclass=MetaElement):
                                 continue
                         len_tags = len(tags)
                         i += 1
-            tags.append((newTag, newTagColor, newTagLevel))
+            tags.append(newTag)
             self.setTags(tags)
-            dbclient.doRegisterTag(self.pentest, newTag, newTagColor, newTagLevel)
+            dbclient.doRegisterTag(self.pentest, newTag)
 
     def setTags(self, tags):
         """Set the model tags to given tags
         Args:
             tags: a list of string describing tags.
         """
+        tags = [Tag(tag) for tag in tags]
         dbclient = DBClient.getInstance()
         old_tags_res = self.getTags()
         old_tags = set()
         for old_tag in old_tags_res:
-            old_tag = str(old_tag[0]) if not isinstance(old_tag, str) else old_tag
-            old_tags.add(old_tag)
+            old_tags.add(old_tag.name)
         new_tags = set()
+        lk_new_tags = {}
         for tag in tags:
-            if (isinstance(tag, tuple) or isinstance(tag, list)) and len(tag) == 3:
-                tag_name = tag[0]
-                dbclient.doRegisterTag(self.pentest, name=tag_name, color=tag[1], level=tag[2])
-            else:
-                tag_name = tag
-                dbclient.doRegisterTag(self.pentest, tag_name)
-            new_tags.add(tag_name)
+            dbclient.doRegisterTag(self.pentest, tag)
+            new_tags.add(tag.name)
+            lk_new_tags[tag.name] = tag
         deleted_tags = old_tags - new_tags
         added_tags = new_tags - old_tags
         target_type = self.__class__.name if hasattr(self.__class__, "name") else self.__class__.coll_name
         for tag in deleted_tags:
-            self.addTagChecks(["tag:onRemove:"+str(tag_name)],{"target_iid":ObjectId(self.getId()), "target_type":target_type, "tags":tags, "target_data":self.getData()})
+            self.addTagChecks(["tag:onRemove:"+str(tag)],{"target_iid":ObjectId(self.getId()), "target_type":target_type, "tags":tags, "target_data":self.getData()})
         for tag in added_tags:
-            self.addTagChecks(["tag:onAdd:"+str(tag_name)],{"target_iid":ObjectId(self.getId()), "target_type":target_type, "tags":tags, "target_data":self.getData()})
+            self.addTagChecks(["tag:onAdd:"+str(tag)],{"target_iid":ObjectId(self.getId()), "target_type":target_type, "tags":tags, "target_data":self.getData()})
+            self.addTagDefects(lk_new_tags.get(tag), self.getData())#, ObjectId(self.getId()), target_type
+        tags = [tag.getData() for tag in tags]
         tags = dbclient.updateInDb(self.pentest, "tags", {"item_id": ObjectId(self.getId())}, {"$set":{"tags":tags, "date": datetime.now(), "item_id":ObjectId(self.getId()), "item_type":target_type}}, upsert=True)
 
     def updateInfos(self, newInfos):
@@ -186,6 +181,40 @@ class ServerElement(metaclass=MetaElement):
         return self.to_str()
     
     @classmethod
+    def add_tag_defects(cls, pentest, tag, target_data):
+        from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
+        from pollenisator.server.servermodels.defect import insert as insert_defect
+        checkitems = CheckItem.fetchObjects({
+            "defect_tags": {
+                "$elemMatch": {
+                    "$elemMatch": {
+                        "$eq": tag.name
+                    }
+                }
+            }
+        })
+        if checkitems is None:
+            return
+        dbclient = DBClient.getInstance()
+        pentest_lang = dbclient.findInDb(pentest, "settings", {"key":"lang"}, False)
+        if pentest_lang is not None:
+            pentest_lang = pentest_lang.get("value")
+        for check in checkitems:
+            for defect_tag in check.defect_tags:
+                if defect_tag[0] == tag.name:
+                    defect_to_add = defect_tag[1]
+                    defect = dbclient.findInDb("pollenisator", "defects", {"_id":ObjectId(defect_to_add)}, False)
+                    if defect is not None:
+                        if pentest_lang is not None and pentest_lang != "" and pentest_lang != defect.get("language", "en"):
+                            continue
+                        defect["ip"] = target_data.get("ip", "")
+                        defect["port"] = target_data.get("port", "")
+                        defect["proto"] = target_data.get("proto", "")
+                        defect["pentest"] = pentest
+                        defect["notes"] = tag.notes
+                        insert_defect(pentest, defect)
+
+    @classmethod
     def add_tag_check(cls, pentest, lvls, infos):
         from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
         from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
@@ -204,6 +233,8 @@ class ServerElement(metaclass=MetaElement):
     def addTagChecks(self, lvls, infos):
         return self.__class__.add_tag_check(self.pentest, lvls, infos)
         
+    def addTagDefects(self, tag, target_data):
+        return self.__class__.add_tag_defects(self.pentest, tag, target_data)
 
     @classmethod
     def apply_retroactively_custom(cls, pentest, check_item):

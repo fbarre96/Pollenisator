@@ -8,6 +8,7 @@ from flask import send_file
 import hashlib
 from pollenisator.core.components.logger_config import logger
 from datetime import datetime
+from pollenisator.core.components.tag import Tag
 from pollenisator.core.components.utils import listPlugin, loadPlugin, detectPlugins
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.utils import JSONDecoder, getMainDir
@@ -96,17 +97,8 @@ def importExistingFile(pentest, upfile, body, **kwargs):
             targets["default"] = default_target
             dbclient.send_notify(pentest, "Cheatsheet", default_target, "notif_terminal")
         for tag in tags:
-            if isinstance(tag, list):
-                tag = tuple(tag)
-            if isinstance(tag, tuple):
-                level = tag[2] if tag[2] is not None else "info"
-                color = tag[1] if tag[1] is not None else "transparent"
-                tag_name = tag[0]
-            else:
-                color = "transparent"
-                level = "info"
-                tag_name = tag
-            res = dbclient.doRegisterTag(pentest, tag_name, color, level)
+            tag = Tag(tag)
+            res = dbclient.doRegisterTag(pentest, tag)
 
         # ADD THE RESULTING TOOL TO AFFECTED
         for target in targets.values():

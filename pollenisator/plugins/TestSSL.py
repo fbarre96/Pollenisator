@@ -1,5 +1,6 @@
 """A plugin to parse testssl.sh"""
 import re
+from pollenisator.core.components.tag import Tag
 
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.server.servermodels.ip import ServerIp
@@ -64,7 +65,7 @@ def parseWarnings(pentest, file_opened):
                     "ip": ip, "port": port, "proto": "tcp"}
                 missconfiguredHosts[ip][port].sort()
                 notes = "\n".join(missconfiguredHosts[ip][port])
-                p_o.addTag(("SSL/TLS-flaws",None,"low"))
+                p_o.addTag(Tag("SSL/TLS-flaws",None,"low", notes=notes))
                 p_o.updateInfos({"compliant": "False"})
         if firstLine:
             return None, None
@@ -113,6 +114,13 @@ class TestSSL(Plugin):
             return " ".join(args[:-1]) + self.getFileOutputArg()+outputDir+toolname + " "+args[-1]
         return command
 
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"SSL/TLS-flaws": Tag("SSL/TLS-flaws", level="low")}
+    
     def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information

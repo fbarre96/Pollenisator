@@ -1,7 +1,7 @@
 """Controller for model object. Mostly handles conversion between mongo data and python objects"""
 
 from bson.objectid import ObjectId
-
+from pollenisator.core.components.tag import Tag
 from pollenisator.core.components.mongo import DBClient
 from datetime import datetime
 
@@ -78,7 +78,7 @@ class ControllerElement:
     def setTags(self, tags):
         """Set the model tags to given tags
         Args:
-            tags: a list of string describing tags.
+            tags: a list of tagInfo describing tags.
         """
         if self.model is None:
             return False
@@ -100,7 +100,7 @@ class ControllerElement:
             override: if True (default), will force add of the new tag and remove tag of the same tag group.
                       if False, will not add this tag.
         """
-        self.model.addTag(newTag,override=override)
+        self.model.addTag(Tag(newTag),override=override)
 
     def getData(self):
         if self.model is None:

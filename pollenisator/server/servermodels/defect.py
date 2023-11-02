@@ -84,7 +84,6 @@ def delete(pentest, defect_iid):
 
 @permission("pentester")
 def insert(pentest, body):
-    
     try:
         dbclient = DBClient.getInstance()
         if "creation_time" in body:
@@ -129,6 +128,8 @@ def insert(pentest, body):
             if "fixes" in body:
                 del body["fixes"]
         body["creation_time"] = datetime.now()
+        if isinstance(body.get("type", []), str):
+            body["type"] = body.get("type", "").split(",")
         ins_result = dbclient.insertInDb(pentest, "defects", body, parent)
         iid = ins_result.inserted_id
         defect_o._id = iid

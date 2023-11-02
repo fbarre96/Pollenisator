@@ -14,16 +14,12 @@ from bson import ObjectId
 from pollenisator.core.components.logger_config import logger
 import dns.resolver
 
-from pollenisator.core.components.tag import Tag
-
 class JSONEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, ObjectId):
             return "ObjectId|"+str(o)
         elif isinstance(o, datetime):
             return str(o)
-        elif isinstance(o, Tag):
-            return o.getData()
         return json.JSONEncoder.default(self, o)
 
 class JSONDecoder(json.JSONDecoder):
@@ -39,7 +35,6 @@ class JSONDecoder(json.JSONDecoder):
                 dct[k] = v
             elif str(v).startswith('ObjectId|'):
                 dct[k] = ObjectId(v.split('ObjectId|')[1])
-            
         return dct
 
 
@@ -92,35 +87,6 @@ def listPlugin():
         ".py") and x != "__pycache__" and x != "__init__.py" and x != "plugin.py"]
     return plugin_list
 
-def detectPlugins(pentest, upfile, cmdline, ext):
-    foundPlugin = "Ignored"
-    results = []
-    for pluginName in listPlugin():
-        result = {"tags":[]}
-        mod = loadPlugin(pluginName)
-        if mod.autoDetectEnabled():
-            notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline, ext=ext, filename=upfile.filename)
-            upfile.stream.seek(0)
-            if notes is not None and tags is not None:
-                foundPlugin = pluginName
-                result["tags"] = tags
-                result["notes"] = notes
-                result["lvl"] = lvl
-                result["targets"] = targets
-                result["plugin"] = pluginName
-                results.append(result)
-    return results
-
-def detectPluginsWithCmd(cmdline):
-    foundPlugins = []
-    for pluginName in listPlugin():
-        mod = loadPlugin(pluginName)
-        if mod.autoDetectEnabled():
-            if mod.detect_cmdline(cmdline):
-                foundPlugins.append(pluginName)
-    if not foundPlugins:
-        return ["Default"]
-    return foundPlugins
 
 def isIp(domain_or_networks):
     """
@@ -165,15 +131,6 @@ def splitRange(rangeIp):
     return subnets
 
 
-def getDefaultWorkerCommandsFile():
-    return os.path.join(getMainDir(), "config", "worker_commands.json")
-
-def getDefaultCommandsFile():
-    return os.path.join(getMainDir(), "config", "default_commands.json")
-
-def getDefaultCheatsheetFile():
-    return os.path.join(getMainDir(), "config", "default_cheatsheet.json")
-
 def resetUnfinishedTools():
     """
     Reset all tools running to a ready state. This is useful if a command was running on a worker and the auto scanning was interrupted.
@@ -204,11 +161,8 @@ def stringToDate(datestring):
     ret = None
     if isinstance(datestring, str):
         if datestring != "None":
-            try:
-                ret = datetime.strptime(
-                    datestring, '%d/%m/%Y %H:%M:%S')
-            except ValueError as e:
-                raise(e)
+            ret = datetime.strptime(
+                datestring, '%d/%m/%Y %H:%M:%S')
     return ret
 
 
@@ -221,11 +175,8 @@ def fitNowTime(dated, datef):
         True if the current time is between the given interval. False otherwise.
         If one of the args is None, returns False."""
     today = datetime.now()
-    try:
-        date_start = stringToDate(dated)
-        date_end = stringToDate(datef)
-    except ValueError:
-        return False
+    date_start = stringToDate(dated)
+    date_end = stringToDate(datef)
     if date_start is None or date_end is None:
         return False
     return today > date_start and date_end > today
@@ -346,6 +297,9 @@ def getDefaultWorkerCommandsFile():
 
 def getDefaultCommandsFile():
     return os.path.join(getMainDir(), "config", "default_commands.json")
+
+def getDefaultCheatsheetFile():
+    return os.path.join(getMainDir(), "config", "default_cheatsheet.json")
 
 def loadServerConfig():
     """Return data converted from json inside config/server.cfg

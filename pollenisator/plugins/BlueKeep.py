@@ -2,6 +2,7 @@
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
+from pollenisator.core.components.tag import Tag
 
 class BlueKeep(Plugin):
     """Inherits Plugin
@@ -31,6 +32,12 @@ class BlueKeep(Plugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"pwned-bluekeep" : Tag("pwned-bluekeep", "red", "high"),"todo-bluekeep": Tag("todo-bluekeep", None, "todo")}
 
     def Parse(self, pentest, file_opened, **kwargs):
         """
@@ -78,15 +85,15 @@ class BlueKeep(Plugin):
                 targets[str(p_o.getId())] = {"ip": ip, "port": kwargs.get(
                     "port", None), "proto": kwargs.get("proto", None)}
             if "VULNERABLE" in line:
-                tags=[("pwned-bluekeep", "red", "high")]
+                ip_o.addTag(Tag(self.getTags()["pwned-bluekeep"], notes=line))
                 if p_o is not None:
-                    p_o.addTag(("pwned-bluekeep", "red", "high"))
+                    ip_o.addTag(Tag(self.getTags()["pwned-bluekeep"], notes=line))
                 ip_o = ServerIp.fetchObject(pentest, {"ip": ip})
                 if ip_o is not None:
-                    ip_o.addTag(("pwned-bluekeep", "red", "high"))
+                    ip_o.addTag(Tag(self.getTags()["pwned-bluekeep"], notes=line))
                   
             elif "UNKNOWN" in line:
-                tags = ["todo-bluekeep", None, "todo"]
+                tags = [self.getTags()["todo-bluekeep"]]
             notes += line
         if not success:
             return None, None, None, None

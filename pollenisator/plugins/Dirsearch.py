@@ -1,5 +1,6 @@
 """A plugin to parse a dirsearch scan"""
 
+from pollenisator.core.components.tag import Tag
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
@@ -99,7 +100,14 @@ class Dirsearch(Plugin):
             string: the path to file created
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
-
+    
+    
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"todo-dirsearch": Tag("todo-dirsearch", "blue", "todo")}
 
     def Parse(self, pentest, file_opened, **_kwargs):
         """
@@ -154,5 +162,5 @@ class Dirsearch(Plugin):
                     newInfos["SSL"] = "True" if hosts[host][port]["service"] == "https" else "False"
                     port_o.updateInfos(newInfos)
                     if atLeastOne:
-                        tags = [("todo-dirsearch", "blue", "todo")]
+                        tags = [Tag(self.getTags()["todo-dirsearch"], notes=notes)]
         return notes, tags, "port", targets

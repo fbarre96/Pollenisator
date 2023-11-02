@@ -8,6 +8,7 @@ import re
 import shutil
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.parser import Parser, ParseError, Term
+from pollenisator.core.components.tag import Tag
 from pollenisator.core.components.utils import JSONDecoder, getMainDir, isIp, JSONEncoder
 from pollenisator.core.controllers.wavecontroller import WaveController
 from pollenisator.core.controllers.intervalcontroller import IntervalController
@@ -21,7 +22,7 @@ from pollenisator.server.permission import permission
 dbclient = DBClient.getInstance()
 
 searchable_collections = ["waves","scopes","ips","ports","tools","defects"]
-validCollections = [ "cheatsheet", "commands", "settings"]
+validCollections = [ "cheatsheet", "commands", "settings" , "defects"]
 operato_trans = {
     "||regex||":"$regex", "==":"$eq", "!=": "$ne", ">":"$gt", "<":"$lt", ">=":"$gte", "<=":"$lte", "in":"$in", "not in":"$nin"
     }
@@ -468,7 +469,7 @@ def registerTag(body):
     color = body["color"]
     level = body["level"]
     pentest = body["pentest"]
-    return dbclient.doRegisterTag(pentest, name, color, level)
+    return dbclient.doRegisterTag(pentest, Tag(name, color, level))
 
 @permission("pentester", "body.pentest")
 def unregisterTag(body):

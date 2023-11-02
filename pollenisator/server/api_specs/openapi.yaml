@@ -103,7 +103,6 @@ components:
                 type: array
                 items:
                   type: string
-    
     # binary_upfile:
     #   content:
     #     multipart/form-data:

@@ -1,6 +1,7 @@
 """A plugin to parse sshscan"""
 
 import json
+from pollenisator.core.components.tag import Tag
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
@@ -32,7 +33,15 @@ class SSHScan(Plugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
-
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"info-sshscan": Tag("info-sshscan"), 
+                "pwned-ssh-nopassword": Tag("pwned-ssh-nopassword", level="high", color="red"),
+                "SSH-flaw": Tag("SSH-flaw", level="low", color="yellow")}
+    
     def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
@@ -49,7 +58,7 @@ class SSHScan(Plugin):
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
             return None, None, None, None
         notes = ""
-        tags = ["info-sshscan"]
+        tags = [self.getTags()["info-sshscan"]]
         content = file_opened.read().decode("utf-8")
         targets = {}
         try:
@@ -79,13 +88,13 @@ class SSHScan(Plugin):
                         "ip": ip, "port": port, "proto": "tcp"}
                     oneScanIsValid = True
                     if "nopassword" in scan["auth_methods"]:
-                        tags = ["pwned-ssh-nopassword", "red", "high"]
+                        tags = [self.getTags()["pwned-ssh-nopassword"]]
                     # Will not exit if port was not ssh
                     is_ok = scan["compliance"]["compliant"]
                     if str(is_ok) == "False":
                         port_o.updateInfos({"compliant": "False"})
                         port_o.updateInfos({"auth_methods": scan["auth_methods"]})
-                        port_o.addTag(("SSH-flaw", None, "low"))
+                        port_o.addTag(Tag(self.getTags()["SSH-flaw"], notes=notes))
             except KeyError:
                 continue
         if not oneScanIsValid:

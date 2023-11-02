@@ -1,5 +1,6 @@
 """A plugin to parse namp script ms17-010 scan"""
 
+from pollenisator.core.components.tag import Tag
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.server.servermodels.defect import ServerDefect
 from pollenisator.server.servermodels.ip import ServerIp
@@ -43,6 +44,15 @@ class EternalBlue(Plugin):
             string: the path to file created
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
+    
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"pwned-eternalblue": Tag("pwned-eternalblue", "red", "high"),
+                "eternalblue": Tag("eternalblue", "red", "high")}
+
 
     def Parse(self, pentest, file_opened, **kwargs):
         """
@@ -89,7 +99,7 @@ class EternalBlue(Plugin):
             targets[str(p_o.getId())] = {
                 "ip": ip, "port": port, "proto": proto}
         if "VULNERABLE" in notes:
-            tags=["pwned-eternalblue", "red", "high"]
+            tags= [self.getTags()["pwned-eternalblue"]]
             if res_insert is not None:
-                p_o.addTag(("eternalblue", "red", "high"))
+                p_o.addTag(Tag(self.getTags()["eternalblue"], notes=notes))
         return notes, tags, "port", targets

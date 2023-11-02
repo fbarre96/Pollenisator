@@ -1,6 +1,7 @@
 """A plugin to parse nmap scan"""
 
 import re
+from pollenisator.core.components.tag import Tag
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.plugins.plugin import Plugin
@@ -120,6 +121,12 @@ class Nmap(Plugin):
         """
         return (commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0])
 
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"info-nmap": Tag("info-nmap", level="info")}
 
     def Parse(self, pentest, file_opened, **kwargs):
         """
@@ -138,7 +145,7 @@ class Nmap(Plugin):
         """
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
             return None, None, None, None
-        tags = []
+        tags = [self.getTags()["info-nmap"]]
         cmdline = kwargs.get("cmdline", None)
         tool_m = kwargs.get("tool", None)
         keep_only_open = True

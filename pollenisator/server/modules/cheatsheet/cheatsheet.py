@@ -26,11 +26,10 @@ class CheckItem(ServerElement):
         self.initialize(pentest, valuesFromDb.get("_id"), valuesFromDb.get("title"),  valuesFromDb.get("pentest_types"), 
                         valuesFromDb.get("lvl"), valuesFromDb.get("ports"), valuesFromDb.get("priority"), valuesFromDb.get("max_thread"), valuesFromDb.get("description"), valuesFromDb.get("category"),
             valuesFromDb.get("check_type"), valuesFromDb.get("step"), valuesFromDb.get("parent"), 
-            valuesFromDb.get("commands"), valuesFromDb.get(""), valuesFromDb.get("defects"), valuesFromDb.get("infos"))
+            valuesFromDb.get("commands"), valuesFromDb.get("defect_tags"), valuesFromDb.get("script"), valuesFromDb.get("infos"))
         
 
-    def initialize(self, pentest, _id, title, pentest_types=None, lvl="", ports="", priority=0, max_thread=1, description="", category="", check_type="manual", step=1, parent=None, commands=None, script=None, defects=None, infos=None):
-
+    def initialize(self, pentest, _id, title, pentest_types=None, lvl="", ports="", priority=0, max_thread=1, description="", category="", check_type="manual", step=1, parent=None, commands=None, defect_tags=None, script=None, infos=None):
         self._id = _id
         self.type = "checkitem"
         self.title = title
@@ -44,9 +43,9 @@ class CheckItem(ServerElement):
         self.step = step
         self.parent = parent
         self.commands = [] if commands is None else commands
+        self.defect_tags = [] if defect_tags is None else defect_tags
         self.script = script
         self.pentest_types = [] if pentest_types is None else pentest_types
-        self.defects = [] if defects is None else defects
         self.infos = {} if infos is None else infos
         dbclient = DBClient.getInstance()
         if pentest != "":
@@ -93,7 +92,7 @@ class CheckItem(ServerElement):
         return {"_id": self._id, "type":self.type, "title":self.title,"pentest_types":self.pentest_types, "lvl":self.lvl, "ports":self.ports,
                 "priority":self.priority, "max_thread":self.max_thread, "description": self.description, "category":self.category,
                 "check_type":self.check_type, "step":self.step, "parent":self.parent,
-                "commands":self.commands, "script":self.script, "defects":self.defects, "infos":self.infos}
+                "commands":self.commands,"defect_tags":self.defect_tags, "script":self.script, "infos":self.infos}
 
     def addInDb(self):
         return doInsert(self.pentest, self.getData())

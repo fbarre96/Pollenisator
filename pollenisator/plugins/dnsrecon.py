@@ -3,6 +3,7 @@
 # 1. Imports
 import re
 import json
+from pollenisator.core.components.tag import Tag
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.plugins.plugin import Plugin
 
@@ -31,6 +32,13 @@ class dnsrecon(Plugin):
             string: the path to file created
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip()
+    
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"info-dnsrecon": Tag("info-dnsrecon")}
 
     def Parse(self, pentest, file_opened, **kwargs):
         """
@@ -113,6 +121,6 @@ class dnsrecon(Plugin):
                     ip_m.updateInfos(infosToAdd)
                 else:
                     countInserted += 1
-                    tags = ["info-dnsrecon"]
+                    tags = [self.getTags()["info-dnsrecon"]]
                     notes += name+" inserted.\n"
         return notes, tags, "wave", {"wave": None}

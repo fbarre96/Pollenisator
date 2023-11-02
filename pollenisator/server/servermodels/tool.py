@@ -1,6 +1,8 @@
 from pollenisator.core.components.logger_config import logger
 from bson import ObjectId
+from bson.errors import InvalidId
 from pollenisator.core.components.mongo import DBClient
+from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.tool import Tool
 from pollenisator.core.controllers.toolcontroller import ToolController
 from pollenisator.server.servermodels.command import ServerCommand
@@ -77,6 +79,10 @@ class ServerTool(Tool, ServerElement):
     
     def getCheckItem(self):
         from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
+        try:
+            ObjectId(self.check_iid)
+        except InvalidId:
+           return None
         check = CheckInstance.fetchObject(self.pentest, {"_id":ObjectId(self.check_iid)})
         if check is None:
             return None
@@ -193,6 +199,7 @@ class ServerTool(Tool, ServerElement):
     @classmethod
     def replaceCommandVariables(cls, pentest, command, data):
         command = cls.unpack_info(data.get("infos",{}), command, depth=0, max_depth=3)
+        return command
     
     @classmethod
     def unpack_info(cls, infos_dict: dict, command: str, depth=0, max_depth=3):
@@ -536,7 +543,8 @@ def listPlugins():
     for plugin in plugin_list:
         mod = loadPlugin(plugin)
         default_bin_names = mod.default_bin_names
-        results.append({"plugin":plugin, "default_bin_names":default_bin_names})
+        tags = [tag for tag in mod.getTags().values()]
+        results.append({"plugin":plugin, "default_bin_names":default_bin_names, "tags":tags})
     return results
     
 @permission("pentester")
@@ -562,7 +570,7 @@ def importResult(pentest, tool_iid, upfile, body):
                 notes = "No results found by plugin."
             if tags is None:
                 tags = []
-            if isinstance(tags, str):
+            if isinstance(tags, Tag):
                 tags = [tags]
             # Success could be change to False by the plugin function (evaluating the return code for exemple)
             # if the success is validated, mark tool as done
@@ -575,7 +583,7 @@ def importResult(pentest, tool_iid, upfile, body):
             # Upload file to SFTP
             msg = "TASK SUCCESS : "+toolModel.name
         except IOError as e:
-            toolModel.addTag(("no-output", None, "error"))
+            toolModel.addTag(Tag("no-output", None, "error", "Failed to read results file"))
             toolModel.notes = "Failed to read results file"
             toolModel.markAsDone()
             update(pentest, tool_iid, ToolController(toolModel).getData())

@@ -1,5 +1,6 @@
 """A plugin to parse nikto scan"""
 
+from pollenisator.core.components.tag import Tag
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
@@ -49,6 +50,13 @@ class Host(Plugin):
             string: the path to file created
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
+    
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"info-host": Tag("info-host")}
 
     def Parse(self, pentest, file_opened, **_kwargs):
         """
@@ -63,7 +71,7 @@ class Host(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
-        tags = ["info-host"]
+        tags = [self.getTags()["info-host"]]
         targets = {}
         try:
             notes = file_opened.read().decode("utf-8")

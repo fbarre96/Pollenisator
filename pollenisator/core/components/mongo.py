@@ -885,8 +885,8 @@ class DBClient:
         return [tags, ["hidden"]]
 
 
-    def doRegisterTag(self, pentest, name, color="transparent", level="info"):
-        if name in self.getRegisteredTags(pentest):
+    def doRegisterTag(self, pentest, tag):
+        if tag.name in self.getRegisteredTags(pentest):
             return False
         if pentest == "pollenisator":
             tags = json.loads(self.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=utils.JSONDecoder)
@@ -894,11 +894,11 @@ class DBClient:
         else:
             tags = self.findInDb(pentest, "settings", {"key":"tags"}, False)
             if tags is None:
-                self.insertInDb(pentest, "settings", {"key":"tags", "value":{name:{"color":color, "level":level}}})
+                self.insertInDb(pentest, "settings", {"key":"tags", "value":{tag.name:{"color":tag.color, "level":tag.level}}})
             else:
                 tags = tags.get("value", {})
-                if name not in tags:
-                    tags[name] = {"color":color, "level":level}
+                if tag.name not in tags:
+                    tags[tag.name] = {"color":tag.color, "level":tag.level}
                     self.updateInDb(pentest, "settings", {"key":"tags"}, {"$set": {"value":tags}}, many=False, notify=True)
         return True    
 

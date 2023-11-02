@@ -1,6 +1,7 @@
 """A plugin to parse python reverse searchsploit scan"""
 
 import re
+from pollenisator.core.components.tag import Tag
 from pollenisator.plugins.plugin import Plugin
 import json
 
@@ -45,6 +46,13 @@ class SearchSploit(Plugin):
         command = command.replace("\"\"", "None")
         return command
 
+    def getTags(self):
+        """Returns a list of tags that can be added by this plugin
+        Returns:
+            list of strings
+        """
+        return {"todo-searchsploit": Tag("todo-searchsploit", level="todo")}
+    
     def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
@@ -75,11 +83,11 @@ class SearchSploit(Plugin):
             elif not re.match(r"\d", jsonFile["SEARCH"]):
                 return notes, tags, "wave", {"wave": None}
             else:     
-                tags.append(("todo-searchsploit", None, "todo"))
                 for exploit in jsonFile["RESULTS_EXPLOIT"]:
                     notes += exploit["Date"] + " - " + exploit["Title"] + "\n"
                     notes += "Exploitdb path : " + exploit["Path"] + "\n"
                     notes += "\n"
+                tags.append(Tag(self.getTags()["todo-searchsploit"], notes))
                 return notes, tags, "wave", {"wave": None}
         except ValueError: # Couldn't parse json file
             return notes,None,None,None
