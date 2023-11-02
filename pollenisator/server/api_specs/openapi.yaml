@@ -468,11 +468,22 @@ paths:
       operationId: pollenisator.server.servermodels.element.getTriggerLevels
       tags:
         - Modules
-      summary: Get current user
+      summary: Get all triggers for a check item.
       security: []
       responses:
         '200':
-          description: Successful read user
+          description: Returns a list of triggers that will be used to add a check instance to the pentest.
+  
+  /getCommandVariables:
+    get:
+      operationId: pollenisator.server.servermodels.element.getCommandVariables
+      tags:
+        - Modules
+      summary: Get possible variables for commands
+      security: []
+      responses:
+        '200':
+          description: list of variables for commands that can be replaced.
           
   /issue:
     post:

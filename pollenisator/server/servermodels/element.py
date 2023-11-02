@@ -25,6 +25,7 @@ class MetaElement(type):
 
 
 class ServerElement(metaclass=MetaElement):
+    command_variables = []
 
     def __init__(self, *args, **kwargs):
         self.repr_string = self.getDetailedString()
@@ -42,6 +43,7 @@ class ServerElement(metaclass=MetaElement):
     def replaceAllCommandVariables(cls, pentest, command, data):
         for class_name in REGISTRY.keys():
             command = REGISTRY[class_name].replaceCommandVariables(pentest, command, data)
+            
         return command
 
     @classmethod
@@ -227,7 +229,18 @@ class ServerElement(metaclass=MetaElement):
     def getTriggers(cls):
         return ["tag:onAdd:str", "tag:onRemove:str"]
     
-   
+    @classmethod
+    def getCommandVariables(cls):
+        return cls.command_variables
+    
+@permission("user")
+def getCommandVariables():
+    """Returns the list of variables for all classes"""
+    ret = set()
+    for class_name in REGISTRY.keys():
+        ret = ret.union(set(REGISTRY[class_name].getCommandVariables()))
+    return sorted(list(ret))
+ 
 @permission("user")
 def getTriggerLevels():
     """Return the list of trigger levels of this object.

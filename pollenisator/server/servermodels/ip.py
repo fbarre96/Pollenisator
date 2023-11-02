@@ -18,6 +18,7 @@ import json
 
 
 class ServerIp(Ip, ServerElement):
+    command_variables = ["ip","ip.infos.*"]
 
     def __init__(self, pentest="", *args, **kwargs):
         dbclient = DBClient.getInstance()

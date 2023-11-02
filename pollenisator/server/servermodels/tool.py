@@ -18,7 +18,7 @@ from pollenisator.server.token import encode_token
 import socketio
 
 class ServerTool(Tool, ServerElement):
-
+    command_variables = ["tool.infos.*"]
     def __init__(self, pentest="", *args, **kwargs):
         dbclient = DBClient.getInstance()
         if pentest != "":
@@ -186,21 +186,23 @@ class ServerTool(Tool, ServerElement):
                 if target is not None:
                     data = target
         command = ServerElement.replaceAllCommandVariables(self.pentest, command, data)
-        tool_infos = self.infos
-        command = self.unpack_info(tool_infos, command, depth=0, max_depth=3)
-            
         if isinstance(command_o, str):
             return command
         return command
     
-    def unpack_info(self, infos_dict: dict, command: str, depth=0, max_depth=3):
+    @classmethod
+    def replaceCommandVariables(cls, pentest, command, data):
+        command = cls.unpack_info(data.get("infos",{}), command, depth=0, max_depth=3)
+    
+    @classmethod
+    def unpack_info(cls, infos_dict: dict, command: str, depth=0, max_depth=3):
         """Recursively unpack infos dict into command string
         """
         if depth > max_depth:
             return
         for key in infos_dict.keys():
             if isinstance(infos_dict[key], dict):
-                command = self.unpack_info(infos_dict[key], command, depth+1, max_depth)
+                command = cls.unpack_info(infos_dict[key], command, depth+1, max_depth)
             else:
                 command = command.replace("|tool.infos."+str(key)+"|", str(infos_dict.get(key, '')))
         return command

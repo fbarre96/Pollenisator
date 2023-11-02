@@ -17,7 +17,7 @@ from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance, 
 from pollenisator.server.permission import permission
 
 class ServerPort(Port, ServerElement):
-    
+    command_variables = ["port","port.proto","port.service","port.product","port.infos.*"]
     def __init__(self, pentest="", *args, **kwargs):
         dbclient = DBClient.getInstance()
         if pentest != "":

@@ -11,7 +11,7 @@ import json
 from pollenisator.server.permission import permission
 
 class ServerScope(Scope, ServerElement):
-    
+    command_variables = ["scope","parent_domain"]
     def __init__(self, pentest="", *args, **kwargs):
         dbclient = DBClient.getInstance()
         super().__init__(*args, **kwargs)

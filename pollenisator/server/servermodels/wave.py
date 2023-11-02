@@ -13,6 +13,8 @@ from pollenisator.server.permission import permission
 
 class ServerWave(Wave, ServerElement):
 
+    command_variables = ["wave"]
+
     def __init__(self, pentest="", *args, **kwargs):
         super().__init__(*args, **kwargs)
         dbclient = DBClient.getInstance()
