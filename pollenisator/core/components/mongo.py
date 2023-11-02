@@ -660,7 +660,7 @@ class DBClient:
         result = self.deleteFromDb(
             "pollenisator", "pentests", {"uuid": pentest_uuid})
         if result is not None:
-            if result.deleted_count == 1:
+            if result == 1:
                 self.client.drop_database(pentest_uuid)
                 return True
 
