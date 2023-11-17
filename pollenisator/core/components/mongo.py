@@ -844,6 +844,8 @@ class DBClient:
             toDbName = os.path.splitext(os.path.basename(filename))[0]
         success, msg = self.registerPentest(owner, toDbName, True, False)
         uuid_name = msg
+        if not self.try_uuid(uuid_name):
+            return msg, 403
         if success:
             connectionString = '' if self.user == '' else "-u "+self.user + \
                 " -p "+self.password + " --authenticationDatabase admin "
@@ -854,7 +856,7 @@ class DBClient:
                     self.ssldir+"/ca.pem --sslAllowInvalidHostnames"
             if kwargs.get("nsFrom", None) is not None and kwargs.get("nsTo", None) is not None:
                 nsfrom = kwargs.get("nsFrom")
-                if try_uuid(nsfrom):
+                if self.try_uuid(nsfrom):
                     cmd += " --nsFrom='"+nsfrom+".*' --nsTo='"+uuid_name+".*'"
             execute(cmd, None, True)
         return msg, 200 if success else 403
