@@ -779,12 +779,13 @@ class DBClient:
             return "database to copy : not found", 404
         
         major_version = ".".join(self.client.server_info()["version"].split(".")[:2])
-        succeed, msg = self.registerPentest(self.getPentestOwner(fromCopy),
-                toCopy, True, True)
-        if not succeed:
-            return msg, 403
-        toCopy = msg
+        
         if float(major_version) < 4.2:
+            succeed, msg = self.registerPentest(self.getPentestOwner(fromCopy),
+                    toCopy, True, True)
+            if not succeed:
+                return msg, 403
+            toCopy = msg
             self.client.admin.command('copydb',
                                         fromdb=fromCopy,
                                         todb=toCopy)
