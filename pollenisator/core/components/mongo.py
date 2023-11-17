@@ -2,7 +2,7 @@
 import os
 import ssl
 import datetime
-from uuid import uuid4
+from uuid import uuid4, UUID
 from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError, OperationFailure
 import pollenisator.core.components.utils as utils
@@ -779,16 +779,16 @@ class DBClient:
             return "database to copy : not found", 404
         
         major_version = ".".join(self.client.server_info()["version"].split(".")[:2])
-        if float(major_version) < 4.2:
-            succeed, msg = self.registerPentest(self.getPentestOwner(fromCopy),
+        succeed, msg = self.registerPentest(self.getPentestOwner(fromCopy),
                 toCopy, True, True)
-            if succeed:
-                self.client.admin.command('copydb',
-                                          fromdb=fromCopy,
-                                          todb=toCopy)
-            else:
-                return msg, 403
-            return "Success", 200
+        if not succeed:
+            return msg, 403
+        toCopy = msg
+        if float(major_version) < 4.2:
+            self.client.admin.command('copydb',
+                                        fromdb=fromCopy,
+                                        todb=toCopy)
+            return "Database copied", 200
         else:
             outpath = self.dumpDb(fromCopy)
             return self.importDatabase(self.getPentestOwner(fromCopy), outpath, nsFrom=fromCopy, nsTo=toCopy)
@@ -817,6 +817,14 @@ class DBClient:
                 self.ssldir+"/ca.pem --sslAllowInvalidHostnames"
         execute(cmd)
         return out_path+".gz"
+    
+    @staticmethod
+    def try_uuid(uuid_to_test):
+        try:
+            uuid_obj = UUID(uuid_to_test, version=4)
+        except ValueError:
+            return False
+        return str(uuid_obj) == uuid_to_test
 
     def importDatabase(self, owner, filename, **kwargs):
         """
@@ -835,6 +843,7 @@ class DBClient:
         else:
             toDbName = os.path.splitext(os.path.basename(filename))[0]
         success, msg = self.registerPentest(owner, toDbName, True, False)
+        uuid_name = msg
         if success:
             connectionString = '' if self.user == '' else "-u "+self.user + \
                 " -p "+self.password + " --authenticationDatabase admin "
@@ -844,7 +853,9 @@ class DBClient:
                 cmd += " --ssl --sslPEMKeyFile "+self.ssldir+"/client.pem --sslCAFile " + \
                     self.ssldir+"/ca.pem --sslAllowInvalidHostnames"
             if kwargs.get("nsFrom", None) is not None and kwargs.get("nsTo", None) is not None:
-                cmd += " --nsFrom='"+kwargs.get("nsFrom")+".*' --nsTo='"+toDbName+".*'"
+                nsfrom = kwargs.get("nsFrom")
+                if try_uuid(nsfrom):
+                    cmd += " --nsFrom='"+nsfrom+".*' --nsTo='"+uuid_name+".*'"
             execute(cmd, None, True)
         return msg, 200 if success else 403
     

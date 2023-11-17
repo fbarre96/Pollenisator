@@ -538,6 +538,8 @@ def dumpDb(dbName, collection=""):
 
     if collection != "" and collection not in dbclient.db.collection_names():
         return "Collection not found in database provided", 404
+    if not re.match(r"^[a-zA-Z0-9_\-]+$", collection):
+        return "Invalid collection name", 400
     path = dbclient.dumpDb(dbName, collection)
     if not os.path.isfile(path):
         return "Failed to export database", 503
@@ -545,6 +547,7 @@ def dumpDb(dbName, collection=""):
         return send_file(path, mimetype="application/gzip", attachment_filename=os.path.basename(path))
     except TypeError as e: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
         return send_file(path, mimetype="application/gzip", download_name=os.path.basename(path))
+
 @permission("user")
 def importDb(orig_name, upfile, **kwargs):
     username = kwargs["token_info"]["sub"]
