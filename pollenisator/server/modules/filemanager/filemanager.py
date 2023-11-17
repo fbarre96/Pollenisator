@@ -173,6 +173,7 @@ def download(pentest, attached_iid, filetype, filename):
 
 @permission("pentester")
 def rmProof(pentest, defect_iid, filename):
+    filename = str(filename)
     filename = filename.replace("/", "_")
     filepath = os.path.join(local_path, pentest, "proof", defect_iid, filename)
     dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(defect_iid)}, {"$pull":{"proofs":filename}})
