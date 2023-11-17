@@ -538,7 +538,7 @@ def dumpDb(dbName, collection=""):
 
     if collection != "" and collection not in dbclient.db.collection_names():
         return "Collection not found in database provided", 404
-    if not re.match(r"^[a-zA-Z0-9_\-]+$", collection):
+    if collection != "" and not re.match(r"^[a-zA-Z0-9_\-]+$", collection):
         return "Invalid collection name", 400
     path = dbclient.dumpDb(dbName, collection)
     if not os.path.isfile(path):
