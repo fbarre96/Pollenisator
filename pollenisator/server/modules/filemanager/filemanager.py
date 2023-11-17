@@ -146,7 +146,7 @@ def importExistingFile(pentest, upfile, body, **kwargs):
 
 @permission("pentester")
 def listFiles(pentest, attached_iid, filetype):
-    filepath = os.path.join(local_path, pentest, filetype, attached_iid)
+    filepath = os.path.join(local_path, pentest, filetype, str(attached_iid))
     try:
         files = os.listdir(filepath)
     except FileNotFoundError:
@@ -156,14 +156,14 @@ def listFiles(pentest, attached_iid, filetype):
 @permission("pentester")
 def download(pentest, attached_iid, filetype, filename):
     if filetype == "result":
-        filepath = os.path.join(local_path, pentest, filetype, attached_iid)
+        filepath = os.path.join(local_path, pentest, filetype, str(attached_iid))
         files = os.listdir(filepath)
         if len(files) == 1:
             filepath = os.path.join(filepath, files[0])
         else:
             return "No result file found for given tool", 404
     else:
-        filepath = os.path.join(local_path, pentest, filetype, attached_iid, filename.replace("/", "_"))
+        filepath = os.path.join(local_path, pentest, filetype, str(attached_iid), filename.replace("/", "_"))
     if not os.path.isfile(filepath):
         return "File not found", 404
     try:
