@@ -11,6 +11,7 @@ from pollenisator.server.modules.activedirectory.users import insert as user_ins
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.core.components.utils import performLookUp
 import json
+import shlex
 
 def getInfos(enum4linux_file):
     parts = ["Starting enum4linux", "Target Information", "Enumerating Workgroup/Domain", "Session Check on", 
@@ -116,6 +117,25 @@ def updateDatabase(pentest, enum_infos):
     port_m.updateInfos(infosToAdd)
     return targets
 
+
+def getUserInfoFromCmdLine(cmdline=None):
+    if cmdline is None:
+        return None, None, None
+    parts = shlex.split(cmdline)
+    domain = None
+    user = None
+    password = None
+    for part_i, part in enumerate(parts):
+        if part == "-u" and user is None:
+            user = parts[part_i+1]
+        if part == "-w" and domain is None:
+            domain = parts[part_i+1]
+        if part == "-p" and password is None:
+            password = parts[part_i+1]
+        if part == "-no-pass":
+            password = ""
+    return domain, user, password
+
 class Enum4Linux(Plugin):
     """Inherits Plugin
     A plugin to parse a enum4linux scan"""
@@ -148,9 +168,10 @@ class Enum4Linux(Plugin):
         Returns:
             list of strings
         """
-        return {"info-enum4linux-success": Tag("info-enum4linux-success")}
+        return {"info-enum4linux-success": Tag("info-enum4linux-success"),
+                "high-null-sessions-allowed": Tag("high-null-sessions-allowed", color="red", level="high"),}
 
-    def Parse(self, pentest, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
        
@@ -167,9 +188,16 @@ class Enum4Linux(Plugin):
         notes = ""
         tags = []
         enum_infos = getInfos(file_opened)
+        cmdline = kwargs.get("cmdline", None)
+        tool_m = kwargs.get("tool", None)
+        if cmdline is None and tool_m is not None:
+            cmdline = tool_m.infos.get("cmdline", None)
+        domain, user, password = getUserInfoFromCmdLine(cmdline)
         notes = json.dumps(enum_infos, indent=4)
         if enum_infos is not None and enum_infos.get("users") is not None:
             tags = [self.getTags()["info-enum4linux-success"]]
+            if domain is None and user is None:
+                tags += [Tag(self.getTags()["high-null-sessions-allowed"], notes=f"Null session allowed on {enum_infos.get('ip')}")]
         elif enum_infos is None:
             return None, None, None, None
         targets = updateDatabase(pentest, enum_infos)

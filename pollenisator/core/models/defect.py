@@ -20,16 +20,15 @@ class Defect(Element):
         Args:
             valueFromDb: a dict holding values to load into the object. A mongo fetched defect is optimal.
                         possible keys with default values are : _id (None), parent (None), infos({}),
-                        ip(""), port(""), proto(""), title(""), synthesis(""), description(""), ease(""), impact(""), risk(""),
+                        target_id, target_type, title(""), synthesis(""), description(""), ease(""), impact(""), risk(""),
                         redactor("N/A"), type([]),  language(""), notes(""), proofs([]), fixes([]), creation_time, infos, index(None)
         """
         if valuesFromDb is None:
             valuesFromDb = {}
         self.proofs = []
         super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None), valuesFromDb.get("infos", {}))
-        self.initialize(valuesFromDb.get("ip", ""), valuesFromDb.get("port", ""),
-                        valuesFromDb.get(
-                            "proto", ""), valuesFromDb.get("title", ""), valuesFromDb.get("synthesis", ""), valuesFromDb.get("description", ""),
+        self.initialize(valuesFromDb.get("target_id", ""), valuesFromDb.get("target_type", ""),
+                        valuesFromDb.get("title", ""), valuesFromDb.get("synthesis", ""), valuesFromDb.get("description", ""),
                         valuesFromDb.get("ease", ""), valuesFromDb.get(
                             "impact", ""),
                         valuesFromDb.get(
@@ -41,12 +40,11 @@ class Defect(Element):
                         valuesFromDb.get("infos", {}),
                         valuesFromDb.get("index", 0))
 
-    def initialize(self, ip, port, proto, title="", synthesis="", description="", ease="", impact="", risk="", redactor="N/A", mtype=None, language="", notes="", proofs=None, fixes=None, creation_time=None, infos=None, index=0):
+    def initialize(self, target_id="", target_type="", title="", synthesis="", description="", ease="", impact="", risk="", redactor="N/A", mtype=None, language="", notes="", proofs=None, fixes=None, creation_time=None, infos=None, index=0):
         """Set values of defect
         Args:
-            ip: defect will be assigned to this IP, can be empty
-            port: defect will be assigned to this port, can be empty but requires an IP.
-            proto: protocol of the assigned port. tcp or udp.
+            target_id: defect will be assigned to this target_id
+            target_type: defect will be assigned to this target_type(target_id)
             title: a title for this defect describing what it is
             synthesis: a short summary of what this defect is about
             description: a more detailed explanation of this particular defect
@@ -75,9 +73,8 @@ class Defect(Element):
         self.mtype = mtype if mtype is not None else []
         self.language = language
         self.notes = notes
-        self.ip = ip
-        self.port = port
-        self.proto = proto
+        self.target_id = target_id
+        self.target_type = target_type
         self.infos = infos if infos is not None else {}
         self.proofs = proofs if proofs is not None else []
         self.fixes = fixes if fixes is not None else []
@@ -93,7 +90,7 @@ class Defect(Element):
 
         return {"title": self.title, "synthesis":self.synthesis, "description":self.description, "ease": self.ease, "impact": self.impact,
                 "risk": self.risk, "redactor": self.redactor, "type": self.mtype, "language":self.language, "notes": self.notes,
-                "ip": self.ip, "port": self.port, "proto": self.proto, "index":self.index,
+                "target_id": self.target_id, "target_type": self.target_type, "index":self.index,
                 "proofs": self.proofs, "creation_time": self.creation_time, "fixes":self.fixes, "_id": self.getId(), "infos": self.infos}
 
 
@@ -127,28 +124,22 @@ class Defect(Element):
             the defect title. If assigned, it will be prepended with ip and (udp/)port
         """
         ret = ""
-        if self.ip is not None:
-            ret += str(self.ip)
-        if self.proto is not None and self.port is not None:
-            if self.proto != "tcp":
-                ret += ":"+self.proto+"/"+self.port
-            else:
-                ret += ":"+self.port
-        ret += " "+self.__str__()
-        return ret
+        return self.getTargetRepr([self.getId()])+" "+self.__str__()
+    
+
 
     def getDbKey(self):
         """Return a dict from model to use as unique composed key.
         Returns:
-            A dict (4 keys :"ip", "port", "proto", "title")
+            A dict (3 keys :"target_id", "target_type", "title")
         """
         if self.pentest == "pollenisator":
             return {"title": self.title}
-        return {"ip": self.ip, "port": self.port, "proto": self.proto, "title": self.title}
+        return {"target_id": self.target_id, "target_type": self.target_type, "title": self.title}
 
     def isAssigned(self):
         """Returns a boolean indicating if this defect is assigned to an ip or is global.
         Returns:
             bool
         """
-        return self.ip != "" and self.port != ""
+        return self.target_id != ""

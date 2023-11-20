@@ -50,8 +50,7 @@ class EternalBlue(Plugin):
         Returns:
             list of strings
         """
-        return {"pwned-eternalblue": Tag("pwned-eternalblue", "red", "high"),
-                "eternalblue": Tag("eternalblue", "red", "high")}
+        return {"pwned-eternalblue": Tag("pwned-eternalblue", "red", "high")}
 
 
     def Parse(self, pentest, file_opened, **kwargs):
@@ -101,5 +100,5 @@ class EternalBlue(Plugin):
         if "VULNERABLE" in notes:
             tags= [self.getTags()["pwned-eternalblue"]]
             if res_insert is not None:
-                p_o.addTag(Tag(self.getTags()["eternalblue"], notes=notes))
+                p_o.addTag(Tag(self.getTags()["pwned-eternalblue"], notes=notes))
         return notes, tags, "port", targets

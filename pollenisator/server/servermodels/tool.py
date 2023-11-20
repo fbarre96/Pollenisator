@@ -190,7 +190,9 @@ class ServerTool(Tool, ServerElement):
             if check is not None:
                 target = check.getTargetData()
                 if target is not None:
-                    data = target
+                    infos = {**data.get("infos", {}), **target.get("infos", {})}
+                    data |= target
+                    data["infos"] = infos
         command = ServerElement.replaceAllCommandVariables(self.pentest, command, data)
         if isinstance(command_o, str):
             return command

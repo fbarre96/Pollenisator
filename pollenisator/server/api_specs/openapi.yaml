@@ -2154,6 +2154,35 @@ paths:
                   value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
                 Already exist:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+
+  "/defects/{pentest}/getTargetRepr":
+    post:
+      operationId: pollenisator.server.servermodels.defect.getTargetRepr
+      tags:
+        - Defects
+      summary: Return target representation of a list of defects
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+      responses:
+        "200":
+          description: Defect repr for each iid
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"5f9150fbed75193ef71ba47f":"IP:PORT for exemple"}'
+
   "/defects/update/{pentest}/{defect_iid}":
     put:
       operationId: pollenisator.server.servermodels.defect.update

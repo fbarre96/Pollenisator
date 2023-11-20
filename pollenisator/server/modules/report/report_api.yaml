@@ -440,9 +440,6 @@ paths:
                   type: string
                 lang:
                   type: string
-                check_api:
-                  type: boolean
-                  default: true
       responses:
         "200":
           description: Success

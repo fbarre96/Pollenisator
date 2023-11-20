@@ -46,6 +46,7 @@ NOT POWNED:
 SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] north.sevenkingdoms.local\brandon.stark account vulnerable to asreproast attack 
 
 """
+    result = {}
     retour = []
     regex_info = re.compile(r"(?:LDAP|SMB)\s+(\S+)\s+(\d+)\s+\S+\s+\[\*\]\s*([^\(]+)\(name:(.*)\) \(domain:(.*)\) \(signing:(True|False)\) \(SMBv1:(False|True)\)$", re.MULTILINE)
     regex_logon_failed = re.compile(
@@ -53,7 +54,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
     regex_success = re.compile(
         r"(?:LDAP|SMB)\s+(\S+)(?:\s+|:)(\d+)\s+(\S+)\s+\[\+\]\s*([^\\]+)\\([^:]+):(.*?)($|\(\S+\))$", re.MULTILINE)
     regex_module_lsassy = re.compile(r"^LSASSY\s+(\S+)\s+(\d+)\s+(\S+)\s+([^\\]+)\\(\S+)\s+(\S+)$")
-    regex_module_secrets = re.compile(r"^(?:SMB|LDAP)\s+(\S+)\s+(\d+)\s+(\S+)\s+(.+)$")
+    regex_module_secrets = re.compile(r"^(?:SMB|LDAP)\s+(\S+)\s+(\d+)\s+(\S+)\s+(?!\[.\])(\S.+)$")
     regex_module_asproast = re.compile(r"^(?:LDAP|SMB)\s+(\S+)\s+(\d+)\s+(\S+)\s+\[[-+]\] ([^\\]+)\\([^:]+) (account vulnerable to asreproast attack)\s*$")
     notes = ""
     countFound = 0
@@ -62,6 +63,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
     cmeFound = False
     lsassy = False
     mode = ""
+    ntds = []
     secrets = []
     tags = []
     for line in cme_file:
@@ -69,7 +71,8 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
             try:
                 line = line.decode("utf-8")
             except UnicodeDecodeError:
-                return None, None, None, None, None, None , None
+                result["success"] = False
+                return result
                 
         line=line.strip()
         line = remove_term_colors(line)
@@ -93,6 +96,9 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
             continue
         elif "Dumped " in line and "NTDS hashes" in line:
             mode = ""
+            ntds = toAdd["ntds"]
+            toAdd["type"] = "success"
+            retour.append(toAdd)
             continue
         if mode == "":
             toAdd = {}
@@ -115,7 +121,6 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                     else:
                         toAdd["password"] = success_infos.group(6)
             else:
-                
                 res_infos = re.search(regex_info, line)
                 res_asrep = re.search(regex_module_asproast, line)
                 res_secrets = re.search(regex_module_secrets, line)
@@ -200,13 +205,26 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
             if module_infos is None:
                 continue
             if "toAdd" in locals():
+                toAdd["ip"] = module_infos.group(1)
+                toAdd["port"] = module_infos.group(2)
+                toAdd["machine_name"] = module_infos.group(3)
                 toAdd["ntds"] = toAdd.get("ntds", []) + [module_infos.group(4)]
+                
     if not cmeFound:
-        return None, None, None, None, None, None, None
+        result["success"] = False
+        return result
     if lsassy:
         notes = f"CME LSASSY Success"
-    notes = f"Pwn3d count : {countPwn}\nConnection success count : {countSuccess}\nHost found : {countFound}\nSecrets found : {len(secrets)}\n"+ ("\n".join(secrets)) + notes
-    return retour, countPwn, countSuccess, notes, secrets, lsassy, tags
+    notes = f"Pwn3d count : {countPwn}\nConnection success count : {countSuccess}\nHost found : {countFound}\nNTDS dump : {len(ntds)}\nSecrets found : {len(secrets)}\n"+ ("\n".join(secrets)) + notes
+    result["retour"] = retour
+    result["notes"] = notes
+    result["countPwn"] = countPwn
+    result["countSuccess"] = countSuccess
+    result["secrets"] = secrets
+    result["lsassy"] = lsassy
+    result["ntds"] = ntds
+    result["tags"] = tags
+    return result
 
 
 def editScopeIPs(pentest, hostsInfos):
@@ -254,7 +272,27 @@ def editScopeIPs(pentest, hostsInfos):
                 if secrets:
                     infosToAdd["secrets"] = infosToAdd.get("secrets", []) + secrets
                     user_info["secrets"] = secrets
-                user_model = User(pentest).initialize(pentest, None, infos.get("domain", ""), infos.get("username", ""), infos.get("password", infos.get("hashNT", "")), infos=user_info)
+                ntds = infos.get("ntds", [])
+                if ntds:
+                    del infos["ntds"]
+                    infosToAdd["ntds"] = ntds
+                    regex_ntds = re.compile(r"^\s*(\S+):\d+:([a-f0-9]+):([a-f0-9]+):::\s*$")
+                    for line in ntds:
+                        matched = re.search(regex_ntds, line)
+                        if matched:
+                            username = matched.group(1)
+                            this_info = {}
+                            hashLM = matched.group(2)
+                            hashNT = matched.group(3)
+                            if hashLM != "aad3b435b51404eeaad3b435b51404ee":
+                                this_info["hashLM"] = hashLM
+                            this_info["hashNT"] = hashNT
+                            user_model = User(pentest).initialize(pentest, None, infos.get("domain", ""), username, "", infos=this_info)
+                            infosToAdd["users"] = infosToAdd.get("users", []) + [user_model]
+                hashNT = infos.get("hashNT", "")
+                if hashNT != "":
+                    user_info["hashNT"] = hashNT
+                user_model = User(pentest).initialize(pentest, None, infos.get("domain", ""), infos.get("username", ""), infos.get("password"), infos=user_info)
                 infosToAdd["users"] = infosToAdd.get("users", []) + [user_model]
                 if powned:
                     infosToAdd["powned"] = powned
@@ -285,12 +323,16 @@ def editScopeIPs(pentest, hostsInfos):
                 users = infosToAdd.get("users", [])
                 for user in users:
                     if isinstance(user, User):
-                        user_iid = computer_m.add_user(user.domain, user.username, user.password, user.infos)
+                        user_iid = computer_m.add_user(computer_m.domain, user.username, user.password, user.infos)
                         user_m = User.fetchObject(pentest, {"_id":ObjectId(user_iid)})
                         if user.infos.get("asreproastable", False):
-                            user_m.addTag(Tag("asreproastable", "orange", "high", f"{user.domain}\\{user.username} is asreproastable"), True)
+                            user_m.addTag(Tag("asreproastable", color="orange", level="high", notes=f"{user.domain}\\{user.username} is asreproastable"), True)
                         if user.infos.get("secrets", []):
-                            user_m.addTag(("user-secrets-found", "red", "high", f"{user.domain}\\{user.username} has secrets : {infos.get('secrets')}"), True)
+                            user_m.addTag(Tag("user-secrets-found", color="red", level="high", notes=f"{user.domain}\\{user.username} has secrets : {infos.get('secrets')}"), True)
+                        if user.infos.get("hashLM", "") != "":
+                            user_m.addTag(Tag("hashLM-found", color="red", level="high", notes=f"{user.domain}\\{user.username} has hashLM : {user.infos.get('hashLM')}"), True)
+                        if user.infos.get("hashNT", "") != "":
+                            user_m.addTag(Tag("hashNT-found", color="red", level="high", notes=f"{user.domain}\\{user.username} has hashNT : {user.infos.get('hashNT')}"), True)
                     else:
                         computer_m.add_user(user[0], user[1], user[2])
                 admins = infosToAdd.get("admins", [])
@@ -302,11 +344,17 @@ def editScopeIPs(pentest, hostsInfos):
                 computer_m.name = infos["machine_name"]
                 computer_m.domain = infos.get("domain")
                 d = computer_m.getData()
+                
                 comp_info = d["infos"]
                 comp_info["plugin"] = CME.get_name()
+
                 comp_info.update(infosToAdd)
                 computer_m = Computer(pentest, d)
                 computer_m.update()
+                if d["infos"].get("signing", True) == False:
+                    computer_m.addTag(Tag("signing-disabled", "orange", "medium", f"Signing is disabled on {computer_m.name}"), True)
+                if d["infos"].get("smbv1", True) == False:
+                    computer_m.addTag(Tag("smbv1-enabled", "orange", "medium", f"SMBv1 is enabled on {computer_m.name}"), True)
             if "users" in infosToAdd:
                 del infosToAdd["users"]
             if "admins" in infosToAdd:
@@ -354,7 +402,11 @@ class CME(Plugin):
                 "todo-lsassy-success": Tag("todo-lsassy-success", "red", "todo"),
                 "user-secrets-found": Tag("user-secrets-found", "red", "high"),
                 "asreproastable": Tag("asreproastable", "orange", "high"),
-                "pwned": Tag("pwned", "red", "high")}
+                "pwned": Tag("pwned", "red", "high"),
+                "signing-disabled": Tag("signing-disabled", "orange", "medium"),
+                "smbv1-enabled" : Tag("smbv1-enabled", "orange", "medium"),
+                "pwned-ntds": Tag("pwned-ntds", "black", "critical"),
+                "hashLM-found": Tag("hashLM-found", "red", "high")}
 
 
     def Parse(self, pentest, file_opened, **_kwargs):
@@ -371,20 +423,26 @@ class CME(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
-        notes = ""
         tags = []
-        hostsInfos, countPwnd,  countSuccess, notes, secrets, lsassy, tags = getInfos(file_opened)
-        if countPwnd is not None:
-            if int(countPwnd) > 0:
-                tags += [Tag(self.getTags()["pwned-cme"], notes=f"{countPwnd} hosts pwned")]
-        if countSuccess is not None:
-            if int(countSuccess) > 0:
-                tags += [Tag(self.getTags()["info-cme-connection-success"], notes=f"{countSuccess} hosts connected")]
-            if len(secrets) > 0:
-                tags += [Tag(self.getTags()["todo-cme-secrets-found"], notes=f"{len(secrets)} secrets found")]
-            if lsassy:
+        result = getInfos(file_opened)
+        if result.get("success", False):
+            return None, None, None, None
+        hostsInfos = result.get("retour", [])
+        if result.get("countPwn") is not None:
+            count = int(result.get("countPwn"))
+            if count > 0:
+                tags += [Tag(self.getTags()["pwned-cme"], notes=f"{count} hosts pwned")]
+        if result.get("countSuccess") is not None:
+            count = int(result.get("countSuccess"))
+            if count > 0:
+                tags += [Tag(self.getTags()["info-cme-connection-success"], notes=f"{count} hosts connected")]
+            if len(result.get("secrets",[])) > 0:
+                tags += [Tag(self.getTags()["todo-cme-secrets-found"], notes=f"{len(result.get('secrets',[]))} secrets found")]
+            if result.get("lsassy"):
                 tags += [Tag(self.getTags()["todo-lsassy-success"], notes=f"lsassy success")]
+            if len(result.get("ntds", [])) > 0:
+                tags += [Tag(self.getTags()["pwned-ntds"], notes=f"{len(result.get('ntds',[]))} ntds found")]
         if hostsInfos is None:
             return None, None, None, None
         targets = editScopeIPs(pentest, hostsInfos)
-        return notes, tags, "ports", targets
+        return result.get("notes", ""), tags, "ports", targets

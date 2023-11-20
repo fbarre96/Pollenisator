@@ -167,7 +167,15 @@ class Computer(ServerElement):
                 self.addCheck("AD:onFirstUserOnSQLServer", {"user":self.users[-1]})
             self.addCheck("AD:onFirstUserOnComputer", {"user":self.users[-1]})
         if len(self.users) >= 1:
-            self.addCheck("AD:onNewUserOnComputer", {"user":self.users[-1]})
+            find_user = None
+            for user in self.users:
+                user_o = User.fetchObject(self.pentest, {"_id":ObjectId(user)})
+                if user_o.username != "" and user_o.password != "":
+                    find_user = user_o.getId()
+                    break
+            if find_user is None:
+                find_user = self.users[-1]
+            self.addCheck("AD:onNewUserOnComputer", {"user":find_user})
 
     def add_admin_checks(self):
         if len(self.admins) == 1:

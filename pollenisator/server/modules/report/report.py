@@ -161,7 +161,6 @@ def search(body):
     terms = body.get("terms", "")
     lang = body.get("language", "")
     perimeter = body.get("perimeter", "")
-    check_api = body.get("check_api", True)
     errors = []
     if type == "remark":
         coll = "remarks"
@@ -180,24 +179,24 @@ def search(body):
     for x in res:
         x["source"] = "local"
         ret.append(x)
-    config = loadServerConfig()
-    api_url = config.get('knowledge_api_url', '')
-    if api_url == "" or not check_api:
-        return {"errors": errors , "answers":ret}
-    try:
-        resp = requests.get(api_url, params=body, timeout=10)
-        if resp.status_code != 200:
-            errors += ["The knowledge dabatase encountered an issue : "+resp.text]
-        if not errors:
-            answer = json.loads(resp.text)
-            for ans in answer:
-                ans["source"] = "api"
-            ret += answer
-    except json.JSONDecodeError as e:
-        errors += ["The knowledge database returned invalid json"]
-    except Exception as e:
-        errors += ["The knowledge database is unreachable"]
-    ret = {"errors": errors , "answers":ret}
+    #config = loadServerConfig()
+    #api_url = config.get('knowledge_api_url', '')
+    #if api_url == "" or not check_api:
+    return {"errors": errors , "answers":ret}
+    # try:
+    #     resp = requests.get(api_url, params=body, timeout=10)
+    #     if resp.status_code != 200:
+    #         errors += ["The knowledge dabatase encountered an issue : "+resp.text]
+    #     if not errors:
+    #         answer = json.loads(resp.text)
+    #         for ans in answer:
+    #             ans["source"] = "api"
+    #         ret += answer
+    # except json.JSONDecodeError as e:
+    #     errors += ["The knowledge database returned invalid json"]
+    # except Exception as e:
+    #     errors += ["The knowledge database is unreachable"]
+    # ret = {"errors": errors , "answers":ret}
     return ret, 200
 
 def craftContext(pentest, **kwargs):

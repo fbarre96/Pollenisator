@@ -5,7 +5,7 @@ from pollenisator.core.models.defect import Defect
 from pollenisator.core.controllers.defectcontroller import DefectController
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.permission import permission
-from pollenisator.core.components.utils import getMainDir
+from pollenisator.core.components.utils import getMainDir, JSONDecoder
 from pollenisator.server.modules.filemanager.filemanager import listFiles, rmProof
 import threading
 import os
@@ -32,21 +32,7 @@ class ServerDefect(Defect, ServerElement):
         return update("defects", ObjectId(self._id), DefectController(self).getData())
 
     def getParentId(self):
-        try:
-            port = self.port
-        except AttributeError:
-            port = None
-        if port is None:
-            port = ""
-        dbclient = DBClient.getInstance()
-        if port == "":
-            obj = dbclient.findInDb(self.pentest, "ips", {"ip": self.ip}, False)
-        else:
-            obj = dbclient.findInDb(self.pentest,
-                "ports", {"ip": self.ip, "port": self.port, "proto": self.proto}, False)
-        if obj is None:
-            return ""
-        return obj.get("_id", None)
+        return self.target_id
 
 def getProofPath(pentest, defect_iid):
     local_path = os.path.join(getMainDir(), "files")
@@ -61,7 +47,7 @@ def delete(pentest, defect_iid):
         return 0
     if not defect.isAssigned() and pentest != "pollenisator":
         # if not assigned to a pentest object it's a report defect (except in pollenisator db where it's a defect template)
-        globalDefects = ServerDefect.fetchObjects(pentest, {"ip":""})
+        globalDefects = ServerDefect.fetchObjects(pentest, {"target_id":""})
         for globalDefect in globalDefects:
             if int(globalDefect.index) > int(defect.index):
                 update(pentest, globalDefect.getId(), {"index":str(int(globalDefect.index) - 1)})
@@ -97,9 +83,9 @@ def insert(pentest, body):
         if existing is not None:
             sem.release()
             return {"res":False, "iid":existing["_id"]}
-        if defect_o.ip.strip() == "" and defect_o.port.strip() != "":
+        if defect_o.target_id != "" and defect_o.target_type == "":
             sem.release()
-            return "If a port is specified, an ip should be specified to", 400
+            return "If a target_id is specified, a target_type should be specified to", 400
         parent = defect_o.getParentId()
         if "_id" in body:
             del body["_id"]
@@ -108,12 +94,12 @@ def insert(pentest, body):
             save_insert_pos = insert_pos
             defects_to_edit = []
             
-            defect_to_edit_o = ServerDefect.fetchObject(pentest, {"ip":"", "index":str(insert_pos)})
+            defect_to_edit_o = ServerDefect.fetchObject(pentest, {"target_id":"", "index":str(insert_pos)})
             if defect_to_edit_o is not None:
                 defects_to_edit.append(defect_to_edit_o)
             while defect_to_edit_o is not None:
                 insert_pos+=1
-                defect_to_edit_o = ServerDefect.fetchObject(pentest, {"ip":"",  "index":str(insert_pos)})
+                defect_to_edit_o = ServerDefect.fetchObject(pentest, {"target_id":"",  "index":str(insert_pos)})
                 if defect_to_edit_o is not None:
                     defects_to_edit.append(defect_to_edit_o)
                 
@@ -136,9 +122,8 @@ def insert(pentest, body):
 
         if defect_o.isAssigned():
             # Edit to global defect and insert it
-            defect_o.ip = ""
-            defect_o.port = ""
-            defect_o.proto = ""
+            defect_o.target_id = ""
+            defect_o.target_type = ""
             defect_o.parent = ""
             defect_o.notes = ""
             insert_res = insert(pentest, DefectController(defect_o).getData())
@@ -157,7 +142,7 @@ def findInsertPosition(pentest, risk):
     for risklevel_i, riskLevel in enumerate(riskLevels):
         if risklevel_i > riskLevelPos:
             break
-        globalDefects = ServerDefect.fetchObjects(pentest, {"ip":"", "risk":riskLevel})
+        globalDefects = ServerDefect.fetchObjects(pentest, {"target_id":"", "risk":riskLevel})
         for globalDefect in globalDefects:
             highestInd = max(int(globalDefect.index)+1, highestInd)
     return highestInd
@@ -180,7 +165,7 @@ def update(pentest, defect_iid, body):
                 insert_pos = str(findInsertPosition(pentest, body["risk"]))
                 if int(insert_pos) > int(defect_o.index):
                     insert_pos = str(int(insert_pos)-1)
-                defectTarget = ServerDefect.fetchObject(pentest, {"ip":"", "index":insert_pos})
+                defectTarget = ServerDefect.fetchObject(pentest, {"target_id":"", "index":insert_pos})
                 moveDefect(pentest, defect_iid, defectTarget.getId())
             if "index" in body:
                 del body["index"]
@@ -198,7 +183,7 @@ def update(pentest, defect_iid, body):
     
 @permission("pentester")
 def getGlobalDefects(pentest):
-    defects = ServerDefect.fetchObjects(pentest, {"ip": ""})
+    defects = ServerDefect.fetchObjects(pentest, {"target_id": ""})
     if defects is None:
         return []
     defects_ordered = []
@@ -208,11 +193,11 @@ def getGlobalDefects(pentest):
     
 @permission("pentester")
 def moveDefect(pentest, defect_id_to_move, target_id):
-    defect_to_move = ServerDefect.fetchObject(pentest, {"_id":ObjectId(defect_id_to_move), "ip":""})
+    defect_to_move = ServerDefect.fetchObject(pentest, {"_id":ObjectId(defect_id_to_move), "target_id":""})
     if defect_to_move is None:
         return "This global defect does not exist", 404
     defects_ordered = getGlobalDefects(pentest)
-    defect_target = ServerDefect.fetchObject(pentest, {"_id":ObjectId(target_id), "ip":""})
+    defect_target = ServerDefect.fetchObject(pentest, {"_id":ObjectId(target_id), "target_id":""})
     if defect_target is None:
         return "the target global defect does not exist", 404
     target_ind = int(defect_target.index)
@@ -230,7 +215,7 @@ def importDefectTemplates(upfile):
     try:
         defects = json.loads(upfile.stream.read())
         for defect in defects:
-            invalids = ["ip", "port", "proto", "scope"]
+            invalids = ["target_id", "target_type",  "scope"]
             for invalid in invalids:
                 if invalid in defect:
                     del defect[invalid]
@@ -261,3 +246,30 @@ def updateDefectTemplate(iid, body):
 @permission("user")
 def deleteDefectTemplate(iid):
     return delete("pollenisator", iid)
+
+@permission("pentester")
+def getTargetRepr(pentest, body):
+    dbclient = DBClient.getInstance()
+    if isinstance(body, str):
+        body = json.loads(body, cls=JSONDecoder)
+    iids_list = []
+    for iid in body:
+        if "ObjectId|" in iid:
+            iid = ObjectId(iid.split("ObjectId|")[1])
+        else:
+            iid = ObjectId(iid)
+        iids_list.append(iid)
+    defects = dbclient.findInDb(pentest, "defects", {"_id": {"$in": iids_list}}, True)
+    ret = {}
+    for data in defects:
+        class_element = ServerElement.classFactory(data["target_type"])
+        if class_element is not None:
+            elem = class_element.fetchObject(pentest, {"_id": ObjectId(data["target_id"])})
+            if elem is None:
+                ret_str = "Target not found"
+            else:
+                ret_str = elem.getDetailedString()
+            ret[str(data["_id"])] = ret_str
+        else:
+            ret[str(data["_id"])] = "Target not found"
+    return ret

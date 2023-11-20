@@ -60,9 +60,8 @@ class DefectController(ControllerElement):
         mtype_dict = values["Type"]
         mtype = [k for k, v in mtype_dict.items() if v == 1]
         language = values["Language"]
-        ip = values["ip"]
-        port = values.get("port", None)
-        proto = values.get("proto", None)
+        target_id = values["target_id"]
+        target_type = values.get("target_type", None)
         notes = values["Notes"]
         proof = values["Proof"]
         fixes = values["Fixes"]
@@ -72,7 +71,7 @@ class DefectController(ControllerElement):
                              "Difficult": {"Minor": "Minor", "Important": "Important", "Major": "Major", "Critical": "Major"},
                              "Arduous": {"Minor": "Minor", "Important": "Minor", "Major": "Important", "Critical": "Important"}}
         risk = tableau_from_ease.get(ease,{}).get(impact,"N/A")
-        self.model.initialize(ip, port, proto, title, ease,
+        self.model.initialize(target_id, target_type, title, ease,
                               impact, risk, redactor, mtype, notes, proofs)
         ret, _ = self.model.addInDb()
         # Update this instance.

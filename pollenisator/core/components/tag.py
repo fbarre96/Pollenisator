@@ -1,10 +1,13 @@
 class Tag:
     def __init__(self, *args, **kwargs):
-        if isinstance(args[0], tuple):
+        if isinstance(args[0], tuple) or isinstance(args[0], list):
             name = args[0][0]
             color = args[0][1]
             level = args[0][2]
-            notes = args[0][3]
+            try:
+                notes = args[0][3]
+            except IndexError:
+                notes = ""
         elif isinstance(args[0], Tag):
             name = args[0].name
             color = args[0].color
@@ -21,7 +24,7 @@ class Tag:
             level = args[0].get("level", None)
             notes = args[0].get("notes", None)
         else:
-            raise ValueError("Tag constructor can't handle this type of argument: "+str(type(args[0])))
+            raise ValueError("Tag constructor can't handle this type of argument: "+str(type(args[0]))+ ";"+str(args[0]))
         if kwargs.get("color", None) is not None:
             color = kwargs.get("color", None)
         if kwargs.get("level", None) is not None:

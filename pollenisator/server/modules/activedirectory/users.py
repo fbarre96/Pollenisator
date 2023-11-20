@@ -303,13 +303,14 @@ def insert(pentest, body):
     domain = user.domain.lower() if user.domain is not None else ""
     username = user.username.lower() if user.username is not None else ""
     password = user.password if user.password is not None else ""
-    existing = dbclient.findInDb(pentest, 
-        "ActiveDirectory", {"type":"user", "domain":domain, "username":username}, False)
+    existing = dbclient.findInDb(pentest,
+        "ActiveDirectory", {"type":"user", "domain":{"$regex":domain}, "username":username}, False)
     if existing is not None:
         if existing["password"] != "":
             return {"res": False, "iid": existing["_id"]}
         else:
-            dbclient.updateInDb(pentest, "ActiveDirectory", {"_id":ObjectId(existing["_id"])}, {"$set":{"password":password}})
+            existing["infos"] |= user.infos
+            dbclient.updateInDb(pentest, "ActiveDirectory", {"_id":ObjectId(existing["_id"])}, {"$set":{"password":password, "infos":existing["infos"]}})
             return {"res": False, "iid": existing["_id"]}
     if "_id" in body:
         del body["_id"]
