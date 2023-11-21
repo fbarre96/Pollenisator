@@ -6,7 +6,6 @@ from pollenisator.server.servermodels.command import ServerCommand
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.permission import permission
 
-
 class CheckInstance(ServerElement):
     coll_name = 'cheatsheet'
 
@@ -92,7 +91,8 @@ class CheckInstance(ServerElement):
         return {"_id": self._id, "type": self.type, "check_iid": self.check_iid, "target_iid": self.target_iid, "target_type": self.target_type, "parent": self.parent, "status": self.status, "notes": self.notes}
 
     def addInDb(self, checkItem=None, toolInfos={}):
-        return doInsert(self.pentest, self.getData(), checkItem, toolInfos)
+        ret = doInsert(self.pentest, self.getData(), checkItem, toolInfos)
+        return ret
 
     @classmethod
     def createFromCheckItem(cls, pentest, checkItem, target_iid, target_type, infos={}):
@@ -182,9 +182,15 @@ def doInsert(pentest, data, checkItem=None, toolInfos=None):
         if command_pentest is not None:
             tool = ServerTool(pentest)
             tool.initialize(str(command_pentest._id), str(iid), target.get("wave", ""), None, target.get("scope", ""), target.get("ip", ""), target.get("port", ""),
-                                        target.get("proto", ""), checkItem.lvl, infos=toolInfos).addInDb()
-            tool.addToQueue() #TODO : SETTINGS TO ENABLE/DISABLE AUTOSCAN AUTO ADD
-
+                                        target.get("proto", ""), checkItem.lvl, infos=toolInfos).addInDb(update_check_infos=False)
+            #tool.addToQueue() #TODO : SETTINGS TO ENABLE/DISABLE AUTOSCAN AUTO ADD
+    ins_result = CheckInstance.fetchObject(pentest, {"_id": iid})
+    
+    if ins_result is None:
+        return {"res": False, "iid": iid}
+    else:
+        ins_result.updateInfos()
+    
     return {"res": True, "iid": iid}
     
 

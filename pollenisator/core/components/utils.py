@@ -24,6 +24,8 @@ class JSONEncoder(json.JSONEncoder):
             return str(o)
         elif isinstance(o, Tag):
             return o.getData()
+        elif isinstance(o, bytes):
+            return str(o, 'utf-8')
         return json.JSONEncoder.default(self, o)
 
 class JSONDecoder(json.JSONDecoder):

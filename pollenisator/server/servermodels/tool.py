@@ -47,8 +47,8 @@ class ServerTool(Tool, ServerElement):
             self.status.append("OOS")
             update(pentest, self._id, {"status": self.status})
     
-    def addInDb(self, check=True, base=None):
-        ret = do_insert(self.pentest, ToolController(self).getData(), check=check, base=base)
+    def addInDb(self, check=True, base=None, update_check_infos=True):
+        ret = do_insert(self.pentest, ToolController(self).getData(), check=check, base=base, update_check=update_check_infos)
         self._id = ret["iid"]
         return ret
 
@@ -445,7 +445,7 @@ def do_insert(pentest, body, **kwargs):
     res_insert = dbclient.insertInDb(pentest, "tools", base, parent)
     ret = res_insert.inserted_id
     tool_o._id = ret
-    if base["check_iid"] != "":
+    if base["check_iid"] != "" and kwargs.get("update_check", True):
         from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
         check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(base["check_iid"])})
         if check is not None:

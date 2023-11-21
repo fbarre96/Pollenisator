@@ -1,11 +1,11 @@
 """A plugin to parse nmap scan"""
 
 import re
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.tag import Tag
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.plugins.plugin import Plugin
-
 
 def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
     """
@@ -16,8 +16,11 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
         Returns:
             notes about inseted ip and ports
     """
+    dbclient = DBClient.getInstance()
     notes = ""
     countOpen = 0
+    ports_to_add = []
+    ips_to_add = []
     all_text = nmapFile.read().decode("utf-8").strip()
     lines = all_text.split("\n")
     if len(lines) <= 3:
@@ -46,7 +49,7 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
                 str(lastIp[1]) if lastIp[1] != "" and lastIp[1] is not None else ""
             ipCIDR_m = ServerIp(pentest).initialize(str(lastIp[0]), notes=notes_ip, infos={"plugin":Nmap.get_name()})
             if not keep_only_open:#add directly
-                ipCIDR_m.addInDb()
+                ips_to_add.append(ipCIDR_m)
             if lastIp[1].strip() != "" and lastIp[1] is not None:
                 ipDom_m = ServerIp(pentest).initialize(
                     str(lastIp[1]), notes="domain:"+str(lastIp[0]), infos={"plugin":Nmap.get_name()})
@@ -69,26 +72,24 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
                 countOpen += 1
                 validIps = []
                 if ipCIDR_m is not None:
-                    ipCIDR_m.addInDb()
+                    ips_to_add.append(ipCIDR_m)
                     validIps.append(ipCIDR_m.ip)
                     if ipDom_m is not None:
-                        insert_res = ipDom_m.addInDb()
-                        if not insert_res["res"]:
-                            ipDom_m = ServerIp.fetchObject(pentest, {"_id": insert_res["iid"]})
-                        hostnames = ipDom_m.infos.get("hostname", [])
-                        if isinstance(hostnames, str):
-                            hostnames = [hostnames]
-                        ipDom_m.updateInfos({"hostname": list(set(list(hostnames)+[str(ipCIDR_m.ip)]))})
+                        ipDom_m.infos["hostname"] = list(set(list( ipDom_m.infos.get("hostname", []))+[str(ipCIDR_m.ip)]))
+                        ips_to_add.append(ipDom_m)
                         validIps.append(ipDom_m.ip)
                 for ipFound in validIps:
                     if ip == "":
                         continue
                     port_o = ServerPort(pentest).initialize(ipFound, port_number, proto, service, product, infos={"plugin":Nmap.get_name()})
-                    insert_res = port_o.addInDb()
-                    if not insert_res["res"]:
-                        port_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})
-                    port_o.service = service
-                    port_o.update()
+                    ports_to_add.append(port_o)
+
+    for ip in ips_to_add:
+        ip.addInDb()
+    for port in ports_to_add:
+        res = port.addInDb()
+        if res["res"] == False:
+            port.update_service()
 
     notes = str(countOpen)+" open ports found\n"+notes
     return notes
@@ -154,7 +155,9 @@ class Nmap(Plugin):
         if cmdline is not None:
             if " -sP " in cmdline:
                 keep_only_open = False
+        
         notes = getIpPortsNmap(pentest, file_opened, keep_only_open)
+        
         if notes is None:
             return None, None, None, None
         return notes, tags, "scope", {}

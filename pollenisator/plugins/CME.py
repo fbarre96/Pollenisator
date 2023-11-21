@@ -425,7 +425,7 @@ class CME(Plugin):
         """
         tags = []
         result = getInfos(file_opened)
-        if result.get("success", False):
+        if result.get("success", False) == False:
             return None, None, None, None
         hostsInfos = result.get("retour", [])
         if result.get("countPwn") is not None:

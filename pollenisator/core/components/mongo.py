@@ -1,15 +1,20 @@
 """Handle mongo database connection and add shortcut functions to common stuff."""
+import hashlib
+import inspect
 import os
 import ssl
 import datetime
 from uuid import uuid4, UUID
 from pymongo import MongoClient
+import pymongo
 from pymongo.errors import ServerSelectionTimeoutError, OperationFailure
 import pollenisator.core.components.utils as utils
 import sys
 import json
+import redis
 from pollenisator.core.components.logger_config import logger
 from bson import ObjectId
+
 
 
 class DBClient:
@@ -46,6 +51,7 @@ class DBClient:
             Exception if it is instanciated.
         """
         pid = os.getpid()  # HACK : One mongo per process.
+        self.redis = None
         if DBClient.__instances.get(pid, None) is not None:
             raise Exception("This class is a singleton!")
         else:
@@ -62,6 +68,7 @@ class DBClient:
                                    "broker_pollenisator", "pollenisator"]
             DBClient.__instances[pid] = self
 
+    
     def reinitConnection(self):
         """Reset client connection"""
         self.client = None
@@ -117,6 +124,14 @@ class DBClient:
         return self.updateInDb("pollenisator", "workers", {"name": worker_hostname}, {
                         "$set": {"last_heartbeat": datetime.datetime.now()}})
 
+    def connect_cache(self):
+        try:
+            if self.redis is None:
+                self.redis = redis.Redis(host='127.0.0.1', port=6379, decode_responses=True)
+        except redis.exceptions.ConnectionError as e:
+            logger.error("No redis server found, continuing without will slow down the app.")
+            self.redis = None
+
 
     def connect(self, config=None, timeoutInMS=500):
         """
@@ -157,6 +172,7 @@ class DBClient:
                     self.client = MongoClient(
                         'mongodb://'+connectionString+self.host+":"+self.port, serverSelectionTimeoutMS=timeoutInMS)
                 server_info = self.client.server_info()
+                self.connect_cache()
                 return True and self.client is not None and server_info is not None
             except ServerSelectionTimeoutError as e:  # Unable to connect
                 print(f"Unable to connect to the database:\nPlease check the mongo db is up and reachable and your configuration file is correct: \n{os.path.normpath(utils.getServerConfigFolder())}/server.cfg")
@@ -358,8 +374,11 @@ class DBClient:
             Return the pymongo result of the find command for the command collection
         """
         self.connect()
+        
         db = self.client[dbName]
         res = db[collection].insert_one(values)
+        cache_key = dbName+"."+collection+"."+str(res.inserted_id)
+        self.redis.set(cache_key, json.dumps(values, cls=utils.JSONEncoder), ex=20)
         if notify:
             self.send_notify(dbName, collection,
                         res.inserted_id, "insert", parentId)
@@ -397,7 +416,6 @@ class DBClient:
         self.connect()
         return self.client[db][collection].count_documents(pipeline)
     
-
     def findInDb(self, db, collection, pipeline=None, multi=True, skip=None, limit=None):
         """
         find something in the database.
@@ -413,8 +431,24 @@ class DBClient:
         if pipeline is None:
             pipeline = {}
         self.connect()
+        cache_key = None
+        if not multi and len(pipeline) == 1 and isinstance(pipeline[list(pipeline.keys())[0]], ObjectId):
+            cache_key = db+"."+collection+"."+str(pipeline[list(pipeline.keys())[0]])
+        #else:
+        #    cache_key = db+"."+collection+hashlib.md5(json.dumps(pipeline, cls=utils.JSONEncoder).encode()).hexdigest()
         dbMongo = self.client[db]
-        return self._find(dbMongo, collection, pipeline, multi, skip, limit)
+        if cache_key:
+            res = self.redis.get(cache_key)
+            if res:
+                res = json.loads(res, cls=utils.JSONDecoder)
+                return res
+        res =  self._find(dbMongo, collection, pipeline, multi, skip, limit)
+        if cache_key:
+            if inspect.isgenerator(res) or isinstance(res, pymongo.cursor.Cursor):
+                res = [r for r in res]
+            store = json.dumps(res, cls=utils.JSONEncoder)
+            self.redis.set(cache_key, store, ex=60) #set serialized object to redis server.
+        return res
 
     def fetchNotifications(self, pentest, fromTime):
         """Fetch notifications from a specific time for a specific pentest.
@@ -927,7 +961,7 @@ class DBClient:
             action: the type of modification performed on this document ("insert", "update" or "delete")
             parentId: (not used) default to "", a node parent id as str
         """
-        from pollenisator.api import notify_clients
+        from pollenisator.app_factory import notify_clients
         notify_clients({"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now()})
         
         # self.client["pollenisator"]["notifications"].insert_one(

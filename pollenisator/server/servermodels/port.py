@@ -90,6 +90,9 @@ class ServerPort(Port, ServerElement):
 
     def update(self):
         return update("ports", ObjectId(self._id), PortController(self).getData())
+    
+    def update_service(self):
+        return update(self.pentest, self._id, {"service": self.service})
 
 @permission("pentester")
 def delete(pentest, port_iid):
@@ -137,7 +140,7 @@ def insert(pentest, body):
             comp = Computer.fetchObject(pentest, {"_id":ObjectId(res["iid"])})
             comp.infos.is_dc = True
             comp.update()
-    elif int(port_o.port) == 1433 or (port_o.service == "ms-sql" or port_o.service == "ms-sql"):
+    elif int(port_o.port) == 1433 or (port_o.service == "ms-sql"):
         res = computer_insert(pentest, {"name":"", "ip":port_o.ip, "domain":"", "admins":[], "users":[], "infos":{"is_sqlserver":True}})
         if not res["res"]:
             comp = Computer.fetchObject(pentest, {"_id":ObjectId(res["iid"])})
