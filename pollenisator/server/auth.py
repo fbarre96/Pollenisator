@@ -113,12 +113,11 @@ def login(body):
     dbclient = DBClient.getInstance()
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(pwd.encode(), salt)
-    user_record = dbclient.findInDb("pollenisator", "users", {"username":username}, False)
+    user_record = dbclient.findInDb("pollenisator", "users", {"username":username}, False, use_cache=False)
     if user_record is None:
         return "Authentication failure", 401
     if user_record["username"] == username:
         if bcrypt.checkpw(pwd.encode(), user_record["hash"]):
-            
             return getTokenFor(username)
     return "Authentication failure", 401
 

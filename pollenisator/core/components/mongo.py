@@ -64,6 +64,7 @@ class DBClient:
             self.current_pentest = None
             self.ssldir = ""
             self.db = None
+            self.cache_collections = ["ports","ips","cheatsheet","commands"]
             self.forbiddenNames = ["admin", "config", "local",
                                    "broker_pollenisator", "pollenisator"]
             DBClient.__instances[pid] = self
@@ -318,6 +319,12 @@ class DBClient:
                 for elem in elems:
                     self.send_notify(dbName, collection, elem["_id"], "update")
         else:
+            if collection in self.cache_collections:
+                if len(pipeline) == 1 and isinstance(pipeline[list(pipeline.keys())[0]], ObjectId):
+                    cache_key = dbName+"."+collection+"."+str(pipeline[list(pipeline.keys())[0]])
+                else:
+                    cache_key = dbName+"."+collection+"."+hashlib.md5(json.dumps(pipeline, cls=utils.JSONEncoder).encode()).hexdigest()
+                self.redis.delete(cache_key)
             res = db[collection].update_one(pipeline, updatePipeline, upsert=upsert)
             if upsert and res.upserted_id is not None:
                 self.send_notify(dbName, collection, res.upserted_id, "insert")
@@ -345,7 +352,7 @@ class DBClient:
         ret = self._insert(self.current_pentest, collection, values, notify, parent)
         return ret
 
-    def insertInDb(self, db, collection, values, _parent='', notify=True):
+    def insertInDb(self, db, collection, values, _parent='', notify=True, multi=False):
         """
         insert something in the database after ensuring connection.
         Args:
@@ -358,9 +365,9 @@ class DBClient:
             Return the pymongo result of the find command for the command collection
         """
         self.connect()
-        return self._insert(db, collection, values, notify)
+        return self._insert(db, collection, values, notify, _parent, multi)
 
-    def _insert(self, dbName, collection, values, notify=True, parentId=''):
+    def _insert(self, dbName, collection, values, notify=True, parentId='', multi=False):
         """
         Perform insertion in the database".
         Args:
@@ -374,14 +381,21 @@ class DBClient:
             Return the pymongo result of the find command for the command collection
         """
         self.connect()
-        
-        db = self.client[dbName]
-        res = db[collection].insert_one(values)
-        cache_key = dbName+"."+collection+"."+str(res.inserted_id)
-        self.redis.set(cache_key, json.dumps(values, cls=utils.JSONEncoder), ex=20)
-        if notify:
-            self.send_notify(dbName, collection,
-                        res.inserted_id, "insert", parentId)
+        if multi:
+            db = self.client[dbName]
+            res = db[collection].insert_many(values, ordered=False)
+            if notify:
+                self.send_notify(dbName, collection,
+                        res.inserted_ids, "insert_many", parentId)
+        else:
+            db = self.client[dbName]
+            res = db[collection].insert_one(values)
+            if res.inserted_id is not None and collection in self.cache_collections:
+                cache_key = dbName+"."+collection+"."+str(res.inserted_id)
+                self.redis.set(cache_key, json.dumps(values, cls=utils.JSONEncoder), ex=20)
+                if notify:
+                    self.send_notify(dbName, collection,
+                                res.inserted_id, "insert", parentId)
         return res
 
     def find(self, collection, pipeline=None, multi=True):
@@ -416,7 +430,7 @@ class DBClient:
         self.connect()
         return self.client[db][collection].count_documents(pipeline)
     
-    def findInDb(self, db, collection, pipeline=None, multi=True, skip=None, limit=None):
+    def findInDb(self, db, collection, pipeline=None, multi=True, skip=None, limit=None, use_cache=True):
         """
         find something in the database.
         Args:
@@ -432,10 +446,11 @@ class DBClient:
             pipeline = {}
         self.connect()
         cache_key = None
-        if not multi and len(pipeline) == 1 and isinstance(pipeline[list(pipeline.keys())[0]], ObjectId):
-            cache_key = db+"."+collection+"."+str(pipeline[list(pipeline.keys())[0]])
-        #else:
-        #    cache_key = db+"."+collection+hashlib.md5(json.dumps(pipeline, cls=utils.JSONEncoder).encode()).hexdigest()
+        if use_cache and collection in self.cache_collections:
+            if not multi and len(pipeline) == 1 and isinstance(pipeline[list(pipeline.keys())[0]], ObjectId):
+                cache_key = db+"."+collection+"."+str(pipeline[list(pipeline.keys())[0]])
+            elif not multi:
+                cache_key = db+"."+collection+"."+hashlib.md5(json.dumps(pipeline, cls=utils.JSONEncoder).encode()).hexdigest()
         dbMongo = self.client[db]
         if cache_key:
             res = self.redis.get(cache_key)
@@ -443,11 +458,11 @@ class DBClient:
                 res = json.loads(res, cls=utils.JSONDecoder)
                 return res
         res =  self._find(dbMongo, collection, pipeline, multi, skip, limit)
-        if cache_key:
+        if cache_key and res:
             if inspect.isgenerator(res) or isinstance(res, pymongo.cursor.Cursor):
                 res = [r for r in res]
             store = json.dumps(res, cls=utils.JSONEncoder)
-            self.redis.set(cache_key, store, ex=60) #set serialized object to redis server.
+            self.redis.set(cache_key, store, ex=30) #set serialized object to redis server.
         return res
 
     def fetchNotifications(self, pentest, fromTime):

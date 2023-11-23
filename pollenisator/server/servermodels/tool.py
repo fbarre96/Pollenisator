@@ -321,6 +321,9 @@ class ServerTool(Tool, ServerElement):
         """
         base = {"wave": self.wave, "name":self.name, "lvl": self.lvl, "check_iid":self.check_iid}
         return base
+    
+    def getHashableDbKey(self):
+        return tuple(self.getDbKey().values())
 
     def __str__(self):
         """
@@ -363,6 +366,32 @@ class ServerTool(Tool, ServerElement):
         elif len(new_status) == 0:
             self.markAsNotDone()
         return update(self.pentest, self.getId(), ToolController(self).getData())
+    
+    @classmethod
+    def bulk_insert(cls, pentest, tools_to_add):
+        """Insert multiple tools in database"""
+        dbclient = DBClient.getInstance()
+        lkp = {}
+        tool_keys = set()
+        or_conditions = []
+        for tool in tools_to_add:
+            hashable_key = tool.getHashableDbKey()
+            lkp[hashable_key] = tool.getData()
+            del lkp[hashable_key]["_id"]
+            if lkp[hashable_key].get("name", "") == "None" or lkp[hashable_key].get("name", "") == "" or lkp[hashable_key].get("name", "") is None:
+                del lkp[hashable_key]["name"]
+            tool_keys.add(hashable_key)
+            or_conditions.append(tool.getDbKey())
+        existing_tools = ServerTool.fetchObjects(pentest, {"$or": or_conditions})
+        existing_tools_as_keys = [] if existing_tools is None else [ existing_tool.getHashableDbKey() for existing_tool in existing_tools]
+        existing_tools_as_keys = set(existing_tools_as_keys)
+        to_add = tool_keys - existing_tools_as_keys
+        things_to_insert = [lkp[tool] for tool in to_add]
+        # Insert new
+        if not things_to_insert:
+            return
+        res = dbclient.insertInDb(pentest, ServerTool.coll_name, things_to_insert, multi=True)
+        return res
     
 @permission("pentester")
 def setStatus(pentest, tool_iid, body):

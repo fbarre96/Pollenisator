@@ -84,3 +84,10 @@ class Port(Element):
             A dict (3 keys :"ip", "port", "proto")
         """
         return {"ip": self.ip, "port": self.port, "proto": self.proto}
+
+    def getHashableDbKey(self):
+        """Return a hashable tuple from model to use as unique composed key.
+        Returns:
+            A tuple (3 keys :"ip", "port", "proto")
+        """
+        return tuple(self.getDbKey().values())

@@ -14,7 +14,6 @@ from pollenisator.core.components.utils import JSONEncoder, performLookUp
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance, delete as checkinstance_delete
 from pollenisator.server.permission import permission
-import json
 
 
 class ServerIp(Ip, ServerElement):
@@ -172,6 +171,38 @@ class ServerIp(Ip, ServerElement):
 
     def addInDb(self):
         return insert(self.pentest, IpController(self).getData())
+    
+    @classmethod
+    def bulk_insert(cls, pentest, ips_to_add):
+        if not ips_to_add:
+            return
+        dbclient = DBClient.getInstance()
+        lkp = {}
+        ip_keys = set()
+        for ip in ips_to_add:
+            lkp[ip.ip] = IpController(ip).getData()
+            del lkp[ip.ip]["_id"]
+            ip_keys.add(ip.ip)
+        existing_ips = dbclient.findInDb(pentest, "ips", {"ip":{"$in":list(ip_keys)}}, multi=True)
+        existing_ips_as_key = [] if existing_ips is None else [x.get("ip") for x in existing_ips]
+        existing_ips_as_key = set(existing_ips_as_key)
+        to_add = ip_keys - existing_ips_as_key
+        things_to_insert = [lkp[ip] for ip in to_add]
+        #UPDATE EXISTING
+        for existing_ip in existing_ips:
+            existing_ip.get("infos", {}).update(lkp[existing_ip.get("ip")].get("infos", {}))
+            dbclient.updateInDb(pentest, "ips", {"_id": ObjectId(existing_ip.get("_id"))}, {"$set":{"infos":existing_ip.get("infos", {})}})
+        # Insert new
+        res = None
+        if things_to_insert:
+            res = dbclient.insertInDb(pentest, "ips", things_to_insert, multi=True)
+        if res is None:
+            return
+        ips_inserted = ServerIp.fetchObjects(pentest, {"_id":{"$in":res.inserted_ids}, "in_scopes":{"$exists": True, "$ne": []}})
+        CheckInstance.bulk_insert_for(pentest, ips_inserted, "ip", ["ip:onAdd"])
+        return ips_inserted
+                    
+    # WIP : add all checks, fix notif sent but not received ?
 
     def update(self):
         return update(self.pentest, self._id, IpController(self).getData())

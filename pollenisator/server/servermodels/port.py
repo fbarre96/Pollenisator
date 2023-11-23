@@ -93,6 +93,32 @@ class ServerPort(Port, ServerElement):
     
     def update_service(self):
         return update(self.pentest, self._id, {"service": self.service})
+    
+    @classmethod
+    def bulk_insert(cls, pentest, ports_to_add):
+        if not ports_to_add:
+            return
+        dbclient = DBClient.getInstance()
+        lkp = {}
+        port_keys = set()
+        or_conditions = []
+        for port in ports_to_add:
+            hashable_key = tuple(port.getDbKey().values())
+            lkp[hashable_key] = PortController(port).getData()
+            del lkp[hashable_key]["_id"]
+            port_keys.add(hashable_key)
+            or_conditions.append({"port": port.port, "proto": port.proto, "ip": port.ip})
+        existing_ports = ServerPort.fetchObjects(pentest, {"$or": or_conditions})
+        existing_ports_as_keys = [] if existing_ports is None else [existing_port.getHashableDbKey() for existing_port in existing_ports]
+        existing_ports_as_keys = set(existing_ports_as_keys)
+        to_add = port_keys - existing_ports_as_keys
+        things_to_insert = [lkp[port] for port in to_add]
+        # Insert new
+        if things_to_insert:
+            res = dbclient.insertInDb(pentest, "ports", things_to_insert, multi=True)
+            ports_inserted = ServerPort.fetchObjects(pentest, {"_id":{"$in":res.inserted_ids}})
+            CheckInstance.bulk_insert_for(pentest, ports_inserted, "port", ["port:onServiceUpdate"])
+        return {"inserted":to_add, "failed":existing_ports}
 
 @permission("pentester")
 def delete(pentest, port_iid):

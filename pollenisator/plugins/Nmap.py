@@ -1,11 +1,15 @@
 """A plugin to parse nmap scan"""
 
+import cProfile
+import io
+import pstats
 import re
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.tag import Tag
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.plugins.plugin import Plugin
+import shlex
 
 def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
     """
@@ -83,14 +87,11 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
                         continue
                     port_o = ServerPort(pentest).initialize(ipFound, port_number, proto, service, product, infos={"plugin":Nmap.get_name()})
                     ports_to_add.append(port_o)
-
-    for ip in ips_to_add:
-        ip.addInDb()
-    for port in ports_to_add:
-        res = port.addInDb()
-        if res["res"] == False:
-            port.update_service()
-
+    ServerIp.bulk_insert(pentest, ips_to_add)
+    results = ServerPort.bulk_insert(pentest, ports_to_add)
+    if results.get("failed", []):
+        for failed in results["failed"]:
+            failed.update_service()
     notes = str(countOpen)+" open ports found\n"+notes
     return notes
 
@@ -121,6 +122,23 @@ class Nmap(Plugin):
             string: the path to file created
         """
         return (commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0])
+    
+    def changeCommand(self, command, outputDir, toolname):
+        """
+        Summary: Complete the given command with the tool output file option and filename absolute path.
+        Args:
+            * command : the command line to complete
+            * outputDir : the directory where the output file must be generated
+            * toolname : the tool name (to be included in the output file name)
+        Return:
+            The command completed with the tool output file option and filename absolute path.
+        """
+        # default is append at the end
+        if self.getFileOutputArg() not in command:
+            parts = shlex.split(command) 
+            parts.insert(1, self.getFileOutputArg()+outputDir+toolname)
+            return " ".join(parts)
+        return command
 
     def getTags(self):
         """Returns a list of tags that can be added by this plugin
@@ -144,6 +162,7 @@ class Nmap(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
+        
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
             return None, None, None, None
         tags = [self.getTags()["info-nmap"]]
@@ -155,9 +174,16 @@ class Nmap(Plugin):
         if cmdline is not None:
             if " -sP " in cmdline:
                 keep_only_open = False
-        
+        pr = cProfile.Profile()
+        pr.enable()
         notes = getIpPortsNmap(pentest, file_opened, keep_only_open)
-        
+        pr.disable()
+        s = io.StringIO()
+        sortby = 'cumulative'
+        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+        ps.print_stats()
+        with open("/tmp/nmap_parse_profiling.txt", "w") as f:
+            f.write(s.getvalue())
         if notes is None:
             return None, None, None, None
         return notes, tags, "scope", {}

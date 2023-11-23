@@ -37,7 +37,10 @@ class ServerInterval(Interval, ServerElement):
             Returns the parent wave's ObjectId _id".
         """
         dbclient = DBClient.getInstance()
-        return dbclient.findInDb(self.pentest, "waves", {"wave": self.wave}, False)["_id"]
+        res = dbclient.findInDb(self.pentest, "waves", {"wave": self.wave}, False)
+        if res:
+            return res.get("_id", None)
+        return None
 
     @classmethod
     def fetchObjects(cls, pentest, pipeline):

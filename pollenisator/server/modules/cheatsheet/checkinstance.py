@@ -93,14 +93,65 @@ class CheckInstance(ServerElement):
     def addInDb(self, checkItem=None, toolInfos={}):
         ret = doInsert(self.pentest, self.getData(), checkItem, toolInfos)
         return ret
-
+    
+    @classmethod
+    def bulk_insert_for(cls, pentest, targets, targets_type, lvls, toolInfos=None):
+        dbclient = DBClient.getInstance()
+        pentest_type = dbclient.findInDb(pentest, "settings", {"key":"pentest_type"}, False)
+        pentest_type = None if pentest_type is None else pentest_type.get("value", None)
+        checks = CheckItem.fetchObjects({"lvl":{"$in":lvls}, "pentest_types":pentest_type})
+        if checks is None:
+            return
+        checks_to_add = []
+        commands_lkp = {}
+        for checkItem in checks:
+            for target in targets:
+                checkinstance = CheckInstance(pentest).initialize(pentest, None, str(
+                    checkItem._id), str(target.getId()), targets_type, None, "", "")
+                checks_to_add.append(checkinstance)
+            for command in checkItem.commands:
+                command_pentest = ServerCommand.fetchObject({"original_iid": str(command)}, pentest)
+                commands_lkp[str(checkItem.getId())] = command_pentest
+                
+        if not checks_to_add:
+            return
+        lkp = {}
+        check_keys = set()
+        or_conditions = []
+        for check in checks_to_add:
+            hashable_key = check.getHashableDbKey()
+            lkp[hashable_key] = check.getData()
+            del lkp[hashable_key]["_id"]
+            lkp[hashable_key]["type"] = "checkinstance"
+            check_keys.add(hashable_key)
+            or_conditions.append(check.getDbKey())
+        existing_checks = CheckInstance.fetchObjects(pentest, {"$or": or_conditions})
+        existing_checks_as_keys = [] if existing_checks is None else [ existing_check.getHashableDbKey() for existing_check in existing_checks]
+        existing_checks_as_keys = set(existing_checks_as_keys)
+        to_add = check_keys - existing_checks_as_keys
+        things_to_insert = [lkp[check] for check in to_add]
+        #UPDATE EXISTING
+        # Insert new
+        if not things_to_insert:
+            return
+        res = dbclient.insertInDb(pentest, CheckInstance.coll_name, things_to_insert, multi=True)
+        checks_inserted = CheckInstance.fetchObjects(pentest, {"_id": {"$in":res.inserted_ids}})
+        # for each commands, add the tool
+        tools_to_add = []
+        for checkitem_id, command in commands_lkp.items():
+            for check in checks_inserted:
+                if check.check_iid == checkitem_id and command is not None:
+                    tool = ServerTool(pentest)
+                    targetdata = target.getData()
+                    tool.initialize(str(command._id), str(check.getId()), targetdata.get("wave", ""), None, targetdata.get("scope", ""), targetdata.get("ip", ""), targetdata.get("port", ""),
+                                                targetdata.get("proto", ""), checkItem.lvl, infos=toolInfos)
+                    tools_to_add.append(tool)
+        if tools_to_add:
+            ServerTool.bulk_insert(pentest, tools_to_add)
+                    
     @classmethod
     def createFromCheckItem(cls, pentest, checkItem, target_iid, target_type, infos={}):
         parent = None
-        if checkItem.parent is not None:
-            check_instance_parent = cls.fetchObject(
-                pentest, {"check_iid": str(checkItem.parent)})
-            parent = str(check_instance_parent.getId())
         checkinstance = CheckInstance(pentest).initialize(pentest, None, str(
             checkItem._id), str(target_iid), target_type, parent, "", "")
         return checkinstance.addInDb(checkItem=checkItem, toolInfos=infos)
@@ -108,9 +159,15 @@ class CheckInstance(ServerElement):
     def update(self):
         return update(self.pentest, self._id, self.getData())
     
+    def getDbKey(self):
+        return {"check_iid": self.check_iid, "target_iid": self.target_iid, "target_type": self.target_type}
     
-    def updateInfos(self):
-        check_item = CheckItem.fetchObject({"_id": ObjectId(self.check_iid)})
+    def getHashableDbKey(self):
+        return tuple(self.getDbKey().values())
+    
+    def updateInfos(self, check_item=None):
+        if check_item is None:
+            check_item = CheckItem.fetchObject({"_id": ObjectId(self.check_iid)})
         if check_item is None:
             return "Check item parent not found"
         data = self.getData()
@@ -159,13 +216,17 @@ def doInsert(pentest, data, checkItem=None, toolInfos=None):
         del data["_id"]
     dbclient = DBClient.getInstance()
     data["type"] = "checkinstance"
+    # CHECK EXISTING
     existing = CheckInstance.fetchObject(pentest, {"check_iid": str(data["check_iid"]), "target_iid": data.get(
         "target_iid", ""), "target_type": data.get("target_type", "")})
     if existing is not None:
         return {"res": False, "iid": existing.getId()}
+    # IF NOT EXISTING INSERT
     ins_result = dbclient.insertInDb(
         pentest, CheckInstance.coll_name, data, True)
+    ins_check = CheckInstance(pentest, data)
     iid = ins_result.inserted_id
+    ins_check._id = iid
     if checkItem is None or str(checkItem._id) != str(data["check_iid"]):
         checkItem = CheckItem.fetchObject(
             {"_id": ObjectId(data["check_iid"])})
@@ -184,13 +245,11 @@ def doInsert(pentest, data, checkItem=None, toolInfos=None):
             tool.initialize(str(command_pentest._id), str(iid), target.get("wave", ""), None, target.get("scope", ""), target.get("ip", ""), target.get("port", ""),
                                         target.get("proto", ""), checkItem.lvl, infos=toolInfos).addInDb(update_check_infos=False)
             #tool.addToQueue() #TODO : SETTINGS TO ENABLE/DISABLE AUTOSCAN AUTO ADD
-    ins_result = CheckInstance.fetchObject(pentest, {"_id": iid})
     
     if ins_result is None:
         return {"res": False, "iid": iid}
-    else:
-        ins_result.updateInfos()
-    
+    # else:
+    #     ins_check.updateInfos(check_item=checkItem) # TODO CHECK IF WAS USEFUL
     return {"res": True, "iid": iid}
     
 

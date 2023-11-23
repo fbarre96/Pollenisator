@@ -53,7 +53,7 @@ def generateNewToken(user_record, new_scopes):
 
     # Update the user record in the database with the new token
     dbclient = DBClient.getInstance()
-    dbclient.updateInDb("pollenisator", "users", {"_id":user_record["_id"]}, {"$set":{"token":jwt_encoded}})
+    dbclient.updateInDb("pollenisator", "users", {"_id":user_record["_id"]}, {"$set":{"token":jwt_encoded}}, notify=False)
 
     # Return the encoded JWT
     return jwt_encoded
