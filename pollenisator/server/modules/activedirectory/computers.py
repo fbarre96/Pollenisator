@@ -2,6 +2,7 @@
 
 from __future__ import absolute_import
 from bson import ObjectId
+from pymongo import UpdateOne
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.logger_config import logger
 from pollenisator.server.servermodels.element import ServerElement
@@ -112,6 +113,44 @@ class Computer(ServerElement):
     
     def addInDb(self):
         return insert(self.pentest, self.getData())
+
+    @classmethod
+    def bulk_insert(self, pentest, computers_to_add):
+        if not computers_to_add:
+            return
+        dbclient = DBClient.getInstance()
+        dbclient.create_index(pentest, "ActiveDirectory", [("ip", 1), ("type", 1)])
+        update_operations = []
+        for computer in computers_to_add:
+            data = computer
+            data["type"] = "computer"
+            if "_id" in data:
+                del data["_id"]
+            dataInfos = {}
+            if "infos" in data:
+                dataInfos = data["infos"]
+                del data["infos"]
+            update_operations.append(UpdateOne({"ip": data["ip"], "type": ["computer"]}, {"$setOnInsert": data, "$set":{"infos":dataInfos}}, upsert=True))
+        result = dbclient.bulk_write(pentest, "ActiveDirectory", update_operations)
+        upserted_ids = result.upserted_ids
+        if not upserted_ids:
+            return
+        computers_inserted = Computer.fetchObjects(pentest, {"_id":{"$in":list(upserted_ids.values())}})
+        for computer in computers_inserted:
+            if computer.infos.is_dc:
+                computer.add_dc_checks()
+                computer.add_domain_checks()
+            if computer.infos.is_sqlserver:
+                computer.add_sqlserver_checks()
+            domain = computer.domain
+            if domain is not None:
+                domain = domain.lower()
+            if domain is not None and domain != "":
+                existingDomain = dbclient.findInDb(pentest, 
+                    "ActiveDirectory", {"type":"computer", "domain":domain.lower()}, False)
+                if existingDomain is None:
+                    computer.addCheck("AD:onNewDomainDiscovered", {"domain":domain.lower()})
+        return upserted_ids
 
     @classmethod
     def getTriggers(cls):
@@ -333,6 +372,14 @@ def insert(pentest, body):  # noqa: E501
     if "_id" in body:
         del body["_id"]
     body["type"] = "computer"
+    
+    ins_result = dbclient.insertInDb(pentest, 
+        "ActiveDirectory", body, True)
+    if computer.infos.is_dc:
+        computer.add_dc_checks()
+        computer.add_domain_checks()
+    if computer.infos.is_sqlserver:
+        computer.add_sqlserver_checks()
     domain = body.get("domain", None)
     if domain is not None:
         domain = domain.lower()
@@ -342,10 +389,6 @@ def insert(pentest, body):  # noqa: E501
              "ActiveDirectory", {"type":"computer", "domain":domain.lower()}, False)
         if existingDomain is None:
             computer.addCheck("AD:onNewDomainDiscovered", {"domain":domain.lower()})
-    ins_result = dbclient.insertInDb(pentest, 
-        "ActiveDirectory", body, True)
-    
-
     iid = ins_result.inserted_id
     return {"res": True, "iid": iid}
 

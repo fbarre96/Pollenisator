@@ -1,3 +1,4 @@
+from pymongo import InsertOne
 from pollenisator.core.components.logger_config import logger
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -369,29 +370,47 @@ class ServerTool(Tool, ServerElement):
     
     @classmethod
     def bulk_insert(cls, pentest, tools_to_add):
-        """Insert multiple tools in database"""
-        dbclient = DBClient.getInstance()
-        lkp = {}
-        tool_keys = set()
-        or_conditions = []
-        for tool in tools_to_add:
-            hashable_key = tool.getHashableDbKey()
-            lkp[hashable_key] = tool.getData()
-            del lkp[hashable_key]["_id"]
-            if lkp[hashable_key].get("name", "") == "None" or lkp[hashable_key].get("name", "") == "" or lkp[hashable_key].get("name", "") is None:
-                del lkp[hashable_key]["name"]
-            tool_keys.add(hashable_key)
-            or_conditions.append(tool.getDbKey())
-        existing_tools = ServerTool.fetchObjects(pentest, {"$or": or_conditions})
-        existing_tools_as_keys = [] if existing_tools is None else [ existing_tool.getHashableDbKey() for existing_tool in existing_tools]
-        existing_tools_as_keys = set(existing_tools_as_keys)
-        to_add = tool_keys - existing_tools_as_keys
-        things_to_insert = [lkp[tool] for tool in to_add]
-        # Insert new
-        if not things_to_insert:
+        if not tools_to_add:
             return
-        res = dbclient.insertInDb(pentest, ServerTool.coll_name, things_to_insert, multi=True)
-        return res
+        dbclient = DBClient.getInstance()
+        dbclient.create_index(pentest, "tools", [("wave", 1), ("name", 1), ("lvl", 1), ("check_iid", 1)])
+        update_operations = []
+        start = time.time()
+        for tool in tools_to_add:
+            data = ToolController(tool).getData()
+            if "_id" in data:
+                del data["_id"]
+            update_operations.append(InsertOne(data))
+        logger.info(f"Crating tool update operations took {time.time() - start}")
+        start = time.time()
+        result = dbclient.bulk_write(pentest, "tools", update_operations)
+        logger.info(f"Bluk writing tool took {time.time() - start}")
+        upserted_ids = result.upserted_ids
+        return upserted_ids
+        # """Insert multiple tools in database"""
+        # dbclient = DBClient.getInstance()
+        # lkp = {}
+        # tool_keys = set()
+        # or_conditions = []
+        # for tool in tools_to_add:
+        #     hashable_key = tool.getHashableDbKey()
+        #     lkp[hashable_key] = tool.getData()
+        #     del lkp[hashable_key]["_id"]
+        #     if lkp[hashable_key].get("name", "") == "None" or lkp[hashable_key].get("name", "") == "" or lkp[hashable_key].get("name", "") is None:
+        #         del lkp[hashable_key]["name"]
+        #     tool_keys.add(hashable_key)
+        #     or_conditions.append(tool.getDbKey())
+        # dbclient.create_index(pentest, "tools", [("wave", 1), ("name", 1), ("lvl", 1), ("check_iid", 1)])
+        # existing_tools = ServerTool.fetchObjects(pentest, {"$or": or_conditions})
+        # existing_tools_as_keys = [] if existing_tools is None else [ existing_tool.getHashableDbKey() for existing_tool in existing_tools]
+        # existing_tools_as_keys = set(existing_tools_as_keys)
+        # to_add = tool_keys - existing_tools_as_keys
+        # things_to_insert = [lkp[tool] for tool in to_add]
+        # # Insert new
+        # if not things_to_insert:
+        #     return
+        # res = dbclient.insertInDb(pentest, ServerTool.coll_name, things_to_insert, multi=True)
+        # return res
     
 @permission("pentester")
 def setStatus(pentest, tool_iid, body):

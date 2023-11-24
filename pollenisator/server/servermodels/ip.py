@@ -173,25 +173,52 @@ class ServerIp(Ip, ServerElement):
         return insert(self.pentest, IpController(self).getData())
     
     @classmethod
-    def bulk_insert(cls, pentest, ips_to_add):
+    def bulk_insert(cls, pentest, ips_to_add, look_scopes=True):
         if not ips_to_add:
             return
         dbclient = DBClient.getInstance()
+        scopes = []
+        settings = {}
+        if look_scopes:
+            scopes = dbclient.findInDb(pentest, "scopes", {}, True)
+            if scopes is None:
+                scopes = []
+            settings_scope_ip = dbclient.findInDb(pentest, "settings", {"key":"include_domains_with_ip_in_scope"}, False)
+            if isinstance(settings_scope_ip.get("value", None), str):
+                settings_scope_ip = settings_scope_ip.get("value", "").lower() == "true"
+            else:
+                settings_scope_ip = settings_scope_ip.get("value", False)
+            settings_all_domains = dbclient.findInDb(pentest,"settings", {"key":"include_all_domains"}, False)
+            if isinstance(settings_all_domains.get("value", None), str):
+                settings_all_domains = settings_all_domains.get("value", "").lower() == "true"
+            else:
+                settings_all_domains = settings_all_domains.get("value", False)
+            settings_top_domain = dbclient.findInDb(pentest, "settings", {"key":"include_domains_with_topdomain_in_scope"}, False)
+            if isinstance(settings_top_domain.get("value", None), str):
+                settings_top_domain = settings_top_domain.get("value", "").lower() == "true"
+            else:
+                settings_top_domain = settings_top_domain.get("value", False)
+            settings["include_domains_with_ip_in_scope"] = settings_scope_ip
+            settings["include_all_domains"] = settings_all_domains
+            settings["include_domains_with_topdomain_in_scope"] = settings_top_domain
         lkp = {}
         ip_keys = set()
         for ip in ips_to_add:
+            if look_scopes:
+                fitted_scope = []
+                for scope in scopes:
+                    if ip.fitInScope(scope["scope"], settings):
+                        fitted_scope.append(str(scope["_id"]))
+                ip.in_scopes = fitted_scope
             lkp[ip.ip] = IpController(ip).getData()
             del lkp[ip.ip]["_id"]
             ip_keys.add(ip.ip)
+        dbclient.create_index(pentest, "ips", [("ip",1)])
         existing_ips = dbclient.findInDb(pentest, "ips", {"ip":{"$in":list(ip_keys)}}, multi=True)
         existing_ips_as_key = [] if existing_ips is None else [x.get("ip") for x in existing_ips]
         existing_ips_as_key = set(existing_ips_as_key)
         to_add = ip_keys - existing_ips_as_key
         things_to_insert = [lkp[ip] for ip in to_add]
-        #UPDATE EXISTING
-        for existing_ip in existing_ips:
-            existing_ip.get("infos", {}).update(lkp[existing_ip.get("ip")].get("infos", {}))
-            dbclient.updateInDb(pentest, "ips", {"_id": ObjectId(existing_ip.get("_id"))}, {"$set":{"infos":existing_ip.get("infos", {})}})
         # Insert new
         res = None
         if things_to_insert:

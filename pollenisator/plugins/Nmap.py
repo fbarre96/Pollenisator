@@ -1,8 +1,4 @@
 """A plugin to parse nmap scan"""
-
-import cProfile
-import io
-import pstats
 import re
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.tag import Tag
@@ -10,6 +6,8 @@ from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.plugins.plugin import Plugin
 import shlex
+import time
+from pollenisator.core.components.logger_config import logger
 
 def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
     """
@@ -25,47 +23,78 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
     countOpen = 0
     ports_to_add = []
     ips_to_add = []
-    all_text = nmapFile.read().decode("utf-8").strip()
-    lines = all_text.split("\n")
-    if len(lines) <= 3:
+    logger.info("Reading nmap file: "+str(nmapFile))
+    first_line = nmapFile.readline().decode("utf-8").strip()
+    nmapFile.seek(0, 2) # Move the file cursor to the end
+    # Get the file size
+    file_size = nmapFile.tell()
+    nmapFile.seek(max(file_size - 1024, 0))  # You can adjust the buffer size as needed
+    # Read the last line
+    last_line = nmapFile.readlines()[-1].decode("utf-8").strip()
+    if file_size <= 200:
         # print("Not enough lines to be nmap")
         return None
-    if not lines[0].startswith("# Nmap"):
+    if not first_line.startswith("# Nmap"):
         # print("Not starting with # Nmap")
         return None
-    if "scan initiated" not in lines[0]:
+    if "scan initiated" not in first_line:
         # print("Not scan initiated on first line")
         return None
-    if "# Nmap done at" not in lines[-1]:
+    if "# Nmap done at" not in last_line:
         # print("Not # Nmap done at at the end : "+str(lines[-1]))
         return None
+    nmapFile.seek(0)
     ipCIDR_m = None
     ipDom_m = None
-    for line in lines:
+
+    i = 0
+    logger.info("Parsing nmap file: "+str(nmapFile))
+    regex_scan_report = re.compile(r"^Nmap scan report for (\S+)(?: \(((?:[0-9]{1,3}\.){3}[0-9]{1,3})\))?$")
+    regex_port = re.compile(r"^(\d+)\/(\S+)\s+open\s+(\S+)(?: +(.+))?$")
+    first_port = False
+    for line in nmapFile:
         # Search ip in file
         # match an ip
+        if isinstance(line, bytes):
+            try:
+                line = line.decode("utf-8")
+            except UnicodeDecodeError:
+                continue
+        i += 1
+        if i % 10000 == 0:
+            logger.info("Parsing nmap file line "+str(i))
+
         ip = re.search(
-            r"^Nmap scan report for (\S+)(?: \(((?:[0-9]{1,3}\.){3}[0-9]{1,3})\))?$", line)
+            regex_scan_report, line)
         if ip is not None:  # regex match
+            # IF THE LIST IS BIG, WE SHOULD FLUSH IT
+            if len(ips_to_add) >= 1024:
+                #logger.info("Flushing ips and ports")
+                bulk_insertions(pentest, ips_to_add, ports_to_add)
+                ips_to_add = []
+                ports_to_add = []
             lastIp = [ip.group(1), ip.group(
                 2) if ip.group(2) is not None else ""]
             notes_ip = "ip:" + \
                 str(lastIp[1]) if lastIp[1] != "" and lastIp[1] is not None else ""
-            ipCIDR_m = ServerIp(pentest).initialize(str(lastIp[0]), notes=notes_ip, infos={"plugin":Nmap.get_name()})
+            ipCIDR_m = ServerIp(pentest, {"in_scopes":[]}).initialize(str(lastIp[0]), notes=notes_ip, in_scopes=[], infos={"plugin":Nmap.get_name()})
             if not keep_only_open:#add directly
                 ips_to_add.append(ipCIDR_m)
             if lastIp[1].strip() != "" and lastIp[1] is not None:
-                ipDom_m = ServerIp(pentest).initialize(
-                    str(lastIp[1]), notes="domain:"+str(lastIp[0]), infos={"plugin":Nmap.get_name()})
+                ipDom_m = ServerIp(pentest, {"in_scopes":[]}).initialize(
+                    str(lastIp[1]), notes="domain:"+str(lastIp[0]), in_scopes=[], infos={"plugin":Nmap.get_name()})
+                if not keep_only_open:#add directly
+                    ips_to_add.append(ipDom_m)
             else:
                 ipDom_m = None
+            first_port = True
         if " open " in line:
             if ipCIDR_m is None:  # Probably a gnmap
                 return None
-            notes += line+"\n"
+            #notes += line+"\n"
             # regex to find open ports in gnmap file
             port_search = re.search(
-                r"^(\d+)\/(\S+)\s+open\s+(\S+)(?: +(.+))?$", line)
+                regex_port, line)
             if port_search is not None:
                 port_number = str(port_search.group(1))
                 proto = str(port_search.group(2))
@@ -76,25 +105,32 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
                 countOpen += 1
                 validIps = []
                 if ipCIDR_m is not None:
-                    ips_to_add.append(ipCIDR_m)
+                    if keep_only_open and first_port:
+                        ips_to_add.append(ipCIDR_m)
                     validIps.append(ipCIDR_m.ip)
                     if ipDom_m is not None:
                         ipDom_m.infos["hostname"] = list(set(list( ipDom_m.infos.get("hostname", []))+[str(ipCIDR_m.ip)]))
-                        ips_to_add.append(ipDom_m)
                         validIps.append(ipDom_m.ip)
+                        ips_to_add.append(ipDom_m)
+                    first_port = False
                 for ipFound in validIps:
                     if ip == "":
                         continue
                     port_o = ServerPort(pentest).initialize(ipFound, port_number, proto, service, product, infos={"plugin":Nmap.get_name()})
                     ports_to_add.append(port_o)
-    ServerIp.bulk_insert(pentest, ips_to_add)
-    results = ServerPort.bulk_insert(pentest, ports_to_add)
-    if results.get("failed", []):
-        for failed in results["failed"]:
-            failed.update_service()
+    bulk_insertions(pentest, ips_to_add, ports_to_add)
     notes = str(countOpen)+" open ports found\n"+notes
     return notes
 
+def bulk_insertions(pentest, ips_to_add, ports_to_add):
+    logger.info("Bulk inserting ips")
+    start = time.time()
+    ServerIp.bulk_insert(pentest, ips_to_add, look_scopes=True)
+    logger.info("Bulk inserting ips took "+str(time.time()-start)+" seconds")
+    start = time.time()
+    logger.info("Bulk inserting ports")
+    results = ServerPort.bulk_insert(pentest, ports_to_add)
+    logger.info("Bulk inserting ports took "+str(time.time()-start)+" seconds")
 
 class Nmap(Plugin):
     default_bin_names = ["nmap"]
@@ -174,16 +210,7 @@ class Nmap(Plugin):
         if cmdline is not None:
             if " -sP " in cmdline:
                 keep_only_open = False
-        pr = cProfile.Profile()
-        pr.enable()
         notes = getIpPortsNmap(pentest, file_opened, keep_only_open)
-        pr.disable()
-        s = io.StringIO()
-        sortby = 'cumulative'
-        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-        ps.print_stats()
-        with open("/tmp/nmap_parse_profiling.txt", "w") as f:
-            f.write(s.getvalue())
         if notes is None:
             return None, None, None, None
         return notes, tags, "scope", {}

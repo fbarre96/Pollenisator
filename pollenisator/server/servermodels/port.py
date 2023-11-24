@@ -1,3 +1,4 @@
+import time
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.port import Port
@@ -12,6 +13,8 @@ from pollenisator.server.modules.activedirectory.computers import (
 from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.core.components.utils import JSONEncoder, checkCommandService
 import json
+from pollenisator.core.components.logger_config import logger
+from pymongo import UpdateOne
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance, delete as checkinstance_delete
 from pollenisator.server.permission import permission
@@ -94,31 +97,84 @@ class ServerPort(Port, ServerElement):
     def update_service(self):
         return update(self.pentest, self._id, {"service": self.service})
     
+    @staticmethod
+    def get_allowed_ports(checkitem, ports):
+        allowed_ports_services = checkitem.ports.split(",")
+        ret = []
+        cache = {}
+        for port in ports:
+            key = (port.port, port.proto, port.service)
+            if key in cache:
+                if cache[key]:
+                    ret.append(port)
+                continue
+            res = checkCommandService(allowed_ports_services, port.port, port.proto, port.service)
+            if res:
+                ret.append(port)
+            cache[key] = res
+        return ret
+    
     @classmethod
     def bulk_insert(cls, pentest, ports_to_add):
         if not ports_to_add:
             return
         dbclient = DBClient.getInstance()
-        lkp = {}
-        port_keys = set()
-        or_conditions = []
+        dbclient.create_index(pentest, "ports", [("port", 1), ("proto", 1), ("ip", 1)])
+        update_operations = []
+        computers = []
+        dcs = []
+        msql = []
+        start = time.time()
         for port in ports_to_add:
-            hashable_key = tuple(port.getDbKey().values())
-            lkp[hashable_key] = PortController(port).getData()
-            del lkp[hashable_key]["_id"]
-            port_keys.add(hashable_key)
-            or_conditions.append({"port": port.port, "proto": port.proto, "ip": port.ip})
-        existing_ports = ServerPort.fetchObjects(pentest, {"$or": or_conditions})
-        existing_ports_as_keys = [] if existing_ports is None else [existing_port.getHashableDbKey() for existing_port in existing_ports]
-        existing_ports_as_keys = set(existing_ports_as_keys)
-        to_add = port_keys - existing_ports_as_keys
-        things_to_insert = [lkp[port] for port in to_add]
-        # Insert new
-        if things_to_insert:
-            res = dbclient.insertInDb(pentest, "ports", things_to_insert, multi=True)
-            ports_inserted = ServerPort.fetchObjects(pentest, {"_id":{"$in":res.inserted_ids}})
-            CheckInstance.bulk_insert_for(pentest, ports_inserted, "port", ["port:onServiceUpdate"])
-        return {"inserted":to_add, "failed":existing_ports}
+            data = PortController(port).getData()
+            if "service" in data:
+                del data["service"]
+            if "_id" in data:
+                del data["_id"]
+            if int(port.port) == 445:
+                computers.append({"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[], "infos":{"is_dc":False}})
+            elif int(port.port) == 88:
+                computers.append({"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[], "infos":{"is_dc":True}})
+            elif int(port.port) == 1433 or port.service == "ms-sql":
+                computers.append({"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[], "infos":{"is_sqlserver":True}})
+            update_operations.append(UpdateOne({"port": port.port, "proto": port.proto, "ip": port.ip}, {"$setOnInsert": data, "$set":{"service":port.service}}, upsert=True))
+        logger.info(f"Crating port update operations took {time.time() - start}")
+        start = time.time()
+        result = dbclient.bulk_write(pentest, "ports", update_operations)
+        logger.info(f"Bluk writing ports took {time.time() - start}")
+        upserted_ids = result.upserted_ids
+        if not upserted_ids:
+            return
+        ports_inserted = ServerPort.fetchObjects(pentest, {"_id":{"$in":list(upserted_ids.values())}})
+        start = time.time()
+        Computer.bulk_insert(pentest, computers)
+        
+            
+        logger.info(f"Computer update took {time.time() - start}")
+        
+        CheckInstance.bulk_insert_for(pentest, ports_inserted, "port", ["port:onServiceUpdate"], f_get_impacted_targets=cls.get_allowed_ports)
+        # lkp = {}
+        # port_keys = set()
+        # or_conditions = []
+        # for port in ports_to_add:
+        #     hashable_key = tuple(port.getDbKey().values())
+        #     lkp[hashable_key] = PortController(port).getData()
+        #     del lkp[hashable_key]["_id"]
+        #     port_keys.add(hashable_key)
+        #     or_conditions.append({"port": port.port, "proto": port.proto, "ip": port.ip})
+        # dbclient.create_index(pentest, "ports", [("port", 1), ("proto", 1), ("ip", 1)])
+        # existing_ports = list(ServerPort.fetchObjects(pentest, {"$or": or_conditions}))
+        # existing_ports_as_keys = [] if existing_ports is None else [existing_port.getHashableDbKey() for existing_port in existing_ports]
+        # existing_ports_as_keys = set(existing_ports_as_keys)
+        # to_add = port_keys - existing_ports_as_keys
+        # things_to_insert = [lkp[port] for port in to_add]
+
+         # Insert new
+        # if things_to_insert:
+        #     res = dbclient.insertInDb(pentest, "ports", things_to_insert, multi=True)
+        #     ports_inserted = ServerPort.fetchObjects(pentest, {"_id":{"$in":res.inserted_ids}})
+        #     CheckInstance.bulk_insert_for(pentest, ports_inserted, "port", ["port:onServiceUpdate"], check_func=cls.check_allowed)
+        # return {"inserted":to_add, "failed":existing_ports}
 
 @permission("pentester")
 def delete(pentest, port_iid):

@@ -1,3 +1,4 @@
+import time
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.server.servermodels.element import ServerElement
@@ -5,6 +6,8 @@ from pollenisator.server.servermodels.tool import ServerTool
 from pollenisator.server.servermodels.command import ServerCommand
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.permission import permission
+from pollenisator.core.components.utils import checkCommandService
+from pollenisator.core.components.logger_config import logger
 
 class CheckInstance(ServerElement):
     coll_name = 'cheatsheet'
@@ -95,7 +98,7 @@ class CheckInstance(ServerElement):
         return ret
     
     @classmethod
-    def bulk_insert_for(cls, pentest, targets, targets_type, lvls, toolInfos=None):
+    def bulk_insert_for(cls, pentest, targets, targets_type, lvls, f_get_impacted_targets=None, toolInfos=None):
         dbclient = DBClient.getInstance()
         pentest_type = dbclient.findInDb(pentest, "settings", {"key":"pentest_type"}, False)
         pentest_type = None if pentest_type is None else pentest_type.get("value", None)
@@ -103,21 +106,32 @@ class CheckInstance(ServerElement):
         if checks is None:
             return
         checks_to_add = []
-        commands_lkp = {}
+        start = time.time()
+        targets = list(targets)
+        
+        commands_pentest = ServerCommand.fetchObjects({}, pentest)
+        commands_lkp = {command_pentest.original_iid: command_pentest for command_pentest in commands_pentest}
+        check_command_lkp = {}
         for checkItem in checks:
-            for target in targets:
+            if callable(f_get_impacted_targets):
+                subset = f_get_impacted_targets(checkItem, targets)
+            else:
+                subset = targets
+            for target in subset:
                 checkinstance = CheckInstance(pentest).initialize(pentest, None, str(
                     checkItem._id), str(target.getId()), targets_type, None, "", "")
                 checks_to_add.append(checkinstance)
             for command in checkItem.commands:
-                command_pentest = ServerCommand.fetchObject({"original_iid": str(command)}, pentest)
-                commands_lkp[str(checkItem.getId())] = command_pentest
-                
+                check_command_lkp[str(checkItem.getId())] = check_command_lkp.get(str(checkItem.getId()), []) + [commands_lkp.get(command, None)]
+        logger.info("0 Check and command creation took : "+str(time.time() - start))
+        
+
         if not checks_to_add:
             return
         lkp = {}
         check_keys = set()
         or_conditions = []
+        start = time.time()
         for check in checks_to_add:
             hashable_key = check.getHashableDbKey()
             lkp[hashable_key] = check.getData()
@@ -125,7 +139,14 @@ class CheckInstance(ServerElement):
             lkp[hashable_key]["type"] = "checkinstance"
             check_keys.add(hashable_key)
             or_conditions.append(check.getDbKey())
+        logger.info("1 CCheck condition creation took : "+str(time.time() - start))
+        start = time.time()
+        dbclient.create_index(pentest, "cheatsheet", [("check_iid", 1), ("target_iid", 1), ("target_type", 1)])
+        logger.info("2 CCheck index creation took : "+str(time.time() - start))
+        start = time.time()
         existing_checks = CheckInstance.fetchObjects(pentest, {"$or": or_conditions})
+        logger.info("3 CCheck search with or condition took : "+str(time.time() - start))
+        start = time.time()
         existing_checks_as_keys = [] if existing_checks is None else [ existing_check.getHashableDbKey() for existing_check in existing_checks]
         existing_checks_as_keys = set(existing_checks_as_keys)
         to_add = check_keys - existing_checks_as_keys
@@ -134,20 +155,34 @@ class CheckInstance(ServerElement):
         # Insert new
         if not things_to_insert:
             return
+        logger.info("4 Crafting things to isnert in check took: "+str(time.time() - start))
+        start = time.time()
         res = dbclient.insertInDb(pentest, CheckInstance.coll_name, things_to_insert, multi=True)
-        checks_inserted = CheckInstance.fetchObjects(pentest, {"_id": {"$in":res.inserted_ids}})
+        logger.info("5 Insertion of checks took: "+str(time.time() - start))
+        start = time.time()
+        checks_inserted = list(CheckInstance.fetchObjects(pentest, {"_id": {"$in":res.inserted_ids}}))
+        logger.info("6 Fetch inserted check took : "+str(time.time() - start))
+        start = time.time()
         # for each commands, add the tool
         tools_to_add = []
-        for checkitem_id, command in commands_lkp.items():
-            for check in checks_inserted:
-                if check.check_iid == checkitem_id and command is not None:
-                    tool = ServerTool(pentest)
-                    targetdata = target.getData()
-                    tool.initialize(str(command._id), str(check.getId()), targetdata.get("wave", ""), None, targetdata.get("scope", ""), targetdata.get("ip", ""), targetdata.get("port", ""),
-                                                targetdata.get("proto", ""), checkItem.lvl, infos=toolInfos)
-                    tools_to_add.append(tool)
+        #for checkitem_id, commands in check_command_lkp.items():
+        for check in checks_inserted:
+            checkitem_id = check.check_iid
+            commands = check_command_lkp.get(checkitem_id, [])
+            for command in commands:
+                tool = ServerTool(pentest)
+                targetdata = target.getData()
+                tool.initialize(str(command.getId()), str(check.getId()), targetdata.get("wave", ""), command.name, targetdata.get("scope", ""), targetdata.get("ip", ""), targetdata.get("port", ""),
+                                            targetdata.get("proto", ""), checkItem.lvl, infos=toolInfos)
+                tools_to_add.append(tool)
+        logger.info("7 Craft tools : "+str(time.time() - start))
+        start = time.time()
         if tools_to_add:
             ServerTool.bulk_insert(pentest, tools_to_add)
+        logger.info("8  insert tools took : "+str(time.time() - start))
+        
+        return checks_inserted
+    
                     
     @classmethod
     def createFromCheckItem(cls, pentest, checkItem, target_iid, target_type, infos={}):
