@@ -434,24 +434,24 @@ def getMainDir():
 
 def checkCommandService(allowed_ports_services, port, proto, service):
     for i, elem in enumerate(allowed_ports_services):
-        if not(elem.strip().startswith("tcp/") or elem.strip().startswith("udp/")):
-            allowed_ports_services[i] = "tcp/"+str(elem.strip())
+        elem_stripped = elem.strip()
+        if not elem_stripped.startswith(("tcp/", "udp/")):
+            allowed_ports_services[i] = "tcp/"+elem_stripped.strip()
     for allowed in allowed_ports_services:
-        protoRange = "udp" if allowed.startswith("udp/") else "tcp"
+        proto_range = "udp" if allowed.startswith("udp/") else "tcp"
         maybeRange = str(allowed)[4:].split("-")
-        startAllowedRange = -1
-        endAllowedRange = -1
+        startAllowedRange = endAllowedRange = -1
         if len(maybeRange) == 2:
             try:
                 startAllowedRange = int(maybeRange[0])
                 endAllowedRange = int(maybeRange[1])
             except ValueError:
-                pass
-        if (proto+"/"+port == allowed) or \
-            (proto+"/"+service == allowed) or \
-            (proto == protoRange and
-                int(port) >= int(startAllowedRange) and
-                int(port) <= int(endAllowedRange)):
+                startAllowedRange = endAllowedRange = -1
+        if proto + "/" + port == allowed or proto + "/" + service == allowed \
+            or (
+                proto == proto_range \
+                and startAllowedRange <= int(port) <= endAllowedRange
+            ):
             return True
     return False
 

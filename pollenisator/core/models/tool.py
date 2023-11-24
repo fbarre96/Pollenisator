@@ -72,16 +72,18 @@ class Tool(Element):
         Returns:
             this object
         """
-        dbclient = DBClient.getInstance()
-        if command_iid is not None and command_iid != "" and command_iid != "None":
-            res = dbclient.findInDb(self.pentest, "commands", {"$or": [
-                {"original_iid":str(command_iid)},
-                {"_id": ObjectId(command_iid)}
-            ]}, False)
-            name = res["name"]
-            self.command_iid = str(res["_id"])
-        else:
-            self.command_iid = None
+        if name is None:
+            if command_iid is not None and command_iid != "" and command_iid != "None":
+                dbclient = DBClient.getInstance()
+
+                res = dbclient.findInDb(self.pentest, "commands", {"$or": [
+                    {"original_iid":str(command_iid)},
+                    {"_id": ObjectId(command_iid)}
+                ]}, False)
+                name = res["name"]
+                self.command_iid = str(res["_id"])
+            else:
+                self.command_iid = None
         self.check_iid = str(check_iid) if check_iid is not None else None
         self.name = name
         self.wave = wave

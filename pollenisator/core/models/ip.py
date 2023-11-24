@@ -43,7 +43,7 @@ class Ip(Element):
         """
         self.ip = ip
         self.notes = notes
-        self.in_scopes = in_scopes if in_scopes is not None else self.getScopesFittingMe()
+        self.in_scopes = in_scopes
         self.infos = infos if infos is not None else {}
         return self
     
@@ -55,7 +55,7 @@ class Ip(Element):
         return {"ip": self.ip, "in_scopes": self.in_scopes, "notes": self.notes, "_id": self.getId(), "infos": self.infos}
 
 
-    def fitInScope(self, scope):
+    def fitInScope(self, scope, settings=None):
         """Checks if this IP is the given scope.
         Args:
             scope: a string of perimeter (Network Ip, IP or domain)
@@ -63,25 +63,30 @@ class Ip(Element):
             boolean: True if this ip/domain is in given scope. False otherwise.
         """
         dbclient = DBClient.getInstance()
-        settings_scope_ip = dbclient.findInDb(self.pentest, "settings", {"key":"include_domains_with_ip_in_scope"}, False)
-        if isinstance(settings_scope_ip, str):
-            settings_scope_ip = settings_scope_ip.lower() == "true"
-        settings_all_domains = dbclient.findInDb(self.pentest,"settings", {"key":"include_all_domains"}, False)
-        if isinstance(settings_all_domains, str):
-            settings_all_domains = settings_all_domains.lower() == "true"
-        settings_top_domain = dbclient.findInDb(self.pentest, "settings", {"key":"include_domains_with_topdomain_in_scope"}, False)
-        if isinstance(settings_top_domain, str):
-            settings_top_domain = settings_top_domain.lower() == "true"
+        if settings is None:
+            settings_scope_ip = dbclient.findInDb(self.pentest, "settings", {"key":"include_domains_with_ip_in_scope"}, False)
+            if isinstance(settings_scope_ip.get("value", None), str):
+                settings_scope_ip = settings_scope_ip.get("value", "").lower() == "true"
+            settings_all_domains = dbclient.findInDb(self.pentest,"settings", {"key":"include_all_domains"}, False)
+            if isinstance(settings_all_domains.get("value", None), str):
+                settings_all_domains = settings_all_domains.get("value", "").lower() == "true"
+            settings_top_domain = dbclient.findInDb(self.pentest, "settings", {"key":"include_domains_with_topdomain_in_scope"}, False)
+            if isinstance(settings_top_domain.get("value", None), str):
+                settings_top_domain = settings_top_domain.get("value", "").lower() == "true"
+        else:
+            settings_scope_ip = settings.get("include_domains_with_ip_in_scope", False)
+            settings_all_domains = settings.get("include_all_domains", False)
+            settings_top_domain = settings.get("include_domains_with_topdomain_in_scope", False)
         if isNetworkIp(scope):
             if Ip.checkIpScope(scope, self.ip):
                 return True
-        elif settings_all_domains["value"]:
+        elif settings_all_domains:
             return True
-        elif Ip.isSubDomain(scope, self.ip) and settings_top_domain["value"]:
+        elif Ip.isSubDomain(scope, self.ip) and settings_top_domain:
             return True
         elif self.ip == scope:
             return True
-        elif settings_scope_ip["value"]:
+        elif settings_scope_ip:
             ip = performLookUp(self.ip)
             if ip is not None and Ip.checkIpScope(scope, ip):
                 return True
