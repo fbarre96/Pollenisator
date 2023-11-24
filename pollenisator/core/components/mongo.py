@@ -74,6 +74,18 @@ class DBClient:
         """Reset client connection"""
         self.client = None
 
+    def bulk_write(self, pentest, collection, update_operations):
+        """Bulk write data to the database.
+        Args:
+            data: A list of dictionnary containing the data to write.
+        Returns:
+            The result of the bulk write.
+        """
+        self.connect()
+        db = self.client[pentest]
+        result = db[collection].bulk_write(update_operations)
+        return result
+
     def getWorkers(self, pipeline=None):
         """Return workers documents from database
         Returns:
@@ -263,6 +275,9 @@ class DBClient:
         collections = self.db.list_collection_names()
         return collections
 
+    def create_index(self, pentest, collection, index):
+        self.connectToDb(pentest)
+        self.db[collection].create_index(index)
 
     def update(self, collection, pipeline, updatePipeline, many=False, notify=True, upsert=False):
         """
