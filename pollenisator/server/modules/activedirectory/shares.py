@@ -8,7 +8,7 @@ from pollenisator.server.modules.activedirectory.share_file import ShareFile
 from pollenisator.server.permission import permission
 
 class Share(ServerElement):
-    coll_name = "ActiveDirectory"
+    coll_name = "shares"
     name = "Share"
     def __init__(self, pentest=None, valuesFromDb=None):
         if valuesFromDb is None:
@@ -179,6 +179,10 @@ class Share(ServerElement):
             Returns the defect +title.
         """
         return self.share
+    
+    @classmethod
+    def getSearchableTextAttribute(cls):
+        return ["share", "ip"]
 
 
 
@@ -196,10 +200,10 @@ def delete(pentest, share_iid):
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     dbclient = DBClient.getInstance()
-    share_dic = dbclient.findInDb(pentest, "ActiveDirectory", {"_id":ObjectId(share_iid), "type":"share"}, False)
+    share_dic = dbclient.findInDb(pentest, "shares", {"_id":ObjectId(share_iid), "type":"share"}, False)
     if share_dic is None:
         return 0
-    res = dbclient.deleteFromDb(pentest, "ActiveDirectory", {"_id": ObjectId(share_iid), "type":"share"}, False)
+    res = dbclient.deleteFromDb(pentest, "shares", {"_id": ObjectId(share_iid), "type":"share"}, False)
     if res is None:
         return 0
     else:
@@ -221,14 +225,14 @@ def insert(pentest, body):
     share = Share(pentest, body) 
     dbclient = DBClient.getInstance()
     existing = dbclient.findInDb(pentest, 
-        "ActiveDirectory", {"type":"share", "share":share.share, "ip":share.ip}, False)
+        "shares", {"type":"share", "share":share.share, "ip":share.ip}, False)
     if existing is not None:
         return {"res": False, "iid": existing["_id"]}
     if "_id" in body:
         del body["_id"]
     body["type"] = "share"
     ins_result = dbclient.insertInDb(pentest,
-        "ActiveDirectory", body, True)
+        "shares", body, True)
     iid = ins_result.inserted_id
     return {"res": True, "iid": iid}
 
@@ -256,5 +260,5 @@ def update(pentest, share_iid, body):
         del body["type"]
     if "_id" in body:
         del body["_id"]
-    dbclient.updateInDb(pentest, "ActiveDirectory", {"_id": ObjectId(share_iid), "type":"share"}, {"$set": body}, False, True)
+    dbclient.updateInDb(pentest, "shares", {"_id": ObjectId(share_iid), "type":"share"}, {"$set": body}, False, True)
     return True

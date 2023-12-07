@@ -55,6 +55,10 @@ class Command(Element):
         return {"name": self.name, "bin_path":self.bin_path, "plugin":self.plugin,  "text": self.text,
                 "timeout": self.timeout,
                 "indb":self.indb, "_id": self.getId(),  "infos": self.infos}
+    
+    @classmethod
+    def getSearchableTextAttribute(cls):
+        return ["name"]
             
     def __str__(self):
         """

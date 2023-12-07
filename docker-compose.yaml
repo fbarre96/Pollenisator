@@ -16,6 +16,8 @@ services:
       - "27017:27017"   # Map container port to host port
     volumes:
       - mongodb_data:/data/db  # Persist MongoDB data
+     security_opt:
+      - no-new-privileges:true
   redis:
     image: redis:latest
     ports:

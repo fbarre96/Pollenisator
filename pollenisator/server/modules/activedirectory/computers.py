@@ -15,7 +15,7 @@ from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
 from pollenisator.server.permission import permission
 
 class Computer(ServerElement):
-    coll_name = "ActiveDirectory"
+    coll_name = "computers"
     name = "Computer"
     command_variables = ["domain"]
     
@@ -71,10 +71,16 @@ class Computer(ServerElement):
             Returns the defect +title.
         """
         return str(self.domain)+"\\"+str(self.name) + " ("+str(self.ip)+")"
+    
+    @classmethod
+    def getSearchableTextAttribute(cls):
+        return ["domain", "name", "ip"]
 
     def getData(self):
         return {"_id": self._id, "name":self.name, "ip":self.ip, "domain":self.domain,
             "admins":self.admins, "users": self.users, "infos":self.infos.getData()}
+    
+    
 
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
@@ -119,7 +125,7 @@ class Computer(ServerElement):
         if not computers_to_add:
             return
         dbclient = DBClient.getInstance()
-        dbclient.create_index(pentest, "ActiveDirectory", [("ip", 1), ("type", 1)])
+        dbclient.create_index(pentest, "computers", [("ip", 1), ("type", 1)])
         update_operations = []
         for computer in computers_to_add:
             data = computer
@@ -131,7 +137,7 @@ class Computer(ServerElement):
                 dataInfos = data["infos"]
                 del data["infos"]
             update_operations.append(UpdateOne({"ip": data["ip"], "type": ["computer"]}, {"$setOnInsert": data, "$set":{"infos":dataInfos}}, upsert=True))
-        result = dbclient.bulk_write(pentest, "ActiveDirectory", update_operations)
+        result = dbclient.bulk_write(pentest, "computers", update_operations)
         upserted_ids = result.upserted_ids
         if not upserted_ids:
             return
@@ -147,7 +153,7 @@ class Computer(ServerElement):
                 domain = domain.lower()
             if domain is not None and domain != "":
                 existingDomain = dbclient.findInDb(pentest, 
-                    "ActiveDirectory", {"type":"computer", "domain":domain.lower()}, False)
+                    "computers", {"type":"computer", "domain":domain.lower()}, False)
                 if existingDomain is None:
                     computer.addCheck("AD:onNewDomainDiscovered", {"domain":domain.lower()})
         return upserted_ids
@@ -297,10 +303,10 @@ def delete(pentest, computer_iid):  # noqa: E501
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     dbclient = DBClient.getInstance()
-    share_dic = dbclient.findInDb(pentest, "ActiveDirectory", {"_id":ObjectId(computer_iid), "type":"computer"}, False)
+    share_dic = dbclient.findInDb(pentest, "computers", {"_id":ObjectId(computer_iid), "type":"computer"}, False)
     if share_dic is None:
         return 0
-    res = dbclient.deleteFromDb(pentest, "ActiveDirectory", {"_id": ObjectId(computer_iid), "type":"computer"}, False)
+    res = dbclient.deleteFromDb(pentest, "computers", {"_id": ObjectId(computer_iid), "type":"computer"}, False)
     if res is None:
         return 0
     else:
@@ -338,7 +344,7 @@ def update(pentest, computer_iid, body):  # noqa: E501
         body["domain"] = domain
     if domain is not None and domain != "":
         existingDomain = dbclient.findInDb(pentest, 
-             "ActiveDirectory", {"type":"computer", "domain":domain}, False)
+             "computers", {"type":"computer", "domain":domain}, False)
         if existingDomain is None:
             computer.addCheck("AD:onNewDomainDiscovered", {"domain":domain})
     if existing.infos.is_dc != computer.infos.is_dc:
@@ -347,7 +353,7 @@ def update(pentest, computer_iid, body):  # noqa: E501
     if existing.infos.is_sqlserver != computer.infos.is_sqlserver:
         existing.add_sqlserver_checks()
 
-    dbclient.updateInDb(pentest, "ActiveDirectory", {"_id": ObjectId(computer_iid), "type":"computer"}, {"$set": body}, False, True)
+    dbclient.updateInDb(pentest, "computers", {"_id": ObjectId(computer_iid), "type":"computer"}, {"$set": body}, False, True)
     return True
 
 @permission("pentester")
@@ -366,7 +372,7 @@ def insert(pentest, body):  # noqa: E501
     computer = Computer(pentest, body)
     dbclient = DBClient.getInstance()
     existing = dbclient.findInDb(pentest, 
-        "ActiveDirectory", {"type":"computer", "ip":computer.ip}, False)
+        "computers", {"type":"computer", "ip":computer.ip}, False)
     if existing is not None:
         return {"res": False, "iid": existing["_id"]}
     if "_id" in body:
@@ -374,7 +380,7 @@ def insert(pentest, body):  # noqa: E501
     body["type"] = "computer"
     
     ins_result = dbclient.insertInDb(pentest, 
-        "ActiveDirectory", body, True)
+        "computers", body, True)
     if computer.infos.is_dc:
         computer.add_dc_checks()
         computer.add_domain_checks()
@@ -386,7 +392,7 @@ def insert(pentest, body):  # noqa: E501
         body["domain"] = domain
     if domain is not None and domain != "":
         existingDomain = dbclient.findInDb(pentest, 
-             "ActiveDirectory", {"type":"computer", "domain":domain.lower()}, False)
+             "computers", {"type":"computer", "domain":domain.lower()}, False)
         if existingDomain is None:
             computer.addCheck("AD:onNewDomainDiscovered", {"domain":domain.lower()})
     iid = ins_result.inserted_id
@@ -398,10 +404,10 @@ def getUsers(pentest, computer_iid):
     computer_m = Computer.fetchObject(pentest, {"_id":ObjectId(computer_iid)})
     if computer_m is None:
         return "Not found", 404
-    users = dbclient.findInDb(pentest, "ActiveDirectory", { "type":"user", "_id" : { "$in" : [ObjectId(x) for x in computer_m.users ]} } , multi=True)
+    users = dbclient.findInDb(pentest, "users", { "type":"user", "_id" : { "$in" : [ObjectId(x) for x in computer_m.users ]} } , multi=True)
     if users is None:
         users = []
-    admins = dbclient.findInDb(pentest, "ActiveDirectory", { "type":"user", "_id" : { "$in" : [ObjectId(x) for x in computer_m.admins ]} }, multi=True)
+    admins = dbclient.findInDb(pentest, "users", { "type":"user", "_id" : { "$in" : [ObjectId(x) for x in computer_m.admins ]} }, multi=True)
     if admins is None:
         admins = []
     return {"users":list(users), "admins":list(admins)}

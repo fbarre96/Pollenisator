@@ -14,7 +14,7 @@ from pollenisator.server.servermodels.tool import ServerTool
 import pollenisator.server.modules.activedirectory.computers as Computer
 
 class User(ServerElement):
-    coll_name = "ActiveDirectory"
+    coll_name = "users"
     name = "User"
     command_variables = ["username","domain","password"]
     
@@ -66,6 +66,10 @@ class User(ServerElement):
             Returns the defect +title.
         """
         return self.domain+"\\"+self.username 
+    
+    @classmethod
+    def getSearchableTextAttribute(cls):
+        return ["domain", "username"]
 
     def getData(self):
         return {"_id": self._id, "username":self.username, "password": self.password, "domain":self.domain,
@@ -133,7 +137,7 @@ class User(ServerElement):
         password = user_o.password if user_o.password is not None else ""
         domain = user_o.domain if user_o.domain is not None else ""
         dbclient = DBClient.getInstance()
-        dc_computer = dbclient.findInDb(self.pentest, "ActiveDirectory", {"type":"computer", "domain":domain, "infos.is_dc":True}, False)
+        dc_computer = dbclient.findInDb(self.pentest, "computers", {"type":"computer", "domain":domain, "infos.is_dc":True}, False)
         dc_ip = None if dc_computer is None else dc_computer.get("ip")
         infos = {"username":username, "password":password, "domain":domain, "dc_ip":dc_ip}
         if dc_ip is None:
@@ -267,10 +271,10 @@ def delete(pentest, user_iid):
     :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
     """
     dbclient = DBClient.getInstance()
-    user_dic = dbclient.findInDb(pentest, "ActiveDirectory", {"_id":ObjectId(user_iid), "type":"user"}, False)
+    user_dic = dbclient.findInDb(pentest, "users", {"_id":ObjectId(user_iid), "type":"user"}, False)
     if user_dic is None:
         return 0
-    computers = dbclient.findInDb(pentest, "ActiveDirectory",
+    computers = dbclient.findInDb(pentest, "computers",
                                 {"type":"computer", "$or": [ { "users": str(user_iid) }, { "admins": str(user_iid) } ] }, True)
     for computer in computers:
         if str(user_iid) in computer["users"]:
@@ -279,7 +283,7 @@ def delete(pentest, user_iid):
         if str(user_iid) in computer["admins"]:
             computer["admins"].remove(str(user_iid))
             Computer.update(pentest, computer["_id"], computer)
-    res = dbclient.deleteFromDb(pentest, "ActiveDirectory", {"_id": ObjectId(str(user_iid)), "type":"user"}, False)
+    res = dbclient.deleteFromDb(pentest, "users", {"_id": ObjectId(str(user_iid)), "type":"user"}, False)
     if res is None:
         return 0
     else:
@@ -304,20 +308,20 @@ def insert(pentest, body):
     username = user.username.lower() if user.username is not None else ""
     password = user.password if user.password is not None else ""
     existing = dbclient.findInDb(pentest,
-        "ActiveDirectory", {"type":"user", "domain":{"$regex":domain}, "username":username}, False)
+        "users", {"type":"user", "domain":{"$regex":domain}, "username":username}, False)
     if existing is not None:
         if existing["password"] != "":
             return {"res": False, "iid": existing["_id"]}
         else:
             existing["infos"] |= user.infos
-            dbclient.updateInDb(pentest, "ActiveDirectory", {"_id":ObjectId(existing["_id"])}, {"$set":{"password":password, "infos":existing["infos"]}})
+            dbclient.updateInDb(pentest, "users", {"_id":ObjectId(existing["_id"])}, {"$set":{"password":password, "infos":existing["infos"]}})
             return {"res": False, "iid": existing["_id"]}
     if "_id" in body:
         del body["_id"]
     body["type"] = "user"
     
     ins_result = dbclient.insertInDb(pentest, 
-        "ActiveDirectory", body, True)
+        "users", body, True)
     iid = ins_result.inserted_id
     user._id = iid
     user.add_user_checks()
@@ -353,5 +357,5 @@ def update(pentest, user_iid, body):
     if str(user.description) != "None" or str(user.description) != "":
         del body["description"]
 
-    dbclient.updateInDb(pentest, "ActiveDirectory", {"_id": ObjectId(user_iid), "type":"user"}, {"$set": body}, False, True)
+    dbclient.updateInDb(pentest, "users", {"_id": ObjectId(user_iid), "type":"user"}, {"$set": body}, False, True)
     return True

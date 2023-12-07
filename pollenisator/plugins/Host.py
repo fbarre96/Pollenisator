@@ -74,7 +74,7 @@ class Host(Plugin):
         tags = [self.getTags()["info-host"]]
         targets = {}
         try:
-            notes = file_opened.read().decode("utf-8")
+            notes = file_opened.read().decode("utf-8", errors="ignore")
         except UnicodeDecodeError:
             return None, None, None, None
         if notes == "":

@@ -69,7 +69,7 @@ class SearchSploit(Plugin):
         tags = []
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
             return None, None, None, None
-        notes = file_opened.read().decode("utf-8")
+        notes = file_opened.read().decode("utf-8", errors="ignore")
         try:
             jsonFile = json.loads(notes)
             if not isinstance(jsonFile, dict):

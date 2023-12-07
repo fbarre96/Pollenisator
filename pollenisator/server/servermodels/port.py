@@ -185,7 +185,7 @@ def delete(pentest, port_iid):
                                              "ip": port_o.ip}, True)
     for tool in tools:
         tool_delete(pentest, tool["_id"])
-    checks = dbclient.findInDb(pentest, "cheatsheet",
+    checks = dbclient.findInDb(pentest, "checkinstances",
                                 {"target_iid": str(port_iid)}, True)
     for check in checks:
         checkinstance_delete(pentest, check["_id"])
@@ -247,7 +247,7 @@ def update(pentest, port_iid, body):
         
         dbclient.deleteFromDb(pentest, "tools", {
                                 "lvl": "port:onServiceUpdate", "ip": oldPort.ip, "port": oldPort.port, "proto": oldPort.proto, "status":{"$ne":"done"}}, many=True)
-        dbclient.deleteFromDb(pentest, "cheatsheet", {
+        dbclient.deleteFromDb(pentest, "checkinstances", {
                                 "lvl": "port:onServiceUpdate", "ip": oldPort.ip, "port": oldPort.port, "proto": oldPort.proto, "status":{"$ne":"done"}}, many=True)     
         port_o.add_port_checks()
     return True

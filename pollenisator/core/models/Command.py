@@ -57,6 +57,10 @@ class Command(Element):
             Returns the command's name string.
         """
         return self.name
+    
+    @classmethod
+    def getSearchableTextAttribute(cls):
+        return ["name"]
 
     def getDbKey(self):
         """Return a dict from model to use as unique composed key.

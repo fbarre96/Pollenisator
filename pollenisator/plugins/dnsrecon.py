@@ -82,7 +82,7 @@ class dnsrecon(Plugin):
         tags = []
         countInserted = 0
         try:
-            dnsrecon_content = json.loads(file_opened.read().decode("utf-8"))
+            dnsrecon_content = json.loads(file_opened.read().decode("utf-8", errors="ignore"))
         except json.decoder.JSONDecodeError:
             return None, None, None, None
         except UnicodeDecodeError:

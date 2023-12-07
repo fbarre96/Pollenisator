@@ -126,7 +126,7 @@ def delete(pentest, scope_iid):
     dbclient = DBClient.getInstance()
     # deleting checks with scope 
     scope_o = ServerScope(pentest, dbclient.findInDb(pentest, "scopes", {"_id": ObjectId(scope_iid)}, False))
-    checks = dbclient.findInDb(pentest, "cheatsheet", {"target_iid": str(scope_iid), "target_type": "scope"})
+    checks = dbclient.findInDb(pentest, "checkinstances", {"target_iid": str(scope_iid), "target_type": "scope"})
     for check in checks:
         checkinstance_delete(pentest, check["_id"])
     # Deleting this scope against every ips
@@ -159,7 +159,7 @@ def insert(pentest, body):
         del body["_id"]
     # Inserting scope
     parent = scope_o.getParentId()
-    res_insert = dbclient.insertInDb(pentest, "scopes", base, parent)
+    res_insert = dbclient.insertInDb(pentest, "scopes", base, parent, notify=True)
     ret = res_insert.inserted_id
     scope_o._id = ret
     # adding the appropriate checks for this scope.

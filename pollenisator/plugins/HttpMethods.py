@@ -118,7 +118,7 @@ class HttpMethods(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         try:
-            notes = file_opened.read().decode("utf-8")
+            notes = file_opened.read().decode("utf-8", errors="ignore")
         except UnicodeDecodeError:
             return None, None, None, None
         targets = {}

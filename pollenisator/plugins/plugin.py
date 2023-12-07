@@ -115,7 +115,7 @@ class Plugin(metaclass=MetaPlugin):
         """
         notes = ""
         tags = [Tag("todo")]
-        notes = file_opened.read().decode("utf-8")
+        notes = file_opened.read().decode("utf-8", errors="ignore")
         return notes, tags, "wave", {"wave": {"wave":"Imported"}}
 
     def getFilePath(self, commandExecuted):

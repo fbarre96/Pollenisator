@@ -61,6 +61,10 @@ class Wave(Element):
             Returns the wave id (name).
         """
         return self.wave
+    
+    @classmethod
+    def getSearchableTextAttribute(cls):
+        return ["wave"]
 
     
 

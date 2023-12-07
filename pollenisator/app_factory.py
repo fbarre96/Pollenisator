@@ -22,6 +22,7 @@ from pollenisator.server.modules.worker.worker import removeWorkers, unregister
 from pathlib import Path
 import ruamel.yaml
 from flask_socketio import join_room, leave_room
+import pymongo
 
 loaded = False
 
@@ -47,7 +48,7 @@ def create_app(debug, async_mode):
     flask_app = app.app
     # Now that the cache is initialized, set up the cached version of `findInDb`
     sm = SocketManager.getInstance()
-    logger.info('Running')
+    logger.info('Running ...')
     sm.socketio.init_app(flask_app, log_output=False, logger=False,
                     engineio_logger=False, async_mode=async_mode)
     @sm.socketio.event
@@ -259,7 +260,6 @@ def create_admin(username="", password=""):
 def notify_clients(notif):
     """Notify clients websockets
     """
-    dbclient = mongo.DBClient.getInstance()
     sm = SocketManager.getInstance()
     #sockets = dbclient.findInDb("pollenisator","sockets",{}, True)
     if notif["db"] == "pollenisator":
@@ -285,6 +285,8 @@ def migrate():
         version = migrate_2_5()
     if version == "2.5":
         version = migrate_2_6()
+    if version == "2.6":
+        version = migrate_2_7()
 
 def migrate_0():
     dbclient = mongo.DBClient.getInstance()
@@ -325,7 +327,28 @@ def migrate_2_6():
     for pentest in pentests:
         dbclient.updateInDb(pentest["uuid"], "settings", {"key":"tags"}, {"$set":{"key":"tags", "value":{}}})
     
-    dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.6"}})
+
+def migrate_2_7():
+    dbclient = mongo.DBClient.getInstance()
+    pentests = dbclient.findInDb("pollenisator","pentests",{}, True)
+    for pentest in pentests:
+        users = dbclient.findInDb(pentest["uuid"], "ActiveDirectory", {"type":"user"}, True)
+        for user in users:
+            dbclient.insertInDb(pentest["uuid"], "users", user)
+        computers = dbclient.findInDb(pentest["uuid"], "ActiveDirectory", {"type":"computer"}, True)
+        for computer in computers:
+            dbclient.insertInDb(pentest["uuid"], "computers", computer)
+        shares = dbclient.findInDb(pentest["uuid"], "ActiveDirectory", {"type":"share"}, True)
+        for share in shares:
+            dbclient.insertInDb(pentest["uuid"], "shares", share)
+        db = dbclient.client[pentest["uuid"]]
+        try:
+            db["cheatsheet"].rename("checkinstances")
+        except pymongo.errors.OperationFailure:
+            pass
+    db = dbclient.client["pollenisator"]
+    db["cheatsheet"].rename("checkitems")
+    dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.7"}})
 
 def init_db():
     """Initialize empty databases or remaining tmp data from last run
@@ -352,7 +375,7 @@ def init_db():
         #createWorker()
     migrate()
     removeWorkers()
-    dbclient.resetRunningTools()
+    #TODO FIX TAKES TOO MUCH TIME OR ADD OPTION TO DO SO dbclient.resetRunningTools()
 
 def init_config():
     conf = loadServerConfig()
@@ -367,10 +390,10 @@ def init_config():
 def run(flask_app, debug):
     sm = SocketManager.getInstance()
     port = init_config()
+    init_db()
     try:
         sm.socketio.run(flask_app, host=os.environ.get("POLLENISATOR_BIND_IP", '0.0.0.0'), port=port,
                      debug=debug, use_reloader=False, )
     except KeyboardInterrupt:
         pass
-    init_db()
     return sm.socketio

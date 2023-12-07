@@ -86,7 +86,7 @@ def delete(pentest, wave_iid):
     wave_o = ServerWave(pentest, dbclient.findInDb(pentest, "waves", {"_id": ObjectId(wave_iid)}, False))
     dbclient.deleteFromDb(pentest, "tools", {"wave": wave_o.wave}, True)
     dbclient.deleteFromDb(pentest, "intervals", {"wave": wave_o.wave}, True)
-    checks = dbclient.findInDb(pentest, "cheatsheet",
+    checks = dbclient.findInDb(pentest, "checkinstances",
                                 {"target_iid": str(wave_iid)}, True)
     for check in checks:
         checkinstance_delete(pentest, check["_id"])

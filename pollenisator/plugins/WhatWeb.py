@@ -79,7 +79,7 @@ class WhatWeb(Plugin):
             return None, None, None, None
         tags = []
         targets = {}
-        notes = file_opened.read().decode("utf-8")
+        notes = file_opened.read().decode("utf-8", errors="ignore")
         if notes == "":
             return None, None, None, None
         try:

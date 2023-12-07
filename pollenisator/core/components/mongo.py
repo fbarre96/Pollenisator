@@ -64,7 +64,7 @@ class DBClient:
             self.current_pentest = None
             self.ssldir = ""
             self.db = None
-            self.cache_collections = ["ports","ips","cheatsheet","commands"]
+            self.cache_collections = ["ports","ips","checkinstances","commands"]
             self.forbiddenNames = ["admin", "config", "local",
                                    "broker_pollenisator", "pollenisator"]
             DBClient.__instances[pid] = self
@@ -339,7 +339,12 @@ class DBClient:
                     cache_key = dbName+"."+collection+"."+str(pipeline[list(pipeline.keys())[0]])
                 else:
                     cache_key = dbName+"."+collection+"."+hashlib.md5(json.dumps(pipeline, cls=utils.JSONEncoder).encode()).hexdigest()
-                self.redis.delete(cache_key)
+                if self.redis:
+                    try:
+                        self.redis.delete(cache_key)
+                    except redis.exceptions.ConnectionError as e:
+                        logger.warning("Failed to connect to redis")
+                        self.redis = None
             res = db[collection].update_one(pipeline, updatePipeline, upsert=upsert)
             if upsert and res.upserted_id is not None:
                 self.send_notify(dbName, collection, res.upserted_id, "insert")
@@ -347,6 +352,7 @@ class DBClient:
                 elem = db[collection].find_one(pipeline)
                 if elem is not None:
                     if notify:
+                        #logger.info("Sending notify for "+str(elem["_id"])+" on "+str(updatePipeline))
                         self.send_notify(dbName, collection, elem["_id"], "update")
         return res
 
@@ -407,10 +413,15 @@ class DBClient:
             res = db[collection].insert_one(values)
             if res.inserted_id is not None and collection in self.cache_collections:
                 cache_key = dbName+"."+collection+"."+str(res.inserted_id)
-                self.redis.set(cache_key, json.dumps(values, cls=utils.JSONEncoder), ex=20)
-                if notify:
-                    self.send_notify(dbName, collection,
-                                res.inserted_id, "insert", parentId)
+                try:
+                    if self.redis:
+                        self.redis.set(cache_key, json.dumps(values, cls=utils.JSONEncoder), ex=20)
+                except redis.exceptions.ConnectionError as e:
+                    logger.warning("Failed to connect to redis")
+                    self.redis = None
+            if res.inserted_id is not None and notify:
+                self.send_notify(dbName, collection,
+                            res.inserted_id, "insert", parentId)
         return res
 
     def find(self, collection, pipeline=None, multi=True):
@@ -468,16 +479,26 @@ class DBClient:
                 cache_key = db+"."+collection+"."+hashlib.md5(json.dumps(pipeline, cls=utils.JSONEncoder).encode()).hexdigest()
         dbMongo = self.client[db]
         if cache_key:
-            res = self.redis.get(cache_key)
-            if res:
-                res = json.loads(res, cls=utils.JSONDecoder)
-                return res
+            if self.redis:
+                try:
+                    res = self.redis.get(cache_key)
+                    if res:
+                        res = json.loads(res, cls=utils.JSONDecoder)
+                        return res
+                except redis.exceptions.ConnectionError:
+                    logger.warning("Failed to connect to redis")
+                    self.redis = None
         res =  self._find(dbMongo, collection, pipeline, multi, skip, limit)
         if cache_key and res:
             if inspect.isgenerator(res) or isinstance(res, pymongo.cursor.Cursor):
                 res = [r for r in res]
             store = json.dumps(res, cls=utils.JSONEncoder)
-            self.redis.set(cache_key, store, ex=30) #set serialized object to redis server.
+            try:
+                if self.redis:
+                    self.redis.set(cache_key, store, ex=30) #set serialized object to redis server.
+            except redis.exceptions.ConnectionError as e:
+                logger.warning("Failed to connect to redis")
+                self.redis = None
         return res
 
     def fetchNotifications(self, pentest, fromTime):
@@ -868,6 +889,10 @@ class DBClient:
             collection: (Opt.) the collection to dump.
         """
         from pollenisator.core.components.utils import execute
+        if dbName not in self.listPentestUuids():
+            raise ValueError("Database not found")
+        if dbName.isalnum() == False:
+            raise ValueError("Invalid database name")
         dir_path = os.path.dirname(os.path.realpath(__file__))
         out_path = os.path.join(
             dir_path, "../../exports/", dbName if collection == "" else dbName+"_"+collection)
@@ -911,6 +936,8 @@ class DBClient:
         uuid_name = msg
         if not self.try_uuid(uuid_name):
             return msg, 403
+        if uuid_name not in self.listPentestUuids():
+            return "Database not found", 404
         if success:
             connectionString = '' if self.user == '' else "-u "+self.user + \
                 " -p "+self.password + " --authenticationDatabase admin "
@@ -921,7 +948,7 @@ class DBClient:
                     self.ssldir+"/ca.pem --sslAllowInvalidHostnames"
             if kwargs.get("nsFrom", None) is not None and kwargs.get("nsTo", None) is not None:
                 nsfrom = kwargs.get("nsFrom")
-                if self.try_uuid(nsfrom):
+                if self.try_uuid(nsfrom) and nsfrom in self.listPentestUuids():
                     cmd += " --nsFrom='"+nsfrom+".*' --nsTo='"+uuid_name+".*'"
             execute(cmd, None, True)
         return msg, 200 if success else 403

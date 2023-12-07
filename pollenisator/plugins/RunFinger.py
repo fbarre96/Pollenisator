@@ -30,7 +30,7 @@ def getInfos(runfinger_file):
         oneLine = True
         if isinstance(line, bytes):
             try:
-                line = line.decode("utf-8")
+                line = line.decode("utf-8", errors="ignore")
             except UnicodeDecodeError:
                 return None, None
         # Search ip in file

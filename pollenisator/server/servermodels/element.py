@@ -47,6 +47,15 @@ class ServerElement(metaclass=MetaElement):
             command = REGISTRY[class_name].replaceCommandVariables(pentest, command, data)
             
         return command
+    
+    @classmethod
+    def buildTextSearchQuery(cls, query):
+        list_of_pipes = []
+        attrs = cls.getSearchableTextAttribute() + ["notes"]
+        for attr in attrs:
+            list_of_pipes.append({ attr:{"$regex": query, "$options": "i"}})
+        return {"$or": list_of_pipes}
+
 
     @classmethod
     def replaceCommandVariables(cls, pentest, command, data):

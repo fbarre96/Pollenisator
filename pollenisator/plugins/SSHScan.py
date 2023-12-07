@@ -59,7 +59,7 @@ class SSHScan(Plugin):
             return None, None, None, None
         notes = ""
         tags = [self.getTags()["info-sshscan"]]
-        content = file_opened.read().decode("utf-8")
+        content = file_opened.read().decode("utf-8", errors="ignore")
         targets = {}
         try:
             notes_json = json.loads(content)

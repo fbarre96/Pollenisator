@@ -375,16 +375,12 @@ class ServerTool(Tool, ServerElement):
         dbclient = DBClient.getInstance()
         dbclient.create_index(pentest, "tools", [("wave", 1), ("name", 1), ("lvl", 1), ("check_iid", 1)])
         update_operations = []
-        start = time.time()
         for tool in tools_to_add:
             data = ToolController(tool).getData()
             if "_id" in data:
                 del data["_id"]
             update_operations.append(InsertOne(data))
-        logger.info(f"Crating tool update operations took {time.time() - start}")
-        start = time.time()
         result = dbclient.bulk_write(pentest, "tools", update_operations)
-        logger.info(f"Bluk writing tool took {time.time() - start}")
         upserted_ids = result.upserted_ids
         return upserted_ids
         # """Insert multiple tools in database"""
@@ -504,7 +500,6 @@ def do_insert(pentest, body, **kwargs):
 @permission("pentester")
 def update(pentest, tool_iid, body):
     dbclient = DBClient.getInstance()
-    
     orig = dbclient.findInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, False)
     res = dbclient.updateInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
     if orig.get("check_iid") is not None and orig.get("check_iid", "") != "":
@@ -649,18 +644,15 @@ def importResult(pentest, tool_iid, upfile, body):
 def queueTasks(pentest, body, **kwargs):
     logger.debug("Queue tasks : "+str(body))
     results = {"successes":[], "failures":[]}
-    tools_iid = body
-    for tool_iid in tools_iid:
+    tools_iids = set()
+    commands_iids = set()
+    for tool_iid in body:
         if isinstance(tool_iid, str) and tool_iid.startswith("ObjectId|"):
             tool_iid = tool_iid.replace("ObjectId|", "")
-        tool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
-        command_o = ServerCommand.fetchObject({"_id": ObjectId(tool.command_iid)}, pentest)
-        if tool is None:
-            logger.debug("Error in launch task : not found :"+str(tool_iid))
-            continue
-        if command_o is None:
-            logger.debug("Error in launch task : command for tool not found :"+str(tool_iid))
-            continue
+        tools_iids.add(ObjectId(tool_iid))
+    tools = ServerTool.fetchObjects(pentest, {"_id": {"$in": list(tools_iids)}})
+    for tool in tools:
+        tool_iid = str(tool.getId())
         res, msg = tool.addToQueue()
         if res:
             results["successes"].append({"tool_iid":tool_iid})

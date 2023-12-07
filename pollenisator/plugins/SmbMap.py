@@ -116,7 +116,7 @@ class SmbMap(Plugin):
         for row in file_opened:
 
             if isinstance(row, bytes):
-                row = row.decode("utf-8")
+                row = row.decode("utf-8", errors="ignore")
             row = row.split(",")
             if first_row and not ','.join(row).startswith("Host,Share,Privs,isDir,Path,fileSize,Date"):
                 return None, None, None, None

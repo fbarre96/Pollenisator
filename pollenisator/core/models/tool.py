@@ -84,6 +84,8 @@ class Tool(Element):
                 self.command_iid = str(res["_id"])
             else:
                 self.command_iid = None
+        else:
+            self.command_iid = str(command_iid)
         self.check_iid = str(check_iid) if check_iid is not None else None
         self.name = name
         self.wave = wave
@@ -115,7 +117,10 @@ class Tool(Element):
                 "datef": self.datef, "scanner_ip": self.scanner_ip,
                 "notes": self.notes, "_id": self.getId(),  "infos": self.infos, "status":self.getStatus()}
 
-
+    @classmethod
+    def getSearchableTextAttribute(cls):
+        return ["name", "text"]
+    
     def getStatus(self):
         """
         Get the tool executing status.

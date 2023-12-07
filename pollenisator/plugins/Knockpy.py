@@ -84,7 +84,7 @@ class Knockpy(Plugin):
         countFound = 0
         for line in file_opened:
             try:
-                line = line.decode("utf-8")
+                line = line.decode("utf-8", errors="ignore")
             except UnicodeDecodeError:
                 return None, None, None, None
             if marker == line.replace(" ","").strip():

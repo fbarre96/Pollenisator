@@ -23,14 +23,13 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
     countOpen = 0
     ports_to_add = []
     ips_to_add = []
-    logger.info("Reading nmap file: "+str(nmapFile))
-    first_line = nmapFile.readline().decode("utf-8").strip()
+    first_line = nmapFile.readline().decode("utf-8", errors="ignore").strip()
     nmapFile.seek(0, 2) # Move the file cursor to the end
     # Get the file size
     file_size = nmapFile.tell()
     nmapFile.seek(max(file_size - 1024, 0))  # You can adjust the buffer size as needed
     # Read the last line
-    last_line = nmapFile.readlines()[-1].decode("utf-8").strip()
+    last_line = nmapFile.readlines()[-1].decode("utf-8", errors="ignore").strip()
     if file_size <= 200:
         # print("Not enough lines to be nmap")
         return None
@@ -47,8 +46,6 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
     ipCIDR_m = None
     ipDom_m = None
 
-    i = 0
-    logger.info("Parsing nmap file: "+str(nmapFile))
     regex_scan_report = re.compile(r"^Nmap scan report for (\S+)(?: \(((?:[0-9]{1,3}\.){3}[0-9]{1,3})\))?$")
     regex_port = re.compile(r"^(\d+)\/(\S+)\s+open\s+(\S+)(?: +(.+))?$")
     first_port = False
@@ -57,19 +54,14 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
         # match an ip
         if isinstance(line, bytes):
             try:
-                line = line.decode("utf-8")
+                line = line.decode("utf-8", errors="ignore")
             except UnicodeDecodeError:
                 continue
-        i += 1
-        if i % 10000 == 0:
-            logger.info("Parsing nmap file line "+str(i))
-
         ip = re.search(
             regex_scan_report, line)
         if ip is not None:  # regex match
             # IF THE LIST IS BIG, WE SHOULD FLUSH IT
-            if len(ips_to_add) >= 1024:
-                #logger.info("Flushing ips and ports")
+            if len(ips_to_add) >= 10000:
                 bulk_insertions(pentest, ips_to_add, ports_to_add)
                 ips_to_add = []
                 ports_to_add = []
@@ -123,15 +115,15 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
     return notes
 
 def bulk_insertions(pentest, ips_to_add, ports_to_add):
-    logger.info("Bulk inserting ips")
+    """Bulk insertions of ips and ports
+    """
     start = time.time()
     ServerIp.bulk_insert(pentest, ips_to_add, look_scopes=True)
-    logger.info("Bulk inserting ips took "+str(time.time()-start)+" seconds")
+    logger.info("Insertion of ips took "+str(time.time()-start)+" seconds")
     start = time.time()
-    logger.info("Bulk inserting ports")
     results = ServerPort.bulk_insert(pentest, ports_to_add)
-    logger.info("Bulk inserting ports took "+str(time.time()-start)+" seconds")
-
+    logger.info("Insertion of ports took "+str(time.time()-start)+" seconds")
+    
 class Nmap(Plugin):
     default_bin_names = ["nmap"]
     def getFileOutputArg(self):

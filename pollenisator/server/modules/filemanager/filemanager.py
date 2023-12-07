@@ -95,7 +95,7 @@ def importExistingFile(pentest, upfile, body, **kwargs):
         targets = {} if targets is None else targets
         if default_target:
             targets["default"] = default_target
-            dbclient.send_notify(pentest, "Cheatsheet", default_target, "notif_terminal")
+            dbclient.send_notify(pentest, "checkinstances", default_target, "notif_terminal")
         for tag in tags:
             tag = Tag(tag)
             res = dbclient.doRegisterTag(pentest, tag)
@@ -121,7 +121,7 @@ def importExistingFile(pentest, upfile, body, **kwargs):
                 check_iid = target.get("check_iid", None)
                 tool_iid = target.get("tool_iid", None)
             if wave is None:
-                wave = "Imported"
+                wave = result.get("plugin", "")+"-Imported"
             if dbclient.findInDb(pentest, "waves", {"wave":wave}, False) is None:
                 dbclient.insertInDb(pentest, "waves", {"wave":wave, "wave_commands":[]})
             tool_m = None

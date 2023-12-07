@@ -55,6 +55,7 @@ class Interval(Element):
             Returns the string "Interval".
         """
         return "Interval"
+        
 
     @classmethod
     def _translateDateString(cls, datestring):

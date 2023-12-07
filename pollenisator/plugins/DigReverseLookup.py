@@ -65,7 +65,7 @@ class DigReverseLookup(Plugin):
         tags = []
         targets = {}
         try:
-            ip, domain = parse_reverse_dig(file_opened.read().decode("utf-8"))
+            ip, domain = parse_reverse_dig(file_opened.read().decode("utf-8", errors="ignore"))
         except UnicodeDecodeError:
             return None, None, None, None
         if ip is None:

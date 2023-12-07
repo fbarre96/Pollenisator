@@ -65,7 +65,7 @@ class BlueKeep(Plugin):
         for line in file_opened:
             # Auto Detect
             try:
-                line = line.decode("utf-8")
+                line = line.decode("utf-8", errors="ignore")
             except UnicodeDecodeError:
                 return None, None, None, None
             infos = line.split(" - ")

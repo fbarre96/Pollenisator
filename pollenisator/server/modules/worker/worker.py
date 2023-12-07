@@ -77,7 +77,7 @@ def deleteWorker(name):
     res = doDeleteWorker(name)
     if isinstance(res, tuple):
         return res
-    return {"n":int(res.deleted_count)}
+    return {"n":int(res)}
 
 def stop_docker(docker_id):
     try:

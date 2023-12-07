@@ -69,6 +69,10 @@ class Port(Element):
             Returns the string protocole/port number.
         """
         return self.proto+"/"+str(self.port)
+    
+    @classmethod
+    def getSearchableTextAttribute(cls):
+        return ["port", "proto", "service", "product"]
 
     def getDetailedString(self):
         """Returns a detailed string describing this port.

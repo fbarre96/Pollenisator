@@ -93,7 +93,10 @@ class Defect(Element):
                 "target_id": self.target_id, "target_type": self.target_type, "index":self.index,
                 "proofs": self.proofs, "creation_time": self.creation_time, "fixes":self.fixes, "_id": self.getId(), "infos": self.infos}
 
-
+    @classmethod
+    def getSearchableTextAttribute(cls):
+        return ["title"]
+    
     @classmethod
     def getRisk(cls, ease, impact):
         """Dict to find a risk level given an ease and an impact.
@@ -117,6 +120,8 @@ class Defect(Element):
             Returns the defect +title.
         """
         return self.title
+    
+   
 
     def getDetailedString(self):
         """Returns a detailed string describing for this defect.

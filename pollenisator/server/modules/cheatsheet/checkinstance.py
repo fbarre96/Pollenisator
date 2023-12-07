@@ -1,3 +1,6 @@
+import cProfile
+import io
+import pstats
 import time
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
@@ -10,7 +13,7 @@ from pollenisator.core.components.utils import checkCommandService
 from pollenisator.core.components.logger_config import logger
 
 class CheckInstance(ServerElement):
-    coll_name = 'cheatsheet'
+    coll_name = 'checkinstances'
 
     
     def __init__(self, pentest, valuesFromDb=None):
@@ -22,8 +25,6 @@ class CheckInstance(ServerElement):
         else:
             raise ValueError(
                 "An empty pentest name was given and the database is not set in mongo instance.")
-        if valuesFromDb is None:
-            valuesFromDb = {}
         if valuesFromDb is None:
             valuesFromDb = {}
         self.initialize(pentest, valuesFromDb.get("_id"), valuesFromDb.get("check_iid"), valuesFromDb.get("target_iid"), valuesFromDb.get(
@@ -48,7 +49,11 @@ class CheckInstance(ServerElement):
             raise ValueError(
                 "An empty pentest name was given and the database is not set in mongo instance.")
         return self
-
+    
+    @classmethod
+    def getSearchableTextAttribute(cls):
+        return ["title", "category", "lvl"] # will load on checktitems attribute
+    
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
         """Fetch many commands from database and return a Cursor to iterate over model objects
@@ -123,7 +128,6 @@ class CheckInstance(ServerElement):
                 checks_to_add.append(checkinstance)
             for command in checkItem.commands:
                 check_command_lkp[str(checkItem.getId())] = check_command_lkp.get(str(checkItem.getId()), []) + [commands_lkp.get(command, None)]
-        logger.info("0 Check and command creation took : "+str(time.time() - start))
         
 
         if not checks_to_add:
@@ -139,14 +143,8 @@ class CheckInstance(ServerElement):
             lkp[hashable_key]["type"] = "checkinstance"
             check_keys.add(hashable_key)
             or_conditions.append(check.getDbKey())
-        logger.info("1 CCheck condition creation took : "+str(time.time() - start))
-        start = time.time()
-        dbclient.create_index(pentest, "cheatsheet", [("check_iid", 1), ("target_iid", 1), ("target_type", 1)])
-        logger.info("2 CCheck index creation took : "+str(time.time() - start))
-        start = time.time()
+        dbclient.create_index(pentest, "checkinstances", [("check_iid", 1), ("target_iid", 1), ("target_type", 1)])
         existing_checks = CheckInstance.fetchObjects(pentest, {"$or": or_conditions})
-        logger.info("3 CCheck search with or condition took : "+str(time.time() - start))
-        start = time.time()
         existing_checks_as_keys = [] if existing_checks is None else [ existing_check.getHashableDbKey() for existing_check in existing_checks]
         existing_checks_as_keys = set(existing_checks_as_keys)
         to_add = check_keys - existing_checks_as_keys
@@ -155,14 +153,8 @@ class CheckInstance(ServerElement):
         # Insert new
         if not things_to_insert:
             return
-        logger.info("4 Crafting things to isnert in check took: "+str(time.time() - start))
-        start = time.time()
         res = dbclient.insertInDb(pentest, CheckInstance.coll_name, things_to_insert, multi=True)
-        logger.info("5 Insertion of checks took: "+str(time.time() - start))
-        start = time.time()
         checks_inserted = list(CheckInstance.fetchObjects(pentest, {"_id": {"$in":res.inserted_ids}}))
-        logger.info("6 Fetch inserted check took : "+str(time.time() - start))
-        start = time.time()
         # for each commands, add the tool
         tools_to_add = []
         #for checkitem_id, commands in check_command_lkp.items():
@@ -175,11 +167,8 @@ class CheckInstance(ServerElement):
                 tool.initialize(str(command.getId()), str(check.getId()), targetdata.get("wave", ""), command.name, targetdata.get("scope", ""), targetdata.get("ip", ""), targetdata.get("port", ""),
                                             targetdata.get("proto", ""), checkItem.lvl, infos=toolInfos)
                 tools_to_add.append(tool)
-        logger.info("7 Craft tools : "+str(time.time() - start))
-        start = time.time()
         if tools_to_add:
             ServerTool.bulk_insert(pentest, tools_to_add)
-        logger.info("8  insert tools took : "+str(time.time() - start))
         
         return checks_inserted
     
@@ -330,20 +319,17 @@ def delete(pentest, iid):
 def update(pentest, iid, body):
     if pentest == "pollenisator":
         return "Forbidden", 403
+    if "_id" in body:
+        del body["_id"]
+    if "type" in body:
+        del body["type"]
+    if "check_iid" in body:
+        del body["check_iid"]
     checkinstance = CheckInstance(pentest, body)
     dbclient = DBClient.getInstance()
     existing = CheckInstance.fetchObject(pentest, {"_id": ObjectId(iid)})
     if existing is None:
         return "Not found", 404
-    if checkinstance.check_iid != existing.check_iid:
-        return "Forbidden", 403
-    if "type" in body:
-        del body["type"]
-    if "check_iid" in body:
-        del body["check_iid"]
-    if "_id" in body:
-        del body["_id"]
-
     dbclient.updateInDb(pentest, CheckInstance.coll_name, {"_id": ObjectId(
         iid), "type": "checkinstance"}, {"$set": body}, many=False, notify=True)
     return True
@@ -351,6 +337,8 @@ def update(pentest, iid, body):
 
 @permission("pentester")
 def getInformations(pentest, iid):
+    pr = cProfile.Profile()
+    pr.enable()
     inst = CheckInstance.fetchObject(pentest, {"_id": ObjectId(iid)})
     if inst is None:
         return "Not found", 404
@@ -368,6 +356,8 @@ def getInformations(pentest, iid):
     at_least_one = False
     total = 0
     done = 0
+    dbclient = DBClient.getInstance()
+    dbclient.create_index(pentest, "tools", [("check_iid",1)])
     tools_to_add = ServerTool.fetchObjects(pentest, {"check_iid": str(iid)})
     if tools_to_add is not None:
         for tool in tools_to_add:
@@ -398,6 +388,13 @@ def getInformations(pentest, iid):
             data["status"] = "todo"
     else:
         data["status"] = ""
+    pr.disable()
+    s = io.StringIO()
+    sortby = pstats.SortKey.CUMULATIVE
+    ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+    ps.print_stats()
+    with open("/tmp/profileserv.txt", "w") as f:
+        f.write(s.getvalue())
     return data
 
 
@@ -405,17 +402,20 @@ def getInformations(pentest, iid):
 def getTargetRepr(pentest, body):
     dbclient = DBClient.getInstance()
     iids_list = [ ObjectId(x) for x in body ]
-    checkinstances = dbclient.findInDb(pentest, "cheatsheet", {"_id": {"$in": iids_list}}, True)
+    checkinstances = dbclient.findInDb(pentest, "checkinstances", {"_id": {"$in": iids_list}}, True)
     ret = {}
+    elements = {}
     for data in checkinstances:
-        class_element = ServerElement.classFactory(data["target_type"])
+        if data["target_type"] not in elements:
+            elements[data["target_type"]] = set()
+        elements[data["target_type"]].add(ObjectId(data["target_iid"]))
+    for element_type, element_iids in elements.items():
+        class_element = ServerElement.classFactory(element_type)
         if class_element is not None:
-            elem = class_element.fetchObject(pentest, {"_id": ObjectId(data["target_iid"])})
-            if elem is None:
+            elems = class_element.fetchObjects(pentest, {"_id": {"$in":list(element_iids)}})
+            if not elems:
                 ret_str = "Target not found"
-            else:
+            for elem in elems:
                 ret_str = elem.getDetailedString()
-            ret[str(data["_id"])] = ret_str
-        else:
-            ret[str(data["_id"])] = "Target not found"
+                ret[str(elem.getId())] = ret_str
     return ret

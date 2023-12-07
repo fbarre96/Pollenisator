@@ -69,7 +69,7 @@ class EternalBlue(Plugin):
         targets = {}
         tags = []
         try:
-            notes = file_opened.read().decode("utf-8")
+            notes = file_opened.read().decode("utf-8", errors="ignore")
         except UnicodeDecodeError:
             return None, None, None, None
         regex_ip = r"Nmap scan report for (\S+)"

@@ -1074,6 +1074,12 @@ paths:
           schema:
             type: string
             default: ""
+        - name: textonly
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         "200":
           description: Successful search results. A dictionnary with type of objects as
@@ -2786,6 +2792,34 @@ paths:
             application/json:
               schema:
                 type: integer
+
+  "/tags/{pentest}/getTaggedBy/{tag_name}":
+    get:
+      operationId: pollenisator.server.servermodels.tag.getTaggedBy
+      tags:
+        - Tags
+      summary: "Get items tagged by a tag"
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tag_name
+          in: path
+          description: tag name to search for
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: tag dict
+          content:
+            application/json:
+              examples:
+                'defects where tagged':
+                  value: '{  "defects": [    {      "_id": "ObjectId|60f190815955e6cf385a405d",      "ease": "Moderate",      "impact": "Major",      "index": "1",      "ip": "",      "notes": "",      "parent": "",      "port": "",      "proofs": [],      "proto": "",      "redactor": "N/A",      "risk": "Major",      "title": "sql",      "type": [        "Application"      ]    },    {      "_id": "ObjectId|60f194db1255fd087c769756",      "ease": "Moderate",      "impact": "Critical",      "index": "0",      "ip": "",      "notes": "",      "parent": "",      "port": "",      "proofs": [],      "proto": "",      "redactor": "N/A",      "risk": "Critical",      "title": "XSS",      "type": [        "Application"      ]    }  ]}'
+        
 
   "/tags/{pentest}/addTag/{item_id}":
     put:

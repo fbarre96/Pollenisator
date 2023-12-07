@@ -69,7 +69,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
     for line in cme_file:
         if isinstance(line, bytes):
             try:
-                line = line.decode("utf-8")
+                line = line.decode("utf-8", errors="ignore")
             except UnicodeDecodeError:
                 result["success"] = False
                 return result

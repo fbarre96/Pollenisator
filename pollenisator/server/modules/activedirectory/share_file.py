@@ -8,7 +8,7 @@ class ShareFile(ServerElement):
 
     Do not edit the class manually.
     """
-    coll_name = "ActiveDirectory"
+    coll_name = "sharefiles"
     name = "ShareFile"
     
     def __init__(self, valuesFromDb=None):
@@ -48,3 +48,7 @@ class ShareFile(ServerElement):
             Returns the defect +title.
         """
         return self.path
+    
+    @classmethod
+    def getSearchableTextAttribute(cls):
+        return ["path"]

@@ -21,11 +21,11 @@ from pollenisator.server.servermodels.scope import insert as insert_scope
 from pollenisator.server.permission import permission
 dbclient = DBClient.getInstance()
 
-searchable_collections = ["waves","scopes","ips","ports","tools","defects"]
-validCollections = [ "cheatsheet", "commands", "settings" , "defects"]
+searchable_collections = ["waves","scopes","ips","ports","tools","defects", "checkinstances", "commands", "computers","shares","users"]
+validPollenisatorDbCollections = [ "checkitems", "commands", "settings" , "defects"]
 operato_trans = {
-    "||regex||":"$regex", "==":"$eq", "!=": "$ne", ">":"$gt", "<":"$lt", ">=":"$gte", "<=":"$lte", "in":"$in", "not in":"$nin"
-    }
+    "||regex||":"$regex", "==":"$eq", "!=": "$ne", ">":"$gt", "<":"$lt", ">=":"$gte", "<=":"$lte", "in":"", "not in":"$nin"
+}
 
 def status():
     dbclient.connect()
@@ -51,7 +51,7 @@ def update(pentest, collection, body):
     if not isinstance(updatePipeline, dict):
         return "Update pipeline argument was not valid", 400
     if pentest == "pollenisator":
-        if collection not in validCollections:
+        if collection not in validPollenisatorDbCollections:
             return "Collection argument is not a valid pollenisator collection", 403
     elif pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 403
@@ -67,7 +67,7 @@ def insert(pentest, collection, body):
     if not isinstance(pipeline, dict):
         return "Pipeline argument was not valid", 400
     if pentest == "pollenisator":
-        if collection not in validCollections:
+        if collection not in validPollenisatorDbCollections:
             return "Collection argument is not a valid pollenisator collection", 403
     elif pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 403
@@ -82,11 +82,11 @@ def find(pentest, collection, body):
     if not isinstance(pipeline, dict):
         return "Pipeline argument was not valid", 400
     if pentest == "pollenisator":
-        if collection not in validCollections:
+        if collection not in validPollenisatorDbCollections:
             return "Collection argument is not a valid pollenisator collection", 403
     elif pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 403
-    res = dbclient.findInDb(pentest, collection, pipeline, body.get("many", True), body.get("skip", None), body.get("limit", None))
+    res = dbclient.findInDb(pentest, collection, pipeline, body.get("many", True), body.get("skip", None), body.get("limit", None), body.get("use_cache", True))
     if isinstance(res, dict):
         return res
     elif res is None:
@@ -99,29 +99,42 @@ def find(pentest, collection, body):
         return ret
         
 @permission("pentester")
-def search(pentest, s):
+def search(pentest, s, textonly):
     """Use a parser to convert the search query into mongo queries and returns all matching objects
     """
     searchQuery = s
     if pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 400
     try:
-        parser = Parser(searchQuery)
-        condition_list = parser.getResult()
-        # Searching
         collections = []
-        builtPipeline = _evaluateCondition(collections, condition_list)
-        logger.debug(f"DEBUG : coll={collections} pipeline={builtPipeline}")
+        if not textonly:
+            parser = Parser(searchQuery)
+            condition_list = parser.getResult()
+            # Searching
+            builtPipeline = _evaluateCondition(collections, condition_list)
+            logger.debug(f"DEBUG : coll={collections} pipeline={builtPipeline}")
         if len(collections) == 0:
             collections = searchable_collections
         list_of_objects = {}
         for collection in collections:
             list_of_objects[collection] = []
-            res = dbclient.findInDb(pentest, collection, builtPipeline, True)
+            if textonly:
+                elem = ServerElement.classFactory(collection)
+                builtPipeline = elem.buildTextSearchQuery(searchQuery)
+            
+            if collection == "checkinstances":
+                res = dbclient.findInDb("pollenisator", "checkitems", builtPipeline, True)
+                for item in res:
+                    checks = dbclient.findInDb(pentest, "checkinstances", [{"check_iid":str(item.get("_id"))}], True)
+                    for elem in checks:
+                        list_of_objects[collection].append(elem)
+            else:
+                res = dbclient.findInDb(pentest, collection, builtPipeline, True)
             if res is None:
                 continue
             for elem in res:
                 list_of_objects[collection].append(elem)
+
         return list_of_objects
     except ParseError as e:
         return str(e).split("\n")[0], 400
@@ -176,7 +189,10 @@ def _evaluateCondition(searchable_collections, condition_list):
                 else:
                     raise Exception(f"When filtering type, only == is a valid operators")
             else:
-                currentCondition[str(termToSearch)] = {operato_trans[operator]: str(value)}
+                if operato_trans[operator] == "":
+                    currentCondition[str(termToSearch)] = str(value)
+                else:
+                    currentCondition[str(termToSearch)] = {operato_trans[operator]: str(value)}
         else:
             raise Exception(f"Unknown operator {operator}")
     else:
@@ -189,7 +205,7 @@ def count(pentest, collection, body):
     if isinstance(pipeline, str):
         pipeline = json.loads(pipeline, cls=JSONDecoder)
     if pentest == "pollenisator":
-        if collection not in validCollections:
+        if collection not in validPollenisatorDbCollections:
             return "Collection argument is not a valid pollenisator collection", 403
     if not isinstance(pipeline, dict):
         return "Pipeline argument was not valid", 400
@@ -209,7 +225,7 @@ def fetchNotifications(pentest, fromTime):
 def aggregate(pentest, collection, body):
     ret = []
     if pentest == "pollenisator":
-        if collection not in validCollections:
+        if collection not in validPollenisatorDbCollections:
             return "Collection argument is not a valid pollenisator collection", 403
     elif pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 403
@@ -226,7 +242,7 @@ def delete(pentest, collection, body):
     if not isinstance(pipeline, dict):
         return "Pipeline argument was not a valid dictionnary", 400
     if pentest == "pollenisator":
-        if collection not in validCollections:
+        if collection not in validPollenisatorDbCollections:
             return "Collection argument is not a valid pollenisator collection", 403
     elif pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 403
@@ -371,8 +387,8 @@ def getPentestInfo(pentest, **kwargs):
     ret["hosts_count"] = dbclient.countInDb(pentest, "ips")
     ret["tools_done_count"] = dbclient.countInDb(pentest, "tools", {"status":"done"})
     ret["tools_count"] = dbclient.countInDb(pentest, "tools", {})
-    ret["checks_done"] = dbclient.countInDb(pentest, "cheatsheet", {"status":"done"})
-    ret["checks_total"] = dbclient.countInDb(pentest, "cheatsheet", {})
+    ret["checks_done"] = dbclient.countInDb(pentest, "checkinstances", {"status":"done"})
+    ret["checks_total"] = dbclient.countInDb(pentest, "checkinstances", {})
     return ret
 
 def preparePentest(pentest, pentest_name, pentest_type, start_date, end_date, scope, settings, pentesters, owner, **kwargs):
@@ -654,7 +670,7 @@ def doExportCommands():
 def doExportCheatsheet():
     dbclient = DBClient.getInstance()
     res = {"checkitems":[], "commands":[]}
-    checks = dbclient.findInDb("pollenisator", "cheatsheet", {}, True)
+    checks = dbclient.findInDb("pollenisator", "checkitems", {}, True)
     for check in checks:
         c = check
         res["checkitems"].append(c)

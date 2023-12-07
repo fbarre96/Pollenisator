@@ -99,7 +99,7 @@ class Gowitness(Plugin):
             return None, None, None, None
         tags = [self.getTags()["gowitness-done"]]
         targets = {}
-        notes = file_opened.read(2).decode("utf-8")
+        notes = file_opened.read(2).decode("utf-8", errors="ignore")
         if notes != "PK":
             return None, None, None, None
         notes = "Valid zip received. Extract them using a script."

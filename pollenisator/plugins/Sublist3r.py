@@ -9,7 +9,7 @@ def parseContent(file_opened):
     ret = set()
     for line in file_opened:
         try:
-            line = line.decode("utf-8")
+            line = line.decode("utf-8", errors="ignore")
         except UnicodeDecodeError:
             return None
         domainGroup = re.search(

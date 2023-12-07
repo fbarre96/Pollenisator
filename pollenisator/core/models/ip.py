@@ -149,6 +149,10 @@ class Ip(Element):
             Returns the string ipv4 of this ip.
         """
         return self.ip
+    
+    @classmethod
+    def getSearchableTextAttribute(cls):
+        return ["ip"]
 
     def getDbKey(self):
         """Return a dict from model to use as unique composed key.

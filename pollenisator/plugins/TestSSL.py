@@ -21,7 +21,7 @@ def parseWarnings(pentest, file_opened):
     missconfiguredHosts = {}
     firstLine = True
     for line in file_opened:
-        line = line.decode("utf-8")
+        line = line.decode("utf-8", errors="ignore")
         if firstLine:
             if line.strip() != '"id", "fqdn/ip", "port", "severity", "finding", "cve", "cwe"' and \
                     line.strip() != '"id","fqdn/ip","port","severity","finding","cve","cwe"':

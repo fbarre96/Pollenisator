@@ -180,7 +180,7 @@ class ServerIp(Ip, ServerElement):
         scopes = []
         settings = {}
         if look_scopes:
-            scopes = dbclient.findInDb(pentest, "scopes", {}, True)
+            scopes = list(dbclient.findInDb(pentest, "scopes", {}, True))
             if scopes is None:
                 scopes = []
             settings_scope_ip = dbclient.findInDb(pentest, "settings", {"key":"include_domains_with_ip_in_scope"}, False)
@@ -244,7 +244,7 @@ def delete(pentest, ip_iid):
                                 {"ip": ip_dic["ip"]}, True)
     for tool in tools:
         tool_delete(pentest, tool["_id"])
-    checks = dbclient.findInDb(pentest, "cheatsheet",
+    checks = dbclient.findInDb(pentest, "checkinstances",
                                 {"target_iid": str(ip_iid)}, True)
     for check in checks:
         checkinstance_delete(pentest, check["_id"])

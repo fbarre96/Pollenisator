@@ -10,7 +10,7 @@ import json
 
 
 class CheckItem(ServerElement):
-    coll_name = 'cheatsheet'
+    coll_name = 'checkitems'
     def __init__(self, pentest, valuesFromDb=None):
         dbclient = DBClient.getInstance()
         if pentest != "":
@@ -189,7 +189,7 @@ def find(body):
         pipeline = json.loads(pipeline, cls=JSONDecoder)
     many = body.get("many", True)
     dbclient = DBClient.getInstance()
-    results = dbclient.findInDb("pollenisator", "cheatsheet", pipeline, many)
+    results = dbclient.findInDb("pollenisator", "checkitems", pipeline, many)
     if results is None:
         return [] if many else ("Not found", 404)
     if many:

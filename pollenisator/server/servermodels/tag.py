@@ -45,3 +45,15 @@ def setTags(pentest, item_id, body):
     tags = body.get("tags", [])
     ControllerElement(item).setTags(tags)
     return True
+
+@permission("pentester")
+def getTaggedBy(pentest, tag_name):
+    dbclient = DBClient.getInstance()
+    list_of_elems = {}
+    tags = dbclient.findInDb(pentest, "tags", {"tags.name":tag_name}, multi=True)
+    for tag in tags:
+        list_of_elems[tag["item_type"]] = list_of_elems.get(tag["item_type"], []) + [tag["item_id"]]
+    for item_type, item_ids in list_of_elems.items():
+        list_of_elems[item_type] = [x for x in dbclient.findInDb(pentest, item_type, {"_id": {"$in": item_ids}}, multi=True)]
+    
+    return list_of_elems

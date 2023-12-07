@@ -76,7 +76,7 @@ class Crtsh(Plugin):
         countInserted = 0
         for line in file_opened:
             try:
-                line = line.decode("utf-8")
+                line = line.decode("utf-8", errors="ignore")
             except UnicodeDecodeError:
                 return None, None, None, None
             domain, _record_type, ip = parse_crtsh_line(line)

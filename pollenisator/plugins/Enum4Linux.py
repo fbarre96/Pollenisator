@@ -24,7 +24,7 @@ def getInfos(enum4linux_file):
     for line in enum4linux_file:
         if isinstance(line, bytes):
             try:
-                line = line.decode("utf-8")
+                line = line.decode("utf-8", errors="ignore")
             except UnicodeDecodeError:
                 return None
         for i,part in enumerate(parts):

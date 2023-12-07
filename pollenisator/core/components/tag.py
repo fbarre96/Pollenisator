@@ -38,3 +38,7 @@ class Tag:
 
     def getData(self):
         return {"name": self.name, "color": self.color, "level": self.level, "notes": self.notes}
+
+    @classmethod
+    def getSearchableTextAttribute(cls):
+        return ["name"]

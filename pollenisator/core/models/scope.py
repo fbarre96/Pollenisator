@@ -63,6 +63,10 @@ class Scope(Element):
             Returns the scope string (network ipv4 range or domain).
         """
         return self.scope
+    
+    @classmethod
+    def getSearchableTextAttribute(cls):
+        return ["scope"]
 
     def getDbKey(self):
         """Return a dict from model to use as unique composed key.

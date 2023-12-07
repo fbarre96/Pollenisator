@@ -80,7 +80,7 @@ class PythonReverseLookup(Plugin):
         tags = []
         targets = {}
         try:
-            result_socket = file_opened.read().decode("utf-8")
+            result_socket = file_opened.read().decode("utf-8", errors="ignore")
         except UnicodeDecodeError:
             return None, None, None, None
         domain, ip = parse_reverse_python(result_socket)

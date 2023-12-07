@@ -17,7 +17,7 @@ from pollenisator.server.servermodels.scope import ServerScope
 from pollenisator.server.servermodels.ip import ServerIp
 from pollenisator.server.permission import permission
 from pollenisator.server.token import encode_token
-
+from itertools import chain
     
 @permission("pentester")
 def startAutoScan(pentest, body, **kwargs):
@@ -164,19 +164,31 @@ def findLaunchableTools(pentest):
     autoscan_enr = dbclient.findInDb(pentest, "autoscan", {"special":True}, False)
     if autoscan_enr is None:
         return toolsLaunchable
-    authorized_commands = autoscan_enr["authorized_commands"]
-    check_items = list(CheckItem.fetchObjects({"type":"auto_commands"}))
+    authorized_commands = [ObjectId(x) for x in autoscan_enr["authorized_commands"]]
+    pentest_commands = ServerCommand.fetchObjects({"_id":{"$in":authorized_commands}}, pentest)
+    authorized_original_commands = [str(x.original_iid) for x in pentest_commands]
+    check_items = list(CheckItem.fetchObjects({"check_type":"auto_commands", "commands":{"$in":authorized_original_commands}}))
     check_items.sort(key=lambda c: c.priority)
     #get not done tools inside wave
     for check_item in check_items:
-        check_instances = CheckInstance.fetchObjects(pentest, {"check_iid":str(check_item._id)})
-        for check_instance in check_instances:
-            notDoneToolsInCheck = getNotDoneToolsPerScope(pentest, check_instance, authorized_commands)
-            for toolId, toolModel in notDoneToolsInCheck.items():
-                if "error" in toolModel.status:
-                    continue
-                toolsLaunchable.append(
-                    {"tool": toolModel, "name": str(toolModel), "priority":int(check_item.priority), "timedout":"timedout" in toolModel.status})
+        check_instances = CheckInstance.fetchObjects(pentest, {"check_iid":str(check_item._id), "status":{"$ne":"done"}})
+        check_ids = [str(x._id) for x in check_instances]
+        tools_without_ip = ServerTool.fetchObjects(pentest, {"check_iid":{"$in":check_ids}, "ip":"", "dated": "None", "datef": "None"})
+        ips_in_scopes = ServerIp.fetchObjects(pentest, {"in_scopes":{"$ne":[]}})
+        ips_in_scopes = [x.ip for x in ips_in_scopes]
+        tools_with_ip_in_scope = ServerTool.fetchObjects(pentest, {"check_iid":{"$in":check_ids}, "ip":{"$in":ips_in_scopes}, "dated": "None", "datef": "None"})
+        for tool in chain(tools_without_ip, tools_with_ip_in_scope):
+            if "error" in tool.status:
+                continue
+            toolsLaunchable.append(
+                {"tool": tool, "name": str(tool), "priority":int(check_item.priority), "timedout":"timedout" in tool.status})
+        # for check_instance in check_instances:
+        #     notDoneToolsInCheck = getNotDoneToolsPerScope(pentest, check_instance, authorized_commands)
+        #     for toolId, toolModel in notDoneToolsInCheck.items():
+        #         if "error" in toolModel.status:
+        #             continue
+        #         toolsLaunchable.append(
+        #             {"tool": toolModel, "name": str(toolModel), "priority":int(check_item.priority), "timedout":"timedout" in toolModel.status})
     return toolsLaunchable
     
 
@@ -194,25 +206,25 @@ def searchForAddressCompatibleWithTime(pentest):
             waves_to_launch.add(intervalModel.wave)
     return waves_to_launch
 
-def getNotDoneToolsPerScope(pentest, check_instance, authorized_commands):
-    """Returns a set of tool mongo ID that are not done yet.
-    """
-    #
-    notDoneTools = dict()
-    # get not done tools that are not IP based (scope)
-    tools = ServerTool.fetchObjects(pentest, {"check_iid":str(check_instance._id), "command_iid":{ "$in": authorized_commands }, "ip":"", "dated": "None", "datef": "None"})
-    for tool in tools:
-        notDoneTools[tool.getId()] = tool
-    # fetch scopes to get IPs in scope
-    scopes = ServerScope.fetchObjects(pentest, {})
-    for scope in scopes:
-        scopeId = scope.getId()
-        # get IPs in scope
-        ips = ServerIp.getIpsInScope(pentest, scopeId)
-        for ip in ips:
-            # fetch IP level and below (e.g port) tools
-            tools = ServerTool.fetchObjects(pentest, {"check_iid":str(check_instance._id), "command_iid":{ "$in": authorized_commands }, "ip": ip.ip, "dated": "None", "datef": "None"})
-            for tool in tools:
-                notDoneTools[tool.getId()] = tool
-    return notDoneTools
+# def getNotDoneToolsPerScope(pentest, check_instance, authorized_commands):
+#     """Returns a set of tool mongo ID that are not done yet.
+#     """
+#     #
+#     notDoneTools = dict()
+#     # get not done tools that are not IP based (scope)
+#     tools = ServerTool.fetchObjects(pentest, {"check_iid":str(check_instance._id), "command_iid":{ "$in": authorized_commands }, "ip":"", "dated": "None", "datef": "None"})
+#     for tool in tools:
+#         notDoneTools[tool.getId()] = tool
+#     # fetch scopes to get IPs in scope
+#     scopes = ServerScope.fetchObjects(pentest, {})
+#     for scope in scopes:
+#         scopeId = scope.getId()
+#         # get IPs in scope
+#         ips = ServerIp.getIpsInScope(pentest, scopeId)
+#         for ip in ips:
+#             # fetch IP level and below (e.g port) tools
+#             tools = ServerTool.fetchObjects(pentest, {"check_iid":str(check_instance._id), "command_iid":{ "$in": authorized_commands }, "ip": ip.ip, "dated": "None", "datef": "None"})
+#             for tool in tools:
+#                 notDoneTools[tool.getId()] = tool
+#     return notDoneTools
 

@@ -124,7 +124,7 @@ class Dirsearch(Plugin):
         """
         tags = []
         try:
-            data = file_opened.read().decode("utf-8")
+            data = file_opened.read().decode("utf-8", errors="ignore")
         except UnicodeDecodeError:
             return None, None, None, None
         notes = ""
