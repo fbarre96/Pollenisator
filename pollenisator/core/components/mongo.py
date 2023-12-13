@@ -140,7 +140,7 @@ class DBClient:
     def connect_cache(self):
         try:
             if self.redis is None:
-                self.redis = redis.Redis(host='127.0.0.1', port=6379, decode_responses=True)
+                self.redis = redis.Redis(host=os.environ("REDIS_HOST", "127.0.0.1"), port=os.environ("REDIS_PORT", 6379), decode_responses=True)
         except redis.exceptions.ConnectionError as e:
             logger.error("No redis server found, continuing without will slow down the app.")
             self.redis = None
