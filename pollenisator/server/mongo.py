@@ -18,6 +18,7 @@ from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.server.servermodels.wave import ServerWave, insert as insert_wave
 from pollenisator.server.servermodels.interval import ServerInterval, insert as insert_interval
 from pollenisator.server.servermodels.scope import insert as insert_scope
+from pollenisator.server.servermodels.defect import insert as insert_defect
 from pollenisator.server.permission import permission
 dbclient = DBClient.getInstance()
 
@@ -630,10 +631,19 @@ def doImportCheatsheet(data,user):
 
         if not obj_ins["res"]:
             failed.append(command)
+    for defect in checks["defects"]:
+        save_id = str(defect["_id"])
+        del defect["_id"]
+        obj_ins = insert_defect("pollenisator", defect)
+        if obj_ins["res"]:
+            matchings[save_id] = str(obj_ins["iid"])
+        else:
+            failed.append(defect)
     for check in checks["checkitems"]:
         save_id = str(check["_id"])
         del check["_id"]
         check["commands"] = [str(matchings[c]) for c in check["commands"]]
+        check["defects"] = [str(matchings[c]) for c in check["defects"]]
         obj_ins = check_insert("pollenisator", check)
         if obj_ins["res"]:
             matchings[save_id] = str(obj_ins["iid"])
@@ -669,11 +679,15 @@ def doExportCommands():
 
 def doExportCheatsheet():
     dbclient = DBClient.getInstance()
-    res = {"checkitems":[], "commands":[]}
+    res = {"checkitems":[], "commands":[], "defects":[]}
     checks = dbclient.findInDb("pollenisator", "checkitems", {}, True)
     for check in checks:
         c = check
         res["checkitems"].append(c)
+    defects = dbclient.findInDb("pollenisator", "defects", {}, True)
+    for defect in defects:
+        c = defect
+        res["defects"].append(c)
     commands = dbclient.findInDb("pollenisator", "commands", {}, True)
     for command in commands:
         c = command
