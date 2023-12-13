@@ -9,14 +9,15 @@ services:
     volumes:
       - ./:/opt/pollenisator  # share source
     command: pollenisator --non-interactive
-    env_file: .env
+    env_file:
+      - .env
   mongodb:
     image: mongo:latest
     ports:
       - "27017:27017"   # Map container port to host port
     volumes:
       - mongodb_data:/data/db  # Persist MongoDB data
-     security_opt:
+    security_opt:
       - no-new-privileges:true
   redis:
     image: redis:latest
