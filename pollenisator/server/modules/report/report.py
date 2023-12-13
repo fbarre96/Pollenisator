@@ -5,7 +5,7 @@ from datetime import datetime
 from flask import send_file
 import pollenisator.core.reporting.wordexport as wordexport
 import pollenisator.core.reporting.powerpointexport as powerpointexport
-import pollenisator.core.reporting.excelexport as excelexport
+#import pollenisator.core.reporting.excelexport as excelexport
 from pollenisator.server import settings
 from pollenisator.server.servermodels.defect import getGlobalDefects
 from pollenisator.core.components.mongo import DBClient
@@ -146,11 +146,11 @@ def _generateDoc(ext, context, template_to_use_path, out_name, translation, retu
             context, template_to_use_path, out_name, translation=translation)
         return_dict["res"] = res
         return_dict["msg"] = msg
-    elif ext == ".xlsx":
-        res, msg = excelexport.createReport(
-            context, template_to_use_path, out_name, translation=translation)
-        return_dict["res"] = res
-        return_dict["msg"] = msg
+    # elif ext == ".xlsx":
+    #     res, msg = excelexport.createReport(
+    #         context, template_to_use_path, out_name, translation=translation)
+    #     return_dict["res"] = res
+    #     return_dict["msg"] = msg
     else:
         return_dict["res"] = False
         return_dict["msg"] = "Unknown template file extension"
