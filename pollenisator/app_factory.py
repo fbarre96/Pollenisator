@@ -271,8 +271,8 @@ def migrate():
     dbclient = mongo.DBClient.getInstance()
     version = dbclient.findInDb("pollenisator","infos",{"key":"version"}, False)
     if version is None:
-        dbclient.insertInDb("pollenisator","infos",{"key":"version","value":"0"})
-        version = "0"
+        dbclient.insertInDb("pollenisator","infos",{"key":"version","value":"2.7"})
+        return
     else:
         version = version["value"]
     if version == "0":
