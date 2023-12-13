@@ -124,10 +124,9 @@ class ServerTool(Tool, ServerElement):
     def findQueueIndexFromPrio(self, queue):
         priority = self.getCheckItem().priority
         i=0
-        for tool in queue:
-            tool = ServerTool.fetchObject(self.pentest, {"_id":ObjectId(tool)})
-            tool_check = tool.getCheckItem()
-            if tool_check is not None and tool_check.priority > priority:
+        for tool_info in queue:
+            queue_priority = tool_info.get("priority", 0)
+            if queue_priority.priority > priority:
                 return i
             i+=1
         return i
@@ -142,12 +141,13 @@ class ServerTool(Tool, ServerElement):
             queue = list(queue["tools"])
         if self.getId() in queue:
             return False, "Already in queue"
+        priority = self.getCheckItem().priority
         if index is None:
             index=self.findQueueIndexFromPrio(queue)
-            queue.insert(index, self.getId())
+            queue.insert(index, {"iid":self.getId(), "priority":priority})
         else:
             try:
-                queue.insert(index, self.getId())
+                queue.insert(index, {"iid":self.getId(), "priority":priority})
             except IndexError:
                 return False, "Index error"
         dbclient.updateInDb(self.pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":queue}})
@@ -155,7 +155,7 @@ class ServerTool(Tool, ServerElement):
     
     def removeFromQueue(self):
         dbclient = DBClient.getInstance()
-        dbclient.updateInDb(self.pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":self.getId()}})
+        dbclient.updateInDb(self.pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools.iid":self.getId()}})
         return True, "remove from to queue"
     
     @staticmethod
@@ -383,30 +383,9 @@ class ServerTool(Tool, ServerElement):
         result = dbclient.bulk_write(pentest, "tools", update_operations)
         upserted_ids = result.upserted_ids
         return upserted_ids
-        # """Insert multiple tools in database"""
-        # dbclient = DBClient.getInstance()
-        # lkp = {}
-        # tool_keys = set()
-        # or_conditions = []
-        # for tool in tools_to_add:
-        #     hashable_key = tool.getHashableDbKey()
-        #     lkp[hashable_key] = tool.getData()
-        #     del lkp[hashable_key]["_id"]
-        #     if lkp[hashable_key].get("name", "") == "None" or lkp[hashable_key].get("name", "") == "" or lkp[hashable_key].get("name", "") is None:
-        #         del lkp[hashable_key]["name"]
-        #     tool_keys.add(hashable_key)
-        #     or_conditions.append(tool.getDbKey())
-        # dbclient.create_index(pentest, "tools", [("wave", 1), ("name", 1), ("lvl", 1), ("check_iid", 1)])
-        # existing_tools = ServerTool.fetchObjects(pentest, {"$or": or_conditions})
-        # existing_tools_as_keys = [] if existing_tools is None else [ existing_tool.getHashableDbKey() for existing_tool in existing_tools]
-        # existing_tools_as_keys = set(existing_tools_as_keys)
-        # to_add = tool_keys - existing_tools_as_keys
-        # things_to_insert = [lkp[tool] for tool in to_add]
-        # # Insert new
-        # if not things_to_insert:
-        #     return
-        # res = dbclient.insertInDb(pentest, ServerTool.coll_name, things_to_insert, multi=True)
-        # return res
+    
+    
+
     
 @permission("pentester")
 def setStatus(pentest, tool_iid, body):
@@ -689,9 +668,9 @@ def getQueue(pentest):
     queue = dbclient.findInDb(pentest, "autoscan", {"type":"queue"}, False)
     if queue is not None:
         tools = queue["tools"]
-        for tool in tools:
+        for tool_info in tools:
             tool_data = {}
-            tool = ServerTool.fetchObject(pentest, {"_id":ObjectId(tool)})
+            tool = ServerTool.fetchObject(pentest, {"_id":ObjectId(tool_info.get("iid"))})
             tool_data = ToolController(tool).getData()
             if tool.text == "":
                 command = tool.getCommand()

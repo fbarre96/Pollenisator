@@ -98,6 +98,63 @@ paths:
       responses:
         '200':
           description: a list of targets representation string in same order as iids list
+  '/cheatsheet/{pentest}/queueCheckInstances':
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+    post:
+      tags:
+        - Cheatsheet
+      summary: queue check instances
+      operationId: pollenisator.server.modules.cheatsheet.checkinstance.queueCheckInstances
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                iids:
+                  type: array
+                  items:
+                    type: string
+                priority:
+                  type: integer
+                  default: 0
+      description: 'queue check instances'
+      responses:
+        '200':
+          description: OK
+  '/cheatsheet/{pentest}/multiChangeOfStatus':
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+    post:
+      tags:
+        - Cheatsheet
+      summary: change status of multiple check instance
+      operationId: pollenisator.server.modules.cheatsheet.checkinstance.multiChangeOfStatus
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                iids:
+                  type: array
+                  items:
+                    type: string
+                status:
+                  type: string
+      description: 'change status of multiple check instance'
+      responses:
+        '200':
+          description: OK
   '/cheatsheet/{pentest}/{iid}':
     parameters:
       - schema:

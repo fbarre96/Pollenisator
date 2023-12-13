@@ -85,24 +85,27 @@ def autoScan(pentest, endoded_token):
             toLaunch = []
             
             for launchableTool in launchableTools:
+                priority = launchableTool["priority"]
+                launchableToolIid = launchableTool["iid"]
+
                 logger.debug("Autoscan : loop")
                 check = getAutoScanStatus(pentest)
                 if not check:
                     break
                 if autoscan_threads - len(toLaunch) - running_tools_count <= 0:
                     break
-                logger.debug("Autoscan : launch task tools: "+str(launchableTool))
-                msg, statuscode = isLaunchable(pentest, launchableTool, authorized_commands)
+                logger.debug("Autoscan : launch task tools: "+str(launchableToolIid))
+                msg, statuscode = isLaunchable(pentest, launchableToolIid, authorized_commands)
                 if statuscode == 404:
-                    dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":launchableTool}})
-                    tool_o = ServerTool.fetchObject(pentest, {"_id":ObjectId(launchableTool)})
+                    dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools.iid":launchableToolIid}})
+                    tool_o = ServerTool.fetchObject(pentest, {"_id":ObjectId(launchableToolIid)})
                     if tool_o is not None:
                         tool_o.markAsError(msg)
                 elif statuscode == 403:
-                    dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":launchableTool}})
+                    dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools.iid":launchableToolIid}})
                 elif statuscode == 200:
-                    dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":launchableTool}})
-                    toLaunch.append([launchableTool, msg])
+                    dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools.iid":launchableToolIid}})
+                    toLaunch.append([launchableToolIid, msg])
                     # the tool will be launched, we can remove it from the queue, let the worker set it as running
             for tool in toLaunch:
                 launchTask(pentest, tool[0], tool[1], endoded_token)

@@ -172,6 +172,28 @@ class CheckInstance(ServerElement):
         
         return checks_inserted
     
+
+    @classmethod
+    def bulk_queue(cls, pentest, checks_iids, priority):
+        dbclient = DBClient.getInstance()
+        results = {"successes":[], "failures":[]}
+        queue = dbclient.findInDb(pentest, "autoscan", {"type":"queue"}, False) 
+        if queue is None:
+            queue = list()
+            dbclient.insertInDb(pentest, "autoscan", {"type":"queue", "tools":[]}) 
+        else:
+            queue = list(queue["tools"])
+        index = len(queue)
+        for i, tool_info in enumerate(queue):
+            if priority > tool_info.get("priority", 0):
+                index = i
+                break
+        tools = ServerTool.fetchObjects(pentest, {"check_iid":{"$in":checks_iids}, "status":{"$ne":"done"}})
+        for tool in tools:
+            queue.insert(index, {"iid":tool.getId(), "priority":priority})
+            results["successes"].append(tool.getId())
+        dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":queue}})
+        return results
                     
     @classmethod
     def createFromCheckItem(cls, pentest, checkItem, target_iid, target_type, infos={}):
@@ -419,3 +441,20 @@ def getTargetRepr(pentest, body):
                 ret_str = elem.getDetailedString()
                 ret[str(elem.getId())] = ret_str
     return ret
+
+@permission("pentester")
+def multiChangeOfStatus(pentest, body):
+    dbclient = DBClient.getInstance()
+    iids_list = [ ObjectId(x) for x in body["iids"] ]
+    dbclient.updateInDb(pentest, "checkinstances", {"_id": {"$in": iids_list}}, {"$set": {"status": body["status"]}}, many=True, notify=True)
+
+@permission("pentester")
+def queueCheckInstances(pentest, body):
+    iids_list = [ ObjectId(x) for x in body.get("iids", []) ]
+    check_iids = set()
+    for check_iid in iids_list:
+        if isinstance(check_iid, str) and check_iid.startswith("ObjectId|"):
+            check_iid = check_iid.replace("ObjectId|", "")
+        check_iids.add(str(check_iid))
+    results = CheckInstance.bulk_queue(pentest, list(check_iids), body.get("priority", 0))
+    return results    
