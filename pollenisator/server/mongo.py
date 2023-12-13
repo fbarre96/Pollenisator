@@ -617,39 +617,52 @@ def doImportCheatsheet(data,user):
         return "Invalid file format, object expected property: checkitems", 400
     if not isinstance(checks["checkitems"], list):
         return "Invalid file format, checkitems  properties must be lists", 400
-    matchings = {}
+    matching_commands = {}
+    matching_defects = {}
     failed = []
     if "commands" not in checks.keys():
         return "Invalid file format, object expected property: commands", 400
     if not isinstance(checks["commands"], list):
         return "Invalid file format, commands  properties must be lists", 400
+    if "defects" not in checks.keys():
+        return "Invalid file format, object expected property: defects", 400
+    if not isinstance(checks["defects"], list):
+        return "Invalid file format, defects  properties must be lists", 400
     for command in checks["commands"]:
         save_id = str(command["_id"])
         del command["_id"]
         obj_ins = command_insert("pollenisator", command, user)
-        matchings[save_id] = str(obj_ins["iid"])
-
+        matching_commands[save_id] = str(obj_ins["iid"])
         if not obj_ins["res"]:
             failed.append(command)
     for defect in checks["defects"]:
         save_id = str(defect["_id"])
         del defect["_id"]
         obj_ins = insert_defect("pollenisator", defect)
-        if obj_ins["res"]:
-            matchings[save_id] = str(obj_ins["iid"])
-        else:
+        matching_defects[save_id] = str(obj_ins["iid"])
+        if not obj_ins["res"]:
             failed.append(defect)
     for check in checks["checkitems"]:
         save_id = str(check["_id"])
         del check["_id"]
-        check["commands"] = [str(matchings[c]) for c in check["commands"]]
-        check["defects"] = [str(matchings[c]) for c in check["defects"]]
+        check_commands = check.get("commands", [])
+        check_defects = check.get("defects", [])
+        check_defect_tags = check.get("defect_tags", [])
+        check["commands"] = []
+        for command in check_commands:
+            if str(command) in matching_commands:
+                check["commands"].append(matching_commands[str(command)])
+        check["defects"] = []
+        for defect in check_defects:
+            if str(defect) in matching_defects:
+                check["defects"].append(matching_defects[str(defect)])
+        defect_tags = []
+        for defect_tag in check_defect_tags:
+            if str(defect_tag[1]) in matching_defects:
+                defect_tag[1] = str(matching_defects[str(defect_tag[1])])
+                defect_tags.append(defect_tag)
+        check["defect_tags"] = defect_tags
         obj_ins = check_insert("pollenisator", check)
-        if obj_ins["res"]:
-            matchings[save_id] = str(obj_ins["iid"])
-        else:
-            failed.append(check)
-   
     return failed
 
     
