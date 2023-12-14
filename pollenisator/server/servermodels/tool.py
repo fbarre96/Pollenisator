@@ -126,7 +126,7 @@ class ServerTool(Tool, ServerElement):
         i=0
         for tool_info in queue:
             queue_priority = tool_info.get("priority", 0)
-            if queue_priority.priority > priority:
+            if queue_priority > priority:
                 return i
             i+=1
         return i
