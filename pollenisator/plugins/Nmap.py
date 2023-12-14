@@ -125,7 +125,7 @@ def bulk_insertions(pentest, ips_to_add, ports_to_add):
     logger.info("Insertion of ports took "+str(time.time()-start)+" seconds")
     
 class Nmap(Plugin):
-    default_bin_names = []
+    default_bin_names = ["nmap"]
     def getFileOutputArg(self):
         """Returns the command line paramater giving the output file
         Returns:

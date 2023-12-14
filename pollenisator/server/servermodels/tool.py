@@ -155,7 +155,7 @@ class ServerTool(Tool, ServerElement):
     
     def removeFromQueue(self):
         dbclient = DBClient.getInstance()
-        dbclient.updateInDb(self.pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools.iid":self.getId()}})
+        dbclient.updateInDb(self.pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":{"iid":launchableToolIid}}})
         return True, "remove from to queue"
     
     @staticmethod

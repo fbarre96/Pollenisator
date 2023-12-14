@@ -97,14 +97,14 @@ def autoScan(pentest, endoded_token):
                 logger.debug("Autoscan : launch task tools: "+str(launchableToolIid))
                 msg, statuscode = isLaunchable(pentest, launchableToolIid, authorized_commands)
                 if statuscode == 404:
-                    dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools.iid":launchableToolIid}})
+                    dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":{"iid":launchableToolIid}}})
                     tool_o = ServerTool.fetchObject(pentest, {"_id":ObjectId(launchableToolIid)})
                     if tool_o is not None:
                         tool_o.markAsError(msg)
                 elif statuscode == 403:
-                    dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools.iid":launchableToolIid}})
+                    dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":{"iid":launchableToolIid}}})
                 elif statuscode == 200:
-                    dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools.iid":launchableToolIid}})
+                    dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":{"iid":launchableToolIid}}})
                     toLaunch.append([launchableToolIid, msg])
                     # the tool will be launched, we can remove it from the queue, let the worker set it as running
             for tool in toLaunch:
