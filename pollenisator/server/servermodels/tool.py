@@ -668,12 +668,14 @@ def getQueue(pentest):
     queue = dbclient.findInDb(pentest, "autoscan", {"type":"queue"}, False)
     if queue is not None:
         tools = queue["tools"]
-        for tool_info in tools:
+        tools_objects = ServerTool.fetchObjects(pentest, {"_id": {"$in": [ObjectId(tool_info.get("iid")) for tool_info in tools]}})
+        commands = ServerCommand.fetchObjects(pentest, {})
+        commands_dict = {str(command.getId()):command for command in commands}
+        for tool in tools_objects:
             tool_data = {}
-            tool = ServerTool.fetchObject(pentest, {"_id":ObjectId(tool_info.get("iid"))})
             tool_data = ToolController(tool).getData()
             if tool.text == "":
-                command = tool.getCommand()
+                command = commands_dict.get(str(tool.command_iid))
                 if command is not None:
                     tool_data["text"] = command.get("text","")
             res.append(tool_data)

@@ -188,11 +188,9 @@ class CheckInstance(ServerElement):
             if priority > tool_info.get("priority", 0):
                 index = i
                 break
-        tools = ServerTool.fetchObjects(pentest, {"check_iid":{"$in":checks_iids}, "status":{"$ne":"done"}})
-        for tool in tools:
-            queue.insert(index, {"iid":tool.getId(), "priority":priority})
-            results["successes"].append(tool.getId())
-        dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":queue}})
+        tools = dbclient.findInDb(pentest, "tools", {"check_iid":{"$in":checks_iids}, "status":{"$ne":"done"}}, True)
+        queue_final = queue[:index] + [{"iid":tool.getId(), "priority":priority} for tool in tools] + queue[index:]
+        dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":queue_final}})
         return results
                     
     @classmethod
@@ -450,6 +448,8 @@ def multiChangeOfStatus(pentest, body):
 
 @permission("pentester")
 def queueCheckInstances(pentest, body):
+    pr = cProfile.Profile()
+    pr.enable()
     iids_list = [ ObjectId(x) for x in body.get("iids", []) ]
     check_iids = set()
     for check_iid in iids_list:
@@ -457,4 +457,11 @@ def queueCheckInstances(pentest, body):
             check_iid = check_iid.replace("ObjectId|", "")
         check_iids.add(str(check_iid))
     results = CheckInstance.bulk_queue(pentest, list(check_iids), body.get("priority", 0))
+    pr.disable()
+    s = io.StringIO()
+    sortby = pstats.SortKey.CUMULATIVE
+    ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+    ps.print_stats()
+    with open("/tmp/profileserv.txt", "w") as f:
+        f.write(s.getvalue())
     return results    
