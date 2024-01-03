@@ -669,7 +669,7 @@ def getQueue(pentest):
     if queue is not None:
         tools = queue["tools"]
         tools_objects = ServerTool.fetchObjects(pentest, {"_id": {"$in": [ObjectId(tool_info.get("iid")) for tool_info in tools]}})
-        commands = ServerCommand.fetchObjects(pentest, {})
+        commands = ServerCommand.fetchObjects({}, pentest)
         commands_dict = {str(command.getId()):command for command in commands}
         for tool in tools_objects:
             tool_data = {}
