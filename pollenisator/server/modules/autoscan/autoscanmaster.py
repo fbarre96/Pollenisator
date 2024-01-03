@@ -71,7 +71,6 @@ def autoScan(pentest, endoded_token):
 
             running_tools_count = dbclient.countInDb(
                 pentest, "tools", {"status": "running"})
-            logger.debug("Autoscan : loop")
             # check_on_running_tools(pentest)
             if autoscan_threads - running_tools_count <= 0:
                 time.sleep(6)
@@ -99,8 +98,6 @@ def autoScan(pentest, endoded_token):
             for launchableTool in launchableTools:
                 priority = launchableTool["priority"]
                 launchableToolIid = launchableTool["iid"]
-
-                logger.debug("Autoscan : loop")
                 check = getAutoScanStatus(pentest)
                 if not check:
                     break
