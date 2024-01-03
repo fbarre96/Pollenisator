@@ -220,6 +220,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
     result["notes"] = notes
     result["countPwn"] = countPwn
     result["countSuccess"] = countSuccess
+    result["success"] = True
     result["secrets"] = secrets
     result["lsassy"] = lsassy
     result["ntds"] = ntds
