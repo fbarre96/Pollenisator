@@ -677,7 +677,10 @@ def getQueue(pentest):
             if tool.text == "":
                 command = commands_dict.get(str(tool.command_iid))
                 if command is not None:
-                    tool_data["text"] = command.get("text","")
+                    try:
+                        tool_data["text"] = command.text
+                    except AttributeError:
+                        tool_data["text"] = ""
             res.append(tool_data)
     return res
 
