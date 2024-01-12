@@ -126,22 +126,26 @@ class Computer(ServerElement):
             return
         dbclient = DBClient.getInstance()
         dbclient.create_index(pentest, "computers", [("ip", 1), ("type", 1)])
-        update_operations = []
+        update_operations = {}
         for computer in computers_to_add:
             data = computer
             data["type"] = "computer"
             if "_id" in data:
                 del data["_id"]
-            dataInfos = {}
-            if "infos" in data:
-                dataInfos = data["infos"]
-                del data["infos"]
-            update_operations.append(UpdateOne({"ip": data["ip"], "type": ["computer"]}, {"$setOnInsert": data, "$set":{"infos":dataInfos}}, upsert=True))
-        result = dbclient.bulk_write(pentest, "computers", update_operations)
+            updater = {"$set":{}}
+            for s in list(data.keys()):
+                if s.startswith("infos."):
+                    updater["$set"][s] = data[s]
+                    del data[s]
+            if len(updater["$set"]) == 0:
+                del updater["$set"]
+            updater["$setOnInsert"] = data
+            update_operations[data["ip"].strip()] = UpdateOne({"ip": data["ip"].strip(), "type": "computer"}, updater, upsert=True)
+        result = dbclient.bulk_write(pentest, "computers", list(update_operations.values()))
         upserted_ids = result.upserted_ids
-        if not upserted_ids:
+        if not upserted_ids and result.modified_count == 0:
             return
-        computers_inserted = Computer.fetchObjects(pentest, {"_id":{"$in":list(upserted_ids.values())}})
+        computers_inserted = Computer.fetchObjects(pentest, {"type":"computer", "ip":{"$in":list(update_operations.keys())}})
         for computer in computers_inserted:
             if computer.infos.is_dc:
                 computer.add_dc_checks()
@@ -374,6 +378,15 @@ def insert(pentest, body):  # noqa: E501
     existing = dbclient.findInDb(pentest, 
         "computers", {"type":"computer", "ip":computer.ip}, False)
     if existing is not None:
+        if body.get("infos", {}).get("is_dc", False) is True:
+            existing["infos"]["is_dc"] = True
+            dbclient.updateInDb(pentest, "computers", {"_id": existing["_id"]}, {"$set": {"infos": existing["infos"]}}, False, True)
+            computer.add_dc_checks()
+            computer.add_domain_checks()
+        if body.get("infos", {}).get("is_sqlserver", False) is True:
+            existing["infos"]["is_sqlserver"] = True
+            dbclient.updateInDb(pentest, "computers", {"_id": existing["_id"]}, {"$set": {"infos": existing["infos"]}}, False, True)
+            computer.add_sqlserver_checks()
         return {"res": False, "iid": existing["_id"]}
     if "_id" in body:
         del body["_id"]
