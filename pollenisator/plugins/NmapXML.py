@@ -56,6 +56,8 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
                 ips_to_add.append(ipCIDR_m)     
                 addedIps.append(ipCIDR_m)
             for hostname in hostnames:
+                if hostname is None:
+                    continue
                 notes_hostname = "hostname:" + \
                     str(hostname.get('name')) if hostname.get('name') != "" and hostname.get('name') is not None else ""
                 hostname_m = ServerIp(pentest, {"in_scopes":[]}).initialize(str(hostname.get('name')), notes=notes_hostname, in_scopes=[], infos={"plugin":NmapXML.get_name()})
@@ -66,13 +68,23 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
             for port in ports:
                 port_info = {
                     'protocol': port.get('protocol', "tcp"),
-                    'portid': port.get('portid'),
-                    'state': port.find('state').get('state', "closed"),
-                    'service': port.find('service').get('name', ""),
-                    'method': port.find('service').get('method', ""),
-                    'product': port.find('service').get('product', ""),
-                    'version': port.find('service').get('version', "")
+                    'portid': port.get('portid')
                 }
+                state = port.find('state')
+                port_info["state"] = "closed"
+                if state is not None:
+                    port_info["state"] = state.get("state", "closed")
+                service = port.find('service')
+                if service is None:
+                    port_info['service'] = ""
+                    port_info['method'] = ""
+                    port_info['product'] = ""
+                    port_info['version'] = ""
+                else:
+                    port_info['service'] = service.get('name', "")
+                    port_info['method'] = service.get('method', "")
+                    port_info['product'] = service.get('product', "")
+                    port_info['version'] = service.get('version', "")
                 if port_info['state'] != 'open':
                     continue
                 countOpen += 1

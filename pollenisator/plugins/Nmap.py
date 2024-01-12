@@ -101,6 +101,8 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
                         ips_to_add.append(ipCIDR_m)
                     validIps.append(ipCIDR_m.ip)
                     if ipDom_m is not None:
+                        if ipDom_m.infos is None:
+                            ipDom_m.infos = {}
                         ipDom_m.infos["hostname"] = list(set(list( ipDom_m.infos.get("hostname", []))+[str(ipCIDR_m.ip)]))
                         validIps.append(ipDom_m.ip)
                         ips_to_add.append(ipDom_m)
@@ -198,7 +200,8 @@ class Nmap(Plugin):
         tool_m = kwargs.get("tool", None)
         keep_only_open = True
         if cmdline is None and tool_m is not None:
-            cmdline = tool_m.infos.get("cmdline", None)
+            if tool_m.infos is not None:
+                cmdline = tool_m.infos.get("cmdline", None)
         if cmdline is not None:
             if " -sP " in cmdline:
                 keep_only_open = False
