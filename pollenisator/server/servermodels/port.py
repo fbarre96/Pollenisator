@@ -122,8 +122,8 @@ class ServerPort(Port, ServerElement):
         dbclient.create_index(pentest, "ports", [("port", 1), ("proto", 1), ("ip", 1)])
         update_operations = []
         computers = []
-        dcs = []
-        msql = []
+        #dcs = []
+        #msql = []
         start = time.time()
         for port in ports_to_add:
             data = PortController(port).getData()
@@ -131,12 +131,12 @@ class ServerPort(Port, ServerElement):
                 del data["service"]
             if "_id" in data:
                 del data["_id"]
-            if int(port.port) == 445:
-                computers.append({"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[], "infos":{"is_dc":False}})
-            elif int(port.port) == 88:
-                computers.append({"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[], "infos":{"is_dc":True}})
+            if int(port.port) == 88:
+                computers.append({"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[], "infos.is_dc":True})
+            elif int(port.port) == 445:
+                computers.append({"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[]})
             elif int(port.port) == 1433 or port.service == "ms-sql":
-                computers.append({"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[], "infos":{"is_sqlserver":True}})
+                computers.append({"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[], "infos.is_sqlserver":True})
             update_operations.append(UpdateOne({"port": port.port, "proto": port.proto, "ip": port.ip}, {"$setOnInsert": data, "$set":{"service":port.service}}, upsert=True))
         logger.info(f"Crating port update operations took {time.time() - start}")
         start = time.time()
@@ -216,13 +216,13 @@ def insert(pentest, body):
     port_o._id = iid
     if int(port_o.port) == 445:
         computer_insert(pentest, {"name":"", "ip":port_o.ip, "domain":"", "admins":[], "users":[], "infos":{"is_dc":False}})
-    elif int(port_o.port) == 88:
+    if int(port_o.port) == 88:
         res = computer_insert(pentest, {"name":"", "ip":port_o.ip, "domain":"", "admins":[], "users":[], "infos":{"is_dc":True}})
         if not res["res"]:
             comp = Computer.fetchObject(pentest, {"_id":ObjectId(res["iid"])})
             comp.infos.is_dc = True
             comp.update()
-    elif int(port_o.port) == 1433 or (port_o.service == "ms-sql"):
+    if int(port_o.port) == 1433 or (port_o.service == "ms-sql"):
         res = computer_insert(pentest, {"name":"", "ip":port_o.ip, "domain":"", "admins":[], "users":[], "infos":{"is_sqlserver":True}})
         if not res["res"]:
             comp = Computer.fetchObject(pentest, {"_id":ObjectId(res["iid"])})
