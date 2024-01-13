@@ -89,7 +89,7 @@ def insert(pentest, body):
         parent = defect_o.getParentId()
         if "_id" in body:
             del body["_id"]
-        if not defect_o.isAssigned():
+        if pentest != "pollenisator" and not defect_o.isAssigned():
             insert_pos = findInsertPosition(pentest, body["risk"])
             save_insert_pos = insert_pos
             defects_to_edit = []
@@ -134,6 +134,17 @@ def insert(pentest, body):
     sem.release()
     return {"res":True, "iid":iid}
 
+def insert_remark(pentest, body):
+    dbclient = DBClient.getInstance()
+    base = {"id":body.get("id", body.get("title", ""))}
+    existing = dbclient.findInDb(pentest, "remarks", base, False)
+    if existing is not None:
+        return {"res":False, "iid":existing["_id"]}
+    body["id"] = body.get("id", body.get("title", ""))
+    ins_result = dbclient.insertInDb(pentest, "remarks", body)
+    iid = ins_result.inserted_id
+    return {"res":True, "iid":iid}
+
 @permission("pentester")
 def findInsertPosition(pentest, risk):
     riskLevels = ["Critical", "Major",  "Important", "Minor"] # TODO do not hardcode those things
@@ -148,7 +159,7 @@ def findInsertPosition(pentest, risk):
     return highestInd
 
 def _findProofsInDescription(description):
-    regex_images = r"!\[.*\]\((.*)\)"
+    regex_images = r"!\[.*\]\(((?!http).*)\)"
     return re.finditer(regex_images, description)
 
 @permission("pentester")
@@ -169,15 +180,16 @@ def update(pentest, defect_iid, body):
                 moveDefect(pentest, defect_iid, defectTarget.getId())
             if "index" in body:
                 del body["index"]
-    body["proofs"] = []
+    body["proofs"] = set()
     proof_groups = _findProofsInDescription(body.get("description", ""))
     existing_proofs_to_remove = listFiles(pentest, defect_iid, "proof")
     for proof_group in proof_groups:
         if proof_group.group(1) in existing_proofs_to_remove:
             existing_proofs_to_remove.remove(proof_group.group(1))
-            body["proofs"].append(proof_group.group(1))
+        body["proofs"].add(proof_group.group(1))
     for proof_to_remove in existing_proofs_to_remove:
         rmProof(pentest, defect_iid, proof_to_remove)
+    body["proofs"] = list(body["proofs"])
     res = dbclient.updateInDb(pentest, "defects", {"_id":ObjectId(defect_iid)}, {"$set":body}, False, True)
     return True
     
@@ -213,13 +225,17 @@ def moveDefect(pentest, defect_id_to_move, target_id):
 @permission("user")
 def importDefectTemplates(upfile):
     try:
-        defects = json.loads(upfile.stream.read())
+        file_content = json.loads(upfile.stream.read())
+        defects = file_content.get("defects", [])
         for defect in defects:
             invalids = ["target_id", "target_type",  "scope"]
             for invalid in invalids:
                 if invalid in defect:
                     del defect[invalid]
             insert("pollenisator", defect)
+        remarks = file_content.get("remarks", [])
+        for remark in remarks:
+            insert_remark("pollenisator", remark)
     except Exception as e:
         return "Invalid json sent", 400
     return True
@@ -227,12 +243,17 @@ def importDefectTemplates(upfile):
 @permission("user")
 def exportDefectTemplates(**kwargs):
     dbclient = DBClient.getInstance()
-    templates = dbclient.findInDb("pollenisator", "defects", {}, True)
-    res = []
-    for template in templates:
+    templates_defects = dbclient.findInDb("pollenisator", "defects", {}, True)
+    templates_remarks = dbclient.findInDb("pollenisator", "remarks", {}, True)
+    res = {"defects": [], "remarks": []}
+    for template in templates_defects:
         t = template
         del t['_id']
-        res.append(t)
+        res["defects"].append(t)
+    for template in templates_remarks:
+        t = template
+        del t['_id']
+        res["remarks"].append(t)
     return res
 
 @permission("user")

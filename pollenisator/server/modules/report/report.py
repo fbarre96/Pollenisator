@@ -197,7 +197,7 @@ def search(body):
     # except Exception as e:
     #     errors += ["The knowledge database is unreachable"]
     # ret = {"errors": errors , "answers":ret}
-    return ret, 200
+    #return ret, 200
 
 def craftContext(pentest, **kwargs):
     dbclient = DBClient.getInstance()
