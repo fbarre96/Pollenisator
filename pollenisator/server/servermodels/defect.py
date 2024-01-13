@@ -145,6 +145,11 @@ def insert_remark(pentest, body):
     iid = ins_result.inserted_id
     return {"res":True, "iid":iid}
 
+def update_remark(pentest, remark_iid, body):
+    dbclient = DBClient.getInstance()
+    res = dbclient.updateInDb(pentest, "remarks", {"_id":ObjectId(remark_iid)}, {"$set":body}, False, True)
+
+
 @permission("pentester")
 def findInsertPosition(pentest, risk):
     riskLevels = ["Critical", "Major",  "Important", "Minor"] # TODO do not hardcode those things
@@ -170,7 +175,7 @@ def update(pentest, defect_iid, body):
         return "This defect does not exist", 404
 
     oldRisk = defect_o.risk
-    if not defect_o.isAssigned():
+    if not defect_o.isAssigned() and pentest != "pollenisator":
         if body.get("risk", None) is not None and pentest != "pollenisator":
             if body["risk"] != oldRisk:
                 insert_pos = str(findInsertPosition(pentest, body["risk"]))
@@ -180,16 +185,17 @@ def update(pentest, defect_iid, body):
                 moveDefect(pentest, defect_iid, defectTarget.getId())
             if "index" in body:
                 del body["index"]
-    body["proofs"] = set()
-    proof_groups = _findProofsInDescription(body.get("description", ""))
-    existing_proofs_to_remove = listFiles(pentest, defect_iid, "proof")
-    for proof_group in proof_groups:
-        if proof_group.group(1) in existing_proofs_to_remove:
-            existing_proofs_to_remove.remove(proof_group.group(1))
-        body["proofs"].add(proof_group.group(1))
-    for proof_to_remove in existing_proofs_to_remove:
-        rmProof(pentest, defect_iid, proof_to_remove)
-    body["proofs"] = list(body["proofs"])
+    if pentest != "pollenisator":
+        body["proofs"] = set()
+        proof_groups = _findProofsInDescription(body.get("description", ""))
+        existing_proofs_to_remove = listFiles(pentest, defect_iid, "proof")
+        for proof_group in proof_groups:
+            if proof_group.group(1) in existing_proofs_to_remove:
+                existing_proofs_to_remove.remove(proof_group.group(1))
+            body["proofs"].add(proof_group.group(1))
+        for proof_to_remove in existing_proofs_to_remove:
+            rmProof(pentest, defect_iid, proof_to_remove)
+        body["proofs"] = list(body["proofs"])
     res = dbclient.updateInDb(pentest, "defects", {"_id":ObjectId(defect_iid)}, {"$set":body}, False, True)
     return True
     
@@ -232,10 +238,14 @@ def importDefectTemplates(upfile):
             for invalid in invalids:
                 if invalid in defect:
                     del defect[invalid]
-            insert("pollenisator", defect)
+            res = insert("pollenisator", defect)
+            if not res["res"]:
+                update("pollenisator", res["iid"], defect)
         remarks = file_content.get("remarks", [])
         for remark in remarks:
-            insert_remark("pollenisator", remark)
+            res = insert_remark("pollenisator", remark)
+            if not res["res"]:
+                update_remark("pollenisator", res["iid"], remark)
     except Exception as e:
         return "Invalid json sent", 400
     return True
