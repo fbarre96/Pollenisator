@@ -267,6 +267,19 @@ def exportDefectTemplates(**kwargs):
     return res
 
 @permission("user")
+def findDefectTemplate(body):
+    dbclient = DBClient.getInstance()
+    if "_id" in body:
+        if str(body["_id"]).startswith("ObjectId|"):
+            body["_id"] = ObjectId(body["_id"].split("|")[1])
+        else:
+            body["_id"] = ObjectId(body["_id"])
+    res = dbclient.findInDb("pollenisator", "defects", body, False)
+    if res is not None:
+        return res
+    return  "No defect template found with this criteria", 404
+
+@permission("user")
 def insertDefectTemplate(body):
     return insert("pollenisator", body)
 

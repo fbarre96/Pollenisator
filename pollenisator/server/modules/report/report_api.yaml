@@ -182,6 +182,22 @@ paths:
               examples:
                 Server issue:
                   value: 'Failed to export'
+  "/report/DefectTemplates/find":
+    post:
+      operationId: pollenisator.server.servermodels.defect.findDefectTemplate
+      tags:
+        - Defect Template
+      summary: Find a Defect template
+      requestBody:
+         $ref: "#/components/requestBodies/DefectTemplate"
+      responses:
+        "200":
+          description: a indicator of success
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: "A defect template body"
   "/report/DefectTemplates/insert":
     post:
       operationId: pollenisator.server.servermodels.defect.insertDefectTemplate
