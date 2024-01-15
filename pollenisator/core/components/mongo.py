@@ -74,7 +74,7 @@ class DBClient:
         """Reset client connection"""
         self.client = None
 
-    def bulk_write(self, pentest, collection, update_operations):
+    def bulk_write(self, pentest, collection, update_operations, notify=True):
         """Bulk write data to the database.
         Args:
             data: A list of dictionnary containing the data to write.
@@ -84,6 +84,8 @@ class DBClient:
         self.connect()
         db = self.client[pentest]
         result = db[collection].bulk_write(update_operations)
+        if notify:
+            self.send_notify(pentest, collection, "update_many", result.upserted_ids)
         return result
 
     def getWorkers(self, pipeline=None):

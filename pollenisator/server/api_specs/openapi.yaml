@@ -2793,7 +2793,7 @@ paths:
               schema:
                 type: integer
 
-  "/tags/{pentest}/getTaggedBy/{tag_name}":
+  "/tags/{pentest}/getTaggedBy":
     get:
       operationId: pollenisator.server.servermodels.tag.getTaggedBy
       tags:
@@ -2806,7 +2806,7 @@ paths:
           schema:
             type: string
         - name: tag_name
-          in: path
+          in: query
           description: tag name to search for
           required: true
           schema:
