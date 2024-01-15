@@ -32,7 +32,7 @@ class Defect(Element):
                         valuesFromDb.get("ease", ""), valuesFromDb.get(
                             "impact", ""),
                         valuesFromDb.get(
-                            "risk", ""), valuesFromDb.get("redactor", "N/A"), list(valuesFromDb.get("type", [])),
+                            "risk", ""), valuesFromDb.get("redactor", "N/A"), valuesFromDb.get("type", []),
                         valuesFromDb.get("language", ""),
                         valuesFromDb.get("notes", ""), valuesFromDb.get(
                             "proofs", []),
@@ -71,6 +71,8 @@ class Defect(Element):
         self.risk = risk
         self.redactor = redactor
         self.mtype = mtype if mtype is not None else []
+        if isinstance(self.mtype, str):
+            self.mtype = [self.mtype]
         self.language = language
         self.notes = notes
         self.target_id = target_id
