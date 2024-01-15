@@ -160,11 +160,13 @@ class ServerElement(metaclass=MetaElement):
         deleted_tags = old_tags - new_tags
         added_tags = new_tags - old_tags
         target_type = self.__class__.name if hasattr(self.__class__, "name") else self.__class__.coll_name
+        data_target = {"target_iid":ObjectId(self.getId()), "target_type":target_type, "tags":tags, "target_data":self.getData()}
+        data_target["target_id"] = ObjectId(self.getId()) # FOR DEFECT ITS TARGET_ID, FOR CHECKS ITS TARGET_IID...
         for tag in deleted_tags:
-            self.addTagChecks(["tag:onRemove:"+str(tag)],{"target_iid":ObjectId(self.getId()), "target_type":target_type, "tags":tags, "target_data":self.getData()})
+            self.addTagChecks(["tag:onRemove:"+str(tag)], data_target)
         for tag in added_tags:
-            self.addTagChecks(["tag:onAdd:"+str(tag)],{"target_iid":ObjectId(self.getId()), "target_type":target_type, "tags":tags, "target_data":self.getData()})
-            self.addTagDefects(lk_new_tags.get(tag), self.getData())#, ObjectId(self.getId()), target_type
+            self.addTagChecks(["tag:onAdd:"+str(tag)], data_target)
+            self.addTagDefects(lk_new_tags.get(tag), data_target)#, ObjectId(self.getId()), target_type
         tags = [tag.getData() for tag in tags]
         tags = dbclient.updateInDb(self.pentest, "tags", {"item_id": ObjectId(self.getId())}, {"$set":{"tags":tags, "date": datetime.now(), "item_id":ObjectId(self.getId()), "item_type":target_type}}, upsert=True)
 
@@ -216,9 +218,11 @@ class ServerElement(metaclass=MetaElement):
                     if defect is not None:
                         if pentest_lang is not None and pentest_lang != "" and pentest_lang != defect.get("language", "en"):
                             continue
-                        defect["ip"] = target_data.get("ip", "")
-                        defect["port"] = target_data.get("port", "")
-                        defect["proto"] = target_data.get("proto", "")
+                        defect["ip"] = target_data.get("target_data", {}).get("ip", "")
+                        defect["port"] = target_data.get("target_data", {}).get("port", "")
+                        defect["proto"] = target_data.get("target_data", {}).get("proto", "")
+                        defect["target_id"] = target_data.get("target_id")
+                        defect["target_type"] = target_data.get("target_type")
                         defect["pentest"] = pentest
                         defect["notes"] = tag.notes
                         insert_defect(pentest, defect)
