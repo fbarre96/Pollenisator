@@ -1,7 +1,3 @@
-import cProfile
-import io
-import pstats
-import time
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.server.servermodels.element import ServerElement
@@ -111,7 +107,6 @@ class CheckInstance(ServerElement):
         if checks is None:
             return
         checks_to_add = []
-        start = time.time()
         targets = list(targets)
         
         commands_pentest = ServerCommand.fetchObjects({}, pentest)
@@ -135,7 +130,6 @@ class CheckInstance(ServerElement):
         lkp = {}
         check_keys = set()
         or_conditions = []
-        start = time.time()
         for check in checks_to_add:
             hashable_key = check.getHashableDbKey()
             lkp[hashable_key] = check.getData()
@@ -357,8 +351,6 @@ def update(pentest, iid, body):
 
 @permission("pentester")
 def getInformations(pentest, iid):
-    pr = cProfile.Profile()
-    pr.enable()
     inst = CheckInstance.fetchObject(pentest, {"_id": ObjectId(iid)})
     if inst is None:
         return "Not found", 404
@@ -408,13 +400,6 @@ def getInformations(pentest, iid):
             data["status"] = "todo"
     else:
         data["status"] = ""
-    pr.disable()
-    s = io.StringIO()
-    sortby = pstats.SortKey.CUMULATIVE
-    ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-    ps.print_stats()
-    with open("/tmp/profileserv.txt", "w") as f:
-        f.write(s.getvalue())
     return data
 
 
@@ -448,8 +433,6 @@ def multiChangeOfStatus(pentest, body):
 
 @permission("pentester")
 def queueCheckInstances(pentest, body):
-    pr = cProfile.Profile()
-    pr.enable()
     iids_list = [ ObjectId(x) for x in body.get("iids", []) ]
     check_iids = set()
     for check_iid in iids_list:
@@ -457,11 +440,4 @@ def queueCheckInstances(pentest, body):
             check_iid = check_iid.replace("ObjectId|", "")
         check_iids.add(str(check_iid))
     results = CheckInstance.bulk_queue(pentest, list(check_iids), body.get("priority", 0))
-    pr.disable()
-    s = io.StringIO()
-    sortby = pstats.SortKey.CUMULATIVE
-    ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-    ps.print_stats()
-    with open("/tmp/profileserv.txt", "w") as f:
-        f.write(s.getvalue())
     return results    
