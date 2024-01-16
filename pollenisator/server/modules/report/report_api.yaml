@@ -274,7 +274,7 @@ paths:
   
               
   "/report/{pentest}/generate":
-    get:
+    post:
       operationId: pollenisator.server.modules.report.report.generateReport
       tags:
         - Report
@@ -286,26 +286,22 @@ paths:
           required: true
           schema:
             type: string
-        - name: templateName
-          in: query
-          description: template name to generate from
-          required: true
-          schema:
-            type: string
-        
-        - name: mainRedactor
-          in: query
-          description: template name to generate from
-          required: false
-          schema:
-            type: string
-            default: "N/A"
-        - name: lang
-          in: query
-          description: lang of the template
-          required: true
-          schema:
-            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                templateName:
+                  type: string
+                mainRedactor:
+                  type: string
+                  default: "N/A"
+                lang:
+                  type: string
+                additional_context:
+                  type: object
+                
       responses:
         "200":
           description: Return a generated report file

@@ -84,7 +84,11 @@ def uploadTemplate(upfile, lang):
 
 
 @permission("user")
-def generateReport(pentest, templateName,  mainRedactor, lang):
+def generateReport(pentest, body):
+    templateName = body.get("templateName", "")
+    mainRedactor = body.get("mainRedactor", "")
+    lang = body.get("lang", "en")
+    additional_context = body.get("additional_context", {})
     if not templateName.endswith(".pptx") and not templateName.endswith(".docx") and not templateName.endswith(".xlsx"):
         return "Invalid extension for template, must be pptx, xlsx or docx", 400
     client_name = settings.find(pentest, "client_name")
@@ -115,6 +119,7 @@ def generateReport(pentest, templateName,  mainRedactor, lang):
         lang_translation = json.loads(f.read())
     context = craftContext(pentest, mainRedac=mainRedactor,
                            client=client_name.strip(), contract=mission_name.strip())
+    context.update(additional_context)
     manager = Manager()
     return_dict = manager.dict()
     p = Process(target=_generateDoc, args=(ext, context, template_to_use_path, out_name, lang_translation, return_dict))
