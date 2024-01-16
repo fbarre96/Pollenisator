@@ -24,6 +24,7 @@ from itertools import chain
 def startAutoScan(pentest, body, **kwargs):
     dbclient = DBClient.getInstance()
     authorized_commands = body.get("command_iids", [])
+    autoqueue = body.get("autoqueue", False)
     for authorized_command in authorized_commands:
         try:
             iid = ObjectId(authorized_command)
@@ -43,7 +44,7 @@ def startAutoScan(pentest, body, **kwargs):
     tools_lauchable = findLaunchableTools(pentest)
     queueTasks(pentest, [tool_model["tool"].getId()
                for tool_model in tools_lauchable])
-    autoscan = Thread(target=autoScan, args=(pentest, encoded))
+    autoscan = Thread(target=autoScan, args=(pentest, encoded, autoqueue))
     try:
         logger.debug("Autoscan : start")
         autoscan.start()
@@ -52,7 +53,7 @@ def startAutoScan(pentest, body, **kwargs):
     return "Success"
 
 
-def autoScan(pentest, endoded_token):
+def autoScan(pentest, endoded_token, autoqueue):
     """
     Search tools to launch within defined conditions and attempts to launch them this  worker.
     Gives a visual feedback on stdout
@@ -78,6 +79,10 @@ def autoScan(pentest, endoded_token):
                     "Autoscan : skip round because too many running tools ")
                 check = getAutoScanStatus(pentest)
                 continue
+            if autoqueue:
+                tools_lauchable = findLaunchableTools(pentest)
+                queueTasks(pentest, [tool_model["tool"].getId()
+                        for tool_model in tools_lauchable])
             launchableTools = []
             queue = dbclient.findInDb(pentest, "autoscan", {
                                       "type": "queue"}, False)

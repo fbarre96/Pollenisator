@@ -25,6 +25,9 @@ paths:
                   type: array
                   items:
                     type: string
+                autoqueue:
+                  type: boolean
+                  default: false
       responses:
         "200":
           description: Successfully started auto scan
