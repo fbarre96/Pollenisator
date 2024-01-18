@@ -309,8 +309,11 @@ def migrate_1_1():
     for pentest in pentests:
         if pentest["uuid"] not in dbs:
             print("missing pentest uuid, exporting it:")
-            outpath = dbclient.dumpDb(pentest["nom"])
-            dbclient.importDatabase(dbclient.getPentestOwner(pentest["nom"]), outpath, nsFrom=pentest["nom"], nsTo=pentest["uuid"])
+            try:
+                outpath = dbclient.dumpDb(pentest["nom"])
+                dbclient.importDatabase(dbclient.getPentestOwner(pentest["nom"]), outpath, nsFrom=pentest["nom"], nsTo=pentest["uuid"])
+            except ValueError as e:
+                pass
     dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"1.2"}})
     return "1.2"
 
