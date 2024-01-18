@@ -20,7 +20,7 @@ python-jose>=3.3.0
 flask_socketio
 flask-cors
 docxtpl>=0.16.7
-markdowntodocx>=0.1.3.15
+markdowntodocx>=0.1.4.1
 docker
 ruamel.yaml
 redis[hiredis]
