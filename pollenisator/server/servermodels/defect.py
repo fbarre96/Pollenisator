@@ -247,7 +247,7 @@ def importDefectTemplates(upfile):
             if not res["res"]:
                 update_remark("pollenisator", res["iid"], remark)
     except Exception as e:
-        return "Invalid json sent", 400
+        return "Invalid json sent : "+str(e), 400
     return True
 
 @permission("user")
