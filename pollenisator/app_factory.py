@@ -329,7 +329,7 @@ def migrate_2_6():
     pentests = dbclient.findInDb("pollenisator","pentests",{}, True)
     for pentest in pentests:
         dbclient.updateInDb(pentest["uuid"], "settings", {"key":"tags"}, {"$set":{"key":"tags", "value":{}}})
-    
+    return "2.6"
 
 def migrate_2_7():
     dbclient = mongo.DBClient.getInstance()
@@ -352,6 +352,7 @@ def migrate_2_7():
     db = dbclient.client["pollenisator"]
     db["cheatsheet"].rename("checkitems")
     dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.7"}})
+    return "2.7"
 
 def init_db():
     """Initialize empty databases or remaining tmp data from last run
