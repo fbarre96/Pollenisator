@@ -15,7 +15,6 @@ import pollenisator.server.modules.activedirectory.computers as Computer
 
 class User(ServerElement):
     coll_name = "users"
-    name = "User"
     command_variables = ["username","domain","password"]
     
     def __init__(self, pentest=None, valuesFromDb=None):
