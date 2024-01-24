@@ -440,5 +440,5 @@ def queueCheckInstances(pentest, body):
         if isinstance(check_iid, str) and check_iid.startswith("ObjectId|"):
             check_iid = check_iid.replace("ObjectId|", "")
         check_iids.add(str(check_iid))
-    results = CheckInstance.bulk_queue(pentest, list(check_iids), body.get("priority", 0), force=force)
+    results = CheckInstance.bulk_queue(pentest, list(check_iids), body.get("priority", 0), force=force_queue)
     return results    
