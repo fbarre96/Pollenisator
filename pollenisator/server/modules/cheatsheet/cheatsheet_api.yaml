@@ -123,6 +123,9 @@ paths:
                 priority:
                   type: integer
                   default: 0
+                force:
+                  type: boolean
+                  default: false
       description: 'queue check instances'
       responses:
         '200':

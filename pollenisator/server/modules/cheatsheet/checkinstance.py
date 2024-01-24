@@ -168,7 +168,7 @@ class CheckInstance(ServerElement):
     
 
     @classmethod
-    def bulk_queue(cls, pentest, checks_iids, priority):
+    def bulk_queue(cls, pentest, checks_iids, priority, force=False):
         dbclient = DBClient.getInstance()
         results = {"successes":[], "failures":[]}
         queue = dbclient.findInDb(pentest, "autoscan", {"type":"queue"}, False) 
@@ -183,7 +183,7 @@ class CheckInstance(ServerElement):
                 index = i
                 break
         tools = dbclient.findInDb(pentest, "tools", {"check_iid":{"$in":checks_iids}, "status":{"$ne":"done"}}, True)
-        queue_final = queue[:index] + [{"iid":tool["_id"], "priority":priority} for tool in tools] + queue[index:]
+        queue_final = queue[:index] + [{"iid":tool["_id"], "priority":priority, "force":force} for tool in tools] + queue[index:]
         dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":queue_final}})
         return results
                     
@@ -435,9 +435,10 @@ def multiChangeOfStatus(pentest, body):
 def queueCheckInstances(pentest, body):
     iids_list = [ ObjectId(x) for x in body.get("iids", []) ]
     check_iids = set()
+    force_queue = body.get("force", False)
     for check_iid in iids_list:
         if isinstance(check_iid, str) and check_iid.startswith("ObjectId|"):
             check_iid = check_iid.replace("ObjectId|", "")
         check_iids.add(str(check_iid))
-    results = CheckInstance.bulk_queue(pentest, list(check_iids), body.get("priority", 0))
+    results = CheckInstance.bulk_queue(pentest, list(check_iids), body.get("priority", 0), force=force)
     return results    

@@ -102,6 +102,7 @@ def autoScan(pentest, endoded_token, autoqueue):
 
             for launchableTool in launchableTools:
                 priority = launchableTool["priority"]
+                force = launchableTool["force"]
                 launchableToolIid = launchableTool["iid"]
                 check = getAutoScanStatus(pentest)
                 if not check:
@@ -111,7 +112,7 @@ def autoScan(pentest, endoded_token, autoqueue):
                 logger.debug("Autoscan : launch task tools: " +
                              str(launchableToolIid))
                 msg, statuscode = isLaunchable(
-                    pentest, launchableToolIid, authorized_commands)
+                    pentest, launchableToolIid, authorized_commands, force)
                 if statuscode == 404:
                     dbclient.updateInDb(pentest, "autoscan", {"type": "queue"}, {
                                         "$pull": {"tools": {"iid": launchableToolIid}}})
