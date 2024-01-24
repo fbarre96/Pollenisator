@@ -183,7 +183,7 @@ class CheckInstance(ServerElement):
                 index = i
                 break
         tools = dbclient.findInDb(pentest, "tools", {"check_iid":{"$in":checks_iids}, "status":{"$ne":"done"}}, True)
-        queue_final = queue[:index] + [{"iid":tool.getId(), "priority":priority} for tool in tools] + queue[index:]
+        queue_final = queue[:index] + [{"iid":tool["_id"], "priority":priority} for tool in tools] + queue[index:]
         dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":queue_final}})
         return results
                     
