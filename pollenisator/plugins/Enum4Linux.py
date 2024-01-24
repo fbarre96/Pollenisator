@@ -110,8 +110,8 @@ def getInfos(enum4linux_file):
                     if len(group) == 2:
                         # groupname, type
                         groupname = group[0]
-                        #type_group = group[1]
-                        infos["domain_users"][infos["domain"]+"\\"+groupname] = {"desc":group[1]}
+                        type_group = group[1]
+                        pass # nothing implemented for groups without user info
 
             return infos
     if found_marker:
