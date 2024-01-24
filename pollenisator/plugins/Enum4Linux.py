@@ -58,8 +58,11 @@ def getInfos(enum4linux_file):
         elif current_part == 3: #"Enumerating Workgroup/Domain"
             if "[+] Got domain/workgroup name: " in line:
                 netbios_domain = line.strip().split(" ")[-1].lower()
-                if netbios_domain not in infos["domain"]:
-                    infos["domain"] = netbios_domain+"."+infos["domain"]
+                if "domain" in infos:
+                    if netbios_domain not in infos["domain"]:
+                        infos["domain"] = netbios_domain+"."+infos["domain"]
+                else:
+                    infos["domain"] = netbios_domain
         elif current_part == 4: #"Session Check on"
             if line.startswith("[+] Server"):
                 if "doesn't allow session" in line:
