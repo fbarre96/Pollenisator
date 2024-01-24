@@ -13,14 +13,21 @@ from pollenisator.core.components.utils import performLookUp
 import json
 import shlex
 
+def remove_term_colors(data):
+    return re.sub(r'\x1b\[[0-9;]+[a-zA-Z]', '', data)
+
 def getInfos(enum4linux_file):
-    parts = ["Starting enum4linux", "Target Information", "Enumerating Workgroup/Domain", "Session Check on", 
-       "Users on", "Groups on", "enum4linux complete on"]
+    parts = [["Starting enum4linux", "ENUM4LINUX"], "Target Information", "via LDAP", "Workgroup/Domain", "Session Check on", 
+       "Users", "Groups", ["complete","Completed"]]
     infos = {"domain_users":{}, "computers":{}}
     current_part = -1
     found_marker = False
     regex_user = re.compile(r"^index: 0x[\da-f]+ RID: 0x[\da-f]+ \S+: 0x[\da-f]+ Account: (.+)(?=\s+Name:)\s+Name:.+(?=Desc:)Desc: (.+)$")
     regex_group = re.compile(r"^Group '([^']+)' \(RID: \d+\) has member: ([^\\]+)\\(.+)$")
+    ng_regex_user = re.compile(r"'\d+':\n\s+username: (.+)\n\s+name: (.+)\n\s+acb: '(.+)'\n\s+description: (.+)", re.MULTILINE)
+    ng_regex_groups = re.compile(r"'\d+':\n\s+groupname: (.+)\n\s+type: (.+)", re.MULTILINE)
+    global_users = ""
+    global_groups = ""
     for line in enum4linux_file:
         if isinstance(line, bytes):
             try:
@@ -28,34 +35,56 @@ def getInfos(enum4linux_file):
             except UnicodeDecodeError:
                 return None
         for i,part in enumerate(parts):
-            if part in line:
+            if isinstance(part, list):
+                for p in part:
+                    if p in line:
+                        current_part = i
+            elif part in line:
                 current_part = i
+        line = remove_term_colors(line)
+
         if current_part == 0: #"Starting enum4linux",
             found_marker = True
         elif current_part == 1: #"Target Information"
-            if line.startswith("Target "):
+            if "Target " in line:
                 infos["ip"] = line.strip().split(" ")[-1]
-            if line.startswith("Username "):
+            if "Username" in line and "Random Username" not in line:
                 infos["username"] = "'".join(line.strip().split("'")[1:-1])
             if line.startswith("Password "):
                 infos["password"] = "'".join(line.strip().split("'")[1:-1])
-        elif current_part == 2: #"Enumerating Workgroup/Domain"
-            if line.startswith("[+] Got domain/workgroup name: "):
+        elif current_part == 2: #"Enumerating LDAP info"
+            if "Long domain name is" in line:
                 infos["domain"] = line.strip().split(" ")[-1].lower()
-        elif current_part == 3: #"Session Check on"
+        elif current_part == 3: #"Enumerating Workgroup/Domain"
+            if "[+] Got domain/workgroup name: " in line:
+                netbios_domain = line.strip().split(" ")[-1].lower()
+                if netbios_domain not in infos["domain"]:
+                    infos["domain"] = netbios_domain+"."+infos["domain"]
+        elif current_part == 4: #"Session Check on"
             if line.startswith("[+] Server"):
                 if "doesn't allow session" in line:
                     infos["session_allowed"] = False
                     return infos
                 else:
                     infos["session_allowed"] = True
-        elif current_part == 4: # user on
+        elif current_part == 5: # user on
             found = re.search(regex_user, line)
             if found is not None:
                 account = found.group(1)
                 desc = found.group(2)
                 infos["domain_users"][infos["domain"]+"\\"+account] = {"desc":desc}
-        elif current_part == 5: # Groups on
+            else:
+                global_users += line
+        elif current_part == 6: # Groups on
+            # also means that users are finished
+            if global_users != "":
+                users = re.findall(ng_regex_user, global_users)
+                for user in users:
+                    if len(user) == 4:
+                        # username, name, acb, description
+                        account = user[0]
+                        desc = user[3]
+                        infos["domain_users"][infos["domain"]+"\\"+account] = {"desc":desc}
             found = re.search(regex_group, line)
             if found is not None:
                 group = found.group(1)
@@ -71,7 +100,19 @@ def getInfos(enum4linux_file):
                         infos["computers"][member] = {"ip":ip, "member":member, "domain":domain}
                 else:    
                     infos["domain_users"][domain+"\\"+member] = user_info
-        elif current_part == 6: #enum4linux complete
+            else:
+                global_groups += line
+        elif current_part == 7: #enum4linux complete
+            # also means that groups are finished
+            if global_groups != "":
+                groups = re.findall(ng_regex_groups, global_groups)
+                for group in groups:
+                    if len(group) == 2:
+                        # groupname, type
+                        groupname = group[0]
+                        #type_group = group[1]
+                        infos["domain_users"][infos["domain"]+"\\"+groupname] = {"desc":group[1]}
+
             return infos
     if found_marker:
         return infos
