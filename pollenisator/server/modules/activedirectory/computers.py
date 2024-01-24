@@ -125,7 +125,8 @@ class Computer(ServerElement):
             return
         dbclient = DBClient.getInstance()
         dbclient.create_index(pentest, "computers", [("ip", 1), ("type", 1)])
-        update_operations = {}
+        update_operations = []
+        set_ip = set()
         for computer in computers_to_add:
             data = computer
             data["type"] = "computer"
@@ -139,12 +140,21 @@ class Computer(ServerElement):
             if len(updater["$set"]) == 0:
                 del updater["$set"]
             updater["$setOnInsert"] = data
-            update_operations[data["ip"].strip()] = UpdateOne({"ip": data["ip"].strip(), "type": "computer"}, updater, upsert=True)
-        result = dbclient.bulk_write(pentest, "computers", list(update_operations.values()))
+            if data["ip"].strip() not in set_ip:
+                update_operations.append(UpdateOne({"ip": data["ip"].strip(), "type": "computer"}, updater, upsert=True))
+                set_ip.add(data["ip"].strip())
+            else:
+                if "$setOnInsert" in updater:
+                    del updater["$setOnInsert"]
+                if updater:
+                    update_operations.append(UpdateOne({"ip": data["ip"].strip(), "type": "computer"}, updater, upsert=True))
+        if not update_operations:
+            return
+        result = dbclient.bulk_write(pentest, "computers", list(update_operations))
         upserted_ids = result.upserted_ids
         if not upserted_ids and result.modified_count == 0:
             return
-        computers_inserted = Computer.fetchObjects(pentest, {"type":"computer", "ip":{"$in":list(update_operations.keys())}})
+        computers_inserted = Computer.fetchObjects(pentest, {"type":"computer", "ip":{"$in":list(set_ip)}})
         for computer in computers_inserted:
             if computer.infos.is_dc:
                 computer.add_dc_checks()

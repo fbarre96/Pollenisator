@@ -143,15 +143,14 @@ class ServerPort(Port, ServerElement):
         result = dbclient.bulk_write(pentest, "ports", update_operations)
         logger.info(f"Bluk writing ports took {time.time() - start}")
         upserted_ids = result.upserted_ids
+        if not upserted_ids and result.modified_count == 0:
+            return
+        start = time.time()
+        Computer.bulk_insert(pentest, computers)
+        logger.info(f"Computer update took {time.time() - start}")
         if not upserted_ids:
             return
         ports_inserted = ServerPort.fetchObjects(pentest, {"_id":{"$in":list(upserted_ids.values())}})
-        start = time.time()
-        Computer.bulk_insert(pentest, computers)
-        
-            
-        logger.info(f"Computer update took {time.time() - start}")
-        
         CheckInstance.bulk_insert_for(pentest, ports_inserted, "port", ["port:onServiceUpdate"], f_get_impacted_targets=cls.get_allowed_ports)
         # lkp = {}
         # port_keys = set()
