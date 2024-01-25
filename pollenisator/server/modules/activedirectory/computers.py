@@ -355,6 +355,8 @@ def update(pentest, computer_iid, body):  # noqa: E501
     if domain is not None:
         domain = domain.lower()
         body["domain"] = domain
+    if domain is None or domain == "":
+        return "Invalid domain", 400
     if domain is not None and domain != "":
         existingDomain = dbclient.findInDb(pentest, 
              "computers", {"type":"computer", "domain":domain}, False)
