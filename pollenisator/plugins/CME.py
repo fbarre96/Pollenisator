@@ -66,6 +66,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
     ntds = []
     secrets = []
     tags = []
+    lastValidDomain = None
     for line in cme_file:
         if isinstance(line, bytes):
             try:
@@ -141,6 +142,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                     toAdd["os"] = res_infos.group(3)
                     toAdd["machine_name"] = res_infos.group(4)
                     toAdd["domain"] = res_infos.group(5)
+                    lastValidDomain = toAdd["domain"]
                     toAdd["signing"] = res_infos.group(6)
                     toAdd["smbv1"] = res_infos.group(7)
                     countFound += 1
@@ -152,6 +154,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                         toAdd["port"] = success_infos.group(2)
                         toAdd["machine_name"] = success_infos.group(3)
                         toAdd["domain"] = success_infos.group(4)
+                        lastValidDomain = toAdd["domain"]
                         toAdd["username"] = success_infos.group(5)
                         toAdd["password"] = success_infos.group(6)
                         pwned = success_infos.group(7) != ""
@@ -198,6 +201,8 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                 continue
             if toAdd.get("ip", None) is not None:
                 if "toAdd" in locals():
+                    if lastValidDomain is not None:
+                        toAdd["domain"] = lastValidDomain
                     toAdd["secrets"] = toAdd.get("secrets", []) + [module_infos.group(4)]
             secrets.append(line)
         elif mode == "ntds":
@@ -205,6 +210,8 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
             if module_infos is None:
                 continue
             if "toAdd" in locals():
+                if lastValidDomain is not None:
+                    toAdd["domain"] = lastValidDomain
                 toAdd["ip"] = module_infos.group(1)
                 toAdd["port"] = module_infos.group(2)
                 toAdd["machine_name"] = module_infos.group(3)
