@@ -305,6 +305,7 @@ def insert(pentest, body):
     dbclient = DBClient.getInstance()
     domain = user.domain.lower() if user.domain is not None else ""
     username = user.username.lower() if user.username is not None else ""
+    username = username.strip()
     password = user.password if user.password is not None else ""
     existing = dbclient.findInDb(pentest,
         "users", {"type":"user", "domain":{"$regex":domain}, "username":username}, False)
@@ -344,7 +345,9 @@ def update(pentest, user_iid, body):
     """
     user = User(pentest, body)
     user.username = user.username.lower()
+    user.username = user.username.strip()
     user.domain = user.domain.lower()
+
     dbclient = DBClient.getInstance()
     user_existing = User.fetchObject(pentest, {"_id": ObjectId(user_iid)})
     if user_existing.username != user.username  and user_existing.domain != user.domain:
