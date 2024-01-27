@@ -501,9 +501,12 @@ def craftCommandLine(pentest, tool_iid, commandline_options=""):
         dbclient.updateInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, {"$set":{"text":commandline_options}}, False, True)
     # GET COMMAND OBJECT FOR THE TOOL
     if toolModel.text == "":
-        command_o = ServerCommand.fetchObject({"_id": ObjectId(toolModel.command_iid)}, pentest)
-        if command_o is None:
-            return "Associated command was not found", 404
+        try:
+            command_o = ServerCommand.fetchObject({"_id": ObjectId(toolModel.command_iid)}, pentest)
+            if command_o is None:
+                return "Associated command was not found", 404
+        except InvalidId:
+            return "No command was not found", 404
     else:
         command_o = str(toolModel.text)
     # Replace vars in command text (command line)
