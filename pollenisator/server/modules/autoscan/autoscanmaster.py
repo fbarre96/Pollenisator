@@ -102,7 +102,7 @@ def autoScan(pentest, endoded_token, autoqueue):
 
             for launchableTool in launchableTools:
                 priority = launchableTool["priority"]
-                force = launchableTool["force"]
+                force = launchableTool.get("force", False)
                 launchableToolIid = launchableTool["iid"]
                 check = getAutoScanStatus(pentest)
                 if not check:
