@@ -470,7 +470,10 @@ def do_insert(pentest, body, **kwargs):
     tool_o._id = ret
     if base["check_iid"] != "" and kwargs.get("update_check", True):
         from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
-        check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(base["check_iid"])})
+        try:
+            check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(base["check_iid"])})
+        except InvalidId:
+            return {"res":True, "iid":ret}
         if check is not None:
             check.updateInfos()
     # adding the appropriate tools for this scope.
