@@ -1,6 +1,5 @@
 # ENABLE debug mode early because evenlet monkey patch other libs
 import os
-import uuid
 
 debug = os.environ.get("FLASK_DEBUG", False)
 if debug:
