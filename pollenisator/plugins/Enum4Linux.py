@@ -50,6 +50,8 @@ def getInfos(enum4linux_file):
                 infos["ip"] = line.strip().split(" ")[-1]
             if "Username" in line and "Random Username" not in line:
                 infos["username"] = "'".join(line.strip().split("'")[1:-1])
+            elif "Random Username" in line:
+                infos["random_username"] = "'".join(line.strip().split("'")[1:-1])
             if line.startswith("Password "):
                 infos["password"] = "'".join(line.strip().split("'")[1:-1])
         elif current_part == 2: #"Enumerating LDAP info"
@@ -70,6 +72,10 @@ def getInfos(enum4linux_file):
                     return infos
                 else:
                     infos["session_allowed"] = True
+                    username = line.split("username '")[1].split("'")[0]
+                    if username.strip() == "" or username.strip() == infos.get("random_username"):
+                        infos["null_session_allowed"] = True
+
         elif current_part == 5: # user on
             found = re.search(regex_user, line)
             if found is not None:
@@ -242,6 +248,8 @@ class Enum4Linux(Plugin):
             tags = [self.getTags()["info-enum4linux-success"]]
             if domain is None and user is None:
                 tags += [Tag(self.getTags()["high-null-sessions-allowed"], notes=f"Null session allowed on {enum_infos.get('ip')}")]
+        elif enum_infos.get("null_session_allowed") == True:
+            tags += [Tag(self.getTags()["high-null-sessions-allowed"], notes=f"Null or guest session allowed on {enum_infos.get('ip')}")]
         elif enum_infos is None:
             return None, None, None, None
         targets = updateDatabase(pentest, enum_infos)
