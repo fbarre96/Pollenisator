@@ -1,15 +1,29 @@
 """Module using Lark parser to parse filter query and return according results"""
+from typing import Any, Iterable, List, Tuple
 from lark import Lark, Transformer, exceptions
-import re
 
 class Term:
     """A search term, meaning "key.name" == (value) """
-    def __init__(self, val):
-        """Constructor"""
+    def __init__(self, val: Any) -> None:
+        """
+        Constructor for the class.
+
+        Args:
+            val (Any): The value to be stored in the instance.
+
+        Returns:
+            None
+        """
         self.val = val
-    
-    def __str__(self):
-        return self.val
+
+    def __str__(self) -> str:
+        """
+        Return the string representation of the object.
+
+        Returns:
+            str: The string representation of the object.
+        """
+        return str(self.val)
 
 class TreeToCondition(Transformer):
     """Inherits lark.Transformer
@@ -47,41 +61,53 @@ class TreeToCondition(Transformer):
     orcond = lambda self, _: "or"
     notcond = lambda self, _: "not"
 
-    def term(self, items):
-        """Applied on parse-tree terms objects.
+    def term(self, items: Iterable[Any]) -> List[Any]:
+        """
+        Applied on parse-tree terms objects.
+
         Args:
-            items: the parse-tree term object
+            items (Iterable[Any]): The parse-tree term object.
+
         Returns:
-            the given item as a list
+            List[Any]: The given item as a list.
         """
         return list(items)
 
-    def var(self, s):
-        """Applied on parse-tree var objects.
+    def var(self, s: Tuple[Any]) -> Term:
+        """
+        Applied on parse-tree var objects.
+
         Args:
-            s: the parse-tree var object
+            s (Tuple[Any]): The parse-tree var object.
+
         Returns:
-            the given item as a Term
+            Term: The given item as a Term.
         """
         (s,) = s
         return Term(s)
 
-    def string(self, s):
-        """Applied on parse-tree string objects.
+    def string(self, s: Tuple[Any]) -> str:
+        """
+        Applied on parse-tree string objects.
+
         Args:
-            s: the parse-tree string object
+            s (Tuple[Any]): The parse-tree string object.
+
         Returns:
-            the given item as a str
+            str: The given item as a string.
         """
         (s,) = s
         return str(s)
-        
-    def number(self, n):
-        """Applied on parse-tree number objects.
+
+    def number(self, n: Tuple[Any]) -> str:
+        """
+        Applied on parse-tree number objects.
+
         Args:
-            s: the parse-tree number object
+            n (Tuple[Any]): The parse-tree number object.
+
         Returns:
-            the given item as a str with double quotes around them
+            str: The given item as a string with double quotes around them.
         """
         (n,) = n
         return "\""+str(n)+"\""
@@ -103,7 +129,7 @@ class Parser:
                         * opregex: the regex operator
                         * STRING: an alphanumeric string with extras characs '.', '[' and ']'
     """
-   
+
     condition_parser = Lark(r"""
     ?term: "("fixedvalue op fixedvalue")"
                 | fixedvalue op fixedvalue
@@ -132,7 +158,7 @@ class Parser:
     """, start='term', parser="lalr", transformer=TreeToCondition())
 
     @classmethod
-    def help(cls):
+    def help(cls) -> str:
         """Return a string to help typing request by providing examples
         Returns:
             A string of examples
@@ -155,23 +181,32 @@ type == "tool" and "done" not in status
 type == "tool" and "ready" in status
 type == "ip" and infos.key == "ABC"
 """
-    def __init__(self, query=""):
-        """Constructor
+    def __init__(self, query: str = "") -> None:
+        """
+        Constructor for the Parser class.
+
         Args:
-            query: the query to parse
+            query (str): The query to parse. Defaults to an empty string.
+
         Raises:
-            ParseError if Lark raises an UnexpectedToken or an UnexptectedCharacters exception.
+            ParseError: If Lark raises an UnexpectedToken or an UnexpectedCharacters exception.
         """
         try:
             self.parsed = Parser.condition_parser.parse(query)
         except exceptions.UnexpectedToken as e:
-            raise ParseError(e)
+            raise ParseError(e) from e
         except exceptions.UnexpectedCharacters as e:
-            raise ParseError(e)
+            raise ParseError(e) from e
 
-    def getResult(self):
+    def getResult(self) -> Any:
+        """
+        Get the result of the parsing.
+
+        Returns:
+            Any: The parsed result.
+        """
         return self.parsed
-        
+
     # def evaluate(self, parsedcopy, data):
     #     """Replace parsed items with corresponding formated data and eval the condition using python eval()
     #     Args:

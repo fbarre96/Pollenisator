@@ -237,7 +237,9 @@ class DBClient:
             self.port = os.environ.get("MONGODB_PORT",str(cfg.get("mongo_port", 27017)))
             self.password = os.environ.get("MONGODB_PASSWORD",str(cfg["password"]))
             self.user = os.environ.get("MONGODB_USER",str(cfg["user"]))
-            self.ssl = os.environ.get("MONGODB_SSL",str(cfg["ssl"]))
+            self.ssl = os.environ.get("MONGODB_SSL",str(cfg["ssl"])).lower()
+            if self.ssl != "true":
+                self.ssl = ""
 
             connectionString = ""
             if self.user != "":
@@ -1158,8 +1160,6 @@ class DBClient:
             raise ValueError("API has trouble connecting to db. Check api server config.")
         if dbName is None or dbName not in pentest_uuids:
             raise ValueError("Database not found")
-        if dbName.isalnum() == False:
-            raise ValueError("Invalid database name")
         dir_path = os.path.dirname(os.path.realpath(__file__))
         out_path = os.path.join(
             dir_path, "../../exports/", dbName if collection == "" else dbName+"_"+collection)
@@ -1169,6 +1169,7 @@ class DBClient:
             self.host+"  --db "+dbName+" --archive="+out_path+".gz --gzip"
         if collection.strip() != "":
             cmd += " -c "+str(collection).strip()
+        
         if self.ssl.strip() != "":
             cmd += " --ssl --sslPEMKeyFile "+self.ssldir+"/client.pem --sslCAFile " + \
                 self.ssldir+"/ca.pem --sslAllowInvalidHostnames"

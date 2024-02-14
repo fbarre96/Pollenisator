@@ -1,22 +1,32 @@
 """Provide useful functions"""
 import sys
 import os
-import socket
 import subprocess
 import time
 from datetime import datetime
 from threading import Timer
 import json
 import shutil
+import re
+from typing import Any, Dict, List, Optional, Union
 from netaddr import IPNetwork
 from netaddr.core import AddrFormatError
 from bson import ObjectId
-from pollenisator.core.components.logger_config import logger
 import dns.resolver
+import werkzeug
 
+from pollenisator.plugins.plugin import Plugin
+from pollenisator.core.components.logger_config import logger
 from pollenisator.core.components.tag import Tag
 
 class JSONEncoder(json.JSONEncoder):
+    """JSON encoder for custom types:
+        - Converts bson.ObjectId to string ObjectId|<id>
+        - Converts datetime to string using datatime.__str__
+        - Converts bytes to string using utf-8
+        - Converts Tag to string using Tag.getData()
+    """
+
     def default(self, o):
         if isinstance(o, ObjectId):
             return "ObjectId|"+str(o)
@@ -29,10 +39,36 @@ class JSONEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, o)
 
 class JSONDecoder(json.JSONDecoder):
-    def __init__(self, *args, **kwargs):
+    """
+    JSON decoder for custom types:
+        - Converts string ObjectId|<id> to bson.ObjectId
+        - Converts string datetime to datetime
+        - Converts string Tag to Tag object
+    """
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """
+        Constructor for the JSONDecoder class.
+
+        Args:
+            args (Any): Variable length argument list.
+            kwargs (Any): Arbitrary keyword arguments.
+
+        Inherits:
+            json.JSONDecoder: The JSONDecoder class from the json module.
+        """
         json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
-        
-    def object_hook(self, dct):
+
+    # Override the object_hook function to convert custom types
+    def object_hook(self, dct: Dict[Any, Any]) -> Dict[Any, Any]: # pylint: disable=method-hidden
+        """
+        Override the object_hook function to convert custom types.
+
+        Args:
+            dct (Dict[Any, Any]): The dictionary to process.
+
+        Returns:
+            Dict[Any, Any]: The processed dictionary with custom types converted.
+        """
         for k,v in dct.items():
             if isinstance(v, list):
                 for i, item in enumerate(v):
@@ -41,20 +77,20 @@ class JSONDecoder(json.JSONDecoder):
                 dct[k] = v
             elif str(v).startswith('ObjectId|'):
                 dct[k] = ObjectId(v.split('ObjectId|')[1])
-            
         return dct
 
 
 
-def loadPlugin(pluginName):
+def loadPlugin(pluginName: str) -> Plugin:
     """
     Load a the plugin python corresponding to the given command name.
     The plugin must start with the command name and be located in plugins folder.
+
     Args:
-        pluginName: the command name to load a plugin for
+        pluginName (str): The command name to load a plugin for.
 
     Returns:
-        return the module plugin loaded or default plugin if not found.
+        Any: The module plugin loaded or default plugin if not found.
     """
     from pollenisator.plugins.plugin import REGISTRY
     # Load plugins
@@ -79,11 +115,12 @@ def loadPlugin(pluginName):
         __import__("Default")
         return REGISTRY["Default"]
 
-def listPlugin():
+def listPlugin() -> List[str]:
     """
     List the plugins.
+
     Returns:
-        return the list of plugins file names.
+        List[str]: The list of plugin file names.
     """
     dir_path = os.path.dirname(os.path.realpath(__file__))
     path = os.path.join(dir_path, "../../plugins/")
@@ -94,17 +131,27 @@ def listPlugin():
         ".py") and x != "__pycache__" and x != "__init__.py" and x != "plugin.py"]
     return plugin_list
 
-def detectPlugins(pentest, upfile, cmdline, ext):
-    foundPlugin = "Ignored"
+def detectPlugins(pentest: str, upfile: werkzeug.datastructures.FileStorage, cmdline: str, ext: str) -> List[Dict[str, Union[str, None, List[Tag]]]]:
+    """
+    Detect which plugins to use on the uploaded file, and get their results.
+
+    Args:
+        pentest (str): The pentest object.
+        upfile (werkzeug.FileStorag): The uploaded file object.
+        cmdline (str): The command line string.
+        ext (str): The file extension.
+
+    Returns:
+        List[Dict[str, Any]]: A list of dictionaries containing the results of each plugin.
+    """
     results = []
     for pluginName in listPlugin():
-        result = {"tags":[]}
+        result: Dict[str, Any] = {"tags":[]}
         mod = loadPlugin(pluginName)
         if mod.autoDetectEnabled():
             notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline, ext=ext, filename=upfile.filename)
             upfile.stream.seek(0)
             if notes is not None and tags is not None:
-                foundPlugin = pluginName
                 result["tags"] = tags
                 result["notes"] = notes
                 result["lvl"] = lvl
@@ -113,7 +160,16 @@ def detectPlugins(pentest, upfile, cmdline, ext):
                 results.append(result)
     return results
 
-def detectPluginsWithCmd(cmdline):
+def detectPluginsWithCmd(cmdline: str) -> List[str]:
+    """
+    Detect plugins with a given command line.
+
+    Args:
+        cmdline (str): The command line string.
+
+    Returns:
+        List[str]: A list of detected plugin names. If no plugins are detected, returns ["Default"].
+    """
     foundPlugins = []
     for pluginName in listPlugin():
         mod = loadPlugin(pluginName)
@@ -124,27 +180,29 @@ def detectPluginsWithCmd(cmdline):
         return ["Default"]
     return foundPlugins
 
-def isIp(domain_or_networks):
+def isIp(domain_or_networks: str) -> bool:
     """
-    Check if the given scope string is a network ip or a domain.
+    Check if the given scope string is a network IP or a domain.
+
     Args:
-        domain_or_networks: the domain string or the network ipv4 range string
+        domain_or_networks (str): The domain string or the network IPv4 range string.
+
     Returns:
-        Returns True if it is a network ipv4 range, False if it is a domain (any other possible case).
+        bool: Returns True if it is a network IPv4 range, False if it is a domain (any other possible case).
     """
-    import re
     regex_network_ip = r"((?:[0-9]{1,3}\.){3}[0-9]{1,3})$"
     ipSearch = re.match(regex_network_ip, domain_or_networks)
     return ipSearch is not None
 
-
-def isNetworkIp(domain_or_networks):
+def isNetworkIp(domain_or_networks: str) -> bool:
     """
-    Check if the given scope string is a network ip or a domain.
+    Check if the given scope string is a network IP or a domain.
+
     Args:
-        domain_or_networks: the domain string or the network ipv4 range string
+        domain_or_networks (str): The domain string or the network IPv4 range string.
+
     Returns:
-        Returns True if it is a network ipv4 range, False if it is a domain (any other possible case).
+        bool: Returns True if it is a network IPv4 range, False if it is a domain (any other possible case).
     """
     try:
         IPNetwork(domain_or_networks)
@@ -153,13 +211,15 @@ def isNetworkIp(domain_or_networks):
     return True
 
 
-def splitRange(rangeIp):
+def splitRange(rangeIp: str) -> List[IPNetwork]:
     """
     Check if the given range string is bigger than a /24, if it is, splits it in many /24.
+
     Args:
-        rangeIp: network ipv4 range string
+        rangeIp (str): Network IPv4 range string.
+
     Returns:
-        Returns a list of IpNetwork objects corresponding to the range given as /24s.
+        List[IPNetwork]: A list of IPNetwork objects corresponding to the range given as /24s.
         If the entry range is smaller than a /24 (like /25 ... /32) the list will be empty.
     """
     ip = IPNetwork(rangeIp)
@@ -167,42 +227,67 @@ def splitRange(rangeIp):
     return subnets
 
 
-def getDefaultWorkerCommandsFile():
+def getDefaultWorkerCommandsFile() -> str:
+    """
+    Get the default worker commands file path.
+
+    Returns:
+        str: The path to the default worker commands file.
+    """
     return os.path.join(getMainDir(), "config", "worker_commands.json")
 
-def getDefaultCommandsFile():
+def getDefaultCommandsFile() -> str:
+    """
+    Get the default commands file path.
+
+    Returns:
+        str: The path to the default commands file.
+    """
     return os.path.join(getMainDir(), "config", "default_commands.json")
 
-def getDefaultCheatsheetFile():
+def getDefaultCheatsheetFile() -> str:
+    """
+    Get the default cheatsheet commands file path.
+
+    Returns:
+        str: The path to the default cheatsheet commands file.
+    """
     return os.path.join(getMainDir(), "config", "default_cheatsheet.json")
 
-def resetUnfinishedTools():
-    """
-    Reset all tools running to a ready state. This is useful if a command was running on a worker and the auto scanning was interrupted.
-    """
-    # test all the cases if datef is defined or not.
-    # Normally, only the first one is necessary
-    from pollenisator.core.models.tool import Tool
-    tools = Tool.fetchObjects({"datef": "None", "scanner_ip": {"$ne": "None"}})
-    for tool in tools:
-        tool.markAsNotDone()
-    tools = Tool.fetchObjects({"datef": "None", "dated": {"$ne": "None"}})
-    for tool in tools:
-        tool.markAsNotDone()
-    tools = Tool.fetchObjects(
-        {"datef": {"$exists": False}, "dated": {"$ne": "None"}})
-    for tool in tools:
-        tool.markAsNotDone()
-    tools = Tool.fetchObjects(
-        {"datef": {"$exists": False}, "scanner_ip": {"$ne": "None"}})
-    for tool in tools:
-        tool.markAsNotDone()
+# def resetUnfinishedTools() -> None:
+#     """
+#     Reset all tools running to a ready state. This is useful if a command was running on a worker and the auto scanning was interrupted.
+#     """
+#     # test all the cases if datef is defined or not.
+#     # Normally, only the first one is necessary
+#     from pollenisator.core.models.tool import Tool
+#     tools = Tool.fetchObjects({"datef": "None", "scanner_ip": {"$ne": "None"}})
+#     for tool in tools:
+#         tool.markAsNotDone()
+#     tools = Tool.fetchObjects({"datef": "None", "dated": {"$ne": "None"}})
+#     for tool in tools:
+#         tool.markAsNotDone()
+#     tools = Tool.fetchObjects(
+#         {"datef": {"$exists": False}, "dated": {"$ne": "None"}})
+#     for tool in tools:
+#         tool.markAsNotDone()
+#     tools = Tool.fetchObjects(
+#         {"datef": {"$exists": False}, "scanner_ip": {"$ne": "None"}})
+#     for tool in tools:
+#         tool.markAsNotDone()
 
 
-def stringToDate(datestring):
-    """Converts a string with format '%d/%m/%Y %H:%M:%S' to a python date object.
+def stringToDate(datestring: str) -> Optional[datetime]:
+    """
+    Converts a string with format '%d/%m/%Y %H:%M:%S' to a python date object.
+
     Args:
-        datestring: Returns the date python object if the given string is successfully converted, None otherwise"""
+        datestring (str): The date string to convert.
+    Raises:
+        ValueError: If the given string is not in the correct format.
+    Returns:
+        Optional[datetime]: The date python object if the given string is successfully converted, None otherwise.
+    """
     ret = None
     if isinstance(datestring, str):
         if datestring != "None":
@@ -210,19 +295,25 @@ def stringToDate(datestring):
                 ret = datetime.strptime(
                     datestring, '%d/%m/%Y %H:%M:%S')
             except ValueError as e:
-                raise(e)
+                raise e
     return ret
 
 
-def fitNowTime(dated, datef):
-    """Check the current time on the machine is between the given start and end date.
+def fitNowTime(dated: Optional[str], datef: Optional[str]) -> bool:
+    """
+    Check the current time on the machine is between the given start and end date.
+
     Args:
-        dated: the starting date for the interval
-        datef: the ending date for the interval
+        dated (Optional[str]): The starting date for the interval.
+        datef (Optional[str]): The ending date for the interval.
+
     Returns:
-        True if the current time is between the given interval. False otherwise.
-        If one of the args is None, returns False."""
+        bool: True if the current time is between the given interval. False otherwise.
+        If one of the args is None, returns False.
+    """
     today = datetime.now()
+    if dated is None or datef is None:
+        return False
     try:
         date_start = stringToDate(dated)
         date_end = stringToDate(datef)
@@ -233,101 +324,108 @@ def fitNowTime(dated, datef):
     return today > date_start and date_end > today
 
 
-def execute(command, timeout=None, printStdout=True):
+def execute(command: str, timeout: Optional[Union[float, datetime]] = None, printStdout: bool = True) -> int:
     """
-    Execute a bash command and print output
+    Execute a bash command and print output.
 
     Args:
-        command: A bash command
-        timeout: a date in the futur when the command will be stopped if still running or None to not use this option, default as None.
-        printStdout: A boolean indicating if the stdout should be printed. Default to True.
+        command (str): A bash command.
+        timeout (Optional[Union[float, datetime]]): A date in the future when the command will be stopped if still running or None to not use this option. Default is None.
+        printStdout (bool): A boolean indicating if the stdout should be printed. Default is True.
 
     Returns:
-        Return the return code of this command
+        int: The return code of this command.
 
     Raises:
-        Raise a KeyboardInterrupt if the command was interrupted by a KeyboardInterrupt (Ctrl+c)
+        KeyboardInterrupt: If the command was interrupted by a KeyboardInterrupt (Ctrl+c).
     """
-
     try:
         proc = subprocess.Popen(
             command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         time.sleep(1) #HACK Break if not there when launching fast custom tools on local host
+        float_timeout = None
+        timer = None
         try:
             if timeout is not None:
                 if isinstance(timeout, float):
-                    timeout = (timeout-datetime.now()).total_seconds()
                     timer = Timer(timeout, proc.kill)
                     timer.start()
-                else:
+                    float_timeout = timeout
+                elif isinstance(timeout, datetime):
                     if timeout.year < datetime.now().year+1:
-                        timeout = (timeout-datetime.now()).total_seconds()
-                        timer = Timer(timeout, proc.kill)
+                        float_timeout = (timeout-datetime.now()).total_seconds()
+                        timer = Timer(float_timeout, proc.kill)
                         timer.start()
-            stdout, stderr = proc.communicate(None, timeout)
+                else:
+                    logger.error(
+                        "ERROR in command execution: timeout must be a float or a datetime object")
+                    return -1
+            raw_stdout, raw_stderr = proc.communicate(None, float_timeout)
             if printStdout:
-                stdout = stdout.decode('utf-8')
-                stderr = stderr.decode('utf-8')
+                stdout = raw_stdout.decode('utf-8')
+                stderr = raw_stderr.decode('utf-8')
                 if str(stdout) != "":
                     print(str(stdout))
                 if str(stderr) != "":
                     print(str(stderr))
         except Exception as e:
-            logger.error(f"ERROR in command execution of command {command}: {e}")
+            logger.error("ERROR in command execution of command %s: %s", command, e)
             proc.kill()
             return -1
         finally:
-            if timeout is not None:
-                if isinstance(timeout, float):
-                    timer.cancel()
-                else:
-                    if timeout.year < datetime.now().year+1:
-                        timer.cancel()
+            if timer is not None:
+                timer.cancel()
         return proc.returncode
     except KeyboardInterrupt as e:
         raise e
 
 
-def performLookUp(domain, nameservers=None):
+def performLookUp(domain: str, nameservers: Optional[List[str]] = None) -> Optional[str]:
     """
-    Uses the socket module to get an ip from a domain.
+    Uses the dns.resolver module to get an IP from a domain.
 
     Args:
-        domain: the domain to look for in dns
+        domain (str): The domain to look for in DNS.
+        nameservers (Optional[List[str]]): A list of nameservers to use for the DNS lookup. If not provided, uses ['8.8.8.8', '1.1.1.1'].
 
     Returns:
-        Return the ip found from dns records, None if failed.
+        Optional[str]: The IP found from DNS records, None if failed.
     """
     my_resolver = dns.resolver.Resolver()
     my_resolver.timeout = 1
     my_resolver.lifetime = 1
     my_resolver.nameservers = nameservers if nameservers is not None else ['8.8.8.8', '1.1.1.1']
-    try: 
+    try:
         answer = my_resolver.query(domain, 'A')
         if answer:
-            res = answer[0].to_text()
+            res = str(answer[0].to_text())
             if res != "0.0.0.0":
                 return res
-    except:
+    except KeyError:
+        return None
+    except Exception:
         return None
     return None
 
     
 
 
-def loadCfg(cfgfile):
+def loadCfg(cfgfile: str) -> Dict[str, Any]:
     """
     Load a json config file.
+
     Args:
-        cfgfile: the path to a json config file
+        cfgfile (str): The path to a json config file.
+
     Raises:
-        FileNotFoundError if the given file does not exist
+        FileNotFoundError: If the given file does not exist.
+
     Returns:
-        Return the json converted values of the config file.
+        Dict[str, Any]: The json converted values of the config file.
     """
     default_tools_infos = dict()
     try:
-        with open(cfgfile, "r") as f:
+        with open(cfgfile, "r", encoding="utf-8") as f:
             default_tools_infos = json.loads(f.read())
     except FileNotFoundError as e:
         raise e
@@ -335,24 +433,26 @@ def loadCfg(cfgfile):
     return default_tools_infos
 
 
-def getServerConfigFolder():
+def getServerConfigFolder() -> str:
+    """
+    Get the server configuration folder path. If the folder does not exist, it is created.
+
+    Returns:
+        str: The path to the server configuration folder.
+    """
     c = os.path.join(os.path.expanduser("~"), ".config/pollenisator/")
-    try:
-        os.makedirs(c)
-    except:
-        pass
+    os.makedirs(c, exist_ok=True)
     return c
 
-def getDefaultWorkerCommandsFile():
-    return os.path.join(getMainDir(), "config", "worker_commands.json")
+def loadServerConfig() -> Dict[str, Any]:
+    """
+    Load the server configuration from the config/server.cfg file. If the file does not exist, it tries to create it from a sample config file.
 
-def getDefaultCommandsFile():
-    return os.path.join(getMainDir(), "config", "default_commands.json")
-
-def loadServerConfig():
-    """Return data converted from json inside config/server.cfg
     Returns:
-        Json converted data inside config/server.cfg
+        Dict[str, Any]: The json converted values of the server config file.
+
+    Raises:
+        SystemExit: If the config file or the sample config file does not exist, or if there is a permission error when trying to create the config file.
     """
     config_file = os.path.join(getServerConfigFolder(), "server.cfg")
     sample_config_file = os.path.join(getMainDir(),"config/", "serverSample.cfg")
@@ -361,78 +461,50 @@ def loadServerConfig():
             try:
                 shutil.copyfile(sample_config_file, config_file)
             except PermissionError:
-                (f"Permission denied when trying to create a config file\n Please create the file {os.path.normpath(config_file)} (you can use the serverSample.cfg as a base)")
+                logger.error("Permission denied when trying to create a config file\n Please create the file %s (you can use the serverSample.cfg as a base)", os.path.normpath(config_file))
                 sys.exit(0)
         else:
-            logger.waring(f"Config file not found inside {os.path.normpath(config_file)}, please create one based on the provided serverSample.cfg inside the same directory.")
+            logger.warning("Config file not found inside %s, please create one based on the provided serverSample.cfg inside the same directory.", os.path.normpath(config_file))
             sys.exit(0)
     return loadCfg(config_file)
 
 
-def saveServerConfig(configDict):
-    """Saves data in configDict to config/server.cfg as json
+def saveServerConfig(configDict: Dict[str, Any]) -> None:
+    """
+    Saves data in configDict to config/server.cfg as json.
+
     Args:
-        configDict: data to be stored in config/server.cfg
+        configDict (Dict[str, Any]): Data to be stored in config/server.cfg.
     """
     configFile = os.path.join(getServerConfigFolder(),"server.cfg")
-    with open(configFile, "w") as f:
+    with open(configFile, "w", encoding="utf8") as f:
         f.write(json.dumps(configDict))
 
 
-def getValidMarkIconPath():
-    """Returns:
-         a validation mark icon path
+def getMainDir() -> str:
     """
-    p = os.path.join(os.path.dirname(
-        os.path.realpath(__file__)), "../../icon/done_tool.png")
-    return p
+    Get the main directory of the Pollenisator application.
 
-
-def getBadMarkIconPath():
-    """Returns:
-         a bad mark icon path
-    """
-    p = os.path.join(os.path.dirname(
-        os.path.realpath(__file__)), "../../icon/cross.png")
-    return p
-
-
-def getWaitingMarkIconPath():
-    """Returns:
-         a waiting icon path
-    """
-    p = os.path.join(os.path.dirname(
-        os.path.realpath(__file__)), "../../icon/waiting.png")
-    return p
-
-
-def getHelpIconPath():
-    """Returns:
-         a help icon path
-    """
-    p = os.path.join(os.path.dirname(
-        os.path.realpath(__file__)), "../../icon/help.png")
-    return p
-
-
-def getIconDir():
-    """Returns:
-        the icon directory path
-    """
-    p = os.path.join(os.path.dirname(
-        os.path.realpath(__file__)), "../../icon/")
-    return p
-
-
-def getMainDir():
-    """Returns:
-        the pollenisator main folder
+    Returns:
+        str: The path to the main directory of the Pollenisator application.
     """
     p = os.path.join(os.path.dirname(
         os.path.realpath(__file__)), "../../")
     return p
 
-def checkCommandService(allowed_ports_services, port, proto, service):
+def checkCommandService(allowed_ports_services: List[str], port: str, proto: str, service: str) -> bool:
+    """
+    Check if a given port and protocol combination is allowed by a list of allowed ports and services.
+
+    Args:
+        allowed_ports_services (List[str]): A list of allowed ports and services in the format "proto/port-service".
+        port (str): The port to check.
+        proto (str): The protocol to check.
+        service (str): The service to check.
+
+    Returns:
+        bool: True if the port and protocol combination is allowed, False otherwise.
+    """
     for i, elem in enumerate(allowed_ports_services):
         elem_stripped = elem.strip()
         if not elem_stripped.startswith(("tcp/", "udp/")):
@@ -454,5 +526,3 @@ def checkCommandService(allowed_ports_services, port, proto, service):
             ):
             return True
     return False
-
-

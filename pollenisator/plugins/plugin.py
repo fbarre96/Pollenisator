@@ -1,9 +1,10 @@
 """A registry for all subclasses of Plugin"""
-REGISTRY = {}
+from typing import Dict
 import shlex
 import os
-
 from pollenisator.core.components.tag import Tag
+
+REGISTRY: Dict[str, 'Plugin'] = {}
 
 def register_class(target_class):
     """Register the given class
