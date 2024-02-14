@@ -1022,10 +1022,7 @@ class DBClient:
         Returns:
             Tuple[bool, str]: Returns a tuple with a boolean indicating if pentest was successfully registered and a string message or the uuid of the pentest.
         """
-        if self.db is None:
-            raise ValueError("No pentest connected")
-        if self.current_pentest is None:
-            raise ValueError("No pentest connected")
+        self.connect()
         oldConnection = self.current_pentest
         authorized, msg = self.validatePentestName(saveAsName.strip().lower())
         # check for forbidden names
@@ -1034,6 +1031,8 @@ class DBClient:
             return False, msg
         # check if already exists
         self.connectToDb("pollenisator")
+        if self.db is None:
+            raise ValueError("Could not connect to pollenisator database")
         uuid = str(uuid4())
         while self.db.pentests.find_one({"uuid": uuid}) is not None:
             uuid = str(uuid4())
@@ -1046,7 +1045,7 @@ class DBClient:
         self.connectToDb(uuid)
         if autoconnect:
             self.connectToDb(uuid)
-        else:
+        elif oldConnection is not None:
             self.connectToDb(oldConnection)
         return True, str(uuid)
 
