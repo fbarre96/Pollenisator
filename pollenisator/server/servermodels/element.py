@@ -1,6 +1,7 @@
 
-
+from abc import ABCMeta, abstractmethod
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Protocol
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.utils import JSONEncoder
 from bson import ObjectId
@@ -23,7 +24,6 @@ class MetaElement(type):
         if name not in REGISTRY:
             register_class(cls)
         return cls
-
 
 
 class ServerElement(metaclass=MetaElement):
@@ -140,12 +140,17 @@ class ServerElement(metaclass=MetaElement):
             self.setTags(tags)
             dbclient.doRegisterTag(self.pentest, newTag)
 
-    def setTags(self, tags):
-        """Set the model tags to given tags
-        Args:
-            tags: a list of string describing tags.
+    def setTags(self, tags: List[Tag]) -> bool:
         """
-        tags = [Tag(tag) for tag in tags]
+        Set the model tags to given tags. This function also handles the addition and removal of tags, 
+        and updates the database accordingly.
+
+        Args:
+            tags (List[Tag]): A list of tags.
+
+        Returns:
+            bool: Always returns True indicating the tags were successfully set.
+        """
         dbclient = DBClient.getInstance()
         old_tags_res = self.getTags()
         old_tags = set()
@@ -169,7 +174,8 @@ class ServerElement(metaclass=MetaElement):
             self.addTagDefects(lk_new_tags.get(tag), data_target)#, ObjectId(self.getId()), target_type
         tags = [tag.getData() for tag in tags]
         tags = dbclient.updateInDb(self.pentest, "tags", {"item_id": ObjectId(self.getId())}, {"$set":{"tags":tags, "date": datetime.now(), "item_id":ObjectId(self.getId()), "item_type":target_type}}, upsert=True)
-
+        return True
+    
     def updateInfos(self, newInfos):
         """Change all infos stores in self.infos with the given new ones and update database.
         Args:

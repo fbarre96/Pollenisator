@@ -52,8 +52,8 @@ def delete(pentest, defect_iid):
             if int(globalDefect.index) > int(defect.index):
                 update(pentest, globalDefect.getId(), {"index":str(int(globalDefect.index) - 1)})
         thisAssignedDefects = ServerDefect.fetchObjects(pentest, {"global_defect": ObjectId(defect_iid)})
-        for thisAssignedDefects in thisAssignedDefects:
-            delete(pentest, thisAssignedDefects.getId())
+        for thisAssignedDefect in thisAssignedDefects:
+            delete(pentest, thisAssignedDefect.getId())
     if pentest != "pollenisator":
         proofs_path = getProofPath(pentest, defect_iid)
         if os.path.isdir(proofs_path):
