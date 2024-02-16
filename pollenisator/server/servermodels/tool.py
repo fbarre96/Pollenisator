@@ -1,403 +1,67 @@
-from pymongo import InsertOne
-from pollenisator.core.components.logger_config import logger
+"""
+Handle request common to Tools
+"""
+import os
+import sys
+import time
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing_extensions import TypedDict
 from bson import ObjectId
 from bson.errors import InvalidId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.tag import Tag
-from pollenisator.core.models.tool import Tool
 from pollenisator.core.controllers.toolcontroller import ToolController
-from pollenisator.server.servermodels.command import ServerCommand
-from pollenisator.server.servermodels.element import ServerElement
 from pollenisator.core.components.socketmanager import SocketManager
-from pollenisator.core.components.utils import JSONEncoder, JSONDecoder
-import json
-from pollenisator.core.components.utils import  checkCommandService, isNetworkIp, loadPlugin, detectPluginsWithCmd
-from datetime import datetime
-import os
-import sys
-import time
+from pollenisator.core.models.command import Command
+from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
+from pollenisator.core.components.utils import loadPlugin, detectPluginsWithCmd
+from pollenisator.core.models.tool import Tool
 from pollenisator.server.permission import permission
 from pollenisator.server.token import encode_token
-import socketio
+from pollenisator.core.components.logger_config import logger
 
-class ServerTool(Tool, ServerElement):
-    command_variables = ["tool.infos.*"]
-    def __init__(self, pentest="", *args, **kwargs):
-        dbclient = DBClient.getInstance()
-        if pentest != "":
-            self.pentest = pentest
-        elif dbclient.current_pentest != "":
-            self.pentest = dbclient.current_pentest
-        else:
-            raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
-        super().__init__(*args, **kwargs)
+ToolInsertResult = TypedDict('ToolInsertResult', {'res': bool, 'iid': str})
+QueueTaskSuccess = TypedDict('QueueTaskSuccess', {'tool_iid': str})
+QueueTaskFail = TypedDict('QueueTaskFail', {'tool_iid': str, 'error': str})
+QueueTasksResult = TypedDict('QueueTasksResult', {'successes': List[QueueTaskSuccess], 'failures': List[QueueTaskFail]})
+response: Any = {}
 
-    def setOutOfTime(self, pentest):
-        """Set this tool as out of time (not matching any interval in wave)
-        Add "OOT" in status
-        """
-        if "OOT" not in self.status:
-            self.status.append("OOT")
-            update(pentest, self._id, {"status": self.status})
-
-    def setOutOfScope(self, pentest):
-        """Set this tool as in scope (is matching at least one scope in wave)
-        Remove "OOS" from status
-        """
-        if not "OOS" in self.status:
-            self.status.append("OOS")
-            update(pentest, self._id, {"status": self.status})
-    
-    def addInDb(self, check=True, base=None, update_check_infos=True):
-        ret = do_insert(self.pentest, ToolController(self).getData(), check=check, base=base, update_check=update_check_infos)
-        self._id = ret["iid"]
-        return ret
-
-    @classmethod
-    def fetchObjects(cls, pentest, pipeline):
-        dbclient = DBClient.getInstance()
-        results = dbclient.findInDb(pentest, "tools", pipeline)
-        for result in results:
-            yield(cls(pentest, result))
-
-    @classmethod
-    def fetchObject(cls, pentest, pipeline):
-        dbclient = DBClient.getInstance()
-        result = dbclient.findInDb(pentest, "tools", pipeline, False)
-        return cls(pentest, result)
-
-    def getCommand(self):
-        """
-        Get the tool associated command.
-
-        Return:
-            Returns the Mongo dict command fetched instance associated with this tool's name.
-        """
-        dbclient = DBClient.getInstance()
-        commandTemplate = dbclient.findInDb(self.pentest,
-                                                 "commands", {"_id": ObjectId(self.command_iid)}, False)
-        return commandTemplate
-    
-    def getCheckItem(self):
-        from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
-        try:
-            ObjectId(self.check_iid)
-        except InvalidId:
-           return None
-        check = CheckInstance.fetchObject(self.pentest, {"_id":ObjectId(self.check_iid)})
-        if check is None:
-            return None
-        return check.getCheckItem()
-
-    def setInScope(self):
-        """Set this tool as out of scope (not matching any scope in wave)
-        Add "OOS" in status
-        """
-        if "OOS" in self.status:
-            self.status.remove("OOS")
-            update(self.pentest, self._id, ToolController(self).getData())
-
-    def setInTime(self):
-        """Set this tool as in time (matching any interval in wave)
-        Remove "OOT" from status
-        """
-        if "OOT" in self.status:
-            self.status.remove("OOT")
-            update(self.pentest, self._id, ToolController(self).getData())
-
-    def delete(self):
-        """
-        Delete the tool represented by this model in database.
-        """
-        delete(self.pentest, self._id)
-
-    def getParentId(self):
-        try:
-            if self.check_iid is not None:
-                return self.check_iid
-            else:
-                return None
-        except TypeError:
-            # None type returned:
-            return None
-        
-    def findQueueIndexFromPrio(self, queue):
-        priority = self.getCheckItem().priority
-        i=0
-        for tool_info in queue:
-            queue_priority = tool_info.get("priority", 0)
-            if queue_priority > priority:
-                return i
-            i+=1
-        return i
-        
-    def addToQueue(self, index=None):
-        dbclient = DBClient.getInstance()
-        queue = dbclient.findInDb(self.pentest, "autoscan", {"type":"queue"}, False) 
-        if queue is None:
-            queue = list()
-            dbclient.insertInDb(self.pentest, "autoscan", {"type":"queue", "tools":[]}) 
-        else:
-            queue = list(queue["tools"])
-        if self.getId() in queue:
-            return False, "Already in queue"
-        priority = self.getCheckItem().priority
-        if index is None:
-            index=self.findQueueIndexFromPrio(queue)
-            queue.insert(index, {"iid":self.getId(), "priority":priority})
-        else:
-            try:
-                queue.insert(index, {"iid":self.getId(), "priority":priority})
-            except IndexError:
-                return False, "Index error"
-        dbclient.updateInDb(self.pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":queue}})
-        return True, "Added to queue"
-    
-    def removeFromQueue(self):
-        dbclient = DBClient.getInstance()
-        dbclient.updateInDb(self.pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":{"iid":launchableToolIid}}})
-        return True, "remove from to queue"
-    
-    @staticmethod
-    def clearQueue(pentest):
-        dbclient = DBClient.getInstance()
-        dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":[]}})
-        return True, "Cleared queue"
-        
-        
-    def getCommandToExecute(self, command_o):
-        """
-        Get the tool bash command to execute.
-        Replace the command's text's variables with tool's informations.
-        Return:
-            Returns the bash command of this tool instance, a marker |outputDir| is still to be replaced.
-        """
-        toolHasCommand = self.text
-        if isinstance(command_o, str):
-            command = command_o
-            self.text = command
-            lvl = self.lvl
-        else:
-            if toolHasCommand is not None and toolHasCommand.strip() != "":
-                command = self.text
-                lvl = self.lvl
-            else:
-                command = command_o.text
-                lvl = self.lvl #not command lvl as it can be changed by modules
-        data = self.getData()
-        if self.check_iid is not None:
-            from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
-            check = CheckInstance.fetchObject(self.pentest, {"_id":ObjectId(self.check_iid)})
-            if check is not None:
-                target = check.getTargetData()
-                if target is not None:
-                    infos = {**data.get("infos", {}), **target.get("infos", {})}
-                    data |= target
-                    data["infos"] = infos
-        command = ServerElement.replaceAllCommandVariables(self.pentest, command, data)
-        if isinstance(command_o, str):
-            return command
-        return command
-    
-    @classmethod
-    def replaceCommandVariables(cls, pentest, command, data):
-        command = cls.unpack_info(data.get("infos",{}), command, depth=0, max_depth=3)
-        return command
-    
-    @classmethod
-    def unpack_info(cls, infos_dict: dict, command: str, depth=0, max_depth=3):
-        """Recursively unpack infos dict into command string
-        """
-        if depth > max_depth:
-            return
-        for key in infos_dict.keys():
-            if isinstance(infos_dict[key], dict):
-                command = cls.unpack_info(infos_dict[key], command, depth+1, max_depth)
-            else:
-                command = command.replace("|tool.infos."+str(key)+"|", str(infos_dict.get(key, '')))
-        return command
-    
-    def getPluginName(self):
-        dbclient = DBClient.getInstance()
-        if self.plugin_used != "":
-            return self.plugin_used
-        command_o = dbclient.findInDb(self.pentest,"commands",{"_id": ObjectId(self.command_iid)}, False)
-        if command_o and "plugin" in command_o.keys():
-            return command_o["plugin"]
-        return None
-
-    def getPlugin(self):
-        mod_name = self.getPluginName()
-        if mod_name:
-            mod = loadPlugin(mod_name)
-            return mod
-        return None
-
-    def markAsDone(self, file_name=None):
-        """Set this tool status as done but keeps OOT or OOS.
-        Args:
-            file_name: the resulting file of thsi tool execution. Default is None
-        """
-        self.datef = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-        newStatus = ["done"]
-        if "OOS" in self.status:
-            newStatus.append("OOS")
-        if "OOT" in self.status:
-            newStatus.append("OOT")
-        self.status = newStatus
-        self.resultfile = file_name
-        dbclient = DBClient.getInstance()
-        dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
-
-    def markAsError(self, msg=""):
-        """Set this tool status as not done by removing "done" or "running" and adding an error status.
-        Also resets starting and ending date as well as worker name
-        """
-        self.dated = "None"
-        self.datef = "None"
-        dbclient = DBClient.getInstance()
-        dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
-        self.scanner_ip = "None"
-        if "done" in self.status:
-            self.status.remove("done")
-        if "running" in self.status:
-            self.status.remove("running")
-        self.notes = msg
-        self.status.append("error")
-
-    def markAsTimedout(self):
-        """Set this tool status as not done by removing "done" or "running" and adding an error status.
-        Also resets starting and ending date as well as worker name
-        """
-        self.dated = "None"
-        self.datef = "None"
-        dbclient = DBClient.getInstance()
-        dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
-        self.scanner_ip = "None"
-        if "done" in self.status:
-            self.status.remove("done")
-        if "running" in self.status:
-            self.status.remove("running")
-        self.status.append("timedout")
-        
-    def markAsNotDone(self):
-        """Set this tool status as not done by removing "done" or "running" status.
-        Also resets starting and ending date as well as worker name
-        """
-        self.dated = "None"
-        self.datef = "None"
-        dbclient = DBClient.getInstance()
-        if self.scanner_ip != "None":
-            dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
-        self.scanner_ip = "None"
-        if "done" in self.status:
-            self.status.remove("done")
-        if "running" in self.status:
-            self.status.remove("running")
-
-    def markAsRunning(self, workerName):
-        """Set this tool status as running but keeps OOT or OOS.
-        Sets the starting date to current time and ending date to "None"
-        Args:
-            workerName: the worker name that is running this tool
-        """
-        self.dated = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-        self.datef = "None"
-        newStatus = ["running"]
-        if "OOS" in self.status:
-            newStatus.append("OOS")
-        if "OOT" in self.status:
-            newStatus.append("OOT")
-        if "timedout" in self.status:
-            newStatus.append("timedout")
-        self.status = newStatus
-        self.scanner_ip = workerName
-        dbclient = DBClient.getInstance()
-        dbclient.updateInDb("pollenisator", "workers", {"name":workerName}, {"$push":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=True)
-
-    def getDbKey(self):
-        """Return a dict from model to use as unique composed key.
-        Returns:
-        {"wave": self.wave, "lvl": self.lvl, "check_iid":self.check_iid}
-        """
-        base = {"wave": self.wave, "name":self.name, "lvl": self.lvl, "check_iid":self.check_iid}
-        return base
-    
-    def getHashableDbKey(self):
-        return tuple(self.getDbKey().values())
-
-    def __str__(self):
-        """
-        Get a string representation of a tool.
-
-        Returns:
-            Returns the tool name. The wave name is prepended if tool lvl is "port" or "ip"
-        """
-        return self.name
-
-    def getDetailedString(self):
-        """
-        Get a more detailed string representation of a tool.
-
-        Returns:
-            string
-        """
-        if self.lvl == "import":
-            return str(self.name)
-        class_element = ServerElement.getClassWithTrigger(self.lvl)
-        if class_element is None:
-            return str(self.name)
-        return class_element.completeDetailedString(self.getData()) + str(self.name)
-    
-    def _setStatus(self, new_status, arg):
-        if "done" in new_status:
-            if arg == "":
-                arg = None
-            self.markAsDone(arg)
-        elif "running" in new_status:
-            self.markAsRunning(arg)
-        elif "not_done" in new_status:
-            self.markAsNotDone()
-        elif "ready" in new_status:
-            self.markAsNotDone()
-        elif "error" in new_status:
-            self.markAsError(arg)
-        elif "timedout" in new_status:
-            self.markAsTimedout()
-        elif len(new_status) == 0:
-            self.markAsNotDone()
-        return update(self.pentest, self.getId(), ToolController(self).getData())
-    
-    @classmethod
-    def bulk_insert(cls, pentest, tools_to_add):
-        if not tools_to_add:
-            return
-        dbclient = DBClient.getInstance()
-        dbclient.create_index(pentest, "tools", [("wave", 1), ("name", 1), ("lvl", 1), ("check_iid", 1)])
-        update_operations = []
-        for tool in tools_to_add:
-            data = ToolController(tool).getData()
-            if "_id" in data:
-                del data["_id"]
-            update_operations.append(InsertOne(data))
-        result = dbclient.bulk_write(pentest, "tools", update_operations)
-        upserted_ids = result.upserted_ids
-        return upserted_ids
-    
-    
-
-    
 @permission("pentester")
-def setStatus(pentest, tool_iid, body):
-    newStatus = body["newStatus"]
+def setStatus(pentest: str, tool_iid: str, body: Dict[str, Any]) -> Tuple[str, int]:
+    """
+    Set the status of a tool in the database. If the tool does not exist, an error message is returned. Otherwise, the 
+    status of the tool is set to the given status.
+
+    Args:
+        pentest (str): The name of the pentest.
+        tool_iid (str): The id of the tool whose status will be set.
+        body (Dict[str, Any]): A dictionary containing the new status and an optional argument.
+
+    Returns:
+        Tuple[str, int]: An error message and status code if an error occurred.
+    """
+    newStatus = body.get("newStatus", "")
     arg = body.get("arg", "")
-    tool_o = ServerTool.fetchObject(pentest, {"_id":ObjectId(tool_iid)})
+    tool_o = Tool.fetchObject(pentest, {"_id":ObjectId(tool_iid)})
     if tool_o is None:
         return "Tool not found", 404
+    tool_o = cast(Tool, tool_o)
     tool_o._setStatus(newStatus, arg)
-
+    return "Success", 200
 @permission("pentester")
-def delete(pentest, tool_iid):
+def delete(pentest: str, tool_iid: str) -> Union[Tuple[str, int], int]:
+    """
+    Delete a tool from the database. If the tool does not exist, an error message is returned. Otherwise, the tool is 
+    deleted and the associated check is updated.
+
+    Args:
+        pentest (str): The name of the pentest.
+        tool_iid (str): The id of the tool to be deleted.
+
+    Returns:
+        Union[Tuple[str, int], int]: An error message and status code if an error occurred, 0 if the deletion was 
+        unsuccessful, otherwise the result of the deletion operation.
+    """
     dbclient = DBClient.getInstance()
     if not dbclient.isUserConnected():
         return "Not connected", 503
@@ -405,9 +69,7 @@ def delete(pentest, tool_iid):
     if tool_existing is None:
         return "Not found", 404
     res = dbclient.deleteFromDb(pentest, "tools", {"_id": ObjectId(tool_iid)}, False)
-    
     if tool_existing.get("check_iid") is not None and tool_existing.get("check_iid", "") != "":
-        from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
         check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(tool_existing.get("check_iid"))})
         if check is not None:
             check.updateInfos()
@@ -417,23 +79,43 @@ def delete(pentest, tool_iid):
         return res
 
 @permission("pentester")
-def insert(pentest, body, **kwargs):
+def insert(pentest: str, body: Dict[str, Any], **kwargs: Any) -> None:
+    """
+    Insert a new tool into the database. If the 'base' key is present in the kwargs, it is removed. The tool is then 
+    inserted into the database.
+
+    Args:
+        pentest (str): The name of the pentest.
+        body (Dict[str, Any]): A dictionary containing the tool details.
+        **kwargs (Any): Additional keyword arguments.
+    """
     if "base" in kwargs:
         del kwargs["base"]
     do_insert(pentest, body, **kwargs)
 
-def do_insert(pentest, body, **kwargs):
+def do_insert(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union[Tuple[str, int], ToolInsertResult]:
+    """
+    Inserts a tool into the database.
+
+    Args:
+        pentest (str): The name of the pentest.
+        body (Dict[str, Any]): The body of the tool to be inserted.
+        **kwargs (Any): Additional parameters.
+
+    Returns:
+        Union[str, Dict[str, Union[bool, str]]]: A string indicating an error or a dictionary containing the result of the operation and the id of the inserted tool.
+    """
     dbclient = DBClient.getInstance()
     if not dbclient.isUserConnected():
         return "Not connected", 503
     if body.get("name", "") == "None" or body.get("name", "") == "" or body.get("name", "") is None:
         del body["name"]
-    tool_o = ServerTool(pentest, body)
+    tool_o = Tool(pentest, body)
     # Checking unicity
     base = tool_o.getDbKey()
     if kwargs.get("base") is not None:
-        for k,v in kwargs.get("base").items():
-            base[k] = v 
+        for k,v in kwargs.get("base", {}).items():
+            base[k] = v
     existing = dbclient.findInDb(pentest, "tools", base, False)
     if existing is not None:
         return {"res":False, "iid":existing["_id"]}
@@ -441,15 +123,6 @@ def do_insert(pentest, body, **kwargs):
         del body["_id"]
     # Checking port /service tool
     parent = tool_o.getParentId()
-    # SHould be handled in check i think
-    # if tool_o.lvl == "port" and tool_o.command_iid is not None and tool_o.command_iid != "":
-    #     if kwargs.get("check", True):
-    #         comm = dbclient.findInDb(pentest, "commands", {"_id":ObjectId(tool_o.command_iid)}, False)
-    #         port = dbclient.findInDb(pentest, "ports", {"_id":ObjectId(parent)}, False)
-    #         if comm:
-    #             allowed_ports_services = comm["ports"].split(",")
-    #             if not checkCommandService(allowed_ports_services, port["port"], port["proto"], port["service"]):
-    #                 return "This tool parent does not match its command ports/services allowed list", 403
     # Inserting tool
     base["name"] = body.get("name", "")
     base["ip"] = body.get("ip", "")
@@ -469,7 +142,6 @@ def do_insert(pentest, body, **kwargs):
     ret = res_insert.inserted_id
     tool_o._id = ret
     if base["check_iid"] != "" and kwargs.get("update_check", True):
-        from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
         try:
             check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(base["check_iid"])})
         except InvalidId:
@@ -480,24 +152,48 @@ def do_insert(pentest, body, **kwargs):
     return {"res":True, "iid":ret}
 
 @permission("pentester")
-def update(pentest, tool_iid, body):
+def update(pentest: str, tool_iid: str, body: Dict[str, Any]) -> bool:
+    """
+    Update a tool in the database.
+
+    Args:
+        pentest (str): The name of the pentest.
+        tool_iid (str): The id of the tool to be updated.
+        body (Dict[str, Any]): The new data for the tool.
+
+    Returns:
+        bool: True if the update was successful, False otherwise.
+    """
     dbclient = DBClient.getInstance()
     orig = dbclient.findInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, False)
-    res = dbclient.updateInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
+    dbclient.updateInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
     if orig.get("check_iid") is not None and orig.get("check_iid", "") != "":
-        from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
         check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(orig.get("check_iid"))})
         if check is not None:
             check.updateInfos()
-
     return True
-    
+
 @permission("pentester")
-def craftCommandLine(pentest, tool_iid, commandline_options=""):
+def craftCommandLine(pentest: str, tool_iid: str, commandline_options: str = "") -> Union[Tuple[str, int], Dict[str, str]]:
+    """
+    Craft the command line for a tool. If the tool does not exist, an error message is returned. If command line options 
+    are provided, they are set in the tool. The command object for the tool is fetched and the command line is crafted 
+    using the command object and the tool. The plugin for the tool is loaded and the output file name is crafted.
+
+    Args:
+        pentest (str): The name of the pentest.
+        tool_iid (str): The id of the tool for which the command line will be crafted.
+        commandline_options (str, optional): The command line options to be set in the tool. Defaults to "".
+
+    Returns:
+        Union[Tuple[str, int], Dict[str, str]]: An error message and status code if an error occurred, otherwise a 
+        dictionary containing the crafted command, the file extension and the complete command with output.
+    """
     # CHECK TOOL EXISTS
-    toolModel = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
+    toolModel = Tool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     if toolModel is None:
         return "Tool does not exist : "+str(tool_iid), 404
+    toolModel = cast(Tool, toolModel)
     if commandline_options != "":
         toolModel.text = commandline_options
         dbclient = DBClient.getInstance()
@@ -505,7 +201,7 @@ def craftCommandLine(pentest, tool_iid, commandline_options=""):
     # GET COMMAND OBJECT FOR THE TOOL
     if toolModel.text == "":
         try:
-            command_o = ServerCommand.fetchObject({"_id": ObjectId(toolModel.command_iid)}, pentest)
+            command_o: Optional[Union[Command, str]] = Command.fetchObject(pentest, {"_id": ObjectId(toolModel.command_iid)})
             if command_o is None:
                 return "Associated command was not found", 404
         except InvalidId:
@@ -528,11 +224,27 @@ def craftCommandLine(pentest, tool_iid, commandline_options=""):
     return {"comm":comm, "ext":ext, "comm_with_output":comm_complete}
 
 @permission("pentester")
-def completeDesiredOuput(pentest, tool_iid, plugin, command_line_options):
+def completeDesiredOuput(pentest: str, tool_iid: str, plugin: str, command_line_options: str) -> Union[Tuple[str, int], Dict[str, str]]:
+    """
+    Complete the desired output for a tool. If the tool does not exist, an error message is returned. The command to 
+    execute is fetched from the tool and the plugin for the tool is loaded. The command is changed using the plugin and 
+    the output file name is crafted.
+
+    Args:
+        pentest (str): The name of the pentest.
+        tool_iid (str): The id of the tool for which the output will be completed.
+        plugin (str): The name of the plugin to be loaded.
+        command_line_options (str): The command line options to be set in the tool.
+
+    Returns:
+        Union[Tuple[str, int], Dict[str, str]]: An error message and status code if an error occurred, otherwise a 
+        dictionary containing the completed command line options and the file output extension.
+    """
     # CHECK TOOL EXISTS
-    toolModel = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
+    toolModel = Tool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     if toolModel is None:
         return "Tool does not exist : "+str(tool_iid), 404
+    toolModel = cast(Tool, toolModel)
     comm = toolModel.getCommandToExecute(command_line_options)
     mod = loadPlugin(plugin)
     # craft outputfile name
@@ -540,9 +252,25 @@ def completeDesiredOuput(pentest, tool_iid, plugin, command_line_options):
     return {"command_line_options":comm, "ext":mod.getFileOutputExt()}
 
 @permission("user")
-def getDesiredOutputForPlugin(body):
-    cmdline = body.get("cmdline")
-    plugin = body.get("plugin")
+def getDesiredOutputForPlugin(body: Dict[str, Any]) -> Union[Tuple[str, int], Dict[str, Union[str, Dict[str, str]]]]:
+    """
+    Get the desired output for a plugin. If the plugin is 'auto-detect', the plugins are detected using the command line. 
+    Otherwise, the plugin is loaded from the body. The command is changed using the plugin and the output file extension 
+    is fetched from the plugin.
+
+    Args:
+        body (Dict[str, Any]): A dictionary containing the command line and the plugin.
+
+    Returns:
+        Dict[str, Union[str, Dict[str, str]]]: A dictionary containing the changed command line options and the output 
+        file extensions for the plugins.
+    """
+    cmdline = body.get("cmdline", None)
+    if cmdline is None:
+        return "No command line given", 400
+    plugin = body.get("plugin", None)
+    if plugin is None:
+        plugin = "auto-detect"
     plugin_results = {}
     if plugin == "auto-detect":
         plugins_detected = detectPluginsWithCmd(cmdline)
@@ -556,17 +284,20 @@ def getDesiredOutputForPlugin(body):
     return {"command_line_options":comm, "plugin_results":plugin_results}
 
 @permission("user")
-def listPlugins():
+def listPlugins() -> List[Dict[str, Any]]:
     """
-    List the plugins.
+    List the plugins available in the plugins directory. For each plugin, the default binary names and the tags are fetched 
+    and added to the results.
+
     Returns:
-        return the list of plugins file names.
+        List[Dict[str, Union[str, List[str]]]]: A list of dictionaries where each dictionary contains the plugin name, 
+        the default binary names for the plugin, and the tags for the plugin.
     """
     dir_path = os.path.dirname(os.path.realpath(__file__))
     path = os.path.join(dir_path, "../../plugins/")
     # Load plugins
     sys.path.insert(0, path)
-    results = []
+    results: List[Dict[str, Any]] = []
     plugin_list = os.listdir(path)
     plugin_list = [x[:-3] for x in plugin_list if x.endswith(
         ".py") and x != "__pycache__" and x != "__init__.py" and x != "plugin.py"]
@@ -576,25 +307,38 @@ def listPlugins():
         tags = [tag for tag in mod.getTags().values()]
         results.append({"plugin":plugin, "default_bin_names":default_bin_names, "tags":tags})
     return results
-    
+
 @permission("pentester")
-def importResult(pentest, tool_iid, upfile, body):
+def importResult(pentest: str, tool_iid: str, upfile: Any, _body: Dict[str, Any]) -> Tuple[str, int]:
+    """
+    Import the result of a tool. The result file is uploaded and the tool is fetched from the database. If the tool has a 
+    plugin, the plugin is used to parse the result file. The notes and tags from the plugin are set in the tool and the 
+    tool is marked as done. If the tool does not have a plugin, the tool is marked as not done.
+
+    Args:
+        pentest (str): The name of the pentest.
+        tool_iid (str): The id of the tool whose result will be imported.
+        upfile (Any): The result file to be uploaded.
+        body (Dict[str, Any]): A dictionary containing additional data.
+
+    Returns:
+        Union[Tuple[str, int], str]: An error message and status code if an error occurred, otherwise a success message.
+    """
     dbclient = DBClient.getInstance()
     #STORE FILE
     res, status, filepath = dbclient.do_upload(pentest, tool_iid, "result", upfile)
     if status != 200:
         return res, status
     # Analyze
-    
-    toolModel = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
+    toolModel = Tool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     if toolModel is None:
         return "Tool not found", 404
+    toolModel = cast(Tool, toolModel)
     mod = toolModel.getPlugin()
     ext = os.path.splitext(upfile.filename)[-1]
     if mod is not None:
         try:
             # Check return code by plugin (can be always true if the return code is inconsistent)
-            
             notes, tags, _, _ = mod.Parse(pentest, upfile, tool=toolModel, ext=ext, filename=upfile.filename)
             if notes is None:
                 notes = "No results found by plugin."
@@ -612,8 +356,8 @@ def importResult(pentest, tool_iid, upfile, body):
             update(pentest, tool_iid, ToolController(toolModel).getData())
             # Upload file to SFTP
             msg = "TASK SUCCESS : "+toolModel.name
-        except IOError as e:
-            toolModel.addTag(Tag("no-output", None, "error", "Failed to read results file"))
+        except IOError as _e:
+            toolModel.addTag(Tag("no-output", "red", "error", "Failed to read results file"))
             toolModel.notes = "Failed to read results file"
             toolModel.markAsDone()
             update(pentest, tool_iid, ToolController(toolModel).getData())
@@ -622,21 +366,37 @@ def importResult(pentest, tool_iid, upfile, body):
         toolModel.markAsNotDone()
         update(pentest, tool_iid, ToolController(toolModel).getData())
         raise Exception(msg)
-    return "Success"
+    return "Success", 200
 
 
 @permission("pentester")
-def queueTasks(pentest, body, **kwargs):
-    logger.debug("Queue tasks : "+str(body))
-    results = {"successes":[], "failures":[]}
+def queueTasks(pentest: str, body: List[str], **kwargs: Any) -> QueueTasksResult:
+    """
+    Queue tasks for a pentest. The tasks are fetched from the body and added to the queue. If a task is successfully added 
+    to the queue, it is added to the successes list. If a task fails to be added to the queue, it is added to the failures 
+    list along with the error message.
+
+    Args:
+        pentest (str): The name of the pentest.
+        body (List[str]): A list of task ids to be added to the queue.
+        **kwargs (Any): Additional keyword arguments.
+
+    Returns:
+        QueueTasksResult: A dictionary containing the successes and 
+        failures of adding tasks to the queue.
+    """
+    logger.debug("Queue tasks : %s", str(body))
+    results: QueueTasksResult = {"successes":[], "failures":[]}
     tools_iids = set()
-    commands_iids = set()
     for tool_iid in body:
         if isinstance(tool_iid, str) and tool_iid.startswith("ObjectId|"):
             tool_iid = tool_iid.replace("ObjectId|", "")
         tools_iids.add(ObjectId(tool_iid))
-    tools = ServerTool.fetchObjects(pentest, {"_id": {"$in": list(tools_iids)}})
+    tools = Tool.fetchObjects(pentest, {"_id": {"$in": list(tools_iids)}})
+    if tools is None:
+        return results
     for tool in tools:
+        tool = cast(Tool, tool)
         tool_iid = str(tool.getId())
         res, msg = tool.addToQueue()
         if res:
@@ -646,15 +406,30 @@ def queueTasks(pentest, body, **kwargs):
     return results
 
 @permission("pentester")
-def unqueueTasks(pentest, body, **kwargs):
-    logger.debug("Remove tasks : "+str(body))
-    results = {"successes":[], "failures":[]}
+def unqueueTasks(pentest: str, body: List[str], **_kwargs: Any) -> QueueTasksResult:
+    """
+    Remove tasks from the queue for a pentest. The tasks are fetched from the body and removed from the queue. If a task 
+    is successfully removed from the queue, it is added to the successes list. If a task fails to be removed from the 
+    queue, it is added to the failures list along with the error message.
+
+    Args:
+        pentest (str): The name of the pentest.
+        body (List[str]): A list of task ids to be removed from the queue.
+        **_kwargs (Any): Additional keyword arguments.
+
+    Returns:
+        QueueTasksResult: A dictionary containing the successes and 
+        failures of removing tasks from the queue.
+    """
+    logger.debug("Remove tasks : %s", str(body))
+    results: QueueTasksResult = {"successes":[], "failures":[]}
     tools_iid = body
     for tool_iid in tools_iid:
         if isinstance(tool_iid, str) and tool_iid.startswith("ObjectId|"):
             tool_iid = tool_iid.replace("ObjectId|", "")
-        tool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
+        tool = Tool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
         if tool:
+            tool = cast(Tool, tool)
             res, msg = tool.removeFromQueue()
             if res:
                 results["successes"].append({"tool_iid":tool_iid})
@@ -663,23 +438,43 @@ def unqueueTasks(pentest, body, **kwargs):
     return results
 
 @permission("pentester")
-def clearTasks(pentest, **kwargs):
-    ServerTool.clearQueue(pentest)
+def clearTasks(pentest: str, **_kwargs: Any):
+    """
+    Remove all tasks queue for pentest given
+
+    Args:
+        pentest (str): given to pentest to clear tasks
+    """
+    Tool.clearQueue(pentest)
 
 
 @permission("pentester")
-def getQueue(pentest):
+def getQueue(pentest: str) -> List[Dict[str, Any]]:
+    """
+    Get the queue for a pentest. The queue is fetched from the database and the tools in the queue are fetched. The 
+    commands for the tools are also fetched. For each tool in the queue, the tool data is fetched and if the tool text is 
+    empty, the command text is set as the tool text. The tool data is then added to the results.
+
+    Args:
+        pentest (str): The name of the pentest.
+
+    Returns:
+        List[Dict[str, Any]]: A list of dictionaries where each dictionary contains the data for a tool in the queue.
+    """
     dbclient = DBClient.getInstance()
-    res = []
+    res: List[Dict[str, Any]] = []
     queue = dbclient.findInDb(pentest, "autoscan", {"type":"queue"}, False)
     if queue is not None:
         tools = queue["tools"]
-        tools_objects = ServerTool.fetchObjects(pentest, {"_id": {"$in": [ObjectId(tool_info.get("iid")) for tool_info in tools]}})
-        commands = ServerCommand.fetchObjects({}, pentest)
+        tools_objects = Tool.fetchObjects(pentest, {"_id": {"$in": [ObjectId(tool_info.get("iid")) for tool_info in tools]}})
+        if tools_objects is None:
+            return res
+        commands = Command.fetchObjects(pentest, {})
         commands_dict = {str(command.getId()):command for command in commands}
         for tool in tools_objects:
+            tool = cast(Tool, tool)
             tool_data = {}
-            tool_data = ToolController(tool).getData()
+            tool_data = tool.getData()
             if tool.text == "":
                 command = commands_dict.get(str(tool.command_iid))
                 if command is not None:
@@ -690,72 +485,135 @@ def getQueue(pentest):
             res.append(tool_data)
     return res
 
-def isLaunchable(pentest, tool_iid, authorized_commands, force=False):
-    logger.debug("launch task : "+str(tool_iid))
+def isLaunchable(pentest: str, tool_iid: ObjectId, authorized_commands: Optional[List[str]], force: bool = False) -> Tuple[str, int]:
+    """
+    Check if a tool is launchable. The tool and its command are fetched from the database. If the command is not 
+    authorized for autoscan and force is not set, an error message is returned. If the tool or the command do not exist, 
+    an error message is returned. The workers that support the command plugin are fetched from the database. If no worker 
+    is available to launch the tool, an error message is returned. If a worker is available, the socket for the worker is 
+    fetched from the database. If the socket does not exist, an error message is returned.
+
+    Args:
+        pentest (str): The name of the pentest.
+        tool_iid (ObjectId): The id of the tool to be launched.
+        authorized_commands (Optional[List[str]]): A list of authorized commands for autoscan.
+        force (bool, optional): Whether to force the launch of the tool. Defaults to False.
+
+    Returns:
+        Tuple[str, int]: An error message and status code if an error occurred, otherwise the socket id for 
+        the worker that will launch the tool.
+    """
+    logger.debug("launch task : %s", str(tool_iid))
     dbclient = DBClient.getInstance()
-    launchableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
-    command_o = ServerCommand.fetchObject({"_id": ObjectId(launchableTool.command_iid)}, pentest)
+    launchableTool = Tool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
+    launchableTool = cast(Tool, launchableTool)
+    command_o = Command.fetchObject(pentest, {"_id": ObjectId(launchableTool.command_iid)})
+    if command_o is None:
+        logger.debug("Error in launch task : command for tool not found : %s",str(tool_iid))
+        return "Command associated not found", 404
+    command_o = cast(Command, command_o)
     if not force:
         if authorized_commands is not None and str(command_o.getId()) not in authorized_commands:
             return "Command not authorized for autoscan", 403
     if launchableTool is None:
-        logger.debug("Error in launch task : not found :"+str(tool_iid))
+        logger.debug("Error in launch task : not found : %s",str(tool_iid))
         return "Tool not found", 404
-    if command_o is None:
-        logger.debug("Error in launch task : command for tool not found :"+str(tool_iid))
-        return "Command associated not found", 404
+
     plugin_to_run = command_o.plugin
-    
     # Find a worker that can launch the tool without breaking limitations
     valid_workers = dbclient.findInDb("pollenisator", "workers", {"pentest": pentest, "supported_plugins":plugin_to_run}, True)
 
-    logger.debug(f"Available workers are {str(valid_workers)}, (tool id {tool_iid})")
+    logger.debug("Available workers are %s, (tool id %s)", str(valid_workers), str(tool_iid))
     choosenWorker = ""
     for worker in valid_workers:
         running_tools = dbclient.countInDb(pentest,"tools",{"status":"running", "scanner_ip":worker["name"]})
         if running_tools <= 5: # TODO not hardcode this parameter
             choosenWorker = worker["name"]
     if choosenWorker == "":
-        logger.debug("Error in launch task : no worker available:"+str(tool_iid))
+        logger.debug("Error in launch task : no worker available: %s", str(tool_iid))
         return "No worker available", 504
-    logger.debug(f"Choosen worker for tool_iid {tool_iid} is {str(choosenWorker)}")
+    logger.debug("Choosen worker %s for tool_iid is %s", str(tool_iid), str(choosenWorker))
     workerName = choosenWorker
     socket = dbclient.findInDb("pollenisator", "sockets", {"user":workerName}, False)
     if socket is None:
-        logger.debug(f"Error in launching {tool_iid} : socket not found to contact {workerName}")
+        logger.debug("Error in launching %s : socket not found to contact %s", str(tool_iid), str(workerName))
         return "Socket not found", 503
-    return str(socket['sid']),200
+    return str(socket['sid']), 200
 
-def launchTask(pentest, tool_iid, socket_sid, worker_token):
+def launchTask(pentest: str, tool_iid: ObjectId, socket_sid: str, worker_token: str) -> Tuple[str, int]:
+    """
+    Launch a task. The task is emitted to the worker using the socket manager. A notification is sent to the database 
+    client that the tool has started.
+
+    Args:
+        pentest (str): The name of the pentest.
+        tool_iid (ObjectId): The id of the tool to be launched.
+        socket_sid (str): The socket id for the worker that will launch the tool.
+        worker_token (str): The token for the worker.
+
+    Returns:
+        Tuple[str, int]: A success message and status code.
+    """
     sm = SocketManager.getInstance()
-    logger.debug(f"Launch task  : emit  {str(socket_sid)} toolid:{str(tool_iid)})")
+    logger.debug("Launch task  : emit %s toolid: %s)", str(socket_sid), str(tool_iid))
     sm.socketio.emit('executeCommand', {'workerToken': worker_token, "pentest":pentest, "toolId":str(tool_iid)}, room=socket_sid)
     dbclient = DBClient.getInstance()
-    dbclient.send_notify(pentest, "tools", tool_iid, "tool_start")
+    dbclient.send_notify(pentest, "tools", str(tool_iid), "tool_start")
     return "Success", 200
 
 @permission("pentester")
-def runTask(pentest, tool_iid, **kwargs):
-    msg, statuscode = isLaunchable(pentest, tool_iid, None)
+def runTask(pentest: str, tool_iid: ObjectId, **kwargs: Any) -> Tuple[str, int]:
+    """
+    Run a task. The task is checked if it is launchable. If the task is not launchable, an error message and status code 
+    are returned. If the task is launchable, the task is launched using the launchTask function.
+
+    Args:
+        pentest (str): The name of the pentest.
+        tool_iid (ObjectId): The id of the tool to be run.
+        **kwargs (Any): Additional keyword arguments.
+
+    Returns:
+        Tuple[str, int]: An error message and status code if an error occurred, otherwise a success message.
+    """
+    msg, statuscode = isLaunchable(pentest, ObjectId(tool_iid), None)
     if statuscode != 200:
         return msg, statuscode
     socket_sid = msg
     encoded = encode_token(kwargs["token_info"])
-    return launchTask(pentest, tool_iid, socket_sid, encoded)
+    return launchTask(pentest, ObjectId(tool_iid), socket_sid, encoded)
 
 @permission("pentester")
-def getProgress(pentest, tool_iid):
+def getProgress(pentest: str, tool_iid: str) -> Tuple[Union[bool, str], int]:
+    """
+    Get the progress of a tool. The tool is fetched from the database and its status is checked. If the tool is done, 
+    True is returned. If the tool is not running, an error message is returned. The workers are fetched from the database 
+    and the worker running the tool is checked. If the worker is not running, an error message is returned. The socket for 
+    the worker is fetched from the database and a getProgress event is emitted to the worker. The response from the worker 
+    is waited for and returned.
+
+    Args:
+        pentest (str): The name of the pentest.
+        tool_iid (str): The id of the tool whose progress will be gotten.
+
+    Returns:
+        Union[Tuple[str, int], bool]: An error message and status code if an error occurred, True if tool is done, otherwise the 
+        progress of the tool and a success status code.
+    """
     dbclient = DBClient.getInstance()
-    tool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
-    logger.info("Trying to get progress of task "+str(tool))
+    tool = Tool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
+    logger.info("Trying to get progress of task %s", str(tool))
     if tool is None:
         return "Tool not found", 404
+    tool = cast(Tool, tool)
     if "done" in tool.status:
-        return True
+        return True, 200
     elif "running"  not in tool.status:
         return "Tool is not running", 400
     workers = dbclient.getWorkers({})
-    workerNames = [worker["name"] for worker in workers]
+    if workers is None:
+        workerNames = []
+    else:
+        workerNames = [worker["name"] for worker in workers]
     saveScannerip = tool.scanner_ip
     if saveScannerip == "":
         return "Empty worker field", 400
@@ -769,13 +627,13 @@ def getProgress(pentest, tool_iid):
         return "Socket not found", 404
     sm.socketio.emit('getProgress', {'pentest': pentest, "tool_iid":str(tool_iid)}, room=socket["sid"])
     global response
-    response = ""
+    response = {}
     @sm.socketio.event
     def getProgressResult(data):
         global response
         response = data
-        if response["result"] is None:
-            response["result"] = b""
+        if data.get("result", "") is None:
+            response = {"result": b""}
     start_time = time.time()
     while time.time() - start_time < 3:
         if len(response) == 0 or response is None:
@@ -784,21 +642,44 @@ def getProgress(pentest, tool_iid):
             break
     if len(response) == 0 or response is None:
         return "Could not get worker progress", 404
-    logger.info('Received response:' +str(response))
-    if isinstance(response["result"], str) or  isinstance(response["result"], bool):
+    logger.info('Received response: %s' , str(response))
+    if isinstance(response["result"], str) or isinstance(response["result"], bool):
         return response["result"], 200
-    return response["result"].decode(), 200
-    
+    elif isinstance(response["result"], bytes):
+        return response["result"].decode(), 200
+    else:
+        return "Invalid response of the worker", 400
+
+
 @permission("pentester")
-def stopTask(pentest, tool_iid, body):
+def stopTask(pentest: str, tool_iid: str, body: Dict[str, Any]) -> Union[Tuple[str, int]]:
+    """
+    Stop a task. The task is fetched from the database and checked if it is stoppable. If the task is not stoppable, an 
+    error message is returned. The workers are fetched from the database and the worker running the task is checked. If 
+    the worker is not running, an error message is returned. The socket for the worker is fetched from the database and a 
+    stopCommand event is emitted to the worker. If forceReset is set in the body, the task is marked as not done.
+
+    Args:
+        pentest (str): The name of the pentest.
+        tool_iid (str): The id of the tool to be stopped.
+        body (Dict[str, Any]): A dictionary containing additional data.
+
+    Returns:
+        Union[Tuple[str, int]]: An error message and status code if an error occurred, otherwise a 
+        success message and status code.
+    """
     dbclient = DBClient.getInstance()
-    stopableTool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
-    logger.info("Trying to stop task "+str(stopableTool))
+    stopableTool = Tool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
+    logger.info("Trying to stop task %s",str(stopableTool))
     if stopableTool is None:
         return "Tool not found", 404
+    stopableTool = cast(Tool, stopableTool)
     workers = dbclient.getWorkers({})
-    workerNames = [worker["name"] for worker in workers]
-    forceReset = body["forceReset"]
+    if workers is None:
+        workerNames = []
+    else:
+        workerNames = [worker["name"] for worker in workers]
+    forceReset = body.get("forceReset", False)
     saveScannerip = stopableTool.scanner_ip
     if forceReset:
         stopableTool.markAsNotDone()
@@ -820,26 +701,40 @@ def stopTask(pentest, tool_iid, body):
     return "Success", 200
 
 @permission("pentester")
-def getDetailedString(pentest, tool_iid):
-    tool = ServerTool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
-    if tool is None:
-        return "Tool not found", 404
-    return tool.getDetailedString()
-
-def getNbOfLaunchedCommand(pentest, worker, command_iid):
+def getDetailedString(pentest: str, tool_iid: str) -> Tuple[str, int]:
     """
-    Get the total number of running commands which have the given command name
+    Get the detailed string of a tool. The tool is fetched from the database using its id. If the tool does not exist, an 
+    error message is returned. If the tool exists, the detailed string of the tool is returned.
 
     Args:
-        command_iid: The command iid to count running tools.
+        pentest (str): The name of the pentest.
+        tool_iid (str): The id of the tool whose detailed string will be gotten.
 
     Returns:
-        Return the total of running tools with this command's name as an integer.
+        Union[Tuple[str, int], str]: An error message and status code if an error occurred, otherwise the detailed string 
+        of the tool.
+    """
+    tool = Tool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
+    if tool is None:
+        return "Tool not found", 404
+    tool = cast(Tool, tool)
+    return tool.getDetailedString(), 200
+
+def getNbOfLaunchedCommand(pentest: str, worker: str, command_iid: ObjectId) -> int:
+    """
+    Get the total number of running commands which have the given command name.
+
+    Args:
+        pentest (str): The name of the pentest.
+        worker (str): The worker's name.
+        command_iid (ObjectId): The command iid to count running tools.
+
+    Returns:
+        int: Return the total of running tools with this command's name as an integer.
     """
     dbclient = DBClient.getInstance()
-    t = dbclient.countInDb(pentest, "tools", {"command_iid": str(command_iid), "scanner_ip": worker, "dated": {
+    t = dbclient.countInDb(pentest, "tools", {"command_iid": ObjectId(command_iid), "scanner_ip": worker, "dated": {
                             "$ne": "None"}, "datef": "None"})
     if t is not None:
         return t
     return 0
-

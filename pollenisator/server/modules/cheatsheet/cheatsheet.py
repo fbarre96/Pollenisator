@@ -1,36 +1,74 @@
+"""
+CheckItem in cheatsheet module,
+A checkitem is something you want to test in a pentest. It is then instanciated many time for each pentest as CheckInstances.
+"""
+from typing import Any, Dict, Iterable, Iterator, List, Literal, Optional, Tuple, Union, cast
+from typing_extensions import TypedDict
 from bson import ObjectId
-from pollenisator.core.components.mongo import DBClient
-from pollenisator.core.controllers.commandcontroller import CommandController
-from pollenisator.server.servermodels.command import ServerCommand
-from pollenisator.server.servermodels.command import doInsert as commandDoInsert
-from pollenisator.server.servermodels.element import ServerElement
-from pollenisator.server.permission import permission
-from pollenisator.core.components.utils import JSONDecoder
 import json
 
+import pymongo
+from pollenisator.core.components.mongo import DBClient
+from pollenisator.core.controllers.commandcontroller import CommandController
+from pollenisator.core.models.command import Command
+from pollenisator.core.models.element import Element
+from pollenisator.server.servermodels.command import doInsert as commandDoInsert
+from pollenisator.server.permission import permission
+from pollenisator.core.components.utils import JSONDecoder
 
-class CheckItem(ServerElement):
+CheckItemInsertResult = TypedDict('CheckItemInsertResult', {'res': bool, 'iid': ObjectId})
+
+class CheckItem(Element):
+    """Represents a checkitem object.
+
+    Attributes:
+        coll_name: collection name in pollenisator or pentest database
+    """
+
     coll_name = 'checkitems'
-    def __init__(self, pentest, valuesFromDb=None):
-        dbclient = DBClient.getInstance()
-        if pentest != "":
-            self.pentest = pentest
-        elif dbclient.current_pentest != "":
-            self.pentest = dbclient.current_pentest
-        else:
-            raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
-        if valuesFromDb is None:
-            valuesFromDb = {}
-        if valuesFromDb is None:
-            valuesFromDb = {}
-        self.initialize(pentest, valuesFromDb.get("_id"), valuesFromDb.get("title"),  valuesFromDb.get("pentest_types"), 
-                        valuesFromDb.get("lvl"), valuesFromDb.get("ports"), valuesFromDb.get("priority"), valuesFromDb.get("max_thread"), valuesFromDb.get("description"), valuesFromDb.get("category"),
-            valuesFromDb.get("check_type"), valuesFromDb.get("step"), valuesFromDb.get("parent"), 
-            valuesFromDb.get("commands"), valuesFromDb.get("defect_tags"), valuesFromDb.get("script"), valuesFromDb.get("infos"))
-        
 
-    def initialize(self, pentest, _id, title, pentest_types=None, lvl="", ports="", priority=0, max_thread=1, description="", category="", check_type="manual", step=1, parent=None, commands=None, defect_tags=None, script=None, infos=None):
-        self._id = _id
+    def __init__(self, pentest: str, valuesFromDb: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Initialize a CheatSheet object. If valuesFromDb is provided, it is used to initialize the object. 
+        Otherwise, the object is initialized with default values.
+
+        Args:
+            pentest (str): The name of the current pentest.
+            valuesFromDb (Optional[Dict[str, Any]], optional): The values from the database. Defaults to None.
+        """
+        if valuesFromDb is None:
+            valuesFromDb = {}
+        super().__init__(pentest, valuesFromDb)
+        self.initialize(valuesFromDb.get("title", ""),  valuesFromDb.get("pentest_types"),
+                        valuesFromDb.get("lvl", ""), str(valuesFromDb.get("ports", "")),
+                        int(valuesFromDb.get("priority", 0)), int(valuesFromDb.get("max_thread", 1)),
+                        valuesFromDb.get("description", ""), str(valuesFromDb.get("category", "")),
+                        valuesFromDb.get("check_type", ""), int(valuesFromDb.get("step", 0)), 
+                        valuesFromDb.get("commands"), valuesFromDb.get("defect_tags"), valuesFromDb.get("script"), valuesFromDb.get("infos"))
+
+    def initialize(self, title: str, pentest_types: Optional[List[str]] = None, lvl: str = "", ports: str = "", priority: int = 0, max_thread: int = 1, description: str = "", category: str = "", check_type: str = "manual", step: int = 1, commands: Optional[List[str]] = None, defect_tags: Optional[List[str]] = None, script: Optional[str] = None, infos: Optional[Dict[str, Any]] = None) -> 'CheckItem':
+        """
+        Initialize this CheatSheet object with the provided parameters.
+
+        Args:
+            title (str): The title of the CheatSheet.
+            pentest_types (Optional[List[str]], optional): The types of pentests this CheatSheet applies to. Defaults to None.
+            lvl (str, optional): The level of the CheatSheet. Defaults to "".
+            ports (str, optional): The ports associated with the CheatSheet. Defaults to "".
+            priority (int, optional): The priority of the CheatSheet. Defaults to 0.
+            max_thread (int, optional): The maximum number of threads for the CheatSheet. Defaults to 1.
+            description (str, optional): The description of the CheatSheet. Defaults to "".
+            category (str, optional): The category of the CheatSheet. Defaults to "".
+            check_type (str, optional): The type of check for the CheatSheet. Defaults to "manual".
+            step (int, optional): The step of the CheatSheet. Defaults to 1.
+            commands (Optional[List[str]], optional): The commands of the CheatSheet. Defaults to None.
+            defect_tags (Optional[List[str]], optional): The defect tags of the CheatSheet. Defaults to None.
+            script (Optional[str], optional): The script of the CheatSheet. Defaults to None.
+            infos (Optional[Dict[str, Any]], optional): The additional information of the CheatSheet. Defaults to None.
+
+        Returns:
+            CheatSheet: The initialized CheatSheet object.
+        """
         self.type = "checkitem"
         self.title = title
         self.ports = ports
@@ -41,28 +79,23 @@ class CheckItem(ServerElement):
         self.priority = priority
         self.max_thread = max_thread
         self.step = step
-        self.parent = parent
         self.commands = [] if commands is None else commands
         self.defect_tags = [] if defect_tags is None else defect_tags
         self.script = script
         self.pentest_types = [] if pentest_types is None else pentest_types
         self.infos = {} if infos is None else infos
-        dbclient = DBClient.getInstance()
-        if pentest != "":
-            self.pentest = pentest
-        elif dbclient.current_pentest != "":
-            self.pentest = dbclient.current_pentest
-        else:
-            raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         return self
 
     @classmethod
-    def fetchObjects(cls, pipeline):
-        """Fetch many commands from database and return a Cursor to iterate over model objects
+    def fetchObjects(cls, _pentest: str, pipeline: Dict[str, Any]) -> Iterator['CheckItem']:
+        """
+        Fetch many commands from database and return a Cursor to iterate over model objects.
+
         Args:
-            pipeline: a Mongo search pipeline (dict)
+            pipeline (Dict[str, Any]): A Mongo search pipeline.
+
         Returns:
-            Returns a cursor to iterate on model objects
+            Iterator[CheckItem]: A cursor to iterate on model objects.
         """
         dbclient = DBClient.getInstance()
         pipeline["type"] = "checkitem"
@@ -70,74 +103,105 @@ class CheckItem(ServerElement):
         if ds is None:
             return None
         for d in ds:
-            # disabling this error as it is an abstract function
-            yield cls("pollenisator",d)  #  pylint: disable=no-value-for-parameter
-    
+            yield CheckItem("pollenisator",d)
+
     @classmethod
-    def fetchObject(cls, pipeline):
-        """Fetch many commands from database and return a Cursor to iterate over model objects
+    def fetchObject(cls, _pentest: str, pipeline: Dict[str, Any]) -> Optional['CheckItem']:
+        """
+        Fetch many commands from database and return a Cursor to iterate over model objects.
+
         Args:
-            pipeline: a Mongo search pipeline (dict)
+            _pentest (str): The name of the current pentest.
+            pipeline (Dict[str, Any]): A Mongo search pipeline.
+
         Returns:
-            Returns a cursor to iterate on model objects
+            Optional[CheckItem]: A cursor to iterate on model objects, None if no object is found.
         """
         dbclient = DBClient.getInstance()
         pipeline["type"] = "checkitem"
         d = dbclient.findInDb("pollenisator", cls.coll_name, pipeline, False)
         if d is None:
             return None
-        return cls("pollenisator", d)
-  
-    def getData(self):
+        return CheckItem("pollenisator", d)
+
+    def getData(self) -> Dict[str, Any]:
+        """
+        Get the data of this CheckItem object as a dictionary.
+        
+        Returns:
+            Dict[str, Any]: The data of this CheckItem object.
+        """
         return {"_id": self._id, "type":self.type, "title":self.title,"pentest_types":self.pentest_types, "lvl":self.lvl, "ports":self.ports,
                 "priority":self.priority, "max_thread":self.max_thread, "description": self.description, "category":self.category,
                 "check_type":self.check_type, "step":self.step, "parent":self.parent,
                 "commands":self.commands,"defect_tags":self.defect_tags, "script":self.script, "infos":self.infos}
 
-    def addInDb(self):
-        return doInsert(self.pentest, self.getData())
-    
+    def addInDb(self) -> CheckItemInsertResult:
+        """
+        Add the check item to the database
 
-    def apply_retroactively(self, pentest):
-        class_registered = ServerElement.getClassWithTrigger(self.lvl)
+        Returns:
+            CheckItemInsertResult: the result of the insert function
+        """
+        res: CheckItemInsertResult = doInsert(self.pentest, self.getData())
+        return res
+
+    def apply_retroactively(self, pentest: str) -> None:
+        """
+        Apply the CheatSheet retroactively. This method checks if the CheatSheet can be applied to any existing elements.
+
+        Args:
+            pentest (str): The name of the current pentest.
+        """
+        class_registered = Element.getClassWithTrigger(self.lvl)
         if class_registered is None:
             return
-        elif class_registered == ServerElement:
-            ServerElement.apply_retroactively_custom(pentest, self)
+        elif class_registered == Element:
+            Element.apply_retroactively_custom(pentest, self)
             return
         all_objects = class_registered.fetchObjects(pentest, {})
+        if all_objects is None:
+            return
         for obj in all_objects:
             obj.checkAllTriggers()
 
 
 
 
-def doInsert(pentest, data):
-    """Insert a checkitem into the database.
+def doInsert(pentest: str, data: Dict[str, Any]) -> CheckItemInsertResult:
+    """
+    Insert a checkitem into the database.
 
     Args:
-        pentest: The pentest name.
-        data: The data to insert.
+        pentest (str): The pentest name.
+        data (Dict[str, Any]): The data to insert.
 
-    Return:
-        A dictionary with the result of the insertion.
+    Returns:
+        CheckItemInsertResult: A dictionary with the result of the insertion.
     """
     if "_id" in data:
         del data["_id"]
     dbclient = DBClient.getInstance()
     data["type"] = "checkitem"
-    existing = CheckItem.fetchObject({"title":data["title"]})
+    existing = CheckItem.fetchObject("pollenisator", {"title":data["title"]})
     if existing is not None:
         return {"res":False, "iid":existing.getId()}
-    
     ins_result = dbclient.insertInDb(
-        pentest, CheckItem.coll_name, data, True)
+        pentest, CheckItem.coll_name, data, notify=True)
+    ins_result = cast(pymongo.results.InsertOneResult, ins_result)
     iid = ins_result.inserted_id
     return {"res": True, "iid": iid}
 
 @permission("user")
-def insert(body):
-    """insert cheatsheet information
+def insert(body: Dict[str, Any]) -> CheckItemInsertResult:
+    """
+    Insert cheatsheet information.
+
+    Args:
+        body (Dict[str, Any]): The data to insert.
+
+    Returns:
+        CheckItemInsertResult: A dictionary with the result of the insertion.
     """
     if "type" in body:
         del body["type"]
@@ -148,11 +212,18 @@ def insert(body):
     return doInsert("pollenisator", data)
 
 @permission("user")
-def delete(iid):
-    """delete cheatsheet item
+def delete(iid: str) -> Union[Tuple[str, int], int]:
+    """
+    Delete a cheatsheet item.
+
+    Args:
+        iid (str): The id of the cheatsheet item to delete.
+
+    Returns:
+       int: Returns "Not found" and 404 if the item is not found, 0 if the deletion failed, or the result of the deletion operation.
     """
     dbclient = DBClient.getInstance()
-    existing = CheckItem.fetchObject({"_id":ObjectId(iid)})
+    existing = CheckItem.fetchObject("pollenisator", {"_id":ObjectId(iid)})
     if existing is None:
         return "Not found", 404
     pentests = dbclient.listPentestUuids()
@@ -164,51 +235,86 @@ def delete(iid):
     return res
 
 @permission("user")
-def update(iid, body):
+def update(iid: str, body: Dict[str, Any]) -> Union[Tuple[str, int], bool]:
+    """
+    Update a cheatsheet item.
+
+    Args:
+        iid (str): The id of the cheatsheet item to update.
+        body (Dict[str, Any]): The data to update.
+
+    Returns:
+        Union[Tuple[str, int], bool]: Returns "Not found" and 404 if the item is not found, or True if the update was successful.
+    """
     # Check if the checkitem to update exists
-    existing = CheckItem.fetchObject({"_id": ObjectId(iid)})
+    existing = CheckItem.fetchObject("pollenisator", {"_id": ObjectId(iid)})
     if existing is None:
         return "Not found", 404
     # Check if the title of the checkitem to update is the same as the one provided in the body
     checkitem = CheckItem("pollenisator", body)
+    data = checkitem.getData()
     # Remove the type and _id from the body because they can't be updated
-    if "type" in body:
-        del body["type"]
-    if "_id" in body:
-        del body["_id"]
+    if "type" in data:
+        del data["type"]
+    if "_id" in data:
+        del data["_id"]
     # Update the checkitem
     dbclient = DBClient.getInstance()
-    dbclient.updateInDb("pollenisator", CheckItem.coll_name, {"_id": ObjectId(iid), "type":"checkitem"}, {"$set": body}, False, True)
+    dbclient.updateInDb("pollenisator", CheckItem.coll_name, {"_id": ObjectId(iid), "type":"checkitem"}, {"$set": data}, False, True)
     return True
 
 
 @permission("user")
-def find(body):
+def find(body: Dict[str,Any]) -> Union[Tuple[str, int], List[Dict[str, Any]], Dict[str, Any]]:
+    """
+    Find checkitems in the database.
+
+    Args:
+        body (Dict[str,Any]): The body of the request. It should contain a pipeline for the search, and a boolean indicating whether to return many results.
+
+    Returns:
+        Union[Tuple[str, int], List[Dict[str, Any]], Dict[str, Any]]: Returns a list of results if many is True, a single result if many is False, or ("Not found", 404) if no results are found.
+    """
     pipeline = body.get("pipeline", {})
     if isinstance(pipeline, str):
         pipeline = json.loads(pipeline, cls=JSONDecoder)
     many = body.get("many", True)
     dbclient = DBClient.getInstance()
-    results = dbclient.findInDb("pollenisator", "checkitems", pipeline, many)
+    results: Union[Dict[str, Any], List[Dict[str, Any]], None, pymongo.cursor.Cursor] = dbclient.findInDb("pollenisator", "checkitems", pipeline, many)
     if results is None:
         return [] if many else ("Not found", 404)
     if many:
+        results = cast(List[Dict[str, Any]], results)
         return [x for x in results]
+    if isinstance(results, pymongo.cursor.Cursor):
+        results = list(results)
     return results
 
+
 @permission("pentester")
-def applyToPentest(pentest, iid, body, **kwargs):
+def applyToPentest(pentest: str, iid: str, _body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[Tuple[str, int], Dict[str, bool]]:
+    """
+    Apply a cheatsheet to a pentest.
+
+    Args:
+        pentest (str): The name of the pentest.
+        iid (str): The id of the cheatsheet item.
+        body (Dict[str, Any]): The body of the request.
+        **kwargs (Dict[str, Any]): Additional keyword arguments.
+
+    Returns:
+        Union[Tuple[str, int], Dict[str, bool]]: Returns "Not found" and 404 if the cheatsheet item is not found, or a dictionary with the result of the operation.
+    """
     user = kwargs["token_info"]["sub"]
-    dbclient = DBClient.getInstance()
-    check_item = CheckItem.fetchObject({"_id":ObjectId(iid)})
+    check_item = CheckItem.fetchObject("pollenisator", {"_id":ObjectId(iid)})
     if check_item is None:
         return "Not found", 404
     for command in check_item.commands:
-        pentest_equiv_command = ServerCommand.fetchObject({"original_iid":str(command)}, pentest)
+        pentest_equiv_command = Command.fetchObject(pentest, {"original_iid":str(command)})
         if pentest_equiv_command is None:
-            orig = ServerCommand.fetchObject({"_id":ObjectId(command)})
+            orig = Command.fetchObject("pollenisator", {"_id":ObjectId(command)})
             if orig:
-                mycommand =  CommandController(orig).getData()
+                mycommand =  orig.getData()
                 mycommand["original_iid"] = str(mycommand["_id"])
                 mycommand["_id"] = None
                 mycommand["indb"] = pentest

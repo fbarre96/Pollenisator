@@ -1,31 +1,21 @@
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
-from pollenisator.server.servermodels.element import ServerElement
-from pollenisator.server.servermodels.tool import ServerTool
-from pollenisator.server.servermodels.command import ServerCommand
+from pollenisator.core.models.command import Command
+from pollenisator.core.models.element import Element
+from pollenisator.core.models.tool import Tool
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.permission import permission
-from pollenisator.core.components.utils import checkCommandService
-from pollenisator.core.components.logger_config import logger
 
-class CheckInstance(ServerElement):
+class CheckInstance(Element):
     coll_name = 'checkinstances'
 
-    
     def __init__(self, pentest, valuesFromDb=None):
-        dbclient = DBClient.getInstance()
-        if pentest != "":
-            self.pentest = pentest
-        elif dbclient.current_pentest != "":
-            self.pentest = dbclient.current_pentest
-        else:
-            raise ValueError(
-                "An empty pentest name was given and the database is not set in mongo instance.")
+        
         if valuesFromDb is None:
             valuesFromDb = {}
+        super().__init__(pentest, valuesFromDb)
         self.initialize(pentest, valuesFromDb.get("_id"), valuesFromDb.get("check_iid"), valuesFromDb.get("target_iid"), valuesFromDb.get(
             "target_type"), valuesFromDb.get("parent", None), valuesFromDb.get("status", ""), valuesFromDb.get("notes", ""))
-        
 
     def initialize(self, pentest, _id, check_iid, target_iid, target_type, parent, status, notes):
         self._id = _id
@@ -45,11 +35,11 @@ class CheckInstance(ServerElement):
             raise ValueError(
                 "An empty pentest name was given and the database is not set in mongo instance.")
         return self
-    
+
     @classmethod
     def getSearchableTextAttribute(cls):
         return ["title", "category", "lvl"] # will load on checktitems attribute
-    
+
     @classmethod
     def fetchObjects(cls, pentest, pipeline):
         """Fetch many commands from database and return a Cursor to iterate over model objects
@@ -83,18 +73,27 @@ class CheckInstance(ServerElement):
         return cls(pentest, d)
 
     def getTargetData(self):
-        target_class = ServerElement.classFactory(self.target_type)
+        target_class = Element.classFactory(self.target_type)
         dbclient = DBClient.getInstance()
         return dbclient.findInDb(self.pentest, target_class.coll_name, {
                                         "_id": ObjectId(self.target_iid)}, False)
-    
-    def getCheckItem(self):
-        return CheckItem.fetchObject({"_id": ObjectId(self.check_iid)})
+
+    def getCheckItem(self) -> 'CheckItem':
+        """
+        Get the CheckItem associated with this CheckInstance.
+
+        Returns:
+            CheckItem: The CheckItem instance associated with this CheckInstance's check iid.
+        """
+        check_item: CheckItem = CheckItem.fetchObject({"_id": ObjectId(self.check_iid)})
+        return check_item
 
     def getData(self):
         return {"_id": self._id, "type": self.type, "check_iid": self.check_iid, "target_iid": self.target_iid, "target_type": self.target_type, "parent": self.parent, "status": self.status, "notes": self.notes}
 
-    def addInDb(self, checkItem=None, toolInfos={}):
+    def addInDb(self, checkItem=None, toolInfos=None):
+        if toolInfos is None:
+            toolInfos = {}
         ret = doInsert(self.pentest, self.getData(), checkItem, toolInfos)
         return ret
     
@@ -108,8 +107,7 @@ class CheckInstance(ServerElement):
             return
         checks_to_add = []
         targets = list(targets)
-        
-        commands_pentest = ServerCommand.fetchObjects({}, pentest)
+        commands_pentest = Command.fetchObjects(pentest, {})
         commands_lkp = {command_pentest.original_iid: command_pentest for command_pentest in commands_pentest}
         check_command_lkp = {}
         for checkItem in checks:
@@ -118,8 +116,7 @@ class CheckInstance(ServerElement):
             else:
                 subset = targets
             for target in subset:
-                checkinstance = CheckInstance(pentest).initialize(pentest, None, str(
-                    checkItem._id), str(target.getId()), targets_type, None, "", "")
+                checkinstance = CheckInstance(pentest).initialize(pentest, None, str(checkItem._id), str(target.getId()), targets_type, None, "", "")
                 checks_to_add.append(checkinstance)
             for command in checkItem.commands:
                 check_command_lkp[str(checkItem.getId())] = check_command_lkp.get(str(checkItem.getId()), []) + [commands_lkp.get(command, None)]
@@ -156,16 +153,17 @@ class CheckInstance(ServerElement):
             checkitem_id = check.check_iid
             commands = check_command_lkp.get(checkitem_id, [])
             for command in commands:
-                tool = ServerTool(pentest)
-                targetdata = target.getData()
-                tool.initialize(str(command.getId()), str(check.getId()), targetdata.get("wave", ""), command.name, targetdata.get("scope", ""), targetdata.get("ip", ""), targetdata.get("port", ""),
-                                            targetdata.get("proto", ""), checkItem.lvl, infos=toolInfos)
-                tools_to_add.append(tool)
+                tool = Tool(pentest)
+                for target in targets:
+                    targetdata = target.getData()
+                    tool.initialize(str(command.getId()), str(check.getId()), targetdata.get("wave", ""), command.name, targetdata.get("scope", ""), targetdata.get("ip", ""), targetdata.get("port", ""),
+                                                targetdata.get("proto", ""), checkItem.lvl, infos=toolInfos)
+                    tools_to_add.append(tool)
         if tools_to_add:
-            ServerTool.bulk_insert(pentest, tools_to_add)
-        
+            Tool.bulk_insert(pentest, tools_to_add)
+
         return checks_inserted
-    
+
 
     @classmethod
     def bulk_queue(cls, pentest, checks_iids, priority, force=False):

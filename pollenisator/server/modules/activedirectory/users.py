@@ -1,87 +1,113 @@
+"""Active directory module to handle users"""
 # coding: utf-8
 
 from __future__ import absolute_import
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing_extensions import TypedDict
 from pollenisator.core.components.logger_config import logger
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
-from pollenisator.server.servermodels.element import ServerElement
+from pollenisator.core.models.element import Element
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
 from pollenisator.server.permission import permission
-from pollenisator.server.servermodels.command import ServerCommand
-from pollenisator.server.servermodels.tool import ServerTool
 
 import pollenisator.server.modules.activedirectory.computers as Computer
 
-class User(ServerElement):
+UserInsertResult = TypedDict('UserInsertResult', {'res': bool, 'iid': ObjectId})
+
+class User(Element):
+    """
+    Class to describe an Active Directory user
+
+    Attributes:
+        coll_name: collection name in database
+        command_variables: list of variables that can be used in commands
+    """
     coll_name = "users"
     command_variables = ["username","domain","password"]
-    
-    def __init__(self, pentest=None, valuesFromDb=None):
+
+    def __init__(self, pentest: str, valuesFromDb: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Initialize a User object. If values from the database are provided, they are used to initialize the object. 
+        Otherwise, the object is initialized with default values.
+
+        Args:
+            pentest (Optional[str], optional): The name of the current pentest. Defaults to None.
+            valuesFromDb (Optional[Dict[str, Any]], optional): The values from the database. Defaults to None.
+        """
         if valuesFromDb is None:
             valuesFromDb = {}
-        self.initialize(pentest, valuesFromDb.get("_id"), valuesFromDb.get("domain"), valuesFromDb.get("username"), valuesFromDb.get("password"),
+        super().__init__(pentest, valuesFromDb)
+        self.initialize( valuesFromDb.get("domain"), valuesFromDb.get("username"), valuesFromDb.get("password"),
             valuesFromDb.get("groups"), valuesFromDb.get("description"), valuesFromDb.get("infos", {}))
 
-    def initialize(self, pentest, _id, domain=None, username=None, password=None,groups=None, description=None, infos=None):
-        """User
-        :param pentest: current pentest 
-        :type pentest: str
-        :param _id: iid of the object
-        :type _id: str
-        :param username: The username of this User.
-        :type username: str
-        :param password: The password of this User.
-        :type password: str
-        :param domain: The domain of this User.
-        :type domain: str
-        :param groups: The groups of this User.
-        :type groups: List[str]
-        :param description: The description of this User.
-        :type description: str
+    def initialize(self, domain: Optional[str] = None, username: Optional[str] = None, password: Optional[str] = None, groups: Optional[List[str]] = None, description: Optional[str] = None, infos: Optional[Dict[str, Any]] = None) -> 'User':
         """
-      
-        self._id = _id
+        Initialize a User object. If parameters are provided, they are used to initialize the object. 
+        Otherwise, the object is initialized with default values.
+
+        Args:
+            domain (Optional[str], optional): The domain of this User. Defaults to None.
+            username (Optional[str], optional): The username of this User. Defaults to None.
+            password (Optional[str], optional): The password of this User. Defaults to None.
+            groups (Optional[List[str]], optional): The groups of this User. Defaults to None.
+            description (Optional[str], optional): The description of this User. Defaults to None.
+            infos (Optional[Dict[str, Any]], optional): Additional information about this User. Defaults to None.
+
+        Returns:
+            User: The initialized User object.
+        """
+
         self.username = username if username is not None else  ""
         self.password = password if password is not None else  ""
         self.domain = domain if domain is not None else  ""
-        self.groups = groups
-        self.description = description
+        self.groups = groups if groups is not None else []
+        self.description = description if description is not None else  ""
         self.infos =  infos if infos is not None else {}
-        dbclient = DBClient.getInstance()
-        if pentest != "":
-            self.pentest = pentest
-        elif dbclient.current_pentest != "":
-            self.pentest = dbclient.current_pentest
-        else:
-            raise ValueError("An empty pentest name was given and the database is not set in mongo instance.")
         return self
-  
-    def __str__(self):
+
+    def __str__(self) -> str:
         """
-        Get a string representation of a defect.
+        Get a string representation of a user.
 
         Returns:
-            Returns the defect +title.
+            Returns the user domain\\username.
         """
-        return self.domain+"\\"+self.username 
-    
+        return str(self.domain)+"\\"+str(self.username)
+
     @classmethod
-    def getSearchableTextAttribute(cls):
+    def getSearchableTextAttribute(cls) -> List[str]:
+        """
+        Get the attributes of the User class that can be used for text search.
+
+        Returns:
+            List[str]: A list of attribute names.
+        """
         return ["domain", "username"]
 
-    def getData(self):
+    def getData(self) -> Dict[str, Any]:
+        """
+        Get the data of this User object as a dictionary.
+
+        Returns:
+            Dict[str, Any]: The data of this User object.
+        """
         return {"_id": self._id, "username":self.username, "password": self.password, "domain":self.domain,
          "groups": self.groups, "description":self.description, "infos":self.infos}
 
-    
+
     @classmethod
-    def fetchObjects(cls, pentest, pipeline):
-        """Fetch many commands from database and return a Cursor to iterate over model objects
+    def fetchObjects(cls, pentest: str, pipeline: Dict[str, Any]) -> Optional[Iterator['User']]:
+        """
+        Fetch many users from the database and return a Cursor to iterate over User objects.
+
         Args:
-            pipeline: a Mongo search pipeline (dict)
+            pentest (str): The name of the current pentest.
+            pipeline (Dict[str, Any]): A MongoDB search pipeline.
+
         Returns:
-            Returns a cursor to iterate on model objects
+            Optional[Iterator[User]]: A cursor to iterate over User objects, or None if no users are found.
         """
         dbclient = DBClient.getInstance()
         pipeline["type"] = "user"
@@ -89,44 +115,78 @@ class User(ServerElement):
         if ds is None:
             return None
         for d in ds:
-            # disabling this error as it is an abstract function
-            yield cls(pentest,d)  #  pylint: disable=no-value-for-parameter
-    
+            yield User(pentest,d)
+
     @classmethod
-    def fetchObject(cls, pentest, pipeline):
-        """Fetch many commands from database and return a Cursor to iterate over model objects
+    def fetchObject(cls, pentest: str, pipeline: Dict[str, Any]) -> Optional['User']:
+        """
+        Fetch a user from the database and return a User object. If no user is found, None is returned.
+
         Args:
-            pipeline: a Mongo search pipeline (dict)
+            pentest (str): The name of the current pentest.
+            pipeline (Dict[str, Any]): A MongoDB search pipeline.
+
         Returns:
-            Returns a cursor to iterate on model objects
+            Optional[User]: A User object, or None if no user is found.
         """
         dbclient = DBClient.getInstance()
         pipeline["type"] = "user"
         d = dbclient.findInDb(pentest, cls.coll_name, pipeline, False)
         if d is None:
             return None
-        return cls(pentest, d)
+        return User(pentest, d)
 
-    def addInDb(self):
-        return insert(self.pentest, self.getData())
+    def addInDb(self) -> UserInsertResult:
+        """
+        Add this User object to the database and return the id of the inserted document.
+
+        Returns:
+            UserInsertResult: The UserInsertResult of the inserted document.
+        """
+        res: UserInsertResult = insert(self.pentest, self.getData())
+        return res
 
     @classmethod
-    def replaceCommandVariables(cls, pentest, command, data):
+    def replaceCommandVariables(cls, _pentest: str, command: str, data: Dict[str, Any]) -> str:
+        """
+        Replace variables in the command with the corresponding values from the data.
+
+        Args:
+            pentest (str): The name of the current pentest.
+            command (str): The command with variables to be replaced.
+            data (Dict[str, str]): The data containing the values for the variables.
+
+        Returns:
+            str: The command with variables replaced by their corresponding values.
+        """
         command = command.replace("|username|", data.get("username", ""))
         command = command.replace("|domain|", "" if data.get("domain", "") is None else data.get("domain", ""))
         command = command.replace("|password|", data.get("password", ""))
         return command
 
-    def checkAllTriggers(self):
+    def checkAllTriggers(self) -> None:
+        """
+        Add the appropriate checks for this user.
+        """
         self.add_user_checks()
-        
-    def add_user_checks(self):
+
+    def add_user_checks(self) -> None:
+        """
+        Add the appropriate user-related checks for this user.
+        """
         if self.password.strip() != "":
             self.addCheck("AD:onNewValidUser", {"user":self})
         else:
             self.addCheck("AD:onNewUserFound", {"user":self})
 
-    def addCheck(self, lvl, info):
+    def addCheck(self, lvl: str, info: Dict[str, Any]) -> None:
+        """
+        Add a check to this User based on the provided level and info.
+
+        Args:
+            lvl (str): The level of the check.
+            info (Dict[str, Any]): The information needed to add the check.
+        """
         checks = CheckItem.fetchObjects({"lvl":lvl})
         user_o = info.get("user")
         if user_o is None:
@@ -145,129 +205,119 @@ class User(ServerElement):
             CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "user", infos=infos)
 
     @classmethod
-    def getTriggers(cls):
+    def getTriggers(cls) -> List[str]:
         """
         Return the list of trigger declared here
+
+        Returns:
+            List[str]: The list of triggers
         """
         return ["AD:onNewValidUser", "AD:onNewUserFound"]
 
     @property
-    def username(self):
+    def username(self) -> str:
         """Gets the username of this User.
 
-
-        :return: The username of this User.
-        :rtype: str
+        Returns:
+            str: The username of this User.
         """
         return self._username
 
     @username.setter
-    def username(self, username):
+    def username(self, username: str):
         """Sets the username of this User.
 
-
-        :param username: The username of this User.
-        :type username: str
+        Args:
+            username (str): The username of this User.
         """
-
         self._username = username
 
     @property
-    def password(self):
+    def password(self) -> str:
         """Gets the password of this User.
 
-
-        :return: The password of this User.
-        :rtype: str
+        Returns:
+            str: The password of this User.
         """
         return self._password
 
     @password.setter
-    def password(self, password):
+    def password(self, password: str):
         """Sets the password of this User.
 
-
-        :param password: The password of this User.
-        :type password: str
+        Args:
+            password (str): The password of this User.
         """
 
         self._password = password
 
     @property
-    def domain(self):
+    def domain(self) -> str:
         """Gets the domain of this User.
 
-
-        :return: The domain of this User.
-        :rtype: str
+        Returns:
+            str: The domain of this User.
         """
         return self._domain
 
     @domain.setter
-    def domain(self, domain):
+    def domain(self, domain: str):
         """Sets the domain of this User.
 
-
-        :param domain: The domain of this User.
-        :type domain: str
+        Args:
+            domain (str): The domain of this User.
         """
 
         self._domain = domain
 
     @property
-    def groups(self):
+    def groups(self) -> List[str]:
         """Gets the groups of this User.
 
-
-        :return: The groups of this User.
-        :rtype: List[str]
+        Returns:
+            List[str]: The groups of this User.
         """
         return self._groups
 
     @groups.setter
-    def groups(self, groups):
+    def groups(self, groups: List[str]):
         """Sets the groups of this User.
 
-
-        :param groups: The groups of this User.
-        :type groups: List[str]
+        Args:
+            groups (List[str]): The groups of this User.
         """
         self._groups = groups
 
     @property
-    def description(self):
+    def description(self) -> str:
         """Gets the description of this User.
-
-
-        :return: The description of this User.
-        :rtype: str
+        
+        Returns:
+            str: The description of this User.
         """
         return self._description
 
     @description.setter
-    def description(self, description):
+    def description(self, description: str):
         """Sets the description of this User.
 
-
-        :param description: The description of this User.
-        :type description: str
+        Args:
+            description (str): The description of this User.
         """
-
         self._description = description
 
 
 @permission("pentester")
-def delete(pentest, user_iid):
-    """delete user
+def delete(pentest: str, user_iid: str) -> int:
+    """
+    Delete an Active Directory user.
 
-    Delete an Active Directory user # noqa: E501
+    Args:
+        pentest (str): The name of the current pentest.
+        user_iid (str): The id of the user to be deleted.
 
-    :param pentest: 
-    :type pentest: str
-    :param user_iid: 
-    :type user_iid: str
-
-    :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
+    Returns:
+        int: The result of the delete operation.
     """
     dbclient = DBClient.getInstance()
     user_dic = dbclient.findInDb(pentest, "users", {"_id":ObjectId(user_iid), "type":"user"}, False)
@@ -289,17 +339,16 @@ def delete(pentest, user_iid):
         return res
 
 @permission("pentester")
-def insert(pentest, body):
-    """insert user
+def insert(pentest:str, body: Dict[str, Any]) -> UserInsertResult:
+    """
+    Insert the user given in the body in the database using
 
-    Add an Active Directory user # noqa: E501
+    Args:
+        pentest (str): The name of the current pentest.
+        body (Dict[str, Any]): The new user data.
 
-    :param pentest: pentest name
-    :type pentest: str
-    :param user: 
-    :type user: dict | bytes
-
-    :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
+    Returns:
+        UserInsertResult: The user inserted dictionnary with "res" and "iid"
     """
     user = User(pentest, body)
     dbclient = DBClient.getInstance()
@@ -326,23 +375,20 @@ def insert(pentest, body):
     iid = ins_result.inserted_id
     user._id = iid
     user.add_user_checks()
-    
     return {"res": True, "iid": iid}
 
 @permission("pentester")
-def update(pentest, user_iid, body):
-    """update user
+def update(pentest: str, user_iid: str, body: Dict[str, Any]) -> Union[bool, Tuple[str, int]]:
+    """
+    Update an Active Directory user.
 
-    Update an Active Directory user # noqa: E501
+    Args:
+        pentest (str): The name of the current pentest.
+        user_iid (str): The id of the user to be updated.
+        body (Union[dict, bytes]): The new user data.
 
-    :param pentest: 
-    :type pentest: str
-    :param user_iid: 
-    :type user_iid: str
-    :param user: 
-    :type user: dict | bytes
-
-    :rtype: Union[None, Tuple[None, int], Tuple[None, int, Dict[str, str]]
+    Returns:
+        Union[bool, Tuple[str, int]]: The result of the update operation.
     """
     user = User(pentest, body)
     user.username = user.username.lower()
@@ -350,9 +396,10 @@ def update(pentest, user_iid, body):
     if "password" in body:
         body["password"] = body.get("password", "").strip()
     user.domain = user.domain.lower()
-
     dbclient = DBClient.getInstance()
     user_existing = User.fetchObject(pentest, {"_id": ObjectId(user_iid)})
+    if user_existing is None:
+        return "Not found", 404
     if user_existing.username != user.username  and user_existing.domain != user.domain:
         return "Forbidden", 403
     if "type" in body:
@@ -361,6 +408,5 @@ def update(pentest, user_iid, body):
         del body["_id"]
     if str(user.description) != "None" or str(user.description) != "":
         del body["description"]
-
     dbclient.updateInDb(pentest, "users", {"_id": ObjectId(user_iid), "type":"user"}, {"$set": body}, False, True)
     return True

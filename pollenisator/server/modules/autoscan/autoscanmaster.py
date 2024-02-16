@@ -1,33 +1,48 @@
 """Module for orchestrating an automatic scan. Must be run in a separate thread/process."""
-from pollenisator.core.components.socketmanager import SocketManager
-from pollenisator.core.components.logger_config import logger
 import time
+from itertools import chain
 from threading import Thread
 from datetime import datetime
+import traceback
+from typing import Any, Dict, Iterator, List, Literal, Set, Union, Tuple, Optional, cast
+from typing_extensions import TypedDict
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
 import pollenisator.core.components.utils as utils
 from pollenisator.core.components.mongo import DBClient
-from pollenisator.server.servermodels.interval import ServerInterval
-from pollenisator.server.servermodels.command import ServerCommand
+from pollenisator.core.models.command import Command
+from pollenisator.core.models.element import Element
+from pollenisator.core.models.interval import Interval
+from pollenisator.core.models.ip import Ip
+from pollenisator.core.models.tool import Tool
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
-from pollenisator.server.servermodels.tool import ServerTool, launchTask, stopTask, isLaunchable, queueTasks
-from pollenisator.server.servermodels.scope import ServerScope
-from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.server.servermodels.tool import launchTask, stopTask, isLaunchable, queueTasks
 from pollenisator.server.permission import permission
 from pollenisator.server.token import encode_token
-from itertools import chain
+from pollenisator.core.components.logger_config import logger
 
+LaunchableToolType = TypedDict('LaunchableToolType', {'tool': Tool, 'name': str, 'priority': int, 'timedout': bool})
 
 @permission("pentester")
-def startAutoScan(pentest, body, **kwargs):
+def startAutoScan(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Tuple[str, int]:
+    """
+    Start an automatic scan.
+
+    Args:
+        pentest (str): The name of the current pentest.
+        body (Dict[str, Any]): The body of the request containing the command ids and the autoqueue flag.
+        **kwargs (Any): Additional keyword arguments.
+
+    Returns:
+        Tuple[str, int]: The result of the start operation.
+    """
     dbclient = DBClient.getInstance()
     authorized_commands = body.get("command_iids", [])
     autoqueue = body.get("autoqueue", False)
     for authorized_command in authorized_commands:
         try:
-            iid = ObjectId(authorized_command)
+            _ = ObjectId(authorized_command) # test Object id valid
         except InvalidId:
             return "Invalid command id", 400
     autoscanRunning = dbclient.findInDb(
@@ -42,33 +57,33 @@ def startAutoScan(pentest, body, **kwargs):
     encoded = encode_token(kwargs["token_info"])
     # queue auto commands
     tools_lauchable = findLaunchableTools(pentest)
-    queueTasks(pentest, [tool_model["tool"].getId()
-               for tool_model in tools_lauchable])
+    queueTasks(pentest, [tool_model["tool"].getId() for tool_model in tools_lauchable])
     autoscan = Thread(target=autoScan, args=(pentest, encoded, autoqueue))
     try:
         logger.debug("Autoscan : start")
         autoscan.start()
     except (KeyboardInterrupt, SystemExit):
         dbclient.deleteFromDb(pentest, "autoscan", {}, True)
-    return "Success"
+    return "Success", 200
 
 
-def autoScan(pentest, endoded_token, autoqueue):
+def autoScan(pentest: str, endoded_token: str, autoqueue: bool) -> None:
     """
-    Search tools to launch within defined conditions and attempts to launch them this  worker.
-    Gives a visual feedback on stdout
+    Search tools to launch within defined conditions and attempts to launch them this worker.
+    Gives a visual feedback on stdout.
 
     Args:
-        pentest: The database to search tools in
+        pentest (str): The database to search tools in.
+        endoded_token (str): The encoded token.
+        autoqueue (bool): The autoqueue flag.
     """
     dbclient = DBClient.getInstance()
     check = True
     try:
         while check:
-            autoscan_threads = dbclient.findInDb(
+            autoscan_threads_settings = dbclient.findInDb(
                 pentest, "settings", {"key": "autoscan_threads"}, False)
-            autoscan_threads = 4 if autoscan_threads is None else int(
-                autoscan_threads["value"])
+            autoscan_threads = 4 if autoscan_threads_settings is None else int(autoscan_threads_settings["value"])
 
             running_tools_count = dbclient.countInDb(
                 pentest, "tools", {"status": "running"})
@@ -95,13 +110,12 @@ def autoScan(pentest, endoded_token, autoqueue):
                 launchableTools = []
             else:
                 launchableTools = queue["tools"]
-            logger.debug("Autoscan : launchable tools: " +
-                         str(len(launchableTools)))
+            logger.debug("Autoscan : launchable tools: %s", str(len(launchableTools)))
             # launchableTools.sort(key=lambda tup: (int(tup["timedout"]), int(tup["priority"])))
-            toLaunch = []
+            toLaunch: List[Tuple[ObjectId, str]] = []
 
             for launchableTool in launchableTools:
-                priority = launchableTool["priority"]
+                #priority = launchableTool["priority"]
                 force = launchableTool.get("force", False)
                 launchableToolIid = launchableTool["iid"]
                 check = getAutoScanStatus(pentest)
@@ -109,16 +123,16 @@ def autoScan(pentest, endoded_token, autoqueue):
                     break
                 if autoscan_threads - len(toLaunch) - running_tools_count <= 0:
                     break
-                logger.debug("Autoscan : launch task tools: " +
-                             str(launchableToolIid))
+                logger.debug("Autoscan : launch task tools: %s", str(launchableToolIid))
                 msg, statuscode = isLaunchable(
                     pentest, launchableToolIid, authorized_commands, force)
                 if statuscode == 404:
                     dbclient.updateInDb(pentest, "autoscan", {"type": "queue"}, {
                                         "$pull": {"tools": {"iid": launchableToolIid}}})
-                    tool_o = ServerTool.fetchObject(
+                    tool_o = Tool.fetchObject(
                         pentest, {"_id": ObjectId(launchableToolIid)})
                     if tool_o is not None:
+                        tool_o = cast(Tool, tool_o)
                         tool_o.markAsError(msg)
                 elif statuscode == 403:
                     dbclient.updateInDb(pentest, "autoscan", {"type": "queue"}, {
@@ -126,7 +140,7 @@ def autoScan(pentest, endoded_token, autoqueue):
                 elif statuscode == 200:
                     dbclient.updateInDb(pentest, "autoscan", {"type": "queue"}, {
                                         "$pull": {"tools": {"iid": launchableToolIid}}})
-                    toLaunch.append([launchableToolIid, msg])
+                    toLaunch.append((launchableToolIid, msg))
                     # the tool will be launched, we can remove it from the queue, let the worker set it as running
             for tool in toLaunch:
                 launchTask(pentest, tool[0], tool[1], endoded_token)
@@ -138,50 +152,66 @@ def autoScan(pentest, endoded_token, autoqueue):
         logger.info("stop autoscan : Kill received...")
         dbclient.deleteFromDb(pentest, "autoscan", {}, True)
     except Exception as e:
-        import traceback
         tb = traceback.format_exc()
         print(tb)
         logger.exception(e)
-        logger.debug("autoscan :"+tb)
+        logger.debug("autoscan : %s", tb)
         logger.error(str(e))
 
 
 @permission("pentester")
-def stopAutoScan(pentest):
+def stopAutoScan(pentest: str) -> Literal["Success"]:
+    """
+    Stop the automatic scan.
+
+    Args:
+        pentest (str): The name of the current pentest.
+
+    Returns:
+        str: Success
+    """
     logger.debug("Autoscan : stop autoscan received ")
     dbclient = DBClient.getInstance()
     toolsRunning = []
     workers = dbclient.getWorkers({"pentest": pentest})
-    for worker in workers:
-        tools = dbclient.findInDb(
-            pentest, "tools", {"scanner_ip": worker["name"], "status": "running"}, True)
-        for tool in tools:
-            toolsRunning.append(tool["_id"])
+    if workers is not None:
+        for worker in workers:
+            tools = dbclient.findInDb(
+                pentest, "tools", {"scanner_ip": worker["name"], "status": "running"}, True)
+            for tool in tools:
+                toolsRunning.append(tool["_id"])
     dbclient.deleteFromDb(pentest, "autoscan", {}, True)
     for toolId in toolsRunning:
-        res, msg = stopTask(pentest, toolId, {"forceReset": True})
+        _res, _msg = stopTask(pentest, toolId, {"forceReset": True})
     return "Success"
 
 
 @permission("pentester")
-def getAutoScanStatus(pentest):
-    # commandsRunning = dbclient.aggregate("tools", [{"$match": {"datef": "None", "dated": {
-    #        "$ne": "None"}, "scanner_ip": {"$ne": "None"}}}, {"$group": {"_id": "$name", "count": {"$sum": 1}}}])
+def getAutoScanStatus(pentest: str) -> bool:
+    """
+    Get the status of the automatic scan.
+
+    Args:
+        pentest (str): The name of the current pentest.
+
+    Returns:
+        bool: True if the automatic scan is running, False otherwise.
+    """
     dbclient = DBClient.getInstance()
     return dbclient.findInDb(pentest, "autoscan", {"special": True}, False) is not None
 
 
-def findLaunchableTools(pentest):
+def findLaunchableTools(pentest: str) -> List[LaunchableToolType]:
     """ 
     Try to find tools that matches all criteria.
+
     Args:
-        workerName: the current working worker
+        pentest (str): The name of the current pentest.
+
     Returns:
-        A tuple with two values:
-            * A list of launchable tools as dictionary with values _id, name and priority
-            * A dictionary of waiting tools with tool's names as keys and integer as value.
+        List[Dict[str, Union[Tool, str, int, bool]]]: A list of launchable tools as dictionary with values _id, name and priority.
     """
-    toolsLaunchable = []
+    toolsLaunchable: List[LaunchableToolType] = []
     time_compatible_waves_id = searchForAddressCompatibleWithTime(pentest)
     if time_compatible_waves_id is None:
         return toolsLaunchable
@@ -192,8 +222,7 @@ def findLaunchableTools(pentest):
         return toolsLaunchable
     authorized_commands = [ObjectId(x)
                            for x in autoscan_enr["authorized_commands"]]
-    pentest_commands = ServerCommand.fetchObjects(
-        {"_id": {"$in": authorized_commands}}, pentest)
+    pentest_commands = Command.fetchObjects(pentest, {"_id": {"$in": authorized_commands}})
     authorized_original_commands = [
         str(x.original_iid) for x in pentest_commands]
     check_items = list(CheckItem.fetchObjects(
@@ -202,62 +231,52 @@ def findLaunchableTools(pentest):
     # get not done tools inside wave
     for check_item in check_items:
         check_instances = CheckInstance.fetchObjects(
-            pentest, {"check_iid": str(check_item._id), "status": {"$ne": "done"}})
-        check_ids = [str(x._id) for x in check_instances]
-        tools_without_ip = ServerTool.fetchObjects(pentest, {"check_iid": {
+            pentest, {"check_iid": str(check_item.getId()), "status": {"$ne": "done"}})
+        check_ids = [str(x.getId()) for x in check_instances]
+        tools_without_ip_db = Tool.fetchObjects(pentest, {"check_iid": {
                                                    "$in": check_ids}, "ip": "", "dated": "None", "datef": "None"})
-        ips_in_scopes = ServerIp.fetchObjects(
+        ips_in_scopes_db = Ip.fetchObjects(
             pentest, {"in_scopes": {"$ne": []}})
-        ips_in_scopes = [x.ip for x in ips_in_scopes]
-        tools_with_ip_in_scope = ServerTool.fetchObjects(pentest, {"check_iid": {
+        if ips_in_scopes_db is None:
+            ips_in_scopes = []
+        else:
+            ips_in_scopes = [cast(Ip, x).ip for x in ips_in_scopes_db]
+        tools_with_ip_in_scope_db = Tool.fetchObjects(pentest, {"check_iid": {
                                                          "$in": check_ids}, "ip": {"$in": ips_in_scopes}, "dated": "None", "datef": "None"})
+        if tools_without_ip_db is None:
+            tools_without_ip: List[Element] = []
+        else:
+            tools_without_ip = list(tools_without_ip_db)
+        if tools_with_ip_in_scope_db is None:
+            tools_with_ip_in_scope: List[Element] = []
+        else:
+            tools_with_ip_in_scope = list(tools_with_ip_in_scope_db)
+
         for tool in chain(tools_without_ip, tools_with_ip_in_scope):
+            tool = cast(Tool, tool)
             if "error" in tool.status:
                 continue
             toolsLaunchable.append(
                 {"tool": tool, "name": str(tool), "priority": int(check_item.priority), "timedout": "timedout" in tool.status})
-        # for check_instance in check_instances:
-        #     notDoneToolsInCheck = getNotDoneToolsPerScope(pentest, check_instance, authorized_commands)
-        #     for toolId, toolModel in notDoneToolsInCheck.items():
-        #         if "error" in toolModel.status:
-        #             continue
-        #         toolsLaunchable.append(
-        #             {"tool": toolModel, "name": str(toolModel), "priority":int(check_item.priority), "timedout":"timedout" in toolModel.status})
     return toolsLaunchable
 
 
-def searchForAddressCompatibleWithTime(pentest):
+def searchForAddressCompatibleWithTime(pentest: str) -> Set[str]:
     """
     Return a list of wave which have at least one interval fitting the actual time.
 
+    Args:
+        pentest (str): The name of the current pentest.
+
     Returns:
-        A set of wave name
+        Set[str]: A set of wave names.
     """
-    waves_to_launch = set()
-    intervals = ServerInterval.fetchObjects(pentest, {})
+    waves_to_launch: Set[str] = set()
+    intervals = Interval.fetchObjects(pentest, {})
+    if intervals is None:
+        return waves_to_launch
     for intervalModel in intervals:
+        intervalModel = cast(Interval, intervalModel)
         if utils.fitNowTime(intervalModel.dated, intervalModel.datef):
             waves_to_launch.add(intervalModel.wave)
     return waves_to_launch
-
-# def getNotDoneToolsPerScope(pentest, check_instance, authorized_commands):
-#     """Returns a set of tool mongo ID that are not done yet.
-#     """
-#     #
-#     notDoneTools = dict()
-#     # get not done tools that are not IP based (scope)
-#     tools = ServerTool.fetchObjects(pentest, {"check_iid":str(check_instance._id), "command_iid":{ "$in": authorized_commands }, "ip":"", "dated": "None", "datef": "None"})
-#     for tool in tools:
-#         notDoneTools[tool.getId()] = tool
-#     # fetch scopes to get IPs in scope
-#     scopes = ServerScope.fetchObjects(pentest, {})
-#     for scope in scopes:
-#         scopeId = scope.getId()
-#         # get IPs in scope
-#         ips = ServerIp.getIpsInScope(pentest, scopeId)
-#         for ip in ips:
-#             # fetch IP level and below (e.g port) tools
-#             tools = ServerTool.fetchObjects(pentest, {"check_iid":str(check_instance._id), "command_iid":{ "$in": authorized_commands }, "ip": ip.ip, "dated": "None", "datef": "None"})
-#             for tool in tools:
-#                 notDoneTools[tool.getId()] = tool
-#     return notDoneTools

@@ -1,10 +1,12 @@
 """Scope Model"""
 
+from typing import Any, Dict, List, Optional
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.element import Element
-from pollenisator.core.models.ip import Ip
-from bson.objectid import ObjectId
-from pollenisator.core.models.tool import Tool
 import pollenisator.core.components.utils as utils
+from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
+from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
+from pollenisator.server.servermodels.scope import ScopeInsertResult, _updateIpsScopes, insert as scope_insert
 
 
 class Scope(Element):
@@ -13,32 +15,40 @@ class Scope(Element):
 
     Attributes:
         coll_name: collection name in pollenisator database
+        command_variables: list of command variables
     """
-
+    command_variables = ["scope", "parent_domain"]
     coll_name = "scopes"
 
-    def __init__(self, valuesFromDb=None):
-        """Constructor
+    def __init__(self, pentest: str, valuesFromDb: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Constructor for the Scope class.
+
         Args:
-            valueFromDb: a dict holding values to load into the object. A mongo fetched interval is optimal.
-                        possible keys with default values are : _id (None), parent (None),  infos({}),
-                        wave(""), scope(""), notes("")
+            pentest (str): The name of the pentest.
+            valuesFromDb (Optional[Dict[str, Any]], optional): A dictionary holding values to load into the object. 
+            A mongo fetched Scope is optimal. Possible keys with default values are : _id (None), parent (None),  
+            infos({}), wave(""), scope(""), notes(""). Defaults to None.
         """
         if valuesFromDb is None:
             valuesFromDb = {}
-        super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None), valuesFromDb.get("infos", {}))
+        super().__init__(pentest, valuesFromDb)
         self.initialize(valuesFromDb.get("wave", ""), valuesFromDb.get("scope", ""),
                         valuesFromDb.get("notes", ""), valuesFromDb.get("infos", {}))
 
-    def initialize(self, wave, scope="", notes="", infos=None):
-        """Set values of scope
+    def initialize(self, wave: str, scope: str = "", notes: str = "", infos: Optional[Dict[str, Any]] = None) -> 'Scope':
+        """
+        Set values of scope.
+
         Args:
-            wave: the wave parent of this scope
-            scope: a string describing the perimeter of this scope (domain, IP, NetworkIP as IP/Mask)
-            notes: notes concerning this IP (opt). Default to ""
-            infos: a dictionnary of additional info
+            wave (str): The wave parent of this scope.
+            scope (str, optional): A string describing the perimeter of this scope (domain, IP, NetworkIP as IP/Mask). 
+            Defaults to "".
+            notes (str, optional): Notes concerning this IP. Defaults to "".
+            infos (Optional[Dict[str, Any]], optional): A dictionary of additional info. Defaults to None.
+
         Returns:
-            this object
+            Scope: This object.
         """
         self.wave = wave
         self.scope = scope
@@ -46,52 +56,63 @@ class Scope(Element):
         self.infos = infos if infos is not None else {}
         return self
 
-    def getData(self):
-        """Return scope attributes as a dictionnary matching Mongo stored scopes
+    def getData(self) -> Dict[str, Any]:
+        """
+        Returns scope attributes as a dictionary matching Mongo stored scopes.
+
         Returns:
-            dict with keys wave, scope, notes, _id, infos
+            Dict[str, Any]: A dictionary with keys "wave", "scope", "notes", "_id", and "infos".
         """
         return {"wave": self.wave, "scope": self.scope, "notes": self.notes, "_id": self.getId(), "infos": self.infos}
 
-
-
-    def __str__(self):
+    def __str__(self) -> str:
         """
         Get a string representation of a scope.
 
         Returns:
-            Returns the scope string (network ipv4 range or domain).
+            str: Returns the scope string (network ipv4 range or domain).
         """
         return self.scope
     
     @classmethod
-    def getSearchableTextAttribute(cls):
+    def getSearchableTextAttribute(cls) -> List[str]:
+        """
+        Returns the list of attributes that can be used for search.
+
+        Returns:
+            List[str]: A list containing the string "scope".
+        """
         return ["scope"]
 
-    def getDbKey(self):
-        """Return a dict from model to use as unique composed key.
+    def getDbKey(self) -> Dict[str, Any]:
+        """
+        Returns a dictionary from model to use as unique composed key.
+
         Returns:
-            A dict (2 keys :"wave", "scope")
+            Dict[str, str]: A dictionary with two keys: "wave" and "scope".
         """
         return {"wave": self.wave, "scope": self.scope}
 
-    
+    def isDomain(self) -> bool:
+        """
+        Checks if this scope is a domain.
 
-    def isDomain(self):
-        """Returns True if this scope is not a valid NetworkIP
         Returns:
-            bool
+            bool: True if this scope is not a valid NetworkIP, False otherwise.
         """
         return not utils.isNetworkIp(self.scope)
 
     @classmethod
-    def isSubDomain(cls, parentDomain, subDomainTest):
-        """Returns True if this scope is a valid subdomain of the given domain
+    def isSubDomain(cls, parentDomain: str, subDomainTest: str) -> bool:
+        """
+        Returns True if this scope is a valid subdomain of the given domain.
+
         Args:
-            parentDomain: a domain that could be the parent domain of the second arg
-            subDomainTest: a domain to be tested as a subdomain of first arg
+            parentDomain (str): A domain that could be the parent domain of the second argument.
+            subDomainTest (str): A domain to be tested as a subdomain of the first argument.
+
         Returns:
-            bool
+            bool: True if the subDomainTest is a subdomain of parentDomain, False otherwise.
         """
         splitted_domain = subDomainTest.split(".")
         # Assuring to check only if there is a domain before the tld (.com, .fr ... )
@@ -100,3 +121,119 @@ class Scope(Element):
             if ".".join(splitted_domain[1:]) == parentDomain:
                 return True
         return False
+
+    @classmethod
+    def replaceCommandVariables(cls, _pentest: str, command: str, data: Dict[str, Any]) -> str:
+        """
+        Replaces variables in the command with their corresponding values from the data dictionary.
+
+        Args:
+            _pentest (str): The name of the pentest.
+            command (str): The command string with variables to be replaced.
+            data (Dict[str, Any]): A dictionary containing the values for the variables.
+
+        Returns:
+            str: The command string with variables replaced by their corresponding values.
+        """
+        scope = data.get("scope", "")
+        scope = "" if scope is None else scope
+        command = command.replace("|scope|", scope)
+        if not utils.isNetworkIp(scope):
+            depths = scope.split(".")
+            if len(depths) > 2:
+                topdomain = ".".join(depths[1:])
+            else:
+                topdomain = ".".join(depths)
+            command = command.replace("|parent_domain|", topdomain)
+        return command
+
+    @classmethod
+    def completeDetailedString(cls, data: Dict[str, Any]) -> str:
+        """
+        Returns a string containing the scope from the data dictionary.
+
+        Args:
+            data (Dict[str, Any]): A dictionary containing the scope.
+
+        Returns:
+            str: The scope string from the data dictionary followed by a space.
+        """
+        return data.get("scope", "")+" "
+
+    @classmethod
+    def updateScopesSettings(cls, pentest: str) -> None:
+        """
+        Updates the settings of all scopes in the given pentest.
+
+        Args:
+            pentest (str): The name of the pentest.
+        """
+        scopes = Scope.fetchObjects(pentest, {})
+        for scope in scopes:
+            _updateIpsScopes(pentest, scope)
+
+    def getParentId(self) -> Optional[str]:
+        """
+        Returns the parent id of this scope.
+
+        Returns:
+            Optional[str]: The id of the parent wave of this scope.
+        """
+        dbclient = DBClient.getInstance()
+        res = dbclient.findInDb(self.pentest, "waves", {"wave": self.wave}, False)
+        if res is None:
+            return None
+        return res["_id"]
+
+    def addInDb(self) -> ScopeInsertResult:
+        """
+        Inserts this scope into the database.
+
+        Returns:
+            str: The id of the inserted scope.
+        """
+        return scope_insert(self.pentest, self.getData())
+
+    @classmethod
+    def getTriggers(cls) -> List[str]:
+        """
+        Returns the list of triggers declared in this class.
+
+        Returns:
+            List[str]: A list of trigger names.
+        """
+        return ["scope:onRangeAdd", "scope:onDomainAdd", "scope:onAdd"]
+
+    def checkAllTriggers(self) -> None:
+        """
+        Checks all triggers for this scope.
+        """
+        self.add_scope_checks()
+
+    def add_scope_checks(self) -> None:
+        """
+        Adds the appropriate checks to this scope based on whether it is a network IP or a domain.
+        """
+        if utils.isNetworkIp(self.scope):
+            self.addChecks(["scope:onRangeAdd", "scope:onAdd"])
+        else:
+            self.addChecks(["scope:onDomainAdd", "scope:onAdd"])
+
+    def addChecks(self, lvls: List[str]) -> None:
+        """
+        Adds the appropriate checks (level check and wave's commands check) for this scope.
+
+        Args:
+            lvls (List[str]): A list of levels to be checked.
+        """
+        dbclient = DBClient.getInstance()
+        search = {"lvl":{"$in": lvls}}
+        pentest_type = dbclient.findInDb(self.pentest, "settings", {"key":"pentest_type"}, False)
+        if pentest_type is not None:
+            search["pentest_types"] = pentest_type["value"]
+        # query mongo db commands collection for all commands having lvl == network or domain
+        checkitems = CheckItem.fetchObjects(search)
+        if checkitems is None:
+            return
+        for check in checkitems:
+            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "scope")

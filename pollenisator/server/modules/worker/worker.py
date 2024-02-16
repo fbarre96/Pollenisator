@@ -5,7 +5,7 @@ from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.controllers.toolcontroller import ToolController
 from pollenisator.core.components.socketmanager import SocketManager
 from pollenisator.server.servermodels.command import addUserCommandsToPentest
-from pollenisator.server.servermodels.tool import ServerTool, update as tool_update
+from pollenisator.server.servermodels.tool import update as tool_update
 from bson import ObjectId
 from pollenisator.server.permission import permission
 import pollenisator.core.components.utils as utils

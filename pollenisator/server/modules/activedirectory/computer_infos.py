@@ -1,161 +1,192 @@
+"""Module Activedirecotry :  ComputerInfos class."""
 # coding: utf-8
-from pollenisator.server.servermodels.element import ServerElement
+
+
+from typing import Any, Dict, Optional, Union, List
 
 
 class ComputerInfos():
-    def __init__(self, valuesFromDb=None):
+    """ComputerInfos class."""
+    def __init__(self, valuesFromDb: Optional[Dict[str, Any]] = None) -> None:
         """
-        :param os: The os of this ComputerInfos.
-        :type os: str
-        :param signing: The signing of this ComputerInfos.
-        :type signing: boolean
-        :param smbv1: The smbv1 of this ComputerInfos.
-        :type smbv1: boolean
-        :param is_dc: The is_dc of this ComputerInfos.
-        :type is_dc: boolean
-        :param is_sqlserver: The is_sqlserver of this ComputerInfos.
-        :type is_sqlserver: boolean
-        :param secrets: The secrets of this ComputerInfos.
-        :type secrets: List[str]
+        Initialize a ComputerInfos object. If valuesFromDb is not provided, an empty dictionary is used. The values for the 
+        attributes of the ComputerInfos object are fetched from the valuesFromDb dictionary using the get method.
+
+        Args:
+            valuesFromDb (Optional[Dict[str, Union[str, bool, List[str]]]], optional): A dictionary containing the values 
+            for the attributes of the ComputerInfos object. Defaults to None.
+
+        Attributes:
+            os (str): The os of this ComputerInfos.
+            signing (bool): The signing of this ComputerInfos.
+            smbv1 (bool): The smbv1 of this ComputerInfos.
+            is_dc (bool): The is_dc of this ComputerInfos.
+            is_sqlserver (bool): The is_sqlserver of this ComputerInfos.
+            secrets (List[str]): The secrets of this ComputerInfos.
         """
         if valuesFromDb is None:
             valuesFromDb = {}
         self.initialize(valuesFromDb.get("os"), valuesFromDb.get("signing"),valuesFromDb.get("smbv1"), \
-             valuesFromDb.get("is_dc"), valuesFromDb.get("secrets"), valuesFromDb.get("is_sqlserver"))
-        
+             valuesFromDb.get("is_dc"), valuesFromDb.get("secrets", []), valuesFromDb.get("is_sqlserver"))
 
-    def initialize(self, os=None, signing=None, smbv1=None, is_dc=None, secrets=None, is_sqlserver=None): 
-        self.os = os
-        self.signing = signing
-        self.smbv1 = smbv1
-        self.is_dc = is_dc
-        self.secrets = secrets
-        self.is_sqlserver = is_sqlserver
+
+    def initialize(self, os: Optional[str] = None, signing: Optional[bool] = None, smbv1: Optional[bool] = None, 
+                   is_dc: Optional[bool] = None, secrets: Optional[List[str]] = None, 
+                   is_sqlserver: Optional[bool] = None) -> 'ComputerInfos': 
+        """
+        Initialize the ComputerInfos object with the provided values. If a value is not provided, the corresponding attribute 
+        is set to None.
+
+        Args:
+            os (Optional[str], optional): The os of the ComputerInfos object. Defaults to None.
+            signing (Optional[bool], optional): The signing of the ComputerInfos object. Defaults to None.
+            smbv1 (Optional[bool], optional): The smbv1 of the ComputerInfos object. Defaults to None.
+            is_dc (Optional[bool], optional): The is_dc of the ComputerInfos object. Defaults to None.
+            secrets (Optional[List[str]], optional): The secrets of the ComputerInfos object. Defaults to None.
+            is_sqlserver (Optional[bool], optional): The is_sqlserver of the ComputerInfos object. Defaults to None.
+
+        Returns:
+            ComputerInfos: The initialized ComputerInfos object.
+        """
+        self.os: Optional[str] = os
+        self.signing: Optional[bool] = signing
+        self.smbv1: Optional[bool] = smbv1
+        self.is_dc: Optional[bool] = is_dc
+        self.secrets: List[str] = secrets if secrets is not None else []
+        self.is_sqlserver: Optional[bool] = is_sqlserver
         return self
 
-    def getData(self):
+    def getData(self) -> Dict[str, Any]:
+        """
+        Get the data of the ComputerInfos object as a dictionary. The keys of the dictionary are the attribute names and the 
+        values are the corresponding attribute values.
+
+        Returns:
+            Dict[str, Union[str, bool, List[str]]]: A dictionary containing the data of the ComputerInfos object.
+        """
         return {"os":self.os, "signing": self.signing, "smbv1":self.smbv1, "is_dc":self.is_dc,  "is_sqlserver":self.is_sqlserver, "secrets":self.secrets}
-    
+
     @property
-    def os(self):
-        """Gets the os of this ComputerInfos.
+    def os(self) -> Optional[str]:
+        """
+        Gets the os of this ComputerInfos.
 
-
-        :return: The os of this ComputerInfos.
-        :rtype: str
+        Returns:
+            Optional[str]: The os of this ComputerInfos.
         """
         return self._os
 
     @os.setter
-    def os(self, os):
-        """Sets the os of this ComputerInfos.
-
-
-        :param os: The os of this ComputerInfos.
-        :type os: str
+    def os(self, os: Optional[str]) -> None:
+        """
+        Sets the os property of this ComputerInfos.
+        Args:
+            os (Optional[str]): The os of this ComputerInfos.
         """
 
-        self._os = os
+        self._os: Optional[str] = os
 
     @property
-    def signing(self):
-        """Gets the signing of this ComputerInfos.
+    def signing(self) -> Optional[bool]:
+        """
+        Gets the signing of this ComputerInfos.
 
-
-        :return: The signing of this ComputerInfos.
-        :rtype: bool
+        Returns:
+            Optional[bool]: The signing of this ComputerInfos.
         """
         return self._signing
 
     @signing.setter
-    def signing(self, signing):
-        """Sets the signing of this ComputerInfos.
+    def signing(self, signing: Optional[bool]) -> None:
+        """
+        Sets the signing of this ComputerInfos.
 
-
-        :param signing: The signing of this ComputerInfos.
-        :type signing: bool
+        Args:
+            signing (Optional[bool]): The signing of this ComputerInfos.
         """
 
         self._signing = signing
 
     @property
-    def smbv1(self):
-        """Gets the smbv1 of this ComputerInfos.
+    def smbv1(self) -> Optional[bool]:
+        """
+        Gets the smbv1 of this ComputerInfos.
 
-
-        :return: The smbv1 of this ComputerInfos.
-        :rtype: bool
+        Returns:
+            Optional[bool]: The smbv1 of this ComputerInfos.
         """
         return self._smbv1
 
     @smbv1.setter
-    def smbv1(self, smbv1):
-        """Sets the smbv1 of this ComputerInfos.
+    def smbv1(self, smbv1: Optional[bool]) -> None:
+        """
+        Sets the smbv1 of this ComputerInfos.
 
-
-        :param smbv1: The smbv1 of this ComputerInfos.
-        :type smbv1: bool
+        Args:
+            smbv1 (Optional[bool]): The smbv1 of this ComputerInfos.
         """
 
         self._smbv1 = smbv1
 
     @property
-    def is_dc(self):
-        """Gets the is_dc of this ComputerInfos.
+    def is_dc(self) -> Optional[bool]:
+        """
+        Gets the is_dc of this ComputerInfos.
 
-
-        :return: The is_dc of this ComputerInfos.
-        :rtype: bool
+        Returns:
+            Optional[bool]: The is_dc of this ComputerInfos.
         """
         return self._is_dc
 
     @is_dc.setter
-    def is_dc(self, is_dc):
-        """Sets the is_dc of this ComputerInfos.
+    def is_dc(self, is_dc: Optional[bool]) -> None:
+        """
+        Sets the is_dc of this ComputerInfos.
 
-
-        :param is_dc: The is_dc of this ComputerInfos.
-        :type is_dc: bool
+        Args:
+            is_dc (Optional[bool]): The is_dc of this ComputerInfos.
         """
 
         self._is_dc = is_dc
 
     @property
-    def is_sqlserver(self):
-        """Gets the is_sqlserver of this ComputerInfos.
+    def is_sqlserver(self) -> Optional[bool]:
+        """
+        Gets the is_sqlserver of this ComputerInfos.
 
-
-        :return: The is_sqlserver of this ComputerInfos.
-        :rtype: bool
+        Returns:
+            Optional[bool]: The is_sqlserver of this ComputerInfos.
         """
         return self._is_sqlserver
 
     @is_sqlserver.setter
-    def is_sqlserver(self, is_sqlserver):
-        """Sets the is_sqlserver of this ComputerInfos.
-        :param is_sqlserver: The is_sqlserver of this ComputerInfos.
-        :type is_sqlserver: bool
+    def is_sqlserver(self, is_sqlserver: Optional[bool]):
+        """
+        Sets the is_sqlserver of this ComputerInfos.
+
+        Args:
+            is_sqlserver (Optional[bool]): The is_sqlserver of this ComputerInfos.
         """
 
         self._is_sqlserver = is_sqlserver
 
     @property
-    def secrets(self):
-        """Gets the secrets of this ComputerInfos.
+    def secrets(self) -> List[str]:
+        """
+        Gets the secrets of this ComputerInfos.
 
-
-        :return: The secrets of this ComputerInfos.
-        :rtype: List[str]
+        Returns:
+            List[str]: The secrets of this ComputerInfos.
         """
         return self._secrets
 
     @secrets.setter
-    def secrets(self, secrets):
-        """Sets the secrets of this ComputerInfos.
+    def secrets(self, secrets: List[str]) -> None:
+        """
+        Sets the secrets of this ComputerInfos.
 
-
-        :param secrets: The secrets of this ComputerInfos.
-        :type secrets: List[str]
+        Args:
+            secrets (List[str]): The secrets of this ComputerInfos.
         """
 
         self._secrets = secrets

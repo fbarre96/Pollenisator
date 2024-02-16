@@ -80,7 +80,7 @@ class DBClient:
         """Reset client connection"""
         self.client = None
 
-    def bulk_write(self, pentest: str, collection: str, update_operations: list[InsertOne | UpdateOne], notify: bool = True) -> pymongo.results.BulkWriteResult:
+    def bulk_write(self, pentest: str, collection: str, update_operations: List[Union[InsertOne, UpdateOne]], notify: bool = True) -> pymongo.results.BulkWriteResult:
         """
         Bulk write data to the MongoDB database.
 
@@ -115,7 +115,7 @@ class DBClient:
             self.send_notify(pentest, collection, upserted_ids, "update_many")
         return result
 
-    def getWorkers(self, pipeline: Optional[Dict[str, Any]] = None) -> Union[Dict[str, Any], List[Dict[str, Any]], None]:
+    def getWorkers(self, pipeline: Optional[Dict[str, Any]] = None) -> Union[List[Dict[str, Any]], None]:
         """
         Return workers documents from the database.
 
@@ -129,7 +129,7 @@ class DBClient:
             List[Dict[str, Any]]: A list for the resulting workers
         """
         pipeline = {} if pipeline is None else pipeline
-        return self.findInDb("pollenisator", "workers", pipeline)
+        return self.findInDb("pollenisator", "workers", pipeline, True)
 
     def getWorker(self, name: str) -> Union[Dict[str, Any], List[Dict[str, Any]], None]:
         """
@@ -505,7 +505,7 @@ class DBClient:
         ret = self._insert(self.current_pentest, collection, values, notify, parent)
         return ret
 
-    def insertInDb(self, db: str, collection: str, values: Dict[str, Any], _parent: str = '', notify: bool = True, multi: bool = False) -> Union[pymongo.results.InsertManyResult, pymongo.results.InsertOneResult]:
+    def insertInDb(self, db: str, collection: str, values: Dict[str, Any], parent: str = '', notify: bool = True, multi: bool = False) -> Union[pymongo.results.InsertManyResult, pymongo.results.InsertOneResult]:
         """
         Insert something in the database after ensuring connection.
 
@@ -513,7 +513,7 @@ class DBClient:
             db (str): The database name to use.
             collection (str): The collection that holds the document to insert.
             values (Dict[str, Any]): The document to insert into the given collection.
-            _parent (str, optional): Not used, default to ''. Was used to give info about parent node.
+            parent (str, optional):
             notify (bool, optional): A boolean asking for all client to be notified of this update. Default to True.
             multi (bool, optional): A boolean defining if multiple documents can be inserted at once. Default to False.
 
@@ -521,7 +521,7 @@ class DBClient:
             Union(pymongo.results.InsertManyResult, pymongo.results.InsertOneResult): Return the pymongo result of the insert command for the command collection.
         """
         self.connect()
-        return self._insert(db, collection, values, notify, _parent, multi)
+        return self._insert(db, collection, values, notify, parent, multi)
 
     def _insert(self, dbName: str, collection: str, values: Union[Dict[str, Any], List[Dict[str, Any]]], notify: bool = True, parentId: str = '', multi: bool = False) -> Union[pymongo.results.InsertOneResult, pymongo.results.InsertManyResult]:
         """
@@ -910,8 +910,8 @@ class DBClient:
         for cal in cals:
             ret.append(str(cal["nom"]))
         return ret
-    
-    def listPentestUuids(self, username: Optional[str] = None) -> Optional[List[str]]:
+
+    def listPentestUuids(self, username: Optional[str] = None) -> List[str]:
         """
         Return the list of pollenisator database UUIDs.
 
@@ -926,7 +926,7 @@ class DBClient:
         """
         cals = self.listPentests(username)
         if cals is None:
-            return None
+            return []
         ret: List[str] = []
         for cal in cals:
             ret.append(str(cal["uuid"]))

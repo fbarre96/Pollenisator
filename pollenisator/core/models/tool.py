@@ -1,11 +1,18 @@
 """Tool Model. A tool is an instanciation of a command against a target"""
 
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+import bson
+from pymongo import InsertOne, UpdateOne
 from pollenisator.core.components.mongo import DBClient
+from pollenisator.core.models.command import Command
 from pollenisator.core.models.element import Element
 from bson.objectid import ObjectId
 from datetime import datetime
 import pollenisator.core.components.utils as utils
-import re
+from pollenisator.plugins.plugin import Plugin
+from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
+from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
+from pollenisator.server.servermodels.tool import ToolInsertResult, do_insert as do_insert, update as tool_update, delete as tool_delete
 
 class Tool(Element):
     """
@@ -13,27 +20,36 @@ class Tool(Element):
 
     Attributes:
         coll_name: collection name in pollenisator database
+        command_variables: list of command variables
     """
     coll_name = "tools"
+    command_variables = ["tool.infos.*"]
 
-    def __init__(self, valuesFromDb=None):
-        """Constructor
+    def __init__(self, pentest: str, valuesFromDb: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Constructor for the Tool class.
+
         Args:
-            valueFromDb: a dict holding values to load into the object. A mongo fetched interval is optimal.
-                        possible keys with default values are : _id(None), parent(None),  infos({}),
-                        name(""), wave(""), scope(""), ip(""), port(""), proto("tcp"), lvl(""), text(""), dated("None"),
-                        datef("None"), scanner_ip("None"), status([]), notes(""), resultfile(""), plugin_used("")
+            pentest (str): The name of the pentest.
+            valuesFromDb (Optional[Dict[str, Any]], optional): A dictionary holding values to load into the object. 
+            A mongo fetched interval is optimal. Possible keys with default values are : _id(None), parent(None),  
+            infos({}), name(""), wave(""), scope(""), ip(""), port(""), proto("tcp"), lvl(""), text(""), dated("None"),
+            datef("None"), scanner_ip("None"), status([]), notes(""), resultfile(""), plugin_used(""). Defaults to None.
         """
         if valuesFromDb is None:
             valuesFromDb = {}
-        super().__init__(valuesFromDb.get("_id", None), valuesFromDb.get("parent", None),valuesFromDb.get("infos", {}))
+        super().__init__(pentest, valuesFromDb)
         self.datef = "None"
         self.dated = "None"
         self.scanner_ip = "None"
         self.resultfile = ""
         self.plugin_used = ""
-        self.status = []
-        self.initialize(str(valuesFromDb.get("command_iid", "")), str(valuesFromDb.get("check_iid", "")), valuesFromDb.get("wave", ""),
+        self.text = ""
+        self.notes = ""
+        self.status: List[str] = []
+        command_iid_or_none = ObjectId(valuesFromDb.get("command_iid", None)) if "command_iid" in valuesFromDb else None
+        check_iid_or_none = ObjectId(valuesFromDb.get("check_iid", None)) if "check_iid" in valuesFromDb else None
+        self.initialize(command_iid_or_none, check_iid_or_none, valuesFromDb.get("wave", ""),
                         valuesFromDb.get("name", None),
                         valuesFromDb.get(
                             "scope", ""), valuesFromDb.get("ip", ""),
@@ -46,48 +62,50 @@ class Tool(Element):
                         valuesFromDb.get(
                             "scanner_ip", "None"), valuesFromDb.get("status", []), valuesFromDb.get("notes", ""), valuesFromDb.get("resultfile", ""), valuesFromDb.get("plugin_used", ""), valuesFromDb.get("infos", {}))
 
-    def initialize(self, command_iid, check_iid=None, wave="", name=None, scope="", ip="", port="", proto="tcp", lvl="", text="",
-                   dated="None", datef="None", scanner_ip="None", status=None, notes="", resultfile="", plugin_used="", infos=None):
-        
-        """Set values of tool
+    def initialize(self, command_iid: Optional[ObjectId], check_iid: Optional[ObjectId] = None, wave: str = "", name: Optional[str] = None, scope: str = "", ip: str = "", port: str = "", proto: str = "tcp", lvl: str = "", text: str = "",
+                   dated: str = "None", datef: str = "None", scanner_ip: str = "None", status: Optional[Union[str, List[str]]] = None, notes: str = "", resultfile: str = "", plugin_used: str = "", infos: Optional[Dict[str, Any]] = None) -> 'Tool':
+        """
+        Initializes the tool with the provided values.
+
         Args:
-            command_iid: iid of the command 
-            check_iid: the checkInstance iid if associated with one
-            wave: the target wave name of this tool (only if lvl is "wave"). Default  ""
-            name: tool name, if None it will be crafted
-            scope: the scope string of the target scope of this tool (only if lvl is "network"). Default  ""
-            ip: the target ip "ip" of this tool (only if lvl is "ip" or "port"). Default  ""
-            port: the target port "port number" of this tool (only if lvl is "port"). Default  ""
-            proto: the target port "proto" of this tool (only if lvl is "port"). Default  "tcp"
-            lvl: the tool level of exploitation (wave, network, ip ort port/). Default ""
-            text: the command to be launched. Can be empty if name is matching  a command. Default ""
-            dated: a starting date and tiem for this interval in format : '%d/%m/%Y %H:%M:%S'. or the string "None"
-            datef: an ending date and tiem for this interval in format : '%d/%m/%Y %H:%M:%S'. or the string "None"
-            scanner_ip: the worker name that performed this tool. "None" if not performed yet. Default is "None"
-            status: a list of status string describing this tool state. Default is None. (Accepted values for string in list are done, running, OOT, OOS)
-            notes: notes concerning this tool (opt). Default to ""
-            resultfile: an output file generated by the tool. Default is ""
-            plugin_used: the plugin used when this tool was imported. Default is ""
-            infos: a dictionnary of additional info
+            command_iid (Optional[ObjectId]): iid of the command.
+            check_iid (Optional[ObjectId], optional): The checkInstance iid if associated with one. Defaults to None.
+            wave (str, optional): The target wave name of this tool (only if lvl is "wave"). Defaults to "".
+            name (Optional[str], optional): Tool name, if None it will be crafted. Defaults to None.
+            scope (str, optional): The scope string of the target scope of this tool (only if lvl is "network"). Defaults to "".
+            ip (str, optional): The target ip "ip" of this tool (only if lvl is "ip" or "port"). Defaults to "".
+            port (str, optional): The target port "port number" of this tool (only if lvl is "port"). Defaults to "".
+            proto (str, optional): The target port "proto" of this tool (only if lvl is "port"). Defaults to "tcp".
+            lvl (str, optional): The tool level of exploitation (wave, network, ip or port/). Defaults to "".
+            text (str, optional): The command to be launched. Can be empty if name is matching a command. Defaults to "".
+            dated (str, optional): A starting date and time for this interval in format : '%d/%m/%Y %H:%M:%S'. or the string "None". Defaults to "None".
+            datef (str, optional): An ending date and time for this interval in format : '%d/%m/%Y %H:%M:%S'. or the string "None". Defaults to "None".
+            scanner_ip (str, optional): The worker name that performed this tool. "None" if not performed yet. Default is "None".
+            status (Optional[Union[str, List[str]]], optional): A list of status string describing this tool state. Default is None. (Accepted values for string in list are done, running, OOT, OOS). Defaults to None.
+            notes (str, optional): Notes concerning this tool (opt). Default to "".
+            resultfile (str, optional): An output file generated by the tool. Default is "".
+            plugin_used (str, optional): The plugin used when this tool was imported. Default is "".
+            infos (Optional[Dict[str, Any]], optional): A dictionary of additional info. Defaults to None.
+
         Returns:
-            this object
+            Tool: This object.
         """
         if name is None:
-            if command_iid is not None and command_iid != "" and command_iid != "None":
+            if command_iid is not None:
                 dbclient = DBClient.getInstance()
 
                 res = dbclient.findInDb(self.pentest, "commands", {"$or": [
-                    {"original_iid":str(command_iid)},
+                    {"original_iid":ObjectId(command_iid)},
                     {"_id": ObjectId(command_iid)}
                 ]}, False)
-                name = res["name"]
-                self.command_iid = str(res["_id"])
-            else:
-                self.command_iid = None
+                name = res.get("name")
+                if name is None:
+                    raise ValueError("Tool name is not defined and cannot be fetched from command. Please provide a name.")
+                self.command_iid = ObjectId(res["_id"])
         else:
-            self.command_iid = str(command_iid)
+            self.command_iid = ObjectId(command_iid)
         self.check_iid = str(check_iid) if check_iid is not None else None
-        self.name = name
+        self.name: str = name
         self.wave = wave
         self.scope = scope
         self.ip = ip
@@ -109,7 +127,13 @@ class Tool(Element):
         self.status = status
         return self
 
-    def getData(self):
+    def getData(self) -> Dict[str, Any]:
+        """
+        Returns a dictionary containing the data of this tool.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the data of this tool.
+        """
         return {"command_iid": self.command_iid, "check_iid": self.check_iid, 
                 "name": self.name, "wave": self.wave, "scope": self.scope,
                 "ip": self.ip, "port": self.port, "proto": self.proto,
@@ -118,42 +142,55 @@ class Tool(Element):
                 "notes": self.notes, "_id": self.getId(),  "infos": self.infos, "status":self.getStatus()}
 
     @classmethod
-    def getSearchableTextAttribute(cls):
+    def getSearchableTextAttribute(cls) -> List[str]:
+        """
+        Returns all the searchable attributes for a tool
+
+        Returns:
+            List[str]: A list containing the attribute names that can be used for searching. In this case, it's ["name", "text"].
+        """
         return ["name", "text"]
-    
-    def getStatus(self):
+
+    def getStatus(self) -> List[str]:
         """
         Get the tool executing status.
 
-        Return:
-            Returns a list of status status are :
+        Returns:
+            List[str]: Returns a list of status status are :
                 OOT : Out of time = This tool is in a wave which does not have any interval for now.
                 OOS : Out os scope = This tool is in an IP OOS
                 done : This tool is completed
-                running : This tool is being run."""
+                running : This tool is being run.
+                ready : this tool is ready to be run"""
         return self.status
 
 
     @classmethod
-    def __sanitize(cls, var_to_path):
-        """Replace unwanted chars in variable given: '/', ' ' and ':' are changed to '_'
+    def __sanitize(cls, var_to_path: str) -> str:
+        """
+        Replace unwanted chars in variable given: '/', ' ' and ':' are changed to '_'
+
         Args:
-            var_to_path: a string to sanitize to use a path folder
+            var_to_path (str): a string to sanitize to use a path folder
+
         Returns:
-            modified arg as string
+            str: modified arg as string
+
         """
         var_to_path = var_to_path.replace("/", "_")
         var_to_path = var_to_path.replace(" ", "_")
         var_to_path = var_to_path.replace(":", "_")
         return var_to_path
 
-    def getOutputDir(self, pentest_uuid):
+    def getOutputDir(self, pentest_uuid: str) -> str:
         """
         Get the tool required output directory path.
+
         Args:
-            pentest_uuid: the pentest database uuid
-        Return:
-            Returns the output directory of this tool instance.
+            pentest_uuid (str): The pentest database uuid.
+
+        Returns:
+            str: The output directory of this tool instance.
         """
         # get command needed directory
         output_dir = Tool.__sanitize(
@@ -170,15 +207,386 @@ class Tool(Element):
             output_dir += Tool.__sanitize(port_dir)+"/"
         return output_dir
 
-    
+    def getResultFile(self) -> str:
+        """
+        Returns the result file of this tool.
 
-    
+        Returns:
+            str: The result file of this tool.
+        """
+        return self.resultfile
 
-    def markAsRunning(self, workerName):
-        """Set this tool status as running but keeps OOT or OOS.
-        Sets the starting date to current time and ending date to "None"
+
+    def setOutOfTime(self, pentest: str) -> None:
+        """
+        Set this tool as out of time (not matching any interval in wave).
+        Add "OOT" in status if it's not already there.
+        
         Args:
-            workerName: the worker name that is running this tool
+            pentest (str): The name of the pentest.
+        """
+        if "OOT" not in self.status:
+            self.status.append("OOT")
+            tool_update(pentest, self._id, {"status": self.status})
+
+    def setOutOfScope(self, pentest: str) -> None:
+        """
+        Set this tool as out of scope (is not matching any scope in wave).
+        Add "OOS" in status if it's not already there.
+
+        Args:
+            pentest (str): The name of the pentest.
+        """
+        if not "OOS" in self.status:
+            self.status.append("OOS")
+            tool_update(pentest, self._id, {"status": self.status})
+
+    def addInDb(self, check: bool = True, base: Optional[str] = None, update_check_infos: bool = True) -> ToolInsertResult:
+        """
+        Inserts this tool into the database.
+
+        Args:
+            check (bool, optional): If True, perform a check before insertion. Defaults to True.
+            base (Optional[str], optional): The base to be used for insertion. Defaults to None.
+            update_check_infos (bool, optional): If True, update the check information. Defaults to True.
+
+        Returns:
+            Dict[str, Union[str, bool]]: A dictionary containing the result of the operation and the id of the inserted tool.
+        """
+        ret = do_insert(self.pentest, self.getData(), check=check, base=base, update_check=update_check_infos)
+        if isinstance(ret, tuple):
+            raise ValueError(ret[0])
+        self._id = ObjectId(ret["iid"])
+        return ret
+
+    def getCommand(self) -> Dict[str, Any]:
+        """
+        Get the tool associated command.
+
+        Returns:
+            Dict[str, Any]: The Mongo dict command fetched instance associated with this tool's name.
+        """
+        dbclient = DBClient.getInstance()
+        commandTemplate = dbclient.findInDb(self.pentest,
+                                                 "commands", {"_id": ObjectId(self.command_iid)}, False)
+        return commandTemplate
+
+    def getCheckItem(self) -> Optional['CheckItem']:
+        """
+        Get the CheckItem associated with this tool.
+
+        Returns:
+            Optional[CheckItem]: The CheckItem instance associated with this tool's check iid, or None if no such CheckItem exists.
+        """
+        try:
+            ObjectId(self.check_iid)
+        except bson.errors.InvalidId:
+            return None
+        check: Optional[CheckInstance] = CheckInstance.fetchObject(self.pentest, {"_id":ObjectId(self.check_iid)})
+        if check is None:
+            return None
+        return check.getCheckItem()
+
+    def setInScope(self) -> None:
+        """
+        Set this tool as in scope (matching any scope in wave).
+        Remove "OOS" from status if it's there.
+        """
+        if "OOS" in self.status:
+            self.status.remove("OOS")
+            tool_update(self.pentest, self._id, self.getData())
+
+    def setInTime(self) -> None:
+        """
+        Set this tool as in time (matching any interval in wave).
+        Remove "OOT" from status if it's there.
+        """
+        if "OOT" in self.status:
+            self.status.remove("OOT")
+            tool_update(self.pentest, self._id, self.getData())
+
+    def delete(self) -> None:
+        """
+        Delete the tool represented by this model in the database.
+        """
+        tool_delete(self.pentest, self._id)
+
+    def getParentId(self) -> Optional[str]:
+        """
+        Get the parent id of this tool.
+
+        Returns:
+            Optional[str]: The parent id if it exists, None otherwise.
+        """
+        try:
+            if self.check_iid is not None:
+                return self.check_iid
+            else:
+                return None
+        except TypeError:
+            # None type returned:
+            return None
+
+    def findQueueIndexFromPrio(self, queue: List[Dict[str, Any]]) -> int:
+        """
+        Find the index in the queue where the tool should be inserted based on its priority.
+
+        Args:
+            queue (List[Dict[str, Any]]): The queue of tools.
+
+        Returns:
+            int: The index where the tool should be inserted in the queue.
+        """
+        check_item = self.getCheckItem()
+        if check_item is None:
+            return 0
+        priority = check_item.priority
+        i=0
+        for tool_info in queue:
+            queue_priority = tool_info.get("priority", 0)
+            if queue_priority > priority:
+                return i
+            i+=1
+        return i
+
+    def addToQueue(self, index: Optional[int] = None) -> Tuple[bool, str]:
+        """
+        Add this tool to the queue.
+
+        Args:
+            index (Optional[int], optional): The index at which to insert the tool in the queue. If None, the tool is inserted based on its priority. Defaults to None.
+
+        Returns:
+            Tuple[bool, str]: A tuple containing a boolean indicating the success of the operation and a message.
+        """
+        dbclient = DBClient.getInstance()
+        queue_db = dbclient.findInDb(self.pentest, "autoscan", {"type":"queue"}, False) 
+        if queue_db is None:
+            queue = list()
+            dbclient.insertInDb(self.pentest, "autoscan", {"type":"queue", "tools":[]}) 
+        else:
+            queue = list(queue_db["tools"])
+        if self.getId() in queue:
+            return False, "Already in queue"
+        check_item = self.getCheckItem()
+        if check_item is None:
+            priority = 0
+        if index is None:
+            index=self.findQueueIndexFromPrio(queue)
+            queue.insert(index, {"iid":self.getId(), "priority":priority})
+        else:
+            try:
+                queue.insert(index, {"iid":self.getId(), "priority":priority})
+            except IndexError:
+                return False, "Index error"
+        dbclient.updateInDb(self.pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":queue}})
+        return True, "Added to queue"
+
+    def removeFromQueue(self) -> Tuple[bool, str]:
+        """
+        Remove this tool from the queue.
+
+        Returns:
+            Tuple[bool, str]: A tuple containing a boolean indicating the success of the operation and a message.
+        """
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb(self.pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":{"iid":self.getId()}}})
+        return True, "remove from to queue"
+
+    @staticmethod
+    def clearQueue(pentest: str) -> Tuple[bool, str]:
+        """
+        Clear the queue of tools.
+
+        Args:
+            pentest (str): The name of the pentest.
+
+        Returns:
+            Tuple[bool, str]: A tuple containing a boolean indicating the success of the operation and a message.
+        """
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":[]}})
+        return True, "Cleared queue"
+
+    def getCommandToExecute(self, command_o: Union[str, Command]) -> str:
+        """
+        Get the tool bash command to execute.
+        Replace the command's text's variables with tool's informations.
+
+        Args:
+            command_o (Union[str, Command]): The command or command string to execute.
+
+        Returns:
+            str: The bash command of this tool instance, a marker |outputDir| is still to be replaced.
+        """
+        toolHasCommand = self.text
+        if isinstance(command_o, str):
+            command = command_o
+            self.text = command
+        else:
+            if toolHasCommand is not None and toolHasCommand.strip() != "":
+                command = self.text
+            else:
+                command = command_o.text
+        data = self.getData()
+        if self.check_iid is not None:
+            check = CheckInstance.fetchObject(self.pentest, {"_id":ObjectId(self.check_iid)})
+            if check is not None:
+                target = check.getTargetData()
+                if target is not None:
+                    infos = {**data.get("infos", {}), **target.get("infos", {})}
+                    data |= target
+                    data["infos"] = infos
+        command = Element.replaceAllCommandVariables(self.pentest, command, data)
+        if isinstance(command_o, str):
+            return command
+        return command
+
+    @classmethod
+    def replaceCommandVariables(cls, _pentest: str, command: str, data: Dict[str, Any]) -> str:
+        """
+        Replace the variables in the command with the corresponding information from the data.
+
+        Args:
+            pentest (str): The name of the pentest.
+            command (str): The command to be modified.
+            data (Dict[str, Any]): The data containing the information to replace the variables in the command.
+
+        Returns:
+            str: The command with the variables replaced by the corresponding information from the data.
+        """
+        command = cls.unpack_info(data.get("infos",{}), command, depth=0, max_depth=3)
+        return command
+
+    @classmethod
+    def unpack_info(cls, infos_dict: Dict[str, Any], command: str, depth: int = 0, max_depth: int = 3) -> str:
+        """
+        Recursively unpack infos dict into command string.
+
+        Args:
+            infos_dict (dict): The dictionary containing the information to be unpacked.
+            command (str): The command string to be modified.
+            depth (int, optional): The current depth of the recursion. Defaults to 0.
+            max_depth (int, optional): The maximum depth of the recursion. Defaults to 3.
+
+        Returns:
+            str: The command string with the information from the dictionary unpacked into it.
+        """
+        if depth > max_depth:
+            return ""
+        for key in infos_dict.keys():
+            if isinstance(infos_dict[key], dict):
+                command = cls.unpack_info(infos_dict[key], command, depth+1, max_depth)
+            else:
+                command = command.replace("|tool.infos."+str(key)+"|", str(infos_dict.get(key, '')))
+        return command
+
+    def getPluginName(self) -> Optional[str]:
+        """
+        Get the name of the plugin used by this tool.
+
+        Returns:
+            Optional[str]: The name of the plugin if it exists, None otherwise.
+        """
+        dbclient = DBClient.getInstance()
+        if self.plugin_used != "":
+            return self.plugin_used
+        command_o = dbclient.findInDb(self.pentest,"commands",{"_id": ObjectId(self.command_iid)}, False)
+        if command_o and "plugin" in command_o.keys():
+            return str(command_o["plugin"])
+        return None
+
+    def getPlugin(self) -> Optional[Plugin]:
+        """
+        Get the plugin module used by this tool.
+
+        Returns:
+            Optional[Plugin]: The plugin module if it exists, None otherwise.
+        """
+        mod_name = self.getPluginName()
+        if mod_name:
+            mod = utils.loadPlugin(mod_name)
+            return mod
+        return None
+
+    def markAsDone(self, file_name: Optional[str] = None) -> None:
+        """
+        Set this tool status as done but keeps OOT or OOS.
+
+        Args:
+            file_name (Optional[str], optional): The resulting file of this tool execution. Default is None.
+        """
+        self.datef = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        newStatus = ["done"]
+        if "OOS" in self.status:
+            newStatus.append("OOS")
+        if "OOT" in self.status:
+            newStatus.append("OOT")
+        self.status = newStatus
+        self.resultfile = file_name if file_name is not None else ""
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
+
+    def markAsError(self, msg: str = "") -> None:
+        """
+        Set this tool status as not done by removing "done" or "running" and adding an error status.
+        Also resets starting and ending date as well as worker name.
+
+        Args:
+            msg (str, optional): The error message. Defaults to "".
+        """
+        self.dated = "None"
+        self.datef = "None"
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
+        self.scanner_ip = "None"
+        if "done" in self.status:
+            self.status.remove("done")
+        if "running" in self.status:
+            self.status.remove("running")
+        self.notes = msg
+        self.status.append("error")
+
+    def markAsTimedout(self) -> None:
+        """
+        Set this tool status as not done by removing "done" or "running" and adding a "timedout" status.
+        Also resets starting and ending date as well as worker name.
+        """
+        self.dated = "None"
+        self.datef = "None"
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
+        self.scanner_ip = "None"
+        if "done" in self.status:
+            self.status.remove("done")
+        if "running" in self.status:
+            self.status.remove("running")
+        self.status.append("timedout")
+
+    def markAsNotDone(self) -> None:
+        """
+        Set this tool status as not done by removing "done" or "running" status.
+        Also resets starting and ending date as well as worker name.
+        """
+        self.dated = "None"
+        self.datef = "None"
+        dbclient = DBClient.getInstance()
+        if self.scanner_ip != "None":
+            dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
+        self.scanner_ip = "None"
+        if "done" in self.status:
+            self.status.remove("done")
+        if "running" in self.status:
+            self.status.remove("running")
+
+
+    def markAsRunning(self, workerName: str) -> None:
+        """
+        Set this tool status as running but keeps OOT or OOS.
+        Sets the starting date to current time and ending date to "None"
+
+        Args:
+            workerName (str): The worker name that is running this tool.
         """
         self.dated = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
         self.datef = "None"
@@ -187,32 +595,120 @@ class Tool(Element):
             newStatus.append("OOS")
         if "OOT" in self.status:
             newStatus.append("OOT")
+        if "timedout" in self.status:
+            newStatus.append("timedout")
         self.status = newStatus
         self.scanner_ip = workerName
-        self.update()
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb("pollenisator", "workers", {"name":workerName}, {"$push":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=True)
 
-    def markAsNotDone(self):
-        """Set this tool status as not done by removing "done" or "running" status.
-        Also resets starting and ending date as well as worker name
+    def getDbKey(self) -> Dict[str, Any]:
         """
-        self.dated = "None"
-        self.datef = "None"
-        self.scanner_ip = "None"
-        if "done" in self.status:
-            self.status.remove("done")
-        if "running" in self.status:
-            self.status.remove("running")
-        if not self.status:
-            self.status = ["ready"]
-        self.update()
+        Return a dictionary from the model to use as a unique composed key.
 
-    
-
-    
-
-    def getResultFile(self):
-        """Returns the result file of this tool
         Returns:
-            strings
+            Dict[str, Any]: A dictionary containing the wave, name, level, and check id of the tool.
         """
-        return self.resultfile
+        base = {"wave": self.wave, "name":self.name, "lvl": self.lvl, "check_iid":self.check_iid}
+        return base
+
+    def getHashableDbKey(self) -> Tuple[Any, ...]:
+        """
+        Return a tuple from the model to use as a unique composed key.
+
+        Returns:
+            Tuple[Union[str, Any]]: A tuple containing the wave, name, level, and check id of the tool.
+        """
+        return tuple(list(self.getDbKey().values()))
+
+    def __str__(self) -> str:
+        """
+        Get a string representation of a tool.
+
+        Returns:
+            str: The tool name. The wave name is prepended if tool lvl is "port" or "ip".
+        """
+        return self.name
+
+    def getDetailedString(self) -> str:
+        """
+        Get a more detailed string representation of a tool.
+
+        Returns:
+            str: A detailed string representation of the tool.
+        """
+        if self.lvl == "import":
+            return str(self.name)
+        class_element = Element.getClassWithTrigger(self.lvl)
+        if class_element is None:
+            return str(self.name)
+        return class_element.completeDetailedString(self.getData()) + str(self.name)
+
+    def _setStatus(self, new_status: str, arg: Optional[str]) -> bool:
+        """
+        Set the status of the tool based on the new status provided.
+
+        Args:
+            new_status (str): The new status to be set.
+            arg (Any): Additional argument used in setting the status.
+
+        Returns:
+            bool: The updated tool data.
+        """
+        if "done" in new_status:
+            if arg == "":
+                arg = None
+            self.markAsDone(None)
+        elif "running" in new_status:
+            self.markAsRunning(arg if arg is not None else "")
+        elif "not_done" in new_status:
+            self.markAsNotDone()
+        elif "ready" in new_status:
+            self.markAsNotDone()
+        elif "error" in new_status:
+            self.markAsError(arg if arg is not None else "")
+        elif "timedout" in new_status:
+            self.markAsTimedout()
+        elif len(new_status) == 0:
+            self.markAsNotDone()
+        res: bool = tool_update(self.pentest, self.getId(), self.getData())
+        return res
+
+    @classmethod
+    def bulk_insert(cls, pentest: str, tools_to_add: List['Tool']) -> List[ObjectId]:
+        """
+        Insert multiple tools into the database in a single operation.
+
+        Args:
+            pentest (str): The name of the pentest.
+            tools_to_add (List[Tool]): The list of tools to be added.
+
+        Returns:
+            List[ObjectId]: The list of ids of the upserted tools.
+        """
+        if not tools_to_add:
+            return []
+        dbclient = DBClient.getInstance()
+        dbclient.create_index(pentest, "tools", [("wave", 1), ("name", 1), ("lvl", 1), ("check_iid", 1)])
+        update_operations: List[Union[InsertOne, UpdateOne]] = []
+        for tool in tools_to_add:
+            data: Any = tool.getData()
+            if "_id" in data:
+                del data["_id"]
+            update_operations.append(InsertOne(data))
+        result = dbclient.bulk_write(pentest, "tools", update_operations)
+        upserted_ids = result.upserted_ids
+        if upserted_ids is None:
+            return []
+        return [ObjectId(val) for val in upserted_ids.values()]
+
+    def update(self) -> bool:
+        """
+        Update the current tool in the database.
+
+        Returns:
+            bool: True if the update was successful, False otherwise.
+        """
+        res: bool = tool_update(self.pentest, self._id, self.getData())
+        return res
+    
