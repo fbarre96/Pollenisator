@@ -4,6 +4,7 @@ This module contains the main application factory for the Pollenisator server.
 import os
 import sys
 from typing import Dict, Any
+import uuid
 from getpass import getpass
 from pathlib import Path
 import json
@@ -59,7 +60,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
     """
     # Read the openapi.yaml file to configure the endpoints
     app = connexion.App(__name__, specification_dir=server_folder, debug=debug)
-    flask_app = app.app
+    flask_app: Flask = app.app
     flask_app.config.from_object(BaseConfig())
     logger.info("LOADING MAIN API")
     if not loaded:

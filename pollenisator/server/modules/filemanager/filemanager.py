@@ -7,7 +7,7 @@ import time
 import traceback
 import hashlib
 from datetime import datetime
-from typing import IO, Dict, List, Tuple, Union, Any, cast
+from typing import IO, Dict, List, Optional, Tuple, Union, Any, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 import bson
@@ -18,6 +18,7 @@ from pollenisator.core.components.tag import Tag
 from pollenisator.core.components.utils import loadPlugin, detectPlugins
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.utils import getMainDir
+from pollenisator.core.models.defect import Defect
 from pollenisator.core.models.tool import Tool
 from pollenisator.server.permission import permission
 
@@ -162,14 +163,14 @@ def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage
         # ADD THE RESULTING TOOL TO AFFECTED
         for target in targets.values():
             date = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            check_iid: Optional[ObjectId] = None
+            tool_iid: Optional[ObjectId] = None
             if target is None:
                 wave = None
                 scope = None
                 ip = None
                 port = None
                 proto = None
-                check_iid = None
-                tool_iid = None
             else:
                 lvl = target.get("lvl", lvl)
                 wave = none_or_str(target.get("wave", None))
@@ -177,8 +178,8 @@ def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage
                 ip = none_or_str(target.get("ip", None))
                 port = none_or_str(target.get("port", None))
                 proto = none_or_str(target.get("proto", None))
-                check_iid = target.get("check_iid", None)
-                tool_iid = target.get("tool_iid", None)
+                check_iid = None if target.get("check_iid", None) is None else ObjectId(target["check_iid"])
+                tool_iid = None if target.get("tool_iid", None) is None else ObjectId(target["tool_iid"])
             if wave is None:
                 wave = result.get("plugin", "")+"-Imported"
             if dbclient.findInDb(pentest, "waves", {"wave":wave}, False) is None:
@@ -195,7 +196,7 @@ def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage
                 tool_m = Tool(pentest).initialize(None, check_iid, wave, name=toolName, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
                                             dated=date, datef=date, scanner_ip=user, status=["done"], notes=notes)
                 ret = tool_m.addInDb()
-                tool_iid = ret["iid"]
+                tool_iid = ObjectId(ret["iid"])
             if tool_m is not None:
                 tool_m = cast(Tool, tool_m)
                 tool_m.setTags(tags)
@@ -223,12 +224,24 @@ def listFiles(pentest: str, attached_iid: str, filetype: str) -> Union[ErrorStat
         return "Invalid filetype", 400
     if not is_valid_object_id(attached_iid):
         return "Invalid attached_iid", 400
-    filepath = os.path.join(local_path, pentest, filetype, str(attached_iid))
-    filepath = os.path.normpath(filepath)
-    if not filepath.startswith(local_path):
-        return "Invalid path", 400
+    files: List[str] = []
     try:
-        files = os.listdir(filepath)
+        if filetype == "proof":
+            defect = Defect.fetchObject(pentest, {"_id": ObjectId(attached_iid)})
+            if defect is None:
+                return "Defect not found", 404
+            defect = cast(Defect, defect)
+            files = defect.listProofFiles()
+        elif filetype == "result":
+            tool = Tool.fetchObject(pentest, {"_id": ObjectId(attached_iid)})
+            if tool is None:
+                return "Tool not found", 404
+            tool = cast(Tool, tool)
+            files = tool.listResultFiles()
+        else:
+            return "Invalid filetype", 400
+    except ValueError:
+        return "Invalid path", 400
     except FileNotFoundError:
         return "File not found", 404
     return files
@@ -284,16 +297,14 @@ def rmProof(pentest: str, defect_iid: str, filename: str) -> ErrorStatus:
     Returns:
         ErrorStatus: A success message if the file was successfully deleted, otherwise an error message and status code.
     """
-    filename = str(filename)
-    filename = filename.replace("/", "_")
     if not is_valid_object_id(defect_iid):
         return "Invalid attached_iid", 400
-    filepath = os.path.join(local_path, pentest, "proof", str(defect_iid), filename)
-    filepath = os.path.normpath(filepath)
-    if not filepath.startswith(local_path):
-        return "Invalid path", 400
-    dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(defect_iid)}, {"$pull":{"proofs":filename}})
-    if not os.path.isfile(filepath):
+    defect = Defect.fetchObject(pentest, {"_id": ObjectId(defect_iid)})
+    if defect is None:
+        return "Defect not found", 404
+    defect = cast(Defect, defect)
+    try:
+        defect.rmProof(filename)
+    except FileNotFoundError:
         return "File not found", 404
-    os.remove(filepath)
-    return "Successfully deleted "+str(filename), 200
+    return "Success", 200

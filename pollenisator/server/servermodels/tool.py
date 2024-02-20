@@ -19,7 +19,8 @@ from pollenisator.server.permission import permission
 from pollenisator.server.token import encode_token
 from pollenisator.core.components.logger_config import logger
 
-ToolInsertResult = TypedDict('ToolInsertResult', {'res': bool, 'iid': str})
+ErrorStatus = Tuple[str, int]
+ToolInsertResult = TypedDict('ToolInsertResult', {'res': bool, 'iid': ObjectId})
 QueueTaskSuccess = TypedDict('QueueTaskSuccess', {'tool_iid': str})
 QueueTaskFail = TypedDict('QueueTaskFail', {'tool_iid': str, 'error': str})
 QueueTasksResult = TypedDict('QueueTasksResult', {'successes': List[QueueTaskSuccess], 'failures': List[QueueTaskFail]})
@@ -92,7 +93,7 @@ def insert(pentest: str, body: Dict[str, Any], **kwargs: Any) -> None:
         del kwargs["base"]
     do_insert(pentest, body, **kwargs)
 
-def do_insert(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union[Tuple[str, int], ToolInsertResult]:
+def do_insert(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union[ErrorStatus, ToolInsertResult]:
     """
     Inserts a tool into the database.
 
@@ -102,7 +103,7 @@ def do_insert(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union[Tuple[
         **kwargs (Any): Additional parameters.
 
     Returns:
-        Union[str, Dict[str, Union[bool, str]]]: A string indicating an error or a dictionary containing the result of the operation and the id of the inserted tool.
+        Union[ErrorStatus, ToolInsertResult]: A string indicating an error or a dictionary containing the result of the operation and the id of the inserted tool.
     """
     dbclient = DBClient.getInstance()
     if not dbclient.isUserConnected():

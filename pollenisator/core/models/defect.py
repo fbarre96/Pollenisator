@@ -1,11 +1,17 @@
 """Defect Model."""
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, Union
+import os
+import re
+import threading
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, cast
 from bson.objectid import ObjectId
+import pollenisator.core.components.utils as utils
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.element import Element
 from pollenisator.server.servermodels.defect import DefectInsertResult, getTargetRepr as getTargetRepr_defect, insert as insert_defect, update as update_defect
 
+sem = threading.Semaphore() 
 
 class Defect(Element):
     """
@@ -30,8 +36,10 @@ class Defect(Element):
         """
         if valuesFromDb is None:
             valuesFromDb = {}
-        self.proofs: List[str] = []
         super().__init__(pentest, valuesFromDb)
+        self.proofs: List[str] = []
+        self.creation_time: Optional[datetime] = None
+        self.index = 0
         if valuesFromDb is not None:
             self.initialize(valuesFromDb.get("target_id", ""), valuesFromDb.get("target_type", ""),
                             valuesFromDb.get("title", ""), valuesFromDb.get("synthesis", ""), valuesFromDb.get("description", ""),
@@ -46,7 +54,7 @@ class Defect(Element):
                             valuesFromDb.get("infos", {}),
                             valuesFromDb.get("index", 0))
 
-    def initialize(self, target_id: str = "", target_type: str = "", title: str = "", synthesis: str = "",
+    def initialize(self, target_id: Optional[ObjectId] = None, target_type: str = "", title: str = "", synthesis: str = "",
                    description: str = "", ease: str = "", impact: str = "", risk: str = "", redactor: str = "N/A",
                    mtype: Optional[Union[str, List[str]]] = None, language: str = "", notes: str = "",
                    proofs: Optional[List[str]] = None, fixes: Optional[List[Dict[str, Any]]] = None,
@@ -56,7 +64,7 @@ class Defect(Element):
         Set values of defect.
 
         Args:
-            target_id (str, optional): Defect will be assigned to this target_id. Defaults to "".
+            target_id (Optional[ObjectId], optional): Defect will be assigned to this target_id. Defaults to "".
             target_type (str, optional): Defect will be assigned to this target_type(target_id). Defaults to "".
             title (str, optional): A title for this defect describing what it is. Defaults to "".
             synthesis (str, optional): A short summary of what this defect is about. Defaults to "".
@@ -89,7 +97,7 @@ class Defect(Element):
             self.mtype = [self.mtype]
         self.language = language
         self.notes = notes
-        self.target_id = ObjectId(target_id)
+        self.target_id: Optional[ObjectId] = ObjectId(target_id)
         self.target_type = target_type
         self.infos = infos if infos is not None else {}
         self.proofs = proofs if proofs is not None else []
@@ -189,18 +197,177 @@ class Defect(Element):
         Returns:
             Union[DefectInsertResult, Tuple[str, int]]: The ObjectId of the inserted document in the database, or None if the operation was not successful.
         """
-        result: Union[DefectInsertResult, Tuple[str, int]] = insert_defect(self.pentest, self.getData())
-        return result
+        try:
+            self.creation_time = datetime.now()
+            if not self.isAssigned():
+                sem.acquire()
+            base = self.getDbKey()
+            existing = Defect.fetchObject(self.pentest, base)
+            if existing is not None:
+                sem.release()
+                return {"res":False, "iid": existing.getId()}
+            if self.target_id is not None and self.target_type == "":
+                sem.release()
+                return "If a target_id is specified, a target_type should be specified to", 400
+            parent = self.getParentId()
+            if self.pentest != "pollenisator" and not self.isAssigned():
+                insert_pos = Defect.findInsertPosition(self.pentest, self.risk)
+                save_insert_pos = insert_pos
+                defects_to_edit = []
 
-    def update(self) -> Union[bool, Tuple[str, int]]:
+                defect_to_edit_o = Defect.fetchObject(self.pentest, {"target_id":None, "index":int(insert_pos)})
+                if defect_to_edit_o is not None:
+                    defects_to_edit.append(defect_to_edit_o)
+                while defect_to_edit_o is not None:
+                    insert_pos+=1
+                    defect_to_edit_o = Defect.fetchObject(self.pentest, {"target_id":None,  "index":int(insert_pos)})
+                    if defect_to_edit_o is not None:
+                        defects_to_edit.append(defect_to_edit_o)
+                    
+                for defect_to_edit in defects_to_edit:
+                    defect_to_edit = cast(Defect, defect_to_edit)
+                    defect_to_edit.update_index(int(defect_to_edit.index)+1)
+                self.index = int(save_insert_pos)
+            else:
+                self.description = ""
+                self.synthesis = ""
+                self.fixes = []
+            self.creation_time = datetime.now()
+            if isinstance(self.mtype, str):
+                self.mtype = self.mtype.split(",")
+            dbclient = DBClient.getInstance()
+            ins_result = dbclient.insertInDb(self.pentest, "defects", self.getData(), str(parent))
+            iid = ins_result.inserted_id
+            self._id = iid
+
+            if self.isAssigned():
+                # Edit to global defect and insert it
+                global_defect = Defect(self.pentest, self.getData())
+                global_defect.target_id = None
+                global_defect.target_type = ""
+                global_defect.parent = None
+                global_defect.notes = ""
+                result = global_defect.addInDb()
+                if isinstance(result, tuple):
+                    pass
+                else:
+                    insert_res = cast(DefectInsertResult, result)
+                    dbclient.updateInDb(self.pentest, "defects", {"_id":ObjectId(iid)}, {"$set":{"global_defect": insert_res["iid"]}})
+        except Exception as e:
+            sem.release()
+            raise(e)
+        sem.release()
+        return {"res":True, "iid":iid}
+
+    def update_index(self, index: int) -> None:
         """
-        Update this defect in the database.
+        Update the defect index in the global defect tables
+
+        Args:
+            index (int): The new index of the defect.
 
         Returns:
-            Union[bool, Tuple[str, int]]: True if the operation was successful, False otherwise.
+            None
         """
-        result: Union[bool, Tuple[str, int]] = update_defect(self.pentest, ObjectId(self._id), self.getData())
-        return result
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb(self.pentest, "defects", {"_id":self.getId()}, {"$set":{"index":index}})
+
+    @classmethod
+    def findInsertPosition(cls, pentest: str, risk: str) -> int:
+        """
+        Find the position to insert a new defect based on its risk level. The position is determined by the highest index of 
+        defects with the same or higher risk level.
+
+        Args:
+            pentest (str): The name of the pentest.
+            risk (str): The risk level of the defect.
+
+        Returns:
+            int: The position to insert the new defect.
+        """
+        riskLevels = ["Critical", "Major",  "Important", "Minor"] # TODO do not hardcode those things
+        riskLevelPos = riskLevels.index(risk)
+        highestInd = 0
+        for risklevel_i, riskLevel in enumerate(riskLevels):
+            if risklevel_i > riskLevelPos:
+                break
+            globalDefects = Defect.fetchObjects(pentest, {"target_id":"", "risk":riskLevel})
+            globalDefects = cast(Iterator[Defect], globalDefects)
+            for globalDefect in globalDefects:
+                highestInd = max(int(globalDefect.index)+1, highestInd)
+        return highestInd
+
+    @classmethod
+    def moveDefect(cls, pentest: str, defect_id_to_move: ObjectId, target_id: ObjectId) -> Union[int, Tuple[str, int]]:
+        """
+        Move a defect to a new position in the global defect table.
+
+        Args:
+            pentest (str): The name of the pentest.
+            defect_id_to_move (ObjectId): The id of the defect to move.
+            target_id (ObjectId): The id of the defect to move the defect to.
+
+        Returns:
+            Union[str, Tuple[str, int]]: The index of the defect in the global defect table if the operation was successful, 
+            or a tuple containing an error message and an error code otherwise.
+        """
+        defect_to_move = Defect.fetchObject(pentest, {"_id":ObjectId(defect_id_to_move), "target_id":None})
+        if defect_to_move is None:
+            return "This global defect does not exist", 404
+        defect_to_move = cast(Defect, defect_to_move)
+        defect_target = Defect.fetchObject(pentest, {"_id":ObjectId(target_id), "target_id":None})
+        if defect_target is None:
+            return "the target global defect does not exist", 404
+        defects_ordered = Defect.getGlobalDefects(pentest)
+        defect_target = cast(Defect, defect_target)
+        target_ind = int(defect_target.index)
+        defect_to_move_ind = int(defect_to_move.index)
+        del defects_ordered[defect_to_move_ind]
+        defects_ordered.insert(target_ind, defect_to_move.getData())
+        for defect_i in range(min(defect_to_move_ind, target_ind), len(defects_ordered)):
+            defect_o = Defect(pentest, defects_ordered[defect_i])
+            defect_o.update_index(defect_i)
+        defect_to_move.update_index(target_ind)
+        return target_ind
+
+    def update(self, data: Dict[str, Any]) -> Union[bool, Tuple[str, int]]:
+        """
+        Update a defect in the database.
+
+        Args:
+            data (Dict[str, Any]): A dictionary containing the details of the defect to be updated.
+
+        Returns:
+            Union[bool, Tuple[str, int]]: True if the operation was successful, or a tuple containing an error message and 
+            an error code otherwise.
+        """
+        data = Defect(self.pentest, data).getData()
+        dbclient = DBClient.getInstance()
+        oldRisk = self.risk
+        if not self.isAssigned() and self.pentest != "pollenisator":
+            if data.get("risk", None) is not None and self.pentest != "pollenisator":
+                if data["risk"] != oldRisk:
+                    insert_pos = str(Defect.findInsertPosition(self.pentest, data["risk"]))
+                    if int(insert_pos) > int(self.index):
+                        insert_pos = str(int(insert_pos)-1)
+                    defectTarget = Defect.fetchObject(self.pentest, {"target_id":None, "index":insert_pos})
+                    if defectTarget is not None:
+                        Defect.moveDefect(self.pentest, self.getId(), defectTarget.getId())
+                if "index" in data:
+                    del data["index"]
+        if self.pentest != "pollenisator":
+            data["proofs"] = set()
+            proof_groups = Defect._findProofsInDescription(data.get("description", ""))
+            existing_proofs_to_remove = self.listProofFiles()
+            for proof_group in proof_groups:
+                if proof_group.group(1) in existing_proofs_to_remove:
+                    existing_proofs_to_remove.remove(proof_group.group(1))
+                data["proofs"].add(proof_group.group(1))
+            for proof_to_remove in existing_proofs_to_remove:
+                self.rmProof(proof_to_remove)
+            data["proofs"] = list(data["proofs"])
+        dbclient.updateInDb(self.pentest, "defects", {"_id":ObjectId(self.getId())}, {"$set":data})
+        return True
 
     def getParentId(self) -> ObjectId:
         """
@@ -225,3 +392,91 @@ class Defect(Element):
         if isinstance(result, tuple):
             raise ValueError(result[0])
         return result.get(str(self.target_id), "Target not found")
+
+    @classmethod
+    def getGlobalDefects(cls, pentest: str) -> List[Dict[str, Any]]:
+        """
+        Get all global defects for a pentest. Global defects are defects that are not assigned to a specific target.
+
+        Args:
+            pentest (str): The name of the pentest.
+
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries, each representing a global defect. The defects are ordered by their index.
+        """
+        defects = Defect.fetchObjects(pentest, {"target_id": ""})
+        if defects is None:
+            return []
+        defects_ordered = []
+        for defect in defects:
+            defects_ordered.append(defect.getData())
+        return sorted(defects_ordered, key=lambda defect: int(defect["index"]))
+
+    @staticmethod
+    def _findProofsInDescription(description: str) -> Iterator[re.Match[str]]:
+        """
+        Find all image references in a description. The function looks for markdown image syntax (![alt text](url)) 
+        where the url does not start with "http".
+
+        Args:
+            description (str): The description to search for image references.
+
+        Returns:
+            Iterator[re.Match[str]]:: An iterator yielding match objects for each image reference found.
+        """
+        regex_images = r"!\[.*\]\(((?!http).*)\)" # regex to find images in markdown
+        return re.finditer(regex_images, description)
+
+
+    def getProofPath(self) -> str:
+        """
+        Get the local path for the proof of a defect.
+
+        Returns:
+            str: The local path for the proof of the defect.
+        """
+        local_path = os.path.join(utils.getMainDir(), "files")
+        filepath = os.path.join(local_path, self.pentest, "proofs", str(self.getId()))
+        filepath = os.path.normpath(filepath)
+        if not filepath.startswith(local_path):
+            raise ValueError("Invalid path")
+        return filepath
+
+    def rmProof(self, filename: str) -> None:
+        """
+        Remove defect proof on disk and in the database
+
+        Args:
+            filename (str): The filename of the proof to remove.
+
+        Raises:
+            ValueError: If the file is not found.
+        """
+        filename = str(filename)
+        filename = os.path.basename(filename.replace("/", "_"))
+        proof_dir = self.getProofPath()
+        proof_path = os.path.join(proof_dir, filename)
+        if not os.path.isfile(proof_path):
+            raise FileNotFoundError("File not found")
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb(self.pentest, "defects", {"_id": ObjectId(self.getId())}, {"$pull":{"proofs":filename}})
+        os.remove(proof_path)
+
+    def listProofFiles(self) -> List[str]:
+        """
+        List all proofs for this defect.
+
+        Raises:
+            FileNotFoundError: If the proof path is not found.
+            ValueError: If the proof path is invalid.
+        Returns:
+            List[str]: A list of all proofs for this defect.
+        """
+        try:
+            proofpath = self.getProofPath()
+            files = os.listdir(proofpath)
+        except FileNotFoundError as e:
+            raise e
+        except ValueError as e:
+            raise e
+        return files

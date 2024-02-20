@@ -9,7 +9,7 @@ paths:
   '/cheatsheet/':
     post:
       summary: insert cheatsheet item
-      operationId: pollenisator.server.modules.cheatsheet.cheatsheet.insert
+      operationId: pollenisator.server.modules.cheatsheet.routes.insert
       responses:
         '200':
           description: OK
@@ -34,7 +34,7 @@ paths:
       tags:
         - Cheatsheet
       summary: Delete check item
-      operationId: pollenisator.server.modules.cheatsheet.cheatsheet.delete
+      operationId: pollenisator.server.modules.cheatsheet.routes.delete
       responses:
         '200':
           description: OK
@@ -43,7 +43,7 @@ paths:
       summary: ''
       tags:
         - Cheatsheet
-      operationId: pollenisator.server.modules.cheatsheet.cheatsheet.update
+      operationId: pollenisator.server.modules.cheatsheet.routes.update
       responses:
         '200':
           description: OK
@@ -193,7 +193,7 @@ paths:
       summary: "Apply the checkitem to the pentest"
       tags:
         - Cheatsheet
-      operationId: pollenisator.server.modules.cheatsheet.cheatsheet.applyToPentest
+      operationId: pollenisator.server.modules.cheatsheet.routes.applyToPentest
       responses:
         '200':
           description: OK
@@ -213,7 +213,7 @@ paths:
 
   "/cheatsheet/find":
     post:
-      operationId: pollenisator.server.modules.cheatsheet.cheatsheet.find
+      operationId: pollenisator.server.modules.cheatsheet.routes.find
       tags:
         - Cheatsheet
       summary: "find check items"

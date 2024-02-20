@@ -7,7 +7,7 @@ from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.command import Command
 from pollenisator.core.models.element import Element
-from pollenisator.core.models.tool import Tool
+import pollenisator.core.models.tool as tool
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.permission import permission
 from pollenisator.core.components.logger_config import logger
@@ -241,14 +241,14 @@ class CheckInstance(Element):
                 lvl = "unknown"
             commands = check_command_lkp.get(str(checkitem_id), [])
             for command_o in commands:
-                tool = Tool(pentest)
+                tool_model = tool.Tool(pentest)
                 for target in targets:
                     targetdata = target.getData()
-                    tool.initialize(ObjectId(command_o.getId()), ObjectId(check.getId()), targetdata.get("wave", ""), command_o.name, targetdata.get("scope", ""), targetdata.get("ip", ""), targetdata.get("port", ""),
+                    tool_model.initialize(ObjectId(command_o.getId()), ObjectId(check.getId()), targetdata.get("wave", ""), command_o.name, targetdata.get("scope", ""), targetdata.get("ip", ""), targetdata.get("port", ""),
                                                 targetdata.get("proto", ""), lvl, infos=toolInfos)
-                    tools_to_add.append(tool)
+                    tools_to_add.append(tool_model)
         if tools_to_add:
-            Tool.bulk_insert(pentest, tools_to_add)
+            tool.Tool.bulk_insert(pentest, tools_to_add)
 
         return return_checkinstances
 
@@ -277,7 +277,7 @@ class CheckInstance(Element):
                 index = i
                 break
         tools = dbclient.findInDb(pentest, "tools", {"check_iid":{"$in":checks_iids}, "status":{"$ne":"done"}}, True)
-        queue_final = queue[:index] + [{"iid":tool["_id"], "priority":priority, "force":force} for tool in tools] + queue[index:]
+        queue_final = queue[:index] + [{"iid":tool_data["_id"], "priority":priority, "force":force} for tool_data in tools] + queue[index:]
         dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":queue_final}})
 
     @classmethod
@@ -352,21 +352,21 @@ class CheckInstance(Element):
         at_least_one = False
         total = 0
         done = 0
-        tools_to_add = Tool.fetchObjects(self.pentest, {"check_iid": ObjectId(self._id)})
+        tools_to_add = tool.Tool.fetchObjects(self.pentest, {"check_iid": ObjectId(self._id)})
         if tools_to_add is not None:
-            for tool in tools_to_add:
-                tool = cast(Tool, tool)
-                if "done" in tool.getStatus():
+            for tool_model in tools_to_add:
+                tool_model = cast(tool.Tool, tool_model)
+                if "done" in tool_model.getStatus():
                     done += 1
                     at_least_one = True
-                elif "running" in tool.getStatus():
+                elif "running" in tool_model.getStatus():
                     at_least_one = True
-                elif "error" in tool.getStatus():
+                elif "error" in tool_model.getStatus():
                     data["tools_error"][str(
-                        tool.getId())] = tool.getDetailedString()
+                        tool_model.getId())] = tool_model.getDetailedString()
                 else:
                     data["tools_not_done"][str(
-                        tool.getId())] = tool.getDetailedString()
+                        tool_model.getId())] = tool_model.getDetailedString()
                 total += 1
 
         if done != total:
@@ -428,9 +428,10 @@ def doInsert(pentest: str, data: Dict[str, Any], checkItem: Optional[CheckItem] 
     for command in checkItem.commands:
         command_pentest = Command.fetchObject(pentest, {"original_iid": ObjectId(command)})
         if command_pentest is not None:
-            tool = Tool(pentest)
-            tool.initialize(ObjectId(command_pentest.getId()), ObjectId(iid), target.get("wave", ""), None, target.get("scope", ""), target.get("ip", ""), target.get("port", ""),
-                                        target.get("proto", ""), checkItem.lvl, infos=toolInfos).addInDb(update_check_infos=False)
+            tool_model = tool.Tool(pentest)
+            tool_model.initialize(ObjectId(command_pentest.getId()), ObjectId(iid), target.get("wave", ""), None, target.get("scope", ""), target.get("ip", ""), target.get("port", ""),
+                                        target.get("proto", ""), checkItem.lvl, infos=toolInfos)
+            tool_model.addInDb(update_check_infos=False)
     if ins_result is None:
         return {"res": False, "iid": iid}
     return {"res": True, "iid": iid}
@@ -550,24 +551,24 @@ def getInformations(pentest: str, iid: str) -> Union[Dict[str, Any], ErrorStatus
     done = 0
     dbclient = DBClient.getInstance()
     dbclient.create_index(pentest, "tools", [("check_iid",1)])
-    tools_to_add = Tool.fetchObjects(pentest, {"check_iid": str(iid)})
+    tools_to_add = tool.Tool.fetchObjects(pentest, {"check_iid": str(iid)})
     if tools_to_add is not None:
-        for tool in tools_to_add:
-            tool = cast(Tool, tool)
-            if "done" in tool.getStatus():
+        for tool_model in tools_to_add:
+            tool_model = cast(tool.Tool, tool_model)
+            if "done" in tool_model.getStatus():
                 done += 1
                 at_least_one = True
-                data["tools_done"][str(tool.getId())] = tool.getData()
-            elif "running" in tool.getStatus():
+                data["tools_done"][str(tool_model.getId())] = tool_model.getData()
+            elif "running" in tool_model.getStatus():
                 at_least_one = True
                 data["tools_running"][str(
-                    tool.getId())] = tool.getDetailedString()
-            elif "error" in tool.getStatus():
+                    tool_model.getId())] = tool_model.getDetailedString()
+            elif "error" in tool_model.getStatus():
                 data["tools_error"][str(
-                    tool.getId())] = tool.getData()
+                    tool_model.getId())] = tool_model.getData()
             else:
                 data["tools_not_done"][str(
-                    tool.getId())] = tool.getDetailedString()
+                    tool_model.getId())] = tool_model.getDetailedString()
             total += 1
 
     if done != total:

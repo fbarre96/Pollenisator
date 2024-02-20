@@ -1,8 +1,10 @@
 """Tool Model. A tool is an instanciation of a command against a target"""
 
+import os
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 import bson
 from pymongo import InsertOne, UpdateOne
+import pollenisator.server.modules.cheatsheet.checkinstance as checkinstance
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.command import Command
 from pollenisator.core.models.element import Element
@@ -11,7 +13,6 @@ from datetime import datetime
 import pollenisator.core.components.utils as utils
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
-from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
 from pollenisator.server.servermodels.tool import ToolInsertResult, do_insert as do_insert, update as tool_update, delete as tool_delete
 
 class Tool(Element):
@@ -47,8 +48,8 @@ class Tool(Element):
         self.text = ""
         self.notes = ""
         self.status: List[str] = []
-        command_iid_or_none = ObjectId(valuesFromDb.get("command_iid", None)) if "command_iid" in valuesFromDb else None
-        check_iid_or_none = ObjectId(valuesFromDb.get("check_iid", None)) if "check_iid" in valuesFromDb else None
+        command_iid_or_none: Optional[ObjectId] = ObjectId(valuesFromDb.get("command_iid", None)) if "command_iid" in valuesFromDb else None
+        check_iid_or_none: Optional[ObjectId] = ObjectId(valuesFromDb.get("check_iid", None)) if "check_iid" in valuesFromDb else None
         self.initialize(command_iid_or_none, check_iid_or_none, valuesFromDb.get("wave", ""),
                         valuesFromDb.get("name", None),
                         valuesFromDb.get(
@@ -227,7 +228,7 @@ class Tool(Element):
         """
         if "OOT" not in self.status:
             self.status.append("OOT")
-            tool_update(pentest, self._id, {"status": self.status})
+            tool_update(pentest, str(self.getId()), {"status": self.status})
 
     def setOutOfScope(self, pentest: str) -> None:
         """
@@ -282,7 +283,7 @@ class Tool(Element):
             ObjectId(self.check_iid)
         except bson.errors.InvalidId:
             return None
-        check: Optional[CheckInstance] = CheckInstance.fetchObject(self.pentest, {"_id":ObjectId(self.check_iid)})
+        check: Optional[checkinstance.CheckInstance] = checkinstance.CheckInstance.fetchObject(self.pentest, {"_id":ObjectId(self.check_iid)})
         if check is None:
             return None
         return check.getCheckItem()
@@ -430,7 +431,7 @@ class Tool(Element):
                 command = command_o.text
         data = self.getData()
         if self.check_iid is not None:
-            check = CheckInstance.fetchObject(self.pentest, {"_id":ObjectId(self.check_iid)})
+            check = checkinstance.CheckInstance.fetchObject(self.pentest, {"_id":ObjectId(self.check_iid)})
             if check is not None:
                 target = check.getTargetData()
                 if target is not None:
@@ -711,4 +712,21 @@ class Tool(Element):
         """
         res: bool = tool_update(self.pentest, self._id, self.getData())
         return res
-    
+
+    def listResultFiles(self) -> List[str]:
+        """
+        List all result files for this tool.
+
+        Returns:
+            List[str]: A list of all results for this tool.
+        """
+        local_path = os.path.join(utils.getMainDir(), "files")
+        filepath = os.path.join(local_path, self.pentest, "results", str(self.getId()))
+        filepath = os.path.normpath(filepath)
+        if not filepath.startswith(local_path):
+            raise ValueError("Invalid path")
+        try:
+            files = os.listdir(filepath)
+        except FileNotFoundError as e:
+            raise e
+        return files

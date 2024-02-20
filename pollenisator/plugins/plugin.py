@@ -1,5 +1,5 @@
 """A registry for all subclasses of Plugin"""
-from typing import Any, BinaryIO, Dict, List, Tuple, Type
+from typing import IO, Any, BinaryIO, Dict, List, Optional, Tuple, Type
 import shlex
 import os
 from pollenisator.core.components.tag import Tag
@@ -124,7 +124,7 @@ class Plugin(metaclass=MetaPlugin):
             return True
         return False
 
-    def Parse(self, pentest: str, file_opened: BinaryIO, **_kwargs: Any) -> Tuple[str, List[Tag], str, Dict[str, Dict[str, Any]]]:
+    def Parse(self, pentest: str, file_opened: IO[bytes], **_kwargs: Any) -> Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Dict[str, str]]]]:
         """
         Parse an opened file to extract information.
 
@@ -134,7 +134,7 @@ class Plugin(metaclass=MetaPlugin):
             **_kwargs (Any): Additional parameters (not used).
 
         Returns:
-            Tuple[str, List[Tag], str, Dict[str, Dict[str, str]]]: A tuple with 4 values (All set to None if Parsing wrong file): 
+            Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Dict[str, str]]]]: A tuple with 4 values (All set to None if Parsing wrong file): 
                 0. notes (str): Notes to be inserted in tool giving direct info to pentester.
                 1. tags (List[Tag]): A list of tags to be added to tool.
                 2. lvl (str): The level of the command executed to assign to given targets.

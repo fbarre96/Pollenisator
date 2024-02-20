@@ -1,12 +1,9 @@
 """Element parent Model. Common ground for every model"""
 from bson.objectid import ObjectId
 from datetime import datetime
-from typing import Any, Dict, Iterator, List, Optional, Union
+from typing import Any, Dict, Iterator, List, Optional, Union, cast
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.tag import Tag
-from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
-from pollenisator.server.servermodels.defect import insert as insert_defect
-from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
 
 REGISTRY: Dict[str, 'Element'] = {}
 
@@ -379,6 +376,9 @@ class Element(metaclass=MetaElement):
             tag (Tag): The tag associated with the defects.
             target_data (Dict[str, Any]): The target data to which the defects will be added.
         """
+        from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
+        from pollenisator.core.models.defect import Defect
+
         checkitems = CheckItem.fetchObjects("pollenisator", {
             "defect_tags": {
                 "$elemMatch": {
@@ -399,18 +399,20 @@ class Element(metaclass=MetaElement):
             for defect_tag in check.defect_tags:
                 if defect_tag[0] == tag.name:
                     defect_to_add = defect_tag[1]
-                    defect = dbclient.findInDb("pollenisator", "defects", {"_id":ObjectId(defect_to_add)}, False)
+                    defect = Defect.fetchObject("pollenisator", {"_id":ObjectId(defect_to_add)})
                     if defect is not None:
-                        if pentest_lang is not None and pentest_lang != "" and pentest_lang != defect.get("language", "en"):
+                        defect = cast(Defect, defect)
+                        if pentest_lang is not None and pentest_lang != "" and pentest_lang != defect.language:
                             continue
-                        defect["ip"] = target_data.get("target_data", {}).get("ip", "")
-                        defect["port"] = target_data.get("target_data", {}).get("port", "")
-                        defect["proto"] = target_data.get("target_data", {}).get("proto", "")
-                        defect["target_id"] = target_data.get("target_id")
-                        defect["target_type"] = target_data.get("target_type")
-                        defect["pentest"] = pentest
-                        defect["notes"] = tag.notes
-                        insert_defect(pentest, defect)
+                        new_defect_data = defect.getData()
+                        new_defect_data["ip"] = target_data.get("target_data", {}).get("ip", "")
+                        new_defect_data["port"] = target_data.get("target_data", {}).get("port", "")
+                        new_defect_data["proto"] = target_data.get("target_data", {}).get("proto", "")
+                        new_defect_data["target_id"] = target_data.get("target_id")
+                        new_defect_data["target_type"] = target_data.get("target_type")
+                        new_defect_data["notes"] = tag.notes
+                        newDefect = Defect(pentest, new_defect_data)
+                        newDefect.addInDb()
 
     @classmethod
     def add_tag_check(cls, pentest: str, lvls: List[str], infos: Dict[str, Any]) -> None:
@@ -422,12 +424,14 @@ class Element(metaclass=MetaElement):
             lvls (List[str]): The levels associated with the check items.
             infos (Dict[str, Any]): The information to which the check items will be added.
         """
+        from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
         dbclient = DBClient.getInstance()
         search = {"lvl":{"$in": lvls}}
         pentest_type = dbclient.findInDb(pentest, "settings", {"key":"pentest_type"}, False)
         if pentest_type is not None:
             search["pentest_types"] = pentest_type["value"]
         # query mongo db commands collection for all commands having lvl == network or domain
+        from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
         checkitems = CheckItem.fetchObjects("pollenisator", search)
         if checkitems is None:
             return
@@ -455,7 +459,7 @@ class Element(metaclass=MetaElement):
         return self.__class__.add_tag_defects(self.pentest, tag, target_data)
 
     @classmethod
-    def apply_retroactively_custom(cls, pentest: str, check_item: CheckItem) -> None:
+    def apply_retroactively_custom(cls, pentest: str, check_item_any: Any) -> None:
         """
         Applies a given check item retroactively to all elements tagged with the same tag as the check item.
 
@@ -463,6 +467,8 @@ class Element(metaclass=MetaElement):
             pentest (str): The name of the pentest.
             check_item (CheckItem): The check item to be applied.
         """
+        from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
+        check_item = cast(CheckItem, check_item_any)
         dbclient = DBClient.getInstance()
         if check_item.lvl.startswith("tag:onAdd:"):
             tag_test = check_item.lvl.split(":")[2]
