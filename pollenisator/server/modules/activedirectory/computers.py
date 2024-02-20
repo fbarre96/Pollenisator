@@ -328,9 +328,10 @@ class Computer(Element):
             find_user = None
             for user in self.users:
                 user_o = User.fetchObject(self.pentest, {"_id":ObjectId(user)})
-                if user_o.username != "" and user_o.password != "":
-                    find_user = user_o.getId()
-                    break
+                if user_o is not None:
+                    if user_o.username != "" and user_o.password != "":
+                        find_user = user_o.getId()
+                        break
             if find_user is None:
                 find_user = self.users[-1]
             self.addCheck("AD:onNewUserOnComputer", {"user":find_user})
@@ -366,11 +367,12 @@ class Computer(Element):
         """
         if infos is None:
             infos = {}
-        user_m = User().initialize(self.pentest, None, domain, username, password, infos=infos)
+        user_m = User(self.pentest).initialize(domain, username, password, infos=infos)
         res = user_m.addInDb()
         if not res["res"]:
-            user_m = User.fetchObject(self.pentest, {"_id":ObjectId(res["iid"])})
-            user_m.updateInfos(infos)
+            user_m_db = User.fetchObject(self.pentest, {"_id":ObjectId(res["iid"])})
+            if user_m_db is not None:
+                user_m_db.updateInfos(infos)
         if str(res["iid"]) not in self.users and password.strip() != "":
             self.users.append(ObjectId(res["iid"]))
             self.add_user_checks()
@@ -425,7 +427,7 @@ class Computer(Element):
             lvl (str): The level of the check to be added.
             info (Dict[str, Any]): The dictionary containing the information for the check.
         """
-        checks = CheckItem.fetchObjects({"lvl":lvl})
+        checks = CheckItem.fetchObjects("pollenisator", {"lvl":lvl})
         if lvl in ["AD:onNewDomainDiscovered", "AD:onNewDC", "AD:onNewSQLServer"]:
             infos = {"domain":info.get("domain")}
         else:
@@ -438,7 +440,7 @@ class Computer(Element):
             domain = user_o.domain if user_o.domain is not None else ""
             infos = {"username":username, "password":password, "domain":domain}
         for check in checks:
-            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "computer", infos=infos)
+            CheckInstance.createFromCheckItem(self.pentest, check, ObjectId(self._id), "computer", infos=infos)
 
 @permission("pentester")
 def delete(pentest: str, computer_iid: ObjectId) -> int:

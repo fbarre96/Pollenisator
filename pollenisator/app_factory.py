@@ -1,32 +1,44 @@
+"""
+This module contains the main application factory for the Pollenisator server.
+"""
 import os
-import connexion
-server_folder = os.path.join(os.path.dirname(
-    os.path.realpath(__file__)), "./server/api_specs/")
-
-
-# Create a URL route in our application for "/"
-import pollenisator.core.components.mongo as mongo
-
-# ENABLE LOGGING EARLY ON
-from pollenisator.core.components.logger_config import logger
-from flask_cors import CORS
+import sys
+from typing import Dict, Any
 from getpass import getpass
+from pathlib import Path
+import json
+import ruamel.yaml
+import pymongo
+import connexion
+from flask_cors import CORS
 from bson import ObjectId
+from flask import Flask, request
+import bcrypt
+from flask_socketio import SocketIO, join_room, leave_room
+from pollenisator.server.modules.worker.worker import removeWorkers, unregister
+from pollenisator.core.components.logger_config import logger
 from pollenisator.core.components.utils import JSONEncoder, loadServerConfig
 from pollenisator.core.components.socketmanager import SocketManager
-from flask import request
-import sys
-import bcrypt
-import json
-from pollenisator.server.modules.worker.worker import removeWorkers, unregister
-from pathlib import Path
-import ruamel.yaml
-from flask_socketio import join_room, leave_room
-import pymongo
+import pollenisator.core.components.mongo as mongo
+
+
+server_folder = os.path.join(os.path.dirname(
+os.path.realpath(__file__)), "./server/api_specs/")
 
 loaded = False
 
 class BaseConfig(object):
+    """
+    Redis basic configuration class for the cache.
+
+    Attributes:
+        CACHE_TYPE (str): The type of cache to use.
+        CACHE_REDIS_HOST (str): The host of the Redis server.
+        CACHE_REDIS_PORT (int): The port of the Redis server.
+        CACHE_REDIS_DB (int): The database to use in the Redis server.
+        CACHE_REDIS_URL (str): The URL of the Redis server.
+        CACHE_DEFAULT_TIMEOUT (int): The default timeout for the cache.
+    """
     CACHE_TYPE="redis"
     CACHE_REDIS_HOST="localhost"
     CACHE_REDIS_PORT=6379
@@ -34,8 +46,16 @@ class BaseConfig(object):
     CACHE_REDIS_URL="redis://localhost:6379/0"
     CACHE_DEFAULT_TIMEOUT=500
 
-def create_app(debug, async_mode):
-    """Loads all API ymal modules and init the App with SocketIO + Connexion + Flask
+def create_app(debug: bool, async_mode: str) -> Flask:
+    """
+    Loads all API yaml modules and initializes the App with SocketIO, Connexion, and Flask.
+
+    Args:
+        debug (bool): Whether to run the application in debug mode.
+        async_mode (str): The asynchronous mode to use for the application. This should be one of the modes supported by Flask-SocketIO.
+
+    Returns:
+        Flask: The initialized Flask application.
     """
     # Read the openapi.yaml file to configure the endpoints
     app = connexion.App(__name__, specification_dir=server_folder, debug=debug)
@@ -83,7 +103,7 @@ def create_app(debug, async_mode):
         """
         from pollenisator.server.token import verifyToken, decode_token
 
-        logger.info("Registering socket for notifications "+str(data))
+        logger.info("Registering socket for notifications %s", str(data))
         sid = request.sid
         token = str(data.get("token", ""))
         pentest = str(data.get("pentest", ""))
@@ -132,7 +152,8 @@ def create_app(debug, async_mode):
 
     @sm.socketio.event
     def disconnect():
-        """Disconnect the socket and unregister it.
+        """
+        Disconnect the socket and unregister it.
 
         Returns:
             None
@@ -147,7 +168,7 @@ def create_app(debug, async_mode):
 
     @sm.socketio.event
     def test(data):
-        logger.info("TEST received : "+str(data))
+        logger.info("TEST received : %s", str(data))
         logger.debug(data)
         sm.socketio.emit("test", {"test":"HELLO"}, to=data.get("pentest"))
         
@@ -198,23 +219,22 @@ def create_app(debug, async_mode):
     return flask_app
 
 
-    
-def load_modules(app, main_file):
+def load_modules(app: Any, main_file: str)->None:
     """Loads all YAML files in the modules folder and merges them into one file.
 
     Args:
-        app: The Connexion app object.
-        main_file: The path to the main YAML file.
+        app (Any): The Connexion app object.
+        main_file (str): The path to the main YAML file.
     """
 
     modules_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "./server/modules/")
     # Load modules
     yaml = ruamel.yaml.YAML()
-    with open(main_file) as fp:
+    with open(main_file , encoding="utf-8") as fp:
         specs = yaml.load(fp)
         for path in Path(modules_path).rglob('*.yaml'):
             print("LOADING MODULE "+str(path))
-            with open(path) as fp2:
+            with open(path , encoding="utf-8") as fp2:
                 module_specs = yaml.load(fp2)
                 if module_specs is None:
                     continue
@@ -224,15 +244,14 @@ def load_modules(app, main_file):
                 for i in module_specs["paths"]:
                     specs["paths"].update({i:module_specs["paths"][i]})
       
-        with open('/tmp/bundled.yaml', 'w') as fw:
+        with open('/tmp/bundled.yaml', 'w', encoding="utf-8") as fw:
             yaml.dump(specs, fw)
             app.add_api('/tmp/bundled.yaml')
             global loaded
             loaded = True
-        
 
 
-def create_admin(username="", password=""):
+def create_admin(username: str = "", password: str = "") -> None:
     """Prompts the user to enter a username and password and creates a new admin account with those credentials.
 
     Args:
@@ -257,8 +276,14 @@ def create_admin(username="", password=""):
     print("Administrator created")
 
 
-def notify_clients(notif):
-    """Notify clients websockets
+def notify_clients(notif: Dict[str, Any]) -> None:
+    """
+    Notify clients via websockets.
+
+    Args:
+        notif (Dict[str, Any]): A dictionary containing the notification details. It should contain a "db" key with the name of the database the notification is associated with.
+
+    If the "db" key is "pollenisator", the notification is sent to all clients. Otherwise, it is sent only to the clients associated with the specified database.
     """
     sm = SocketManager.getInstance()
     #sockets = dbclient.findInDb("pollenisator","sockets",{}, True)
@@ -354,8 +379,11 @@ def migrate_2_7():
     dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.7"}})
     return "2.7"
 
-def init_db():
-    """Initialize empty databases or remaining tmp data from last run
+def init_db() -> None:
+    """
+    Initialize empty databases or remaining tmp data from the last run.
+
+    This function connects to the database, deletes any remaining socket data, checks for existing users, and creates an admin user if none exist. It also handles command-line arguments for non-interactive mode and help. Finally, it performs database migration and removes any remaining workers.
     """
     dbclient = mongo.DBClient.getInstance()
     dbclient.deleteFromDb("pollenisator", "sockets", {}, many=True, notify=False)
@@ -381,7 +409,15 @@ def init_db():
     removeWorkers()
     #TODO FIX TAKES TOO MUCH TIME OR ADD OPTION TO DO SO dbclient.resetRunningTools()
 
-def init_config():
+def init_config() -> int:
+    """
+    Initialize the server configuration.
+
+    This function loads the server configuration, sets the port number, and determines whether to use SSL based on the configuration and environment variables.
+
+    Returns:
+        int: The port number to use for the server.
+    """
     conf = loadServerConfig()
     port = int(os.environ.get("POLLENISATOR_PORT", conf.get("api_port", 5000)))
     https = os.environ.get("POLLENISATOR_SSL",conf.get("https", "false").lower() == "true")
@@ -391,7 +427,20 @@ def init_config():
         ssl_context = None
     return port
 
-def run(flask_app, debug):
+def run(flask_app: Flask, debug: bool) -> SocketIO:
+    """
+    Run the Flask application with SocketIO.
+
+    Args:
+        flask_app (Flask): The Flask application to run.
+        debug (bool): Whether to run the application in debug mode.
+
+    Returns:
+        SocketIO: The SocketIO instance associated with the Flask application.
+
+    Raises:
+        KeyboardInterrupt: If the application is interrupted by the user.
+    """
     sm = SocketManager.getInstance()
     port = init_config()
     init_db()

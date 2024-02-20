@@ -6,7 +6,6 @@ from typing import Any, Dict, Iterator, List, Tuple, Union, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
-from pollenisator.core.controllers.defectcontroller import DefectController
 from pollenisator.core.models.defect import Defect
 from pollenisator.core.models.element import Element
 from pollenisator.server.permission import permission
@@ -149,7 +148,7 @@ def insert(pentest: str, body: Dict[str, Any]) -> Union[DefectInsertResult, Tupl
             defect_o.target_type = ""
             defect_o.parent = ""
             defect_o.notes = ""
-            insert_res = insert(pentest, DefectController(defect_o).getData())
+            insert_res = insert(pentest, defect_o.getData())
             dbclient.updateInDb(pentest, "defects", {"_id":ObjectId(iid)}, {"$set":{"global_defect": insert_res["iid"]}})
     except Exception as e:
         sem.release()
@@ -321,7 +320,7 @@ def moveDefect(pentest: str, defect_id_to_move: str, target_id: str) -> Union[Tu
     target_ind = int(defect_target.index)
     defect_to_move_ind = int(defect_to_move.index)
     del defects_ordered[defect_to_move_ind]
-    defects_ordered.insert(target_ind, DefectController(defect_to_move).getData())
+    defects_ordered.insert(target_ind, defect_to_move.getData())
     for defect_i in range(min(defect_to_move_ind, target_ind), len(defects_ordered)):
         defect_o = Defect(pentest, defects_ordered[defect_i])
         update(pentest, defect_o.getId(), {"index":str(defect_i)})

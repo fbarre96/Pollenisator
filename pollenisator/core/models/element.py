@@ -285,6 +285,14 @@ class Element(metaclass=MetaElement):
             self.setTags(tags)
             dbclient.doRegisterTag(self.pentest, newTag)
 
+    def delTag(self, tag: str) -> None:
+        """Delete the given tag name in model if it has it
+        Args:
+            tag (str): a string describing a tag name.
+        """
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb(self.pentest, "tags", {"item_id": ObjectId(self.getId())}, {"$pull":{"tags.name":tag}})
+
     def setTags(self, tags: List[Tag]) -> bool:
         """
         Set the model tags to given tags. This function also handles the addition and removal of tags, 
@@ -424,7 +432,7 @@ class Element(metaclass=MetaElement):
         if checkitems is None:
             return
         for check in checkitems:
-            CheckInstance.createFromCheckItem(pentest, check, str(infos.get("target_iid")), infos.get("target_type"), infos)
+            CheckInstance.createFromCheckItem(pentest, check, ObjectId(infos.get("target_iid")), str(infos.get("target_type", "")), infos)
 
     def addTagChecks(self, lvls: List[str], infos: Dict[str, Any]) -> None:
         """

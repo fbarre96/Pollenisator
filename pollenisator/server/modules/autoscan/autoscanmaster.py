@@ -225,7 +225,7 @@ def findLaunchableTools(pentest: str) -> List[LaunchableToolType]:
     pentest_commands = Command.fetchObjects(pentest, {"_id": {"$in": authorized_commands}})
     authorized_original_commands = [
         str(x.original_iid) for x in pentest_commands]
-    check_items = list(CheckItem.fetchObjects(
+    check_items = list(CheckItem.fetchObjects("pollenisator",
         {"check_type": "auto_commands", "commands": {"$in": authorized_original_commands}}))
     check_items.sort(key=lambda c: c.priority)
     # get not done tools inside wave

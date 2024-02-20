@@ -1,5 +1,11 @@
+"""
+Start api server
+"""
+
 # ENABLE debug mode early because evenlet monkey patch other libs
 import os
+from typing import Any
+from flask_socketio import SocketIO
 
 debug = os.environ.get("FLASK_DEBUG", False)
 if debug:
@@ -15,25 +21,28 @@ flask_app = app_factory.create_app(debug, async_mode)
 
 
 @flask_app.route('/')
-def home():
-    """Returns a simple message to indicate that the API is working.
+def home() -> str:
+    """
+    Returns a simple message to indicate that the API is working.
+
+    Returns:
+        str: A message indicating that the API is working.
     """
     return "Api working"
 
-def main():
-    """Create the app and run it
+def main() -> None:
+    """
+    Create the app and run it
     """
     with flask_app.app_context():
         run(flask_app)
-    
-def run(flask_app):
-    """Starts the API server.
+
+def run(flask_app: Any) -> SocketIO:
+    """
+    Starts the API server.
     """
     return app_factory.run(flask_app, debug)
-    
 
 # If we're running in stand alone mode, run the application
 if __name__ == '__main__':
     main()
-
-

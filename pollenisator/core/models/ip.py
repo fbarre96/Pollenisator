@@ -1,6 +1,6 @@
 """Ip Model. Describes Hosts (not just IP now but domains too)"""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, cast
 from bson import ObjectId
 import re
 from netaddr import IPNetwork, IPAddress
@@ -9,7 +9,7 @@ from pollenisator.core.models.element import Element
 from pollenisator.core.models.port import Port
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
-from pollenisator.server.servermodels.ip import update as ip_update, insert as ip_insert
+from pollenisator.server.servermodels.ip import IpInsertResult, update as ip_update, insert as ip_insert
 from pollenisator.core.components.utils import isNetworkIp, performLookUp
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.tool import Tool
@@ -44,14 +44,14 @@ class Ip(Element):
             self.initialize(valuesFromDb.get("ip", ""), valuesFromDb.get("notes", ""),
                         valuesFromDb.get("in_scopes", None),  infos=valuesFromDb.get("infos", {}))
 
-    def initialize(self, ip: str = "", notes: str = "", in_scopes: Optional[List[str]] = None, infos: Optional[Dict[str, Any]] = None) -> 'Ip':
+    def initialize(self, ip: str = "", notes: str = "", in_scopes: Optional[List[ObjectId]] = None, infos: Optional[Dict[str, Any]] = None) -> 'Ip':
         """
         Set values of IP.
 
         Args:
             ip (str, optional): The host (IP or domain) to represent. Defaults to "".
             notes (str, optional): Notes concerning this IP. Defaults to "".
-            in_scopes (Optional[List[str]], optional): A list of scopes that matches this host. 
+            in_scopes (Optional[List[ObjectId]], optional): A list of scopes that matches this host. 
             If empty this IP will be OOS (Out of Scope). Defaults to None.
             infos (Optional[Dict[str, Any]], optional): A dictionary of additional info. Defaults to None.
 
@@ -60,7 +60,7 @@ class Ip(Element):
         """
         self.ip = ip
         self.notes = notes
-        self.in_scopes = in_scopes if in_scopes is not None else self.getScopesFittingMe()
+        self.in_scopes: List[ObjectId] = in_scopes if in_scopes is not None else self.getScopesFittingMe()
         self.infos = infos if infos is not None else {}
         return self
 
@@ -233,20 +233,31 @@ class Ip(Element):
 
 
     @classmethod
-    def getIpsInScope(cls, pentest, scopeId):
+    def getIpsInScope(cls, pentest: str, scopeId: ObjectId) -> Iterator['Ip']:
         """Returns a list of IP objects that have the given scope id in there matching scopes.
         Args:
-            scopeId: a mongo ObjectId of a scope object.
+            scopeId (ObjectId): a mongo ObjectId of a scope object.
         Returns:
-            a mongo cursor of IP objects matching the given scopeId
+            Iterator['Ip']: a mongo cursor of IP objects matching the given scopeId
         """
         dbclient = DBClient.getInstance()
-        ips = dbclient.findInDb(pentest, "ips", {"in_scopes": {"$elemMatch": {"$eq": str(scopeId)}}})
+        ips = dbclient.findInDb(pentest, "ips", {"in_scopes": {"$elemMatch": {"$eq": ObjectId(scopeId)}}})
         for ip in ips:
             yield Ip(pentest, ip)
 
     @classmethod
-    def replaceCommandVariables(cls, pentest, command, data):
+    def replaceCommandVariables(cls, pentest: str, command: str, data: Dict[str, Any]) -> str:
+        """
+        Replace command variables with actual values.
+
+        Args:
+            pentest (str): The name of the pentest.
+            command (str): The command to replace variables in.
+            data (Dict[str, Any]): The data containing the actual values.
+
+        Returns:
+            str: The command with variables replaced with actual values.
+        """
         command = command.replace("|ip|", data.get("ip", ""))
         dbclient = DBClient.getInstance()
         ip_db = dbclient.findInDb(pentest, "ips", {"ip":data.get("ip", "")}, False)
@@ -258,37 +269,64 @@ class Ip(Element):
         return command
 
     @classmethod
-    def completeDetailedString(cls, data):
-        return data.get("ip", "")+" "
-    
-    def removeScopeFitting(self, pentest, scopeId):
-        """Remove the given scopeId from the list of scopes this IP fits in.
-        Args:
-            scopeId: a mongo ObjectId of a scope object.
+    def completeDetailedString(cls, data: Dict[str, Any]) -> str:
         """
-        if str(scopeId) in self.in_scopes:
-            self.in_scopes.remove(str(scopeId))
+        Complete the detailed string with the IP address.
+
+        Args:
+            data (Dict[str, Any]): The data containing the IP address.
+
+        Returns:
+            str: The detailed string with the IP address appended.
+        """
+        return str(data.get("ip", ""))+" "
+
+    def removeScopeFitting(self, pentest: str, scopeId: ObjectId) -> None:
+        """
+        Remove the given scopeId from the list of scopes this IP fits in.
+
+        Args:
+            pentest (str): The name of the pentest.
+            scopeId (ObjectId): A mongo ObjectId of a scope object.
+        """
+        if ObjectId(scopeId) in self.in_scopes:
+            self.in_scopes.remove(ObjectId(scopeId))
             ip_update(pentest, self._id, self.getData())
             if not self.in_scopes:
                 tools = Tool.fetchObjects(pentest, {"ip": self.ip})
+                if tools is None:
+                    return
                 for tool in tools:
+                    tool = cast(Tool, tool)
                     tool.setOutOfScope(pentest)
 
-    def addScopeFitting(self, pentest, scopeId):
-        """Add the given scopeId to the list of scopes this IP fits in.
+    def addScopeFitting(self, pentest: str, scopeId: ObjectId) -> None:
+        """
+        Add the given scopeId to the list of scopes this IP fits in.
+
         Args:
-            scopeId: a mongo ObjectId of a Scope object.
+            pentest (str): The name of the pentest.
+            scopeId (ObjectId): A mongo ObjectId of a Scope object.
         """
         if not self.in_scopes:
             tools = Tool.fetchObjects(pentest, {"ip": self.ip})
-            for tool in tools:
-                tool.setInScope()
-        if str(scopeId) not in self.in_scopes:
-            self.in_scopes.append(str(scopeId))
+            if tools is not None:
+                for tool in tools:
+                    tool = cast(Tool, tool)
+                    tool.setInScope()
+        if ObjectId(scopeId) not in self.in_scopes:
+            self.in_scopes.append(ObjectId(scopeId))
             ip_update(pentest, self._id, self.getData())
 
 
-    def getParentId(self):
+    def getParentId(self) -> Optional[ObjectId]:
+        """
+        Get the parent id of the current IP. If the IP is private or an error occurs during lookup, return None. 
+        If the IP is found in the database, set its id as the parent and return it.
+
+        Returns:
+            Optional[ObjectId]: The ObjectId of the parent IP if it exists, None otherwise.
+        """
         if self.parent is not None:
             return self.parent
         try:
@@ -306,7 +344,7 @@ class Ip(Element):
                 return None
             self.parent = ObjectId(ip_in_db["_id"])
             ip_update(self.pentest, self._id, {"parent": self.parent})
-            return ip_in_db["_id"]
+            return self.parent
         return None
 
     def checkAllTriggers(self) -> None:
@@ -318,9 +356,12 @@ class Ip(Element):
         if self.in_scopes:
             self.addChecks(["ip:onAdd"])
 
-    def addChecks(self, lvls):
+    def addChecks(self, lvls: List[str]) -> None:
         """
         Add the appropriate checks (level check and wave's commands check) for this scope.
+
+        Args:
+            lvls (List[str]): The levels to add checks for.
         """
         dbclient = DBClient.getInstance()
         search = {"lvl":{"$in": lvls}}
@@ -332,22 +373,43 @@ class Ip(Element):
         if checkitems is None:
             return
         for check in checkitems:
-            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "ip")
+            CheckInstance.createFromCheckItem(self.pentest, check, ObjectId(self._id), "ip")
 
     @classmethod
-    def getTriggers(cls):
+    def getTriggers(cls) -> List[str]:
         """
         Return the list of trigger declared here
+
+        Returns:
+            List[str]: list of triggers
         """
         return ["ip:onAdd"]
 
-    def addInDb(self):
-        return ip_insert(self.pentest, self.getData())
+    def addInDb(self) -> IpInsertResult:
+        """
+        Add the current IP object to the database.
+
+        Returns:
+            IpInsertResult: A dictionary with the result of the insertion.
+        """
+        res: IpInsertResult = ip_insert(self.pentest, self.getData())
+        return res
 
     @classmethod
-    def bulk_insert(cls, pentest, ips_to_add, look_scopes=True):
+    def bulk_insert(cls, pentest: str, ips_to_add: List['Ip'], look_scopes: bool = True) -> List['Ip']:
+        """
+        Bulk insert IP objects into the database.
+
+        Args:
+            pentest (str): The name of the pentest.
+            ips_to_add (List['Ip']): A list of IP objects to add.
+            look_scopes (bool, optional): Whether to look for scopes. Defaults to True.
+
+        Returns:
+            Optional[List[Ip]]: A list of the inserted IP objects if any were inserted, None otherwise.
+        """
         if not ips_to_add:
-            return
+            return []
         dbclient = DBClient.getInstance()
         scopes = []
         settings = {}
@@ -380,28 +442,32 @@ class Ip(Element):
                 fitted_scope = []
                 for scope in scopes:
                     if ip.fitInScope(scope["scope"], settings):
-                        fitted_scope.append(str(scope["_id"]))
+                        fitted_scope.append(ObjectId(scope["_id"]))
                 ip.in_scopes = fitted_scope
             lkp[ip.ip] = ip.getData()
             del lkp[ip.ip]["_id"]
             ip_keys.add(ip.ip)
         dbclient.create_index(pentest, "ips", [("ip",1)])
         existing_ips = dbclient.findInDb(pentest, "ips", {"ip":{"$in":list(ip_keys)}}, multi=True)
-        existing_ips_as_key = [] if existing_ips is None else [x.get("ip") for x in existing_ips]
-        existing_ips_as_key = set(existing_ips_as_key)
+        existing_ips_as_key = set() if existing_ips is None else set([x.get("ip") for x in existing_ips])
         to_add = ip_keys - existing_ips_as_key
         things_to_insert = [lkp[ip] for ip in to_add]
         # Insert new
         res = None
         if things_to_insert:
-            res = dbclient.insertInDb(pentest, "ips", things_to_insert, multi=True)
+            res = dbclient.insertManyInDb(pentest, "ips", things_to_insert)
         if res is None:
-            return
+            return []
         ips_inserted = Ip.fetchObjects(pentest, {"_id":{"$in":res.inserted_ids}, "in_scopes":{"$exists": True, "$ne": []}})
-        CheckInstance.bulk_insert_for(pentest, ips_inserted, "ip", ["ip:onAdd"])
-        return ips_inserted
-                    
-    # WIP : add all checks, fix notif sent but not received ?
+        if ips_inserted is None:
+            return []
+        list_ips_inserted = list(ips_inserted)
+        CheckInstance.bulk_insert_for(pentest, list_ips_inserted, "ip", ["ip:onAdd"])
+        return cast(List[Ip], list_ips_inserted)
 
-    def update(self):
-        return ip_update(self.pentest, self._id, self.getData())
+    def update(self)-> bool:
+        """
+        Update the current IP object in the database.
+        """
+        res: bool = ip_update(self.pentest, self._id, self.getData())
+        return res

@@ -7,7 +7,7 @@ import os
 import ssl
 import sys
 from collections.abc import Iterable
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union, overload
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union, cast, overload
 from uuid import UUID, uuid4
 
 import pymongo
@@ -115,7 +115,7 @@ class DBClient:
             self.send_notify(pentest, collection, upserted_ids, "update_many")
         return result
 
-    def getWorkers(self, pipeline: Optional[Dict[str, Any]] = None) -> Union[List[Dict[str, Any]], None]:
+    def getWorkers(self, pipeline: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
         Return workers documents from the database.
 
@@ -129,9 +129,12 @@ class DBClient:
             List[Dict[str, Any]]: A list for the resulting workers
         """
         pipeline = {} if pipeline is None else pipeline
-        return self.findInDb("pollenisator", "workers", pipeline, True)
+        workers = self.findInDb("pollenisator", "workers", pipeline, True)
+        if workers is None:
+            return []
+        return workers
 
-    def getWorker(self, name: str) -> Union[Dict[str, Any], List[Dict[str, Any]], None]:
+    def getWorker(self, name: str) -> Union[Dict[str, Any], None]:
         """
         Return a worker document from the database.
 
@@ -412,7 +415,7 @@ class DBClient:
         if self.current_pentest is None:
             raise ValueError("No pentest connected")
         return self._update(self.current_pentest, collection, pipeline, updatePipeline, many=many, notify=notify, upsert=upsert)
-    
+
     def updateInDb(self, db: str, collection: str, pipeline: Dict[str, Any], updatePipeline: Dict[str, Any], many: bool = False, notify: bool = True, upsert: bool = False) -> pymongo.results.UpdateResult:
         """
         Update something in the database.
@@ -432,7 +435,7 @@ class DBClient:
         """
         self.connect()
         return self._update(db, collection, pipeline, updatePipeline, many=many, notify=notify, upsert=upsert)
-    
+
     def _update(self, dbName: str, collection: str, pipeline: Dict[str, Any], updatePipeline: Dict[str, Any], many: bool = False, notify: bool = True, upsert: bool = False) -> pymongo.results.UpdateResult:
         """
         Wrapper for the pymongo update and update_many functions. Then notify observers if notify is true.
@@ -505,7 +508,25 @@ class DBClient:
         ret = self._insert(self.current_pentest, collection, values, notify, parent)
         return ret
 
-    def insertInDb(self, db: str, collection: str, values: Dict[str, Any], parent: str = '', notify: bool = True, multi: bool = False) -> Union[pymongo.results.InsertManyResult, pymongo.results.InsertOneResult]:
+    def insertManyInDb(self, db: str, collection: str, values: List[Dict[str, Any]], parent: str = '', notify: bool = True) ->pymongo.results.InsertManyResult:
+        """
+        Insert many documents in the database.
+
+        Args:
+            db (str): The name of the database.
+            collection (str): The name of the collection.
+            values (List[Dict[str, Any]]): The list of documents to insert into the collection.
+            parent (str, optional): Not used, default to ''. Was used to give info about parent node.
+            notify (bool, optional): A boolean asking for all client to be notified of this insert. Defaults to True.
+        
+        Returns:
+            pymongo.results.InsertManyResult: The result of the insert_many operation.
+        """
+        self.connect()
+        return self._insert(db, collection, values, notify, parent, True)
+
+
+    def insertInDb(self, db: str, collection: str, values: Dict[str, Any], parent: str = '', notify: bool = True) -> pymongo.results.InsertOneResult:
         """
         Insert something in the database after ensuring connection.
 
@@ -515,14 +536,19 @@ class DBClient:
             values (Dict[str, Any]): The document to insert into the given collection.
             parent (str, optional):
             notify (bool, optional): A boolean asking for all client to be notified of this update. Default to True.
-            multi (bool, optional): A boolean defining if multiple documents can be inserted at once. Default to False.
 
         Returns:
-            Union(pymongo.results.InsertManyResult, pymongo.results.InsertOneResult): Return the pymongo result of the insert command for the command collection.
+            pymongo.results.InsertOneResult: Return the pymongo result of the insert command for the command collection.
         """
         self.connect()
-        return self._insert(db, collection, values, notify, parent, multi)
+        return self._insert(db, collection, values, notify, parent, False)
 
+    @overload
+    def _insert(self, dbName: str, collection: str, values: Dict[str, Any], notify: bool = True, parentId: str ='', multi: Literal[False] = False) ->  pymongo.results.InsertOneResult:
+        ...
+    @overload
+    def _insert(self, dbName: str, collection: str, values: List[Dict[str, Any]], notify: bool = True, parentId: str ='', multi: Literal[True] = True) ->  pymongo.results.InsertManyResult:
+        ...
     def _insert(self, dbName: str, collection: str, values: Union[Dict[str, Any], List[Dict[str, Any]]], notify: bool = True, parentId: str = '', multi: bool = False) -> Union[pymongo.results.InsertOneResult, pymongo.results.InsertManyResult]:
         """
         Perform insertion in the database.

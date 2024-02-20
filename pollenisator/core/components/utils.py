@@ -131,7 +131,7 @@ def listPlugin() -> List[str]:
         ".py") and x != "__pycache__" and x != "__init__.py" and x != "plugin.py"]
     return plugin_list
 
-def detectPlugins(pentest: str, upfile: werkzeug.datastructures.FileStorage, cmdline: str, ext: str) -> List[Dict[str, Union[str, None, List[Tag]]]]:
+def detectPlugins(pentest: str, upfile: werkzeug.datastructures.FileStorage, cmdline: str, ext: str) -> List[Dict[str, Any]]:
     """
     Detect which plugins to use on the uploaded file, and get their results.
 

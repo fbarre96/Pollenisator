@@ -1,7 +1,7 @@
 """Port Model"""
 
 import time
-from typing import Dict, List, Tuple, Union, cast
+from typing import Dict, Iterable, List, Tuple, Union, cast
 
 from pymongo import UpdateOne, InsertOne
 from pollenisator.core.components.mongo import DBClient
@@ -112,7 +112,8 @@ class Port(Element):
         """Check all triggers for this port object"""
         self.add_port_checks()
 
-    def add_port_checks(self):
+    def add_port_checks(self) -> None:
+        """Check service related triggers for this port object"""
         self.addChecks(["port:onServiceUpdate"])
 
     def addChecks(self, lvls):
@@ -254,4 +255,4 @@ class Port(Element):
         if not upserted_ids:
             return
         ports_inserted = Port.fetchObjects(pentest, {"_id":{"$in":list(upserted_ids.values())}})
-        CheckInstance.bulk_insert_for(pentest, ports_inserted, "port", ["port:onServiceUpdate"], f_get_impacted_targets=cls.get_allowed_ports)
+        CheckInstance.bulk_insert_for(pentest, cast(Iterable, ports_inserted), "port", ["port:onServiceUpdate"], f_get_impacted_targets=cls.get_allowed_ports)

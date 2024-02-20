@@ -1,6 +1,8 @@
 """Scope Model"""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
+
+from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.element import Element
 import pollenisator.core.components.utils as utils
@@ -158,7 +160,7 @@ class Scope(Element):
         Returns:
             str: The scope string from the data dictionary followed by a space.
         """
-        return data.get("scope", "")+" "
+        return str(data.get("scope", ""))+" "
 
     @classmethod
     def updateScopesSettings(cls, pentest: str) -> None:
@@ -169,10 +171,12 @@ class Scope(Element):
             pentest (str): The name of the pentest.
         """
         scopes = Scope.fetchObjects(pentest, {})
+        if scopes is None:
+            return
         for scope in scopes:
-            _updateIpsScopes(pentest, scope)
+            _updateIpsScopes(pentest, cast(Scope, scope))
 
-    def getParentId(self) -> Optional[str]:
+    def getParentId(self) -> Optional[ObjectId]:
         """
         Returns the parent id of this scope.
 
@@ -183,7 +187,7 @@ class Scope(Element):
         res = dbclient.findInDb(self.pentest, "waves", {"wave": self.wave}, False)
         if res is None:
             return None
-        return res["_id"]
+        return ObjectId(res["_id"])
 
     def addInDb(self) -> ScopeInsertResult:
         """
@@ -192,7 +196,8 @@ class Scope(Element):
         Returns:
             str: The id of the inserted scope.
         """
-        return scope_insert(self.pentest, self.getData())
+        res: ScopeInsertResult = scope_insert(self.pentest, self.getData())
+        return res
 
     @classmethod
     def getTriggers(cls) -> List[str]:
@@ -232,8 +237,8 @@ class Scope(Element):
         if pentest_type is not None:
             search["pentest_types"] = pentest_type["value"]
         # query mongo db commands collection for all commands having lvl == network or domain
-        checkitems = CheckItem.fetchObjects(search)
+        checkitems = CheckItem.fetchObjects("pollenisator", search)
         if checkitems is None:
             return
         for check in checkitems:
-            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "scope")
+            CheckInstance.createFromCheckItem(self.pentest, check, ObjectId(self._id), "scope")

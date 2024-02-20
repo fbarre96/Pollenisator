@@ -75,7 +75,7 @@ def insert(pentest: str, body: Dict[str, Any]) -> Union[IntervalInsertResult, Tu
         stringToDate(body.get("datef", ""))
     except ValueError as _e:
         return "Invalid date format, expected '%d/%m/%Y %H:%M:%S'", 400
-    ins_result = dbclient.insertInDb(pentest, "intervals", body, str(parent), multi=False)
+    ins_result = dbclient.insertInDb(pentest, "intervals", body, str(parent))
     ins_result = cast(InsertOneResult, ins_result)
     interval_o.setToolsInTime()
     iid = ins_result.inserted_id

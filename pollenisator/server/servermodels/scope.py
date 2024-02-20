@@ -28,13 +28,13 @@ def delete(pentest: str, scope_iid: str) -> int:
     dbclient = DBClient.getInstance()
     # deleting checks with scope 
     scope_o = Scope(pentest, dbclient.findInDb(pentest, "scopes", {"_id": ObjectId(scope_iid)}, False))
-    checks = dbclient.findInDb(pentest, "checkinstances", {"target_iid": str(scope_iid), "target_type": "scope"})
+    checks = dbclient.findInDb(pentest, "checkinstances", {"target_iid": ObjectId(scope_iid), "target_type": "scope"})
     for check in checks:
         checkinstance_delete(pentest, check["_id"])
     # Deleting this scope against every ips
-    ips = Ip.getIpsInScope(pentest, scope_iid)
+    ips = Ip.getIpsInScope(pentest, ObjectId(scope_iid))
     for ip in ips:
-        ip.removeScopeFitting(pentest, scope_iid)
+        ip.removeScopeFitting(pentest, ObjectId(scope_iid))
     res = dbclient.deleteFromDb(pentest, "scopes", {"_id": ObjectId(scope_iid)}, False)
     parent_wave = dbclient.findInDb(pentest, "waves", {"wave": scope_o.wave}, False)
     if parent_wave is None:

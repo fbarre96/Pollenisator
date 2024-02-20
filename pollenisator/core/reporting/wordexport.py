@@ -1,3 +1,4 @@
+from typing import Any, Dict, Tuple, Union
 from pollenisator.core.components.logger_config import logger
 import os
 from docxtpl import DocxTemplate
@@ -6,6 +7,8 @@ import jinja2
 from markdowntodocx.markdownconverter import convertMarkdownInFile
 import re
 from docx.shared import Cm
+
+translation: Dict[str, str] = {}
 
 def translate(w):
     if isinstance(w, list):
@@ -22,17 +25,27 @@ def getInitials(words):
     for word in words:
         try:
             word_str = "".join([x[0] for x in word.split(" ")]) # Active Directory -> AD and Base -> B
-        except:
+        except IndexError:
             word_str = ""
         initials.append(word_str)
     return ", ".join(initials)
 
 
-def createReport(context, template, out_name, **kwargs):
+def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs: Any) -> Union[Tuple[bool, str], Tuple[bool, str]]:
+    """
+    Create a report based on a template and a context.
+
+    Args:
+        context (Dict[str, Any]): The context for the report, including defects and their proofs.
+        template (str): The path to the template file.
+        out_name (str): The name of the output file.
+        **kwargs (Any): Additional parameters, including the translation.
+
+    Returns:
+        Union[Tuple[bool, str], Tuple[bool, str]]: A tuple containing a boolean indicating whether the operation was successful, and a string containing the path to the generated report or an error message.
+    """
     global translation
-    translation = kwargs.get("translation")
-    global cell_style
-    global normal_style
+    translation = kwargs.get("translation" ,{})
     doc = DocxTemplate(template)
     jinja_env = jinja2.Environment(autoescape=True)
     jinja_env.filters['translate'] = translate
@@ -55,13 +68,13 @@ def createReport(context, template, out_name, **kwargs):
     try:
         doc.render(context, jinja_env)
     except jinja2.exceptions.TemplateSyntaxError as e:
-        return False, "Error in template syntax : "+str(e) 
+        return False, "Error in template syntax : "+str(e)
     dir_path = os.path.dirname(os.path.realpath(__file__))
     out_path = os.path.join(dir_path, "../../exports/", out_name+".docx")
     doc.save(out_path)
-    logger.info("Converting Markdown of "+str(out_path))
+    logger.info("Converting Markdown of %s", str(out_path))
     result, msg = convertMarkdownInFile(out_path, out_path, {"Header":"Sous-défaut"})
     if not result:
         return False, "Error in Markdown conversion : "+str(msg)
-    logger.info("Generated report at "+str(out_path))
+    logger.info("Generated report at %s", str(out_path))
     return True, out_path

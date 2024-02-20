@@ -1,19 +1,27 @@
+"""
+Module to manage files upload and download.
+"""
 import json
 import os
-import shutil
+import time
 import traceback
-import connexion
-from bson import ObjectId
-from flask import send_file
 import hashlib
-from pollenisator.core.components.logger_config import logger
 from datetime import datetime
+from typing import IO, Dict, List, Tuple, Union, Any, cast
+from typing_extensions import TypedDict
+from bson import ObjectId
+import bson
+from flask import Response, send_file
+import werkzeug
+from pollenisator.core.components.logger_config import logger
 from pollenisator.core.components.tag import Tag
-from pollenisator.core.components.utils import listPlugin, loadPlugin, detectPlugins
+from pollenisator.core.components.utils import loadPlugin, detectPlugins
 from pollenisator.core.components.mongo import DBClient
-from pollenisator.core.components.utils import JSONDecoder, getMainDir
-from pollenisator.core.controllers.toolcontroller import ToolController
+from pollenisator.core.components.utils import getMainDir
+from pollenisator.core.models.tool import Tool
 from pollenisator.server.permission import permission
+
+POSSIBLE_TYPES = ["proof", "result"]
 
 dbclient = DBClient.getInstance()
 local_path = os.path.join(getMainDir(), "files")
@@ -22,13 +30,40 @@ try:
 except FileExistsError:
     pass
 
+ErrorStatus = Tuple[str, int]
+FileUploadResult = TypedDict('FileUploadResult', {'remote_path': str, 'msg': str, 'status': int})
 
-def md5(f):
-    """Compute md5 hash of the given file name.
+def none_or_str(value: Any) -> Union[str, None]:
+    """
+    Return the value if it is a string, otherwise None.
+
     Args:
-        fname: path to the file you want to compute the md5 of.
-    Return:
-        The digested hash of the file in an hexadecimal string format.
+        value (Any): The value to check.
+
+    Returns:
+        Union[str, None]: The value if it is a string, otherwise None.
+    """
+    if value is None:
+        return None
+    return str(value)
+
+def is_valid_object_id(value: Union[str, ObjectId]) -> bool:
+    try:
+        ObjectId(value)
+    except bson.errors.InvalidId:
+        return False
+    return True
+
+def md5(f: IO[bytes]) -> str:
+    """
+    Compute md5 hash of the given file stream.
+
+    Args:
+        fname (IO[bytes]): open file you want to compute the md5 of.
+
+    Returns:
+        str: The digested hash of the file in an hexadecimal string format.
+
     """
     hash_md5 = hashlib.md5()
     for chunk in iter(lambda: f.read(4096), b""):
@@ -36,16 +71,41 @@ def md5(f):
     return hash_md5.hexdigest()
 
 @permission("pentester")
-def upload(pentest, defect_iid, upfile):
-    msg, status, filepath = dbclient.do_upload(pentest, defect_iid, "proof", upfile)
+def upload(pentest: str, defect_iid: str, upfile: werkzeug.datastructures.FileStorage) -> Union[FileUploadResult, ErrorStatus]:
+    """
+    Upload a file as proof for a defect.
+
+    Args:
+        pentest (str): The name of the pentest.
+        defect_iid (str): The id of the defect.
+        upfile (werkzeug.datastructures.FileStorage): The file to upload.
+
+    Returns:
+        Union[FileUploadResult, ErrorStatus]: A dictionary containing the remote path, message, and status if the upload was successful, otherwise a tuple containing the message and status.
+    """
+    msg, status, _filepath = dbclient.do_upload(pentest, defect_iid, "proof", upfile)
     if status == 200:
-        name = upfile.filename.replace("/", "_")
+        if upfile.filename is not None:
+            name = upfile.filename.replace("/", "_")
+        else:
+            name = "proof_"+str(time.time()).replace(".", "_")
         return {"remote_path": f"files/{pentest}/download/proof/{defect_iid}/{name}", "msg":msg, "status":status}
     return msg, status
-    
+
 @permission("pentester")
-def importExistingFile(pentest, upfile, body, **kwargs):
-    from pollenisator.server.servermodels.tool import ServerTool
+def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage, body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[str, Dict[str, int]]:
+    """
+    Import an existing file into the pentest.
+
+    Args:
+        pentest (str): The name of the pentest.
+        upfile (werkzeug.datastructures.FileStorage): The file to import.
+        body (Dict[str, Any]): Additional parameters for the import, such as the plugin to use, the default target, and the command line.
+        **kwargs (Dict[str, Any]): Additional keyword arguments, including the user token.
+
+    Returns:
+        Union[str, Dict[str, int]]: An error message if an error occurred, otherwise a dictionary mapping plugin names to the number of times they were used.
+    """
     user = kwargs["token_info"]["sub"]
     plugin = body.get("plugin", "auto-detect")
     default_target = json.loads(body.get("default_target", {}))
@@ -53,32 +113,31 @@ def importExistingFile(pentest, upfile, body, **kwargs):
 
     md5File = md5(upfile.stream)
     upfile.stream.seek(0)
-    name = upfile.filename.replace("/", "_")
+    name = upfile.filename.replace("/", "_") if upfile.filename is not None else "file_"+str(time.time()).replace(".", "_")
     toolName = os.path.splitext(os.path.basename(name))[
         0] + md5File[:6]
-    results_count = {}
+    results_count: Dict[str, int] = {}
     plugin_results = []
     error_msg = None
-    ext = os.path.splitext(upfile.filename)[-1]
+    ext = os.path.splitext(name)[-1]
     if plugin == "auto-detect":
         # AUTO DETECT
         plugin_results = detectPlugins(pentest, upfile, cmdline, ext)
         for result in plugin_results:
             foundPlugin = result.get("plugin", None)
             if foundPlugin is not None:
-                results_count[foundPlugin] = results_count.get(
-                    foundPlugin, 0) + 1
+                results_count[foundPlugin] = results_count.get(foundPlugin, 0) + 1
     else:
-        # SET PLUGIN 
+        # SET PLUGIN
         mod = loadPlugin(plugin)
         try:
-            logger.info("PLUGIN for cmdline "+str(cmdline))
+            logger.info("PLUGIN for cmdline %s", str(cmdline))
             notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline, ext=ext,filename=upfile.filename)
             results_count[plugin] = results_count.get(plugin, 0) + 1
             plugin_results.append({"plugin":plugin, "notes":notes, "tags":tags, "lvl":lvl, "targets":targets})
         except Exception as e:
             error_msg = e
-            logger.error("Plugin exception : "+str(e))
+            logger.error("Plugin exception : %s", str(e))
             traceback.print_exc()
             notes = tags = lvl = targets = None
     if error_msg:
@@ -98,7 +157,7 @@ def importExistingFile(pentest, upfile, body, **kwargs):
             dbclient.send_notify(pentest, "checkinstances", default_target, "notif_terminal")
         for tag in tags:
             tag = Tag(tag)
-            res = dbclient.doRegisterTag(pentest, tag)
+            dbclient.doRegisterTag(pentest, tag)
 
         # ADD THE RESULTING TOOL TO AFFECTED
         for target in targets.values():
@@ -113,11 +172,11 @@ def importExistingFile(pentest, upfile, body, **kwargs):
                 tool_iid = None
             else:
                 lvl = target.get("lvl", lvl)
-                wave = target.get("wave", None)
-                scope = target.get("scope", None)
-                ip = target.get("ip", None)
-                port = target.get("port", None)
-                proto = target.get("proto", None)
+                wave = none_or_str(target.get("wave", None))
+                scope = none_or_str(target.get("scope", None))
+                ip = none_or_str(target.get("ip", None))
+                port = none_or_str(target.get("port", None))
+                proto = none_or_str(target.get("proto", None))
                 check_iid = target.get("check_iid", None)
                 tool_iid = target.get("tool_iid", None)
             if wave is None:
@@ -126,27 +185,48 @@ def importExistingFile(pentest, upfile, body, **kwargs):
                 dbclient.insertInDb(pentest, "waves", {"wave":wave, "wave_commands":[]})
             tool_m = None
             if tool_iid is not None:
-                tool_m = ServerTool.fetchObject(pentest, {"_id":ObjectId(tool_iid)})
+                tool_m = Tool.fetchObject(pentest, {"_id":ObjectId(tool_iid)})
+                tool_m = cast(Tool, tool_m)
                 tool_m.notes = notes
                 tool_m.scanner_ip = user
                 tool_iid = tool_m.getId()
 
             if tool_m is None: # tool not found, create it
-                tool_m = ServerTool(pentest).initialize("", check_iid, wave, name=toolName, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
+                tool_m = Tool(pentest).initialize(None, check_iid, wave, name=toolName, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
                                             dated=date, datef=date, scanner_ip=user, status=["done"], notes=notes)
                 ret = tool_m.addInDb()
                 tool_iid = ret["iid"]
-            ToolController(tool_m).setTags(tags)
-            upfile.stream.seek(0)
-            msg, status, filepath = dbclient.do_upload(pentest, str(tool_iid), "result", upfile)
-            if status == 200:
-                tool_m.plugin_used = plugin
-                tool_m._setStatus(["done"], filepath)
+            if tool_m is not None:
+                tool_m = cast(Tool, tool_m)
+                tool_m.setTags(tags)
+                upfile.stream.seek(0)
+                _msg, status, filepath = dbclient.do_upload(pentest, str(tool_iid), "result", upfile)
+                if status == 200:
+                    tool_m.plugin_used = plugin
+                    tool_m._setStatus(["done"], filepath)
     return results_count
 
 @permission("pentester")
-def listFiles(pentest, attached_iid, filetype):
+def listFiles(pentest: str, attached_iid: str, filetype: str) -> Union[ErrorStatus, List[str]]:
+    """
+    List all files of a specific type attached to a specific item in a pentest.
+
+    Args:
+        pentest (str): The name of the pentest.
+        attached_iid (str): The id of the item the files are attached to.
+        filetype (str): The type of the files to list.
+
+    Returns:
+       Union[ErrorStatus, List[str]]: A list of filenames if successful, otherwise an error message and status code.
+    """
+    if filetype not in POSSIBLE_TYPES:
+        return "Invalid filetype", 400
+    if not is_valid_object_id(attached_iid):
+        return "Invalid attached_iid", 400
     filepath = os.path.join(local_path, pentest, filetype, str(attached_iid))
+    filepath = os.path.normpath(filepath)
+    if not filepath.startswith(local_path):
+        return "Invalid path", 400
     try:
         files = os.listdir(filepath)
     except FileNotFoundError:
@@ -154,7 +234,27 @@ def listFiles(pentest, attached_iid, filetype):
     return files
 
 @permission("pentester")
-def download(pentest, attached_iid, filetype, filename):
+def download(pentest: str, attached_iid: str, filetype: str, filename: str) -> Union[ErrorStatus, Response]:
+    """
+    Download a file of a specific type attached to a specific item in a pentest.
+
+    Args:
+        pentest (str): The name of the pentest.
+        attached_iid (str): The id of the item the file is attached to.
+        filetype (str): The type of the file to download.
+        filename (str): The name of the file to download.
+
+    Returns:
+       Union[ErrorStatus, Response]: The file to download if successful, otherwise an error message and status code.
+    """
+    if filetype not in POSSIBLE_TYPES:
+        return "Invalid filetype", 400
+    if not is_valid_object_id(attached_iid):
+        return "Invalid attached_iid", 400
+    filepath = os.path.join(local_path, pentest, filetype, str(attached_iid))
+    filepath = os.path.normpath(filepath)
+    if not filepath.startswith(local_path):
+        return "Invalid path", 400
     if filetype == "result":
         filepath = os.path.join(local_path, pentest, filetype, str(attached_iid))
         files = os.listdir(filepath)
@@ -163,24 +263,37 @@ def download(pentest, attached_iid, filetype, filename):
         else:
             return "No result file found for given tool", 404
     else:
-        filepath = os.path.join(local_path, pentest, filetype, str(attached_iid), filename.replace("/", "_"))
+        filepath = os.path.join(filepath, filename.replace("/", "_"))
     if not os.path.isfile(filepath):
         return "File not found", 404
     try:
         return send_file(filepath, attachment_filename=filename.replace("/", "_"))
-    except TypeError as e: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
+    except TypeError: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
         return send_file(filepath, download_name=filename.replace("/", "_"))
 
 @permission("pentester")
-def rmProof(pentest, defect_iid, filename):
+def rmProof(pentest: str, defect_iid: str, filename: str) -> ErrorStatus:
+    """
+    Remove a proof file from a defect in a pentest.
+
+    Args:
+        pentest (str): The name of the pentest.
+        defect_iid (str): The id of the defect the proof is attached to.
+        filename (str): The name of the proof file to remove.
+
+    Returns:
+        ErrorStatus: A success message if the file was successfully deleted, otherwise an error message and status code.
+    """
     filename = str(filename)
     filename = filename.replace("/", "_")
+    if not is_valid_object_id(defect_iid):
+        return "Invalid attached_iid", 400
     filepath = os.path.join(local_path, pentest, "proof", str(defect_iid), filename)
+    filepath = os.path.normpath(filepath)
+    if not filepath.startswith(local_path):
+        return "Invalid path", 400
     dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(defect_iid)}, {"$pull":{"proofs":filename}})
     if not os.path.isfile(filepath):
         return "File not found", 404
     os.remove(filepath)
-    return "Successfully deleted "+str(filename)
-
-
-
+    return "Successfully deleted "+str(filename), 200

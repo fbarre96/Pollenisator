@@ -10,7 +10,6 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.tag import Tag
-from pollenisator.core.controllers.toolcontroller import ToolController
 from pollenisator.core.components.socketmanager import SocketManager
 from pollenisator.core.models.command import Command
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
@@ -72,7 +71,7 @@ def delete(pentest: str, tool_iid: str) -> Union[Tuple[str, int], int]:
     if tool_existing.get("check_iid") is not None and tool_existing.get("check_iid", "") != "":
         check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(tool_existing.get("check_iid"))})
         if check is not None:
-            check.updateInfos()
+            check.updateInfosCheck()
     if res is None:
         return 0
     else:
@@ -147,7 +146,7 @@ def do_insert(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union[Tuple[
         except InvalidId:
             return {"res":True, "iid":ret}
         if check is not None:
-            check.updateInfos()
+            check.updateInfosCheck()
     # adding the appropriate tools for this scope.
     return {"res":True, "iid":ret}
 
@@ -170,7 +169,7 @@ def update(pentest: str, tool_iid: str, body: Dict[str, Any]) -> bool:
     if orig.get("check_iid") is not None and orig.get("check_iid", "") != "":
         check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(orig.get("check_iid"))})
         if check is not None:
-            check.updateInfos()
+            check.updateInfosCheck()
     return True
 
 @permission("pentester")
@@ -350,21 +349,21 @@ def importResult(pentest: str, tool_iid: str, upfile: Any, _body: Dict[str, Any]
             # if the success is validated, mark tool as done
             toolModel.notes = notes
             for tag in tags:
-                ToolController(toolModel).addTag(tag)
+                toolModel.addTag(tag)
             toolModel.markAsDone(filepath)
             # And update the tool in database
-            update(pentest, tool_iid, ToolController(toolModel).getData())
+            update(pentest, tool_iid, toolModel.getData())
             # Upload file to SFTP
             msg = "TASK SUCCESS : "+toolModel.name
         except IOError as _e:
             toolModel.addTag(Tag("no-output", "red", "error", "Failed to read results file"))
             toolModel.notes = "Failed to read results file"
             toolModel.markAsDone()
-            update(pentest, tool_iid, ToolController(toolModel).getData())
+            update(pentest, tool_iid, toolModel.getData())
     else:
         msg = "TASK FAILED (no plugin found) : "+toolModel.name
         toolModel.markAsNotDone()
-        update(pentest, tool_iid, ToolController(toolModel).getData())
+        update(pentest, tool_iid, toolModel.getData())
         raise Exception(msg)
     return "Success", 200
 
@@ -683,7 +682,7 @@ def stopTask(pentest: str, tool_iid: str, body: Dict[str, Any]) -> Union[Tuple[s
     saveScannerip = stopableTool.scanner_ip
     if forceReset:
         stopableTool.markAsNotDone()
-        update(pentest, tool_iid, ToolController(stopableTool).getData())
+        update(pentest, tool_iid, stopableTool.getData())
     if saveScannerip == "":
         return "Empty worker field", 400
     if saveScannerip == "localhost":
@@ -697,7 +696,7 @@ def stopTask(pentest: str, tool_iid: str, body: Dict[str, Any]) -> Union[Tuple[s
     sm.socketio.emit('stopCommand', {'pentest': pentest, "tool_iid":str(tool_iid)}, room=socket["sid"])
     if not forceReset:
         stopableTool.markAsNotDone()
-        update(pentest, tool_iid, ToolController(stopableTool).getData())
+        update(pentest, tool_iid, stopableTool.getData())
     return "Success", 200
 
 @permission("pentester")

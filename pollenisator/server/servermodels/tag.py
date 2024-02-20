@@ -4,7 +4,6 @@ Handle  request common to Tags
 from typing import Dict, Any, List, Tuple, Union
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
-from pollenisator.core.controllers.controllerelement import ControllerElement
 from pollenisator.core.models.element import Element
 from pollenisator.server.permission import permission
 
@@ -34,7 +33,7 @@ def addTag(pentest: str, item_id: str, body: Dict[str, Any]) -> Union[Tuple[str,
         return "Invalid item, not found", 404
     tag = body.get("tag", "")
     overrideGroups = body.get("overrideGroups", False)
-    ControllerElement(item).addTag(tag, overrideGroups)
+    item.addTag(tag, overrideGroups)
     return True
 
 @permission("pentester")
@@ -62,7 +61,7 @@ def delTag(pentest: str, item_id: str, body: Dict[str, Any]) -> Union[Tuple[str,
     if item is None:
         return "Invalid item, not found", 404
     tag = body.get("tag", "")
-    ControllerElement(item).delTag(tag)
+    item.delTag(tag)
     return True
 
 @permission("pentester")
@@ -90,7 +89,7 @@ def setTags(pentest: str, item_id: str, body: Dict[str, Any]) -> Union[Tuple[str
     if item is None:
         return "Invalid item, not found", 404
     tags = body.get("tags", [])
-    ControllerElement(item).setTags(tags)
+    item.setTags(tags)
     return True
 
 @permission("pentester")

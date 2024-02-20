@@ -2,14 +2,13 @@
 CheckItem in cheatsheet module,
 A checkitem is something you want to test in a pentest. It is then instanciated many time for each pentest as CheckInstances.
 """
-from typing import Any, Dict, Iterable, Iterator, List, Literal, Optional, Tuple, Union, cast
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 import json
 
 import pymongo
 from pollenisator.core.components.mongo import DBClient
-from pollenisator.core.controllers.commandcontroller import CommandController
 from pollenisator.core.models.command import Command
 from pollenisator.core.models.element import Element
 from pollenisator.server.servermodels.command import doInsert as commandDoInsert

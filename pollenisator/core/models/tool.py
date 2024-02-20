@@ -62,7 +62,7 @@ class Tool(Element):
                         valuesFromDb.get(
                             "scanner_ip", "None"), valuesFromDb.get("status", []), valuesFromDb.get("notes", ""), valuesFromDb.get("resultfile", ""), valuesFromDb.get("plugin_used", ""), valuesFromDb.get("infos", {}))
 
-    def initialize(self, command_iid: Optional[ObjectId], check_iid: Optional[ObjectId] = None, wave: str = "", name: Optional[str] = None, scope: str = "", ip: str = "", port: str = "", proto: str = "tcp", lvl: str = "", text: str = "",
+    def initialize(self, command_iid: Optional[ObjectId], check_iid: Optional[ObjectId] = None, wave: Optional[str] = "", name: Optional[str] = None, scope: Optional[str] = "", ip: Optional[str] = "", port: Optional[str] = "", proto: Optional[str] = "tcp", lvl: str = "", text: str = "",
                    dated: str = "None", datef: str = "None", scanner_ip: str = "None", status: Optional[Union[str, List[str]]] = None, notes: str = "", resultfile: str = "", plugin_used: str = "", infos: Optional[Dict[str, Any]] = None) -> 'Tool':
         """
         Initializes the tool with the provided values.
@@ -70,12 +70,12 @@ class Tool(Element):
         Args:
             command_iid (Optional[ObjectId]): iid of the command.
             check_iid (Optional[ObjectId], optional): The checkInstance iid if associated with one. Defaults to None.
-            wave (str, optional): The target wave name of this tool (only if lvl is "wave"). Defaults to "".
+            wave (Optional, optional): The target wave name of this tool (only if lvl is "wave"). Defaults to "".
             name (Optional[str], optional): Tool name, if None it will be crafted. Defaults to None.
-            scope (str, optional): The scope string of the target scope of this tool (only if lvl is "network"). Defaults to "".
-            ip (str, optional): The target ip "ip" of this tool (only if lvl is "ip" or "port"). Defaults to "".
-            port (str, optional): The target port "port number" of this tool (only if lvl is "port"). Defaults to "".
-            proto (str, optional): The target port "proto" of this tool (only if lvl is "port"). Defaults to "tcp".
+            scope (Optional, optional): The scope string of the target scope of this tool (only if lvl is "network"). Defaults to "".
+            ip (Optional, optional): The target ip "ip" of this tool (only if lvl is "ip" or "port"). Defaults to "".
+            port (Optional, optional): The target port "port number" of this tool (only if lvl is "port"). Defaults to "".
+            proto (Optional, optional): The target port "proto" of this tool (only if lvl is "port"). Defaults to "tcp".
             lvl (str, optional): The tool level of exploitation (wave, network, ip or port/). Defaults to "".
             text (str, optional): The command to be launched. Can be empty if name is matching a command. Defaults to "".
             dated (str, optional): A starting date and time for this interval in format : '%d/%m/%Y %H:%M:%S'. or the string "None". Defaults to "None".
@@ -644,12 +644,12 @@ class Tool(Element):
             return str(self.name)
         return class_element.completeDetailedString(self.getData()) + str(self.name)
 
-    def _setStatus(self, new_status: str, arg: Optional[str]) -> bool:
+    def _setStatus(self, new_status: List[str], arg: Optional[str]) -> bool:
         """
         Set the status of the tool based on the new status provided.
 
         Args:
-            new_status (str): The new status to be set.
+            new_status (List[str]): The list of new status to be set.
             arg (Any): Additional argument used in setting the status.
 
         Returns:

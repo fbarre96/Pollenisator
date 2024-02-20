@@ -1,6 +1,8 @@
 """Wave Model. Stores which command should be launched and associates Interval and Scope"""
 
 from typing import Any, Dict, Iterator, List, Optional, cast
+
+from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.tool import Tool
 from pollenisator.core.models.element import Element
@@ -37,13 +39,13 @@ class Wave(Element):
         self.initialize(valuesFromDb.get("wave", ""),
                         valuesFromDb.get("wave_commands", []), valuesFromDb.get("infos", {}))
 
-    def initialize(self, wave: str = "", wave_commands: Optional[List[str]] = None, infos: Optional[Dict[str, Any]] = None) -> 'Wave':
+    def initialize(self, wave: str = "", wave_commands: Optional[List[ObjectId]] = None, infos: Optional[Dict[str, Any]] = None) -> 'Wave':
         """
         Set values of scope.
 
         Args:
             wave (str, optional): The wave name. Defaults to "".
-            wave_commands (Optional[List[str]], optional): A list of command names that are to be launched in this wave. Defaults to None (empty list).
+            wave_commands (Optional[List[ObjectId]], optional): A list of command names that are to be launched in this wave. Defaults to None (empty list).
             infos (Optional[Dict[str, Any]], optional): A dictionary of additional info. Defaults to None (empty dict).
 
         Returns:
@@ -160,11 +162,11 @@ class Wave(Element):
         pentest_type = dbclient.findInDb(self.pentest, "settings", {"key":"pentest_type"}, False)
         if pentest_type is not None:
             search["pentest_types"] = pentest_type["value"]
-        checkitems = CheckItem.fetchObjects(search)
+        checkitems = CheckItem.fetchObjects("pollenisator", search)
         if checkitems is None:
             return None
         for check in checkitems:
-            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "wave")
+            CheckInstance.createFromCheckItem(self.pentest, check, ObjectId(self._id), "wave")
 
     def getTools(self) -> Optional[Iterator[Element]]:
         """

@@ -1,15 +1,15 @@
 """A registry for all subclasses of Plugin"""
-from typing import Dict
+from typing import Any, BinaryIO, Dict, List, Tuple, Type
 import shlex
 import os
 from pollenisator.core.components.tag import Tag
 
 REGISTRY: Dict[str, 'Plugin'] = {}
 
-def register_class(target_class):
+def register_class(target_class: Type) -> None:
     """Register the given class
     Args:
-        target_class: type <class>
+        target_class (Type): type <class>
     """
     REGISTRY[target_class.__name__] = target_class()
 
@@ -23,76 +23,99 @@ class MetaPlugin(type):
 
 
 class Plugin(metaclass=MetaPlugin):
-    """ Parent base plugin to be inherited
+    """
+    Parent base plugin to be inherited
     Attributes:
         autoDetect: indicating to auto-detect that this plugin is able to auto detect.
+        default_bin_names: list of default binary names (ex: "nmap" for "nmap", ["dirsearch", "dirsearch.py"] for dirsearch, etc.)
     """
     autoDetect = True  # Authorize parsing function be used for autodetection
     default_bin_names = ["default"]
 
-    def autoDetectEnabled(self):
-        """Returns a boolean indicating if this plugin is able to recognize a file to be parsed by it.
+    def autoDetectEnabled(self) -> bool:
+        """
+        Returns a boolean indicating if this plugin is able to recognize a file to be parsed by it.
+
         Returns: 
             bool
         """
         return self.__class__.autoDetect
 
     @classmethod
-    def get_name(cls):
+    def get_name(cls) -> str:
+        """
+        Returns the name of the plugin
+
+        Returns:
+            str
+        """
         return cls.__name__
 
-    def getFileOutputArg(self):
-        """Returns the command line paramater giving the output file
+    def getFileOutputArg(self) -> str:
+        """
+        Returns the command line parameter giving the output file
+
         Returns:
-            string
+            str: for example " -o " or by default " | tee "
         """
         return " | tee "
 
-    def getFileOutputExt(self):
-        """Returns the expected file extension for this command result file
+    def getFileOutputExt(self) -> str:
+        """
+        Returns the expected file extension for this command result file
+
         Returns:
-            string
+            str: default to .log.txt
         """
         return ".log.txt"
 
-    def changeCommand(self, command, outputDir, toolname):
+    def changeCommand(self, command: str, outputDir: str, toolname: str) -> str:
         """
-        Summary: Complete the given command with the tool output file option and filename absolute path.
+        Complete the given command with the tool output file option and filename absolute path.
+
         Args:
-            * command : the command line to complete
-            * outputDir : the directory where the output file must be generated
-            * toolname : the tool name (to be included in the output file name)
-        Return:
-            The command completed with the tool output file option and filename absolute path.
+            command (str): The command line to complete.
+            outputDir (str): The directory where the output file must be generated.
+            toolname (str): The tool name (to be included in the output file name).
+
+        Returns:
+            str: The command completed with the tool output file option and filename absolute path.
         """
         # default is append at the end
         if self.getFileOutputArg() not in command:
             return command + self.getFileOutputArg()+outputDir+toolname
         return command
 
-    def getFileOutputPath(self, commandExecuted):
-        """Returns the output file path given in the executed command using getFileOutputArg
+    def getFileOutputPath(self, commandExecuted: str) -> str:
+        """
+        Returns the output file path given in the executed command using getFileOutputArg
+
         Args:
             commandExecuted: the command that was executed with an output file inside.
+
         Returns:
-            string: the path to file created
+            str: the path to file created
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip()
-    
-    def getTags(self):
-        """Returns a list of tags that can be added by this plugin
-        Returns:
-            list of strings
-        """
-        return {"todo": Tag("todo", level="todo")}
 
-    
-    def detect_cmdline(self, cmdline):
-        """Returns a boolean indicating if this plugin is able to recognize a command line as likely to output results for it.
-        Args:
-            cmdline: the command line to test
+    def getTags(self) -> Dict[str, Tag]:
+        """
+        Returns a dictionnary of tags that can be added by this plugin. Useful to be able to list all tags that can be added by all plugins.
+
         Returns:
-            bool
+            Dict[str, Tag]: a dictionnary of tags that can be added by this plugin
+        """
+        return {"todo": Tag("todo", "transparent", "todo", None)}
+
+    def detect_cmdline(self, cmdline: str) -> bool:
+        """
+        Returns a boolean indicating if this plugin is able to recognize a command line as likely to output results for it.
+
+        Args:
+            cmdline (str): The command line to test.
+
+        Returns:
+            bool: True if the command line is recognized by the plugin, False otherwise.
         """
         cmd_args = shlex.split(cmdline)
         if not cmd_args:
@@ -101,29 +124,34 @@ class Plugin(metaclass=MetaPlugin):
             return True
         return False
 
-    def Parse(self, pentest, file_opened, **_kwargs):
+    def Parse(self, pentest: str, file_opened: BinaryIO, **_kwargs: Any) -> Tuple[str, List[Tag], str, Dict[str, Dict[str, Any]]]:
         """
-        Parse a opened file to extract information
+        Parse an opened file to extract information.
+
         Args:
-            file_opened: the open file
-            _kwargs: not used
+            pentest (str): The name of the pentest.
+            file_opened (BinaryIO): The opened file.
+            **_kwargs (Any): Additional parameters (not used).
+
         Returns:
-            a tuple with 4 values (All set to None if Parsing wrong file): 
-                0. notes: notes to be inserted in tool giving direct info to pentester
-                1. tags: a list of tags to be added to tool 
-                2. lvl: the level of the command executed to assign to given targets
-                3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
+            Tuple[str, List[Tag], str, Dict[str, Dict[str, str]]]: A tuple with 4 values (All set to None if Parsing wrong file): 
+                0. notes (str): Notes to be inserted in tool giving direct info to pentester.
+                1. tags (List[Tag]): A list of tags to be added to tool.
+                2. lvl (str): The level of the command executed to assign to given targets.
+                3. targets (Dict[str, Dict[str, str]]): A list of composed keys allowing retrieve/insert from/into database targeted objects.
         """
         notes = ""
         tags = [Tag("todo")]
         notes = file_opened.read().decode("utf-8", errors="ignore")
         return notes, tags, "wave", {"wave": {"wave":"Imported"}}
 
-    def getFilePath(self, commandExecuted):
+    def getFilePath(self, commandExecuted: str) -> str:
         """Returns the output file path given in the executed command using getFileOutputArg
+
         Args:
             commandExecuted: the command that was executed with an output file inside.
+
         Returns:
-            string: the path to file created
+            str: the path to file created
         """
         return self.getFileOutputPath(commandExecuted)

@@ -16,7 +16,7 @@ class Tag:
         notes (str): The notes of the tag.
     """
     @overload
-    def __init__(self, name: str, color: str, level: str, notes: Optional[str]) -> None:
+    def __init__(self, name: str, color: str, level: str, notes: Optional[str]= None) -> None:
         ...
     @overload
     def __init__(self, tag: 'Tag') -> None:
