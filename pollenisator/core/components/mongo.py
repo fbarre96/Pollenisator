@@ -1172,6 +1172,7 @@ class DBClient:
         if self.ssl.strip() != "":
             cmd += " --ssl --sslPEMKeyFile "+self.ssldir+"/client.pem --sslCAFile " + \
                 self.ssldir+"/ca.pem --sslAllowInvalidHostnames"
+        logger.info("Dumping database with cmd : %s",cmd)
         execute(cmd)
         return out_path+".gz"
     
