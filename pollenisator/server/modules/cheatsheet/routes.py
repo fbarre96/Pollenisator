@@ -52,13 +52,7 @@ def delete(iid: str) -> Union[Tuple[str, int], int]:
     existing = CheckItem.fetchObject("pollenisator", {"_id":ObjectId(iid)})
     if existing is None:
         return "Not found", 404
-    pentests = dbclient.listPentestUuids()
-    for pentest in pentests:
-        dbclient.deleteFromDb(pentest, CheckItem.coll_name, {"check_iid":ObjectId(iid)}, many=True, notify=True)
-    res = dbclient.deleteFromDb("pollenisator", CheckItem.coll_name, {"_id":ObjectId(iid)}, many=False, notify=True)
-    if res is None:
-        return 0
-    return res
+    return existing.deleteFromDb()
 
 @permission("user")
 def update(iid: str, body: Dict[str, Any]) -> Union[Tuple[str, int], bool]:

@@ -76,6 +76,42 @@ class Command(Element):
                 "timeout": self.timeout,
                 "indb":self.indb, "_id": self.getId(),  "infos": self.infos}
 
+    def deleteFromDb(self) -> int:
+        """
+        Delete the command from the database.
+
+        Returns:
+            int: 0 if the deletion was unsuccessful, otherwise the result of the deletion operation.
+        """
+        dbclient = DBClient.getInstance()
+        #TODO : delete from checks
+        pentests = set(self.pentest)
+        # Remove from all waves this command.
+        if self.indb == "pollenisator":
+            pentest_uuids = dbclient.listPentestUuids()
+            if pentest_uuids is not None:
+                pentests.union(pentest_uuids)
+        else:
+            pentests.add(self.indb)
+
+        for pentest in pentests:
+            waves = dbclient.findInDb(pentest, "waves", {}, True)
+            for wave in waves:
+                toBeUpdated = wave["wave_commands"]
+                if self.getId() in wave["wave_commands"]:
+                    toBeUpdated.remove(self.getId())
+                    dbclient.updateInDb(pentest, "waves", {"_id": wave["_id"]}, {
+                        "$set": {"wave_commands": toBeUpdated}}, False)
+            # Remove all tools refering to this command's name.
+            dbclient.deleteFromDb(pentest,
+                                    "tools", {"name": self.name}, True, True)
+        res: int = dbclient.deleteFromDb(self.indb, "commands", {
+            "_id": ObjectId(self.getId())}, False, True)
+        if res is None:
+            return 0
+        else:
+            return res
+
     @classmethod
     def getSearchableTextAttribute(cls) -> List[str]:
         """

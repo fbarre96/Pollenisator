@@ -21,7 +21,7 @@ from pollenisator.core.models.command import Command
 from pollenisator.core.models.element import Element
 from pollenisator.core.models.interval import Interval
 from pollenisator.core.models.wave import Wave
-from pollenisator.server.modules.cheatsheet.cheatsheet import doInsert as check_insert
+from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.servermodels.command import  addUserCommandsToPentest, doInsert as command_insert
 from pollenisator.server.servermodels.wave import insert as insert_wave
 from pollenisator.server.servermodels.interval import insert as insert_interval
@@ -364,6 +364,7 @@ def aggregate(pentest: str, collection: str, body: List[Dict[str, Any]]) -> Unio
     for r in res:
         ret.append(r)
     return ret
+
 @permission("pentester")
 def delete(pentest: str, collection: str, body: Dict[str, Any]) -> Union[int, None, Tuple[str, int]]:
     """
@@ -1019,7 +1020,8 @@ def doImportCheatsheet(data: str, user: str) -> Union[ErrorStatus, List[Dict[str
                 defect_tag[1] = str(matching_defects[str(defect_tag[1])])
                 defect_tags.append(defect_tag)
         check["defect_tags"] = defect_tags
-        obj_ins = check_insert("pollenisator", check)
+        check_o = CheckItem("pollenisator", check)
+        check_o.addInDb()
     return failed
 
 @permission("user")

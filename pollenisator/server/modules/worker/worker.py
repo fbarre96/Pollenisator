@@ -10,7 +10,6 @@ from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.socketmanager import SocketManager
 from pollenisator.core.models.tool import Tool
 from pollenisator.server.servermodels.command import addUserCommandsToPentest
-from pollenisator.server.servermodels.tool import update as tool_update
 from pollenisator.server.permission import permission
 from pollenisator.core.components.logger_config import logger
 
@@ -117,7 +116,7 @@ def removeWorkers() -> Dict[str, int]:
             tool_m = cast(Tool, tool_m)
             if "running" in tool_m.getStatus():
                 tool_m.markAsNotDone()
-                tool_update(running_tool["pentest"], running_tool["iid"], tool_m.getData())
+                tool_m.update()
         doDeleteWorker(worker["name"])
         count += 1
     return {"n":int(count)}
@@ -254,7 +253,7 @@ def unregister(name: str) -> ErrorStatus:
             tool_m = cast(Tool, tool_m)
             if "running" in tool_m.getStatus():
                 tool_m.markAsNotDone()
-                tool_update(running_tool["pentest"], running_tool["iid"], tool_m.getData())
+                tool_m.update()
         doDeleteWorker(name)
         return "Success", 200
     return "Worker not Found", 404

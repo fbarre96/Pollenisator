@@ -1,6 +1,7 @@
 """Wave Model. Stores which command should be launched and associates Interval and Scope"""
 
 from typing import Any, Dict, Iterator, List, Optional, cast
+from typing_extensions import TypedDict
 
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
@@ -11,6 +12,7 @@ import pollenisator.core.components.utils as utils
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
 
+WaveInsertResult = TypedDict('WaveInsertResult', {'res': bool, 'iid': ObjectId})
 
 class Wave(Element):
     """
@@ -191,6 +193,45 @@ class Wave(Element):
             tool = cast(Tool, tool)
             if "done" not in tool.getStatus():
                 tool.delete()
+
+    def deleteFromDb(self) -> int:
+        """
+        Delete the wave from the database. All tools and intervals associated with the wave are also deleted from the database.
+
+        Returns:
+            int: The result of the deletion operation. If the wave was not found, None is returned. Otherwise, the number of deleted documents is returned.
+        """
+        dbclient = DBClient.getInstance()
+        dbclient.deleteFromDb(self.pentest, "tools", {"wave": self.wave}, True)
+        dbclient.deleteFromDb(self.pentest, "intervals", {"wave": self.wave}, True)
+        checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": self.getId()})
+        if checks is not None:
+            for check in checks:
+                check.deleteFromDb()
+        res = dbclient.deleteFromDb(self.pentest, "waves", {"_id": ObjectId(self.getId())}, False)
+        if res is None:
+            return 0
+        else:
+            return res
+
+    def addInDb(self) -> WaveInsertResult:
+        """
+        Insert a new wave into the database.
+
+        Returns:
+            WaveInsertResult: A dictionary containing the result of the operation and the id of the wave.
+        """
+        # Checking unicity
+        dbclient = DBClient.getInstance()
+        existing = Wave.fetchObject(self.pentest, {"wave": self.wave})
+        if existing is not None:
+            return {"res":False, "iid":existing.getId()}
+        # Inserting scope
+        res_insert = dbclient.insertInDb(self.pentest, "waves", {"wave": self.wave, "wave_commands": list(self.wave_commands)})
+        ret = res_insert.inserted_id
+        self._id = ret
+        self.add_wave_checks()
+        return {"res":True, "iid":ret}
 
     @classmethod
     def getTriggers(cls) -> List[str]:

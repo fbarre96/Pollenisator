@@ -5,10 +5,6 @@ from typing import Any, Dict, TypedDict, cast
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.ip import Ip
-from pollenisator.server.servermodels.tool import delete as tool_delete
-from pollenisator.server.servermodels.port import delete as port_delete
-from pollenisator.server.servermodels.defect import delete as defect_delete
-from pollenisator.server.modules.cheatsheet.checkinstance import delete as checkinstance_delete
 from pollenisator.server.permission import permission
 
 IpInsertResult = TypedDict('IpInsertResult', {'res': bool, 'iid': ObjectId})
@@ -25,31 +21,11 @@ def delete(pentest: str, ip_iid: str) -> int:
     Returns:
         int: 0 if the deletion was unsuccessful, otherwise the result of the deletion operation.
     """
-    dbclient = DBClient.getInstance()
-    ip_dic = dbclient.findInDb(pentest, "ips", {"_id":ObjectId(ip_iid)}, False)
-    if ip_dic is None:
+    ip_o = Ip.fetchObject(pentest, {"_id": ObjectId(ip_iid)})
+    if ip_o is None:
         return 0
-    tools = dbclient.findInDb(pentest, "tools",
-                                {"ip": ip_dic["ip"]}, True)
-    for tool in tools:
-        tool_delete(pentest, tool["_id"])
-    checks = dbclient.findInDb(pentest, "checkinstances",
-                                {"target_iid": str(ip_iid)}, True)
-    for check in checks:
-        checkinstance_delete(pentest, check["_id"])
-    defects = dbclient.findInDb(pentest, "defects",
-                                    {"ip": ip_dic["ip"], "$or": [{"port": {"$exists": False}}, {"port": None}]}, True)
-    for defect in defects:
-        defect_delete(pentest, defect["_id"])
-    ports = dbclient.findInDb(pentest, "ports",
-                                {"ip": ip_dic["ip"]}, True)
-    for port in ports:
-        port_delete(pentest, port["_id"])
-    res = dbclient.deleteFromDb(pentest, "ips", {"_id": ObjectId(ip_iid)}, False)
-    if res is None:
-        return 0
-    else:
-        return res
+    ip_o = cast(Ip, ip_o)
+    return ip_o.deleteFromDb()
 
 @permission("pentester")
 def insert(pentest: str, body: Dict[str, Any]) -> IpInsertResult:

@@ -132,6 +132,20 @@ class Share(Element):
             return None
         return Share(pentest, d)
 
+    def deleteFromDb(self) -> int:
+        """
+        Delete this Share object from the database.
+
+        Returns:
+            int: The result of the delete operation.
+        """
+        dbclient = DBClient.getInstance()
+        res = dbclient.deleteFromDb(self.pentest, "shares", {"_id": ObjectId(self.getId()), "type":"share"}, False)
+        if res is None:
+            return 0
+        else:
+            return res
+
     @property
     def ip(self) -> str:
         """
@@ -258,15 +272,11 @@ def delete(pentest: str, share_iid: str) -> int:
     Returns:
         int: The result of the delete operation.
     """
-    dbclient = DBClient.getInstance()
-    share_dic = dbclient.findInDb(pentest, "shares", {"_id":ObjectId(share_iid), "type":"share"}, False)
-    if share_dic is None:
+    share_o = Share.fetchObject(pentest, {"_id": ObjectId(share_iid)})
+    if share_o is None:
         return 0
-    res = dbclient.deleteFromDb(pentest, "shares", {"_id": ObjectId(share_iid), "type":"share"}, False)
-    if res is None:
-        return 0
-    else:
-        return res
+    return share_o.deleteFromDb()
+    
 
 @permission("pentester")
 def insert(pentest: str, body: Dict[str, Any]) -> ShareInsertResult:

@@ -173,6 +173,21 @@ class Computer(Element):
         res: ComputerInsertResult = insert(self.pentest, self.getData())
         return res
 
+    def deleteFromDb(self) -> int:
+        """
+        Delete the Computer object from the database. The delete method of the database is called with the current pentest 
+        and the id of the Computer object.
+
+        Returns:
+            int: The result of the delete operation.
+        """
+        dbclient = DBClient.getInstance()
+        res = dbclient.deleteFromDb(self.pentest, "computers", {"_id": ObjectId(self.getId()), "type":"computer"}, False)
+        if res is None:
+            return 0
+        else:
+            return res
+    
     @classmethod
     def bulk_insert(cls, pentest: str, computers_to_add: List[Dict[str, Any]]) -> Optional[List[str]]:
         """
@@ -454,15 +469,11 @@ def delete(pentest: str, computer_iid: ObjectId) -> int:
     Returns:
         int: The result of the delete operation.
     """
-    dbclient = DBClient.getInstance()
-    share_dic = dbclient.findInDb(pentest, "computers", {"_id":ObjectId(computer_iid), "type":"computer"}, False)
-    if share_dic is None:
+    computer_o = Computer.fetchObject(pentest, {"_id": ObjectId(computer_iid)})
+    if computer_o is None:
         return 0
-    res = dbclient.deleteFromDb(pentest, "computers", {"_id": ObjectId(computer_iid), "type":"computer"}, False)
-    if res is None:
-        return 0
-    else:
-        return res
+    return computer_o.deleteFromDb()
+    
 
 @permission("pentester")
 def update(pentest: str, computer_iid: ObjectId, body: Dict[str, Any]) -> Union[Tuple[str, int], bool]:

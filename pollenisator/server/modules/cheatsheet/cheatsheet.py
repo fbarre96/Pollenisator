@@ -139,6 +139,21 @@ class CheckItem(Element):
         res: CheckItemInsertResult = CheckItem.doInsert(self.pentest, self.getData())
         return res
 
+    def deleteFromDb(self) -> int:
+        """
+        Delete this checkitem from the database.
+
+        Returns:
+            int: 0 if the deletion was unsuccessful, otherwise the result of the deletion operation.
+        """
+        dbclient = DBClient.getInstance()
+        pentests = dbclient.listPentestUuids()
+        for pentest in pentests:
+            dbclient.deleteFromDb(pentest, CheckItem.coll_name, {"check_iid":ObjectId(self.getId())}, many=True, notify=True)
+        res = dbclient.deleteFromDb("pollenisator", CheckItem.coll_name, {"_id":ObjectId(self.getId())}, many=False, notify=True)
+        if res is None:
+            return 0
+        return res
 
     @classmethod
     def doInsert(cls, pentest: str, data: Dict[str, Any]) -> CheckItemInsertResult:

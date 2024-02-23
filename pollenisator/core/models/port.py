@@ -6,8 +6,10 @@ from typing import Dict, Iterable, List, Tuple, Union, cast
 from pymongo import UpdateOne, InsertOne
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.utils import checkCommandService
+from pollenisator.core.models.defect import Defect
 from pollenisator.core.models.element import Element
 from bson.objectid import ObjectId
+from pollenisator.core.models.tool import Tool
 from pollenisator.server.modules.activedirectory.computers import Computer
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
@@ -172,11 +174,41 @@ class Port(Element):
     def update(self) -> bool:
         """
         Update port in the database with the current object's data.
+        
         Returns:
             bool: True if the update was successful, False otherwise.
         """
         res: bool = port_update(self.pentest, ObjectId(self._id), self.getData())
         return res
+
+    def deleteFromDb(self) -> int:
+        """
+        Delete this port from the database.
+
+        Returns:
+            int: The number of deleted ports.
+        """
+        dbclient = DBClient.getInstance()
+        tools = Tool.fetchObjects(self.pentest, {"port": self.port, "proto": self.proto, "ip": self.ip})
+        if tools is not None:
+            for tool in tools:
+                tool = cast(Tool, tool)
+                tool.deleteFromDb()
+        checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": str(self._id)})
+        if checks is not None:
+            for check in checks:
+                check.deleteFromDb()
+        defects = Defect.fetchObjects(self.pentest, {"port": self.port, "proto": self.proto, "ip": self.ip})
+        if defects is not None:
+            for defect in defects:
+                defect = cast(Defect, defect)
+                defect.deleteFromDb()
+        res = dbclient.deleteFromDb(self.pentest, "ports", {"_id": ObjectId(self.getId())}, False)
+        if res is None:
+            return 0
+        else:
+            return res
+
     def update_service(self) -> bool:
         """
         Update the port service only in the database with the current object's data.

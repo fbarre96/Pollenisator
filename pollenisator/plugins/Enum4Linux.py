@@ -244,13 +244,13 @@ class Enum4Linux(Plugin):
             cmdline = tool_m.infos.get("cmdline", None)
         domain, user, password = getUserInfoFromCmdLine(cmdline)
         notes = json.dumps(enum_infos, indent=4)
+        if enum_infos is None or not isinstance(enum_infos, dict):
+            return None, None, None, None
         if enum_infos is not None and enum_infos.get("users") is not None:
             tags = [self.getTags()["info-enum4linux-success"]]
             if domain is None and user is None:
                 tags += [Tag(self.getTags()["high-null-sessions-allowed"], notes=f"Null session allowed on {enum_infos.get('ip')}")]
         elif enum_infos.get("null_session_allowed") == True:
             tags += [Tag(self.getTags()["high-null-sessions-allowed"], notes=f"Null or guest session allowed on {enum_infos.get('ip')}")]
-        elif enum_infos is None:
-            return None, None, None, None
         targets = updateDatabase(pentest, enum_infos)
         return notes, tags, "ports", targets

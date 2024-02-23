@@ -1,7 +1,7 @@
 """
 Handle  request common to Waves
 """
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
@@ -12,7 +12,7 @@ from pollenisator.server.permission import permission
 WaveInsertResult = TypedDict('WaveInsertResult', {'res': bool, 'iid': ObjectId})
 
 @permission("pentester")
-def delete(pentest: str, wave_iid: str) -> Optional[int]:
+def delete(pentest: str, wave_iid: str) -> int:
     """
     Delete a wave. The wave is fetched from the database and all tools and intervals associated with the wave are deleted 
     from the database. All check instances associated with the wave are also deleted. Finally, the wave itself is deleted 
@@ -23,22 +23,14 @@ def delete(pentest: str, wave_iid: str) -> Optional[int]:
         wave_iid (str): The id of the wave to be deleted.
 
     Returns:
-        Optional[int]: The result of the deletion operation. If the wave was not found, None is returned. Otherwise, the 
+        int: The result of the deletion operation. If the wave was not found, None is returned. Otherwise, the 
         number of deleted documents is returned.
     """
-    dbclient = DBClient.getInstance()
-    wave_o = Wave(pentest, dbclient.findInDb(pentest, "waves", {"_id": ObjectId(wave_iid)}, False))
-    dbclient.deleteFromDb(pentest, "tools", {"wave": wave_o.wave}, True)
-    dbclient.deleteFromDb(pentest, "intervals", {"wave": wave_o.wave}, True)
-    checks = dbclient.findInDb(pentest, "checkinstances",
-                                {"target_iid": str(wave_iid)}, True)
-    for check in checks:
-        checkinstance_delete(pentest, check["_id"])
-    res = dbclient.deleteFromDb(pentest, "waves", {"_id": ObjectId(wave_iid)}, False)
-    if res is None:
+    wave_o = Wave.fetchObject(pentest, {"_id": ObjectId(wave_iid)})
+    if wave_o is None:
         return 0
-    else:
-        return res
+    wave_o = cast(Wave, wave_o)
+    return wave_o.deleteFromDb()
 
 @permission("pentester")
 def insert(pentest: str, body: Dict[str, Any]) -> WaveInsertResult:
@@ -55,20 +47,8 @@ def insert(pentest: str, body: Dict[str, Any]) -> WaveInsertResult:
     Returns:
         WaveInsertResult: A dictionary containing the result of the operation and the id of the wave.
     """
-    dbclient = DBClient.getInstance()
     wave_o = Wave(pentest, body)
-    # Checking unicity
-    existing = dbclient.findInDb(pentest, "waves", {"wave": wave_o.wave}, False)
-    if existing is not None:
-        return {"res":False, "iid":existing["_id"]}
-    if "_id" in body:
-        del body["_id"]
-    # Inserting scope
-    res_insert = dbclient.insertInDb(pentest, "waves", {"wave": wave_o.wave, "wave_commands": list(wave_o.wave_commands)})
-    ret = res_insert.inserted_id
-    wave_o._id = ret
-    wave_o.add_wave_checks()
-    return {"res":True, "iid":ret}
+    return wave_o.addInDb()
 
 @permission("pentester")
 def update(pentest: str, wave_iid: ObjectId, body: Dict[str, Any]) -> None:

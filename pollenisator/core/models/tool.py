@@ -2,6 +2,7 @@
 
 import os
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing_extensions import TypedDict
 import bson
 from pymongo import InsertOne, UpdateOne
 import pollenisator.server.modules.cheatsheet.checkinstance as checkinstance
@@ -13,7 +14,10 @@ from datetime import datetime
 import pollenisator.core.components.utils as utils
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
-from pollenisator.server.servermodels.tool import ToolInsertResult, do_insert as do_insert, update as tool_update, delete as tool_delete
+
+
+ErrorStatus = Tuple[str, int]
+ToolInsertResult = TypedDict('ToolInsertResult', {"res": bool, "iid": ObjectId})
 
 class Tool(Element):
     """
@@ -105,7 +109,7 @@ class Tool(Element):
                 self.command_iid = ObjectId(res["_id"])
         else:
             self.command_iid = ObjectId(command_iid)
-        self.check_iid = str(check_iid) if check_iid is not None else None
+        self.check_iid: Optional[ObjectId] = ObjectId(check_iid) if check_iid is not None else None
         self.name: str = name
         self.wave = wave
         self.scope = scope
@@ -218,17 +222,14 @@ class Tool(Element):
         return self.resultfile
 
 
-    def setOutOfTime(self, pentest: str) -> None:
+    def setOutOfTime(self) -> None:
         """
         Set this tool as out of time (not matching any interval in wave).
         Add "OOT" in status if it's not already there.
-        
-        Args:
-            pentest (str): The name of the pentest.
         """
         if "OOT" not in self.status:
             self.status.append("OOT")
-            tool_update(pentest, str(self.getId()), {"status": self.status})
+            self.updateInDb( {"status": self.status})
 
     def setOutOfScope(self, pentest: str) -> None:
         """
@@ -240,25 +241,102 @@ class Tool(Element):
         """
         if not "OOS" in self.status:
             self.status.append("OOS")
-            tool_update(pentest, self._id, {"status": self.status})
+            self.updateInDb( {"status": self.status})
 
-    def addInDb(self, check: bool = True, base: Optional[str] = None, update_check_infos: bool = True) -> ToolInsertResult:
+    def addInDb(self, base: Optional[Dict[str, Any]] = None, update_check: bool = False) -> Union[ErrorStatus, ToolInsertResult]:
         """
-        Inserts this tool into the database.
+        Inserts a tool into the database.
 
         Args:
-            check (bool, optional): If True, perform a check before insertion. Defaults to True.
-            base (Optional[str], optional): The base to be used for insertion. Defaults to None.
-            update_check_infos (bool, optional): If True, update the check information. Defaults to True.
+            base (Optional[Dict[str, Any]]): A dictionary containing the base data for the tool. If provided, this data is used to check for an existing tool in the database.
+            update_check (bool): Whether to update the check associated with the tool.
 
         Returns:
-            Dict[str, Union[str, bool]]: A dictionary containing the result of the operation and the id of the inserted tool.
+            Union[ErrorStatus, ToolInsertResult]: A string indicating an error or a dictionary containing the result of the operation and the id of the inserted tool.
         """
-        ret = do_insert(self.pentest, self.getData(), check=check, base=base, update_check=update_check_infos)
-        if isinstance(ret, tuple):
-            raise ValueError(ret[0])
-        self._id = ObjectId(ret["iid"])
-        return ret
+        dbclient = DBClient.getInstance()
+        if not dbclient.isUserConnected():
+            return "Not connected", 503
+        body = self.getData()
+        self.name = ""
+        # Checking unicity
+        db_base = self.getDbKey()
+        if base is not None:
+            for k,v in base.items():
+                if k is not None and v is not None:
+                    db_base[str(k)] = v
+        existing = dbclient.findInDb(self.pentest, "tools", db_base, False)
+        if existing is not None:
+            return {"res":False, "iid":existing["_id"]}
+        if "_id" in body:
+            del body["_id"]
+        # Checking port /service tool
+        parent = self.getParentId()
+        # Inserting tool
+        db_base["name"] = body.get("name", "")
+        db_base["ip"] = body.get("ip", "")
+        db_base["scope"] = body.get("scope", "")
+        db_base["port"] = body.get("port", "")
+        db_base["proto"] = body.get("proto", "")
+        db_base["command_iid"] = body.get("command_iid", "")
+        db_base["check_iid"] = body.get("check_iid", "")
+        db_base["scanner_ip"] = body.get("scanner_ip", "None")
+        db_base["dated"] = body.get("dated", "None")
+        db_base["datef"] = body.get("datef", "None")
+        db_base["text"] = body.get("text", "")
+        db_base["status"] = body.get("status", [])
+        db_base["notes"] = body.get("notes", "")
+        db_base["infos"] = body.get("infos", {})
+        res_insert = dbclient.insertInDb(self.pentest, "tools", db_base, parent)
+        ret = res_insert.inserted_id
+        self._id = ret
+        if db_base["check_iid"] != "" and update_check:
+            try:
+                check = checkinstance.CheckInstance.fetchObject(self.pentest, {"_id":ObjectId(db_base["check_iid"])})
+            except bson.errors.InvalidId:
+                return {"res":True, "iid":ret}
+            if check is not None:
+                check.updateInfosCheck()
+        # adding the appropriate tools for this scope.
+        return {"res":True, "iid":ret}
+
+    def updateInDb(self, data: Dict[str, Any]) -> bool:
+        """
+        Update the tool in the database with the provided data.
+        
+        Args:
+            data (Dict[str, Any]): The data to update the tool with.
+            
+        Returns:
+            bool: True if the update was successful, False otherwise.
+        """
+        dbclient = DBClient.getInstance()
+        if "_id" in data:
+            del data["_id"]
+        dbclient.updateInDb(self.pentest, "tools", {"_id":ObjectId(self.getId())}, {"$set":data})
+        if self.check_iid is not None:
+            check_o = checkinstance.CheckInstance.fetchObject(self.pentest, {"_id":ObjectId(self.check_iid)})
+            if check_o is not None:
+                check_o.updateInfosCheck()
+        return True
+
+    def deleteFromDb(self) -> int:
+        """
+        Delete the tool from the database.
+
+        Returns:
+            int: The number of deleted tools.
+        """
+        dbclient = DBClient.getInstance()
+        res = dbclient.deleteFromDb(self.pentest, "tools", {"_id": ObjectId(self.getId())}, False)
+        if self.check_iid is not None:
+            check_m = checkinstance.CheckInstance.fetchObject(self.pentest, {"_id":ObjectId(self.check_iid)})
+            if check_m is not None:
+                check_m.updateInfosCheck()
+        if res is None:
+            return 0
+        else:
+            return res
 
     def getCommand(self) -> Dict[str, Any]:
         """
@@ -295,7 +373,7 @@ class Tool(Element):
         """
         if "OOS" in self.status:
             self.status.remove("OOS")
-            tool_update(self.pentest, self._id, self.getData())
+            self.updateInDb( {"status": self.status})
 
     def setInTime(self) -> None:
         """
@@ -304,20 +382,24 @@ class Tool(Element):
         """
         if "OOT" in self.status:
             self.status.remove("OOT")
-            tool_update(self.pentest, self._id, self.getData())
+            self.updateInDb({"status":self.status})
 
-    def delete(self) -> None:
+    def delete(self) -> int:
         """
+        ALIAS OF deleteFromDb :
         Delete the tool represented by this model in the database.
-        """
-        tool_delete(self.pentest, self._id)
 
-    def getParentId(self) -> Optional[str]:
+        Returns:
+            int: The number of deleted tools.
+        """
+        return self.deleteFromDb()
+
+    def getParentId(self) -> Optional[ObjectId]:
         """
         Get the parent id of this tool.
 
         Returns:
-            Optional[str]: The parent id if it exists, None otherwise.
+            Optional[ObjectId]: The parent id if it exists, None otherwise.
         """
         try:
             if self.check_iid is not None:
@@ -672,7 +754,7 @@ class Tool(Element):
             self.markAsTimedout()
         elif len(new_status) == 0:
             self.markAsNotDone()
-        res: bool = tool_update(self.pentest, self.getId(), self.getData())
+        res: bool = self.updateInDb(self.getData())
         return res
 
     @classmethod
@@ -710,7 +792,7 @@ class Tool(Element):
         Returns:
             bool: True if the update was successful, False otherwise.
         """
-        res: bool = tool_update(self.pentest, self._id, self.getData())
+        res: bool = self.updateInDb(self.getData())
         return res
 
     def listResultFiles(self) -> List[str]:

@@ -48,6 +48,7 @@ def setStatus(pentest: str, tool_iid: str, body: Dict[str, Any]) -> Tuple[str, i
     tool_o = cast(Tool, tool_o)
     tool_o._setStatus(newStatus, arg)
     return "Success", 200
+
 @permission("pentester")
 def delete(pentest: str, tool_iid: str) -> Union[Tuple[str, int], int]:
     """
@@ -65,18 +66,11 @@ def delete(pentest: str, tool_iid: str) -> Union[Tuple[str, int], int]:
     dbclient = DBClient.getInstance()
     if not dbclient.isUserConnected():
         return "Not connected", 503
-    tool_existing = dbclient.findInDb(pentest,"tools",{"_id":ObjectId(tool_iid)}, False)
+    tool_existing = Tool.fetchObject(pentest, {"_id":ObjectId(tool_iid)})
     if tool_existing is None:
         return "Not found", 404
-    res = dbclient.deleteFromDb(pentest, "tools", {"_id": ObjectId(tool_iid)}, False)
-    if tool_existing.get("check_iid") is not None and tool_existing.get("check_iid", "") != "":
-        check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(tool_existing.get("check_iid"))})
-        if check is not None:
-            check.updateInfosCheck()
-    if res is None:
-        return 0
-    else:
-        return res
+    tool_existing = cast(Tool, tool_existing)
+    return tool_existing.deleteFromDb()
 
 @permission("pentester")
 def insert(pentest: str, body: Dict[str, Any], **kwargs: Any) -> None:
@@ -91,65 +85,9 @@ def insert(pentest: str, body: Dict[str, Any], **kwargs: Any) -> None:
     """
     if "base" in kwargs:
         del kwargs["base"]
-    do_insert(pentest, body, **kwargs)
+    tool_m = Tool(pentest, body)
+    tool_m.addInDb(**kwargs)
 
-def do_insert(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union[ErrorStatus, ToolInsertResult]:
-    """
-    Inserts a tool into the database.
-
-    Args:
-        pentest (str): The name of the pentest.
-        body (Dict[str, Any]): The body of the tool to be inserted.
-        **kwargs (Any): Additional parameters.
-
-    Returns:
-        Union[ErrorStatus, ToolInsertResult]: A string indicating an error or a dictionary containing the result of the operation and the id of the inserted tool.
-    """
-    dbclient = DBClient.getInstance()
-    if not dbclient.isUserConnected():
-        return "Not connected", 503
-    if body.get("name", "") == "None" or body.get("name", "") == "" or body.get("name", "") is None:
-        del body["name"]
-    tool_o = Tool(pentest, body)
-    # Checking unicity
-    base = tool_o.getDbKey()
-    if kwargs.get("base") is not None:
-        for k,v in kwargs.get("base", {}).items():
-            base[k] = v
-    existing = dbclient.findInDb(pentest, "tools", base, False)
-    if existing is not None:
-        return {"res":False, "iid":existing["_id"]}
-    if "_id" in body:
-        del body["_id"]
-    # Checking port /service tool
-    parent = tool_o.getParentId()
-    # Inserting tool
-    base["name"] = body.get("name", "")
-    base["ip"] = body.get("ip", "")
-    base["scope"] = body.get("scope", "")
-    base["port"] = body.get("port", "")
-    base["proto"] = body.get("proto", "")
-    base["command_iid"] = body.get("command_iid", "")
-    base["check_iid"] = body.get("check_iid", "")
-    base["scanner_ip"] = body.get("scanner_ip", "None")
-    base["dated"] = body.get("dated", "None")
-    base["datef"] = body.get("datef", "None")
-    base["text"] = body.get("text", "")
-    base["status"] = body.get("status", [])
-    base["notes"] = body.get("notes", "")
-    base["infos"] = body.get("infos", {})
-    res_insert = dbclient.insertInDb(pentest, "tools", base, parent)
-    ret = res_insert.inserted_id
-    tool_o._id = ret
-    if base["check_iid"] != "" and kwargs.get("update_check", True):
-        try:
-            check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(base["check_iid"])})
-        except InvalidId:
-            return {"res":True, "iid":ret}
-        if check is not None:
-            check.updateInfosCheck()
-    # adding the appropriate tools for this scope.
-    return {"res":True, "iid":ret}
 
 @permission("pentester")
 def update(pentest: str, tool_iid: str, body: Dict[str, Any]) -> bool:
@@ -164,14 +102,11 @@ def update(pentest: str, tool_iid: str, body: Dict[str, Any]) -> bool:
     Returns:
         bool: True if the update was successful, False otherwise.
     """
-    dbclient = DBClient.getInstance()
-    orig = dbclient.findInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, False)
-    dbclient.updateInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, {"$set":body}, False, True)
-    if orig.get("check_iid") is not None and orig.get("check_iid", "") != "":
-        check = CheckInstance.fetchObject(pentest, {"_id":ObjectId(orig.get("check_iid"))})
-        if check is not None:
-            check.updateInfosCheck()
-    return True
+    tool_old = Tool.fetchObject(pentest, {"_id":ObjectId(tool_iid)})
+    if tool_old is None:
+        return False
+    tool_old = cast(Tool, tool_old)
+    return tool_old.updateInDb(body)
 
 @permission("pentester")
 def craftCommandLine(pentest: str, tool_iid: str, commandline_options: str = "") -> Union[Tuple[str, int], Dict[str, str]]:

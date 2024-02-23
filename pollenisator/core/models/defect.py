@@ -272,6 +272,43 @@ class Defect(Element):
         dbclient = DBClient.getInstance()
         dbclient.updateInDb(self.pentest, "defects", {"_id":self.getId()}, {"$set":{"index":index}})
 
+    def deleteFromDb(self) -> int:
+        """
+        Delete this defect from database
+        
+        Returns:
+            int: the number of deleted documents
+        """
+        dbclient = DBClient.getInstance()
+        if not self.isAssigned() and self.pentest != "pollenisator":
+            # if not assigned to a pentest object it's a report defect (except in pollenisator db where it's a defect template)
+            globalDefects_iterator = Defect.fetchObjects(self.pentest, {"target_id":""})
+            if globalDefects_iterator is None:
+                globalDefects: List[Defect] = []
+            else:
+                globalDefects = cast(List[Defect], globalDefects_iterator)
+            for globalDefect in globalDefects:
+                globalDefect = cast(Defect, globalDefect)
+                if int(globalDefect.index) > int(self.index):
+                    globalDefect.update_index(int(globalDefect.index)-1)
+            thisAssignedDefects = Defect.fetchObjects(self.pentest, {"global_defect": ObjectId(self.getId())})
+            if thisAssignedDefects is not None:
+                for thisAssignedDefect in thisAssignedDefects:
+                    thisAssignedDefect = cast(Defect, thisAssignedDefect)
+                    thisAssignedDefect.deleteFromDb()
+        if self.pentest != "pollenisator":
+            proofs_path = self.getProofPath()
+            files = self.listProofFiles()
+            for filetodelete in files:
+                filetodelete = os.path.basename(filetodelete)
+                os.remove(os.path.join(proofs_path, filetodelete))
+            os.rmdir(proofs_path)
+        res = dbclient.deleteFromDb(self.pentest, "defects", {"_id": ObjectId(self.getId())}, False)
+        if res is None:
+            return 0
+        else:
+            return res
+
     @classmethod
     def findInsertPosition(cls, pentest: str, risk: str) -> int:
         """

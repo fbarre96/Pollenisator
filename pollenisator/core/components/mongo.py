@@ -487,7 +487,7 @@ class DBClient:
                         self.send_notify(dbName, collection, elem["_id"], "update")
         return res
 
-    def insert(self, collection: str, values: Dict[str, Any], parent: str = '', notify: bool = True) -> Union[pymongo.results.InsertManyResult, pymongo.results.InsertOneResult]:
+    def insert(self, collection: str, values: Dict[str, Any], parent: Optional[ObjectId] = None, notify: bool = True) -> Union[pymongo.results.InsertManyResult, pymongo.results.InsertOneResult]:
         """
         Wrapper for the pymongo insert_one. Then notify observers.
 
@@ -508,7 +508,7 @@ class DBClient:
         ret = self._insert(self.current_pentest, collection, values, notify, parent)
         return ret
 
-    def insertManyInDb(self, db: str, collection: str, values: List[Dict[str, Any]], parent: str = '', notify: bool = True) ->pymongo.results.InsertManyResult:
+    def insertManyInDb(self, db: str, collection: str, values: List[Dict[str, Any]], parent: Optional[ObjectId] = None, notify: bool = True) ->pymongo.results.InsertManyResult:
         """
         Insert many documents in the database.
 
@@ -516,7 +516,7 @@ class DBClient:
             db (str): The name of the database.
             collection (str): The name of the collection.
             values (List[Dict[str, Any]]): The list of documents to insert into the collection.
-            parent (str, optional): Not used, default to ''. Was used to give info about parent node.
+            parent (ObjectId, optional): the parent id of the documents to insert. Defaults to None.
             notify (bool, optional): A boolean asking for all client to be notified of this insert. Defaults to True.
         
         Returns:
@@ -526,7 +526,7 @@ class DBClient:
         return self._insert(db, collection, values, notify, parent, True)
 
 
-    def insertInDb(self, db: str, collection: str, values: Dict[str, Any], parent: str = '', notify: bool = True) -> pymongo.results.InsertOneResult:
+    def insertInDb(self, db: str, collection: str, values: Dict[str, Any], parent: Optional[ObjectId] = None, notify: bool = True) -> pymongo.results.InsertOneResult:
         """
         Insert something in the database after ensuring connection.
 
@@ -534,7 +534,7 @@ class DBClient:
             db (str): The database name to use.
             collection (str): The collection that holds the document to insert.
             values (Dict[str, Any]): The document to insert into the given collection.
-            parent (str, optional):
+            parent (ObjectId, optional):
             notify (bool, optional): A boolean asking for all client to be notified of this update. Default to True.
 
         Returns:
@@ -544,12 +544,12 @@ class DBClient:
         return self._insert(db, collection, values, notify, parent, False)
 
     @overload
-    def _insert(self, dbName: str, collection: str, values: Dict[str, Any], notify: bool = True, parentId: str ='', multi: Literal[False] = False) ->  pymongo.results.InsertOneResult:
+    def _insert(self, dbName: str, collection: str, values: Dict[str, Any], notify: bool = True, parentId: Optional[ObjectId] = None, multi: Literal[False] = False) ->  pymongo.results.InsertOneResult:
         ...
     @overload
-    def _insert(self, dbName: str, collection: str, values: List[Dict[str, Any]], notify: bool = True, parentId: str ='', multi: Literal[True] = True) ->  pymongo.results.InsertManyResult:
+    def _insert(self, dbName: str, collection: str, values: List[Dict[str, Any]], notify: bool = True, parentId: Optional[ObjectId] = None, multi: Literal[True] = True) ->  pymongo.results.InsertManyResult:
         ...
-    def _insert(self, dbName: str, collection: str, values: Union[Dict[str, Any], List[Dict[str, Any]]], notify: bool = True, parentId: str = '', multi: bool = False) -> Union[pymongo.results.InsertOneResult, pymongo.results.InsertManyResult]:
+    def _insert(self, dbName: str, collection: str, values: Union[Dict[str, Any], List[Dict[str, Any]]], notify: bool = True, parentId: Optional[ObjectId] = None, multi: bool = False) -> Union[pymongo.results.InsertOneResult, pymongo.results.InsertManyResult]:
         """
         Perform insertion in the database.
 
@@ -558,7 +558,7 @@ class DBClient:
             collection (str): The collection that holds the document to insert.
             values (Union[Dict[str, Any], List[Dict[str, Any]]]): The document(s) to insert into the given collection.
             notify (bool, optional): A boolean asking for all client to be notified of this update. Default to True.
-            parentId (str, optional): Not used, default to ''. Was used to give info about parent node.
+            parentId (ObjectId, optional):  default to None
             multi (bool, optional): A boolean defining if multiple documents can be inserted at once. Default to False.
 
         Returns:
@@ -572,7 +572,7 @@ class DBClient:
             res_many: pymongo.results.InsertManyResult = db[collection].insert_many(values, ordered=False)
             if notify:
                 self.send_notify(dbName, collection,
-                        res_many.inserted_ids, "insert_many", parentId)
+                        list(map(str, res_many.inserted_ids)), "insert_many", str(parentId))
         else:
             db = self.client[dbName]
             res_solo: pymongo.results.InsertOneResult = db[collection].insert_one(values)
@@ -586,7 +586,7 @@ class DBClient:
                     self.redis = None
             if res_solo.inserted_id is not None and notify:
                 self.send_notify(dbName, collection,
-                            res_solo.inserted_id, "insert", parentId)
+                            str(res_solo.inserted_id), "insert", str(parentId))
         return res_many if multi else res_solo
 
     def find(self, collection: str, pipeline: Optional[Dict[str, Any]] = None, multi: bool = True) -> Union[pymongo.cursor.Cursor, None, List[Dict[str, Any]]]:

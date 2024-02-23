@@ -33,46 +33,6 @@ def getCommands(body: Dict[str, Any]) -> List[Dict[str, Any]]:
         return []
     return [x for x in results]
 
-def doDelete(pentest: str, command: Command) -> int:
-    """
-    Delete a command from the database and remove all references to it.
-
-    Args:
-        pentest (str): The name of the pentest.
-        command (Command): The command object to be deleted.
-
-    Returns:
-        Union[int, Any]: 0 if the deletion was unsuccessful, otherwise the result of the deletion operation.
-    """
-    dbclient = DBClient.getInstance()
-    #TODO : delete from checks
-    pentests = set(pentest)
-    # Remove from all waves this command.
-    if command.indb == "pollenisator":
-        pentest_uuids = dbclient.listPentestUuids()
-        if pentest_uuids is not None:
-            pentests.union(pentest_uuids)
-    else:
-        pentests.add(command.indb)
-
-    for pentest in pentests:
-        waves = dbclient.findInDb(pentest, "waves", {}, True)
-        for wave in waves:
-            toBeUpdated = wave["wave_commands"]
-            if command._id in wave["wave_commands"]:
-                toBeUpdated.remove(command._id)
-                dbclient.updateInDb(pentest, "waves", {"_id": wave["_id"]}, {
-                    "$set": {"wave_commands": toBeUpdated}}, False)
-        # Remove all tools refering to this command's name.
-        dbclient.deleteFromDb(pentest,
-                                   "tools", {"name": command.name}, True, True)
-    res: int = dbclient.deleteFromDb(command.indb, "commands", {
-        "_id": ObjectId(command._id)}, False, True)
-    if res is None:
-        return 0
-    else:
-        return res
-
 @permission("user")
 def deleteCommand(command_iid: str, **_kwargs: Any) -> Union[Tuple[str, int],int]:
     """
@@ -92,7 +52,7 @@ def deleteCommand(command_iid: str, **_kwargs: Any) -> Union[Tuple[str, int],int
     if c is None:
         return "Not found", 404
     command = Command("pollenisator", c)
-    return doDelete("pollenisator", command)
+    return command.deleteFromDb()
 
 @permission("pentester")
 def delete(pentest: str, command_iid: str, **_kwargs: Any) -> Union[Tuple[str, int], int]:
@@ -114,7 +74,7 @@ def delete(pentest: str, command_iid: str, **_kwargs: Any) -> Union[Tuple[str, i
     if c is None:
         return "Not found", 404
     command = Command(pentest, c)
-    return doDelete(pentest, command)
+    return command.deleteFromDb()
 
 
 def doInsert(_pentest: str, body: Dict[str, Any], user: str) -> CommandInsertResult:

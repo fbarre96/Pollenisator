@@ -1,15 +1,17 @@
 """Scope Model"""
 
 from typing import Any, Dict, List, Optional, cast
+from typing_extensions import TypedDict
 
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.element import Element
 import pollenisator.core.components.utils as utils
+from pollenisator.core.models.ip import Ip
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
-from pollenisator.server.servermodels.scope import ScopeInsertResult, _updateIpsScopes, insert as scope_insert
 
+ScopeInsertResult = TypedDict('ScopeInsertResult', {'res': bool, 'iid': ObjectId})
 
 class Scope(Element):
     """
@@ -174,7 +176,8 @@ class Scope(Element):
         if scopes is None:
             return
         for scope in scopes:
-            _updateIpsScopes(pentest, cast(Scope, scope))
+            scope = cast(Scope, scope)
+            scope._updateIpsScopes()
 
     def getParentId(self) -> Optional[ObjectId]:
         """
@@ -196,8 +199,67 @@ class Scope(Element):
         Returns:
             str: The id of the inserted scope.
         """
-        res: ScopeInsertResult = scope_insert(self.pentest, self.getData())
-        return res
+        dbclient = DBClient.getInstance()
+        base = self.getDbKey()
+        existing = Scope.fetchObject(self.pentest, base)
+        if existing is not None:
+            existing = cast(Scope, existing)
+            return {"res":False, "iid":existing.getId()}
+        # Inserting scope
+        parent = self.getParentId()
+        data = self.getData()
+        if "_id" in data:
+            del data["_id"]
+        res_insert = dbclient.insertInDb(self.pentest, "scopes", data, parent, notify=True)
+        ret = res_insert.inserted_id
+        self._id = ObjectId(ret)
+        # adding the appropriate checks for this scope.
+        self.add_scope_checks()
+        self._updateIpsScopes()
+        return {"res":True, "iid":ret}
+
+    def _updateIpsScopes(self) -> None:
+        """
+        Update the scopes of all IPs in the database. If an IP fits in the given scope and the scope is not already in the IP's 
+        scopes, the scope is added to the IP's scopes.
+        """
+        # Testing this scope against every ips
+        ips = Ip.fetchObjects(self.pentest, {"in_scopes":{"$ne":self.getId()}})
+        if ips is None:
+            return None
+        for ip_o in ips:
+            ip_o = cast(Ip, ip_o)
+            if ip_o.fitInScope(self.scope):
+                ip_o.addScopeFitting(self.pentest, self.getId())
+
+    def deleteFromDb(self) -> int:
+        """
+        Deletes this scope from the database.
+
+        Returns:
+            int: The result of the deletion operation. If the scope was not found, None is returned. Otherwise, the 
+            number of deleted documents is returned.
+        """
+        dbclient = DBClient.getInstance()
+        # deleting checks with scope
+        checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": ObjectId(self.getId()), "target_type": "scope"})
+        if checks is not None:
+            for check in checks:
+                check.deleteFromDb()
+        # Deleting this scope against every ips
+        ips = Ip.getIpsInScope(self.pentest, ObjectId(self.getId()))
+        for ip in ips:
+            ip.removeScopeFitting(self.pentest, ObjectId(self.getId()))
+        res = dbclient.deleteFromDb(self.pentest, "scopes", {"_id": ObjectId(self.getId())}, False)
+        parent_wave = dbclient.findInDb(self.pentest, "waves", {"wave": self.wave}, False)
+        if parent_wave is None:
+            return 1
+        dbclient.send_notify(self.pentest, "waves", parent_wave["_id"], "update", "")
+        # Finally delete the selected element
+        if res is None:
+            return 0
+        else:
+            return res
 
     @classmethod
     def getTriggers(cls) -> List[str]:

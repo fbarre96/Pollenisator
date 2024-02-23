@@ -149,7 +149,11 @@ def detectPlugins(pentest: str, upfile: werkzeug.datastructures.FileStorage, cmd
         result: Dict[str, Any] = {"tags":[]}
         mod = loadPlugin(pluginName)
         if mod.autoDetectEnabled():
-            notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline, ext=ext, filename=upfile.filename)
+            try:
+                notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline, ext=ext, filename=upfile.filename)
+            except Exception as e:
+                logger.error("Error in plugin %s: %s", pluginName, e)
+                notes, tags, lvl, targets  = None, None, None, None
             upfile.stream.seek(0)
             if notes is not None and tags is not None:
                 result["tags"] = tags

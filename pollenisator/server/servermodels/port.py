@@ -1,7 +1,7 @@
 """
 Handle  request common to Ports
 """
-from typing import Any, Dict, TypedDict
+from typing import Any, Dict, TypedDict, cast
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.port import Port
@@ -25,26 +25,13 @@ def delete(pentest: str, port_iid: str) -> int:
     Returns:
         int: 0 if the deletion was unsuccessful, otherwise the result of the deletion operation.
     """
-    dbclient = DBClient.getInstance()
-
-    port_o = Port(pentest, dbclient.findInDb(pentest, "ports", {"_id":ObjectId(port_iid)}, False))
-    tools = dbclient.findInDb(pentest, "tools", {"port": port_o.port, "proto": port_o.proto,
-                                             "ip": port_o.ip}, True)
-    for tool in tools:
-        tool_delete(pentest, tool["_id"])
-    checks = dbclient.findInDb(pentest, "checkinstances",
-                                {"target_iid": str(port_iid)}, True)
-    for check in checks:
-        checkinstance_delete(pentest, check["_id"])
-    defects = dbclient.findInDb(pentest, "defects", {"port": port_o.port, "proto": port_o.proto,
-                                                "ip": port_o.ip}, True)
-    for defect in defects:
-        defect_delete(pentest, defect["_id"])
-    res = dbclient.deleteFromDb(pentest, "ports", {"_id": ObjectId(port_iid)}, False)
-    if res is None:
+    port_o = Port.fetchObject(pentest, {"_id":ObjectId(port_iid)})
+    if port_o is None:
         return 0
-    else:
-        return res
+    port_o = cast(Port, port_o)
+    res = port_o.deleteFromDb()
+    return res
+
 
 @permission("pentester")
 def insert(pentest: str, body: Dict[str, Any]) -> PortInsertResult:

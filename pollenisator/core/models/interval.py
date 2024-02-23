@@ -9,6 +9,8 @@ from pollenisator.core.models.tool import Tool
 import pollenisator.core.components.utils as utils
 from datetime import datetime
 
+from pollenisator.core.models.wave import Wave
+
 
 class Interval(Element):
     """
@@ -128,3 +130,35 @@ class Interval(Element):
         if res:
             return ObjectId(res.get("_id", None)) if res.get("_id", None) is not None else None
         return None
+
+    def deleteFromDb(self) -> int:
+        """
+        Deletes this interval from the database.
+
+        Returns:
+            int: 0 if the deletion was unsuccessful, otherwise the result of the deletion operation.
+        """
+        dbclient = DBClient.getInstance()
+        res = dbclient.deleteFromDb(self.pentest, "intervals", {"_id": ObjectId(self.getId())}, False)
+        parent_wave = Wave.fetchObject(self.pentest, {"wave": self.wave})
+        if parent_wave is not None:
+            dbclient.send_notify(self.pentest,
+                                    "waves", str(parent_wave.getId()), "update", "")
+            other_intervals = Wave.fetchObjects(self.pentest, {"wave": self.wave})
+            if other_intervals is not None:
+                no_interval_in_time = True
+                for other_interval_o in other_intervals:
+                    other_interval_o = cast(Interval, other_interval_o)
+                    if utils.fitNowTime(other_interval_o.dated, other_interval_o.datef):
+                        no_interval_in_time = False
+                        break
+                if no_interval_in_time:
+                    tools = Tool.fetchObjects(self.pentest, {"wave": self.wave})
+                    if tools is not None:
+                        for tool_o in tools:
+                            tool_o = cast(Tool, tool_o)
+                            tool_o.setOutOfTime()
+        if res is None:
+            return 0
+        else:
+            return res

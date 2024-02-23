@@ -25,31 +25,12 @@ def delete(pentest: str, interval_iid: str) -> Union[Tuple[str, int], int]:
     Returns:
         int: 0 if the deletion was unsuccessful, otherwise the result of the deletion operation.
     """
-    dbclient = DBClient.getInstance()
-    interval_o = Interval(pentest, dbclient.findInDb(pentest, "intervals", {"_id": ObjectId(interval_iid)}, False))
+    interval_o = Interval.fetchObject(pentest, {"_id": ObjectId(interval_iid)})
     if interval_o is None:
         return "Interval not found", 404
-    res = dbclient.deleteFromDb(pentest, "intervals", {"_id": ObjectId(interval_iid)}, False)
-    parent_wave = dbclient.findInDb(pentest, "waves", {"wave": interval_o.wave}, False)
-    if parent_wave is not None:
-        dbclient.send_notify(pentest,
-                                "waves", parent_wave["_id"], "update", "")
-        other_intervals = dbclient.findInDb(pentest, "waves", {"wave": interval_o.wave})
-        no_interval_in_time = True
-        for other_interval_data in other_intervals:
-            other_interval = Interval(pentest, other_interval_data)
-            if fitNowTime(other_interval.dated, other_interval.datef):
-                no_interval_in_time = False
-                break
-        if no_interval_in_time:
-            tools = dbclient.findInDb(pentest, "tools", {"wave": interval_o.wave})
-            for tool_data in tools:
-                tool = Tool(pentest, tool_data)
-                tool.setOutOfTime(pentest)
-    if res is None:
-        return 0
-    else:
-        return res
+    interval_o = cast(Interval, interval_o)
+    res = interval_o.deleteFromDb()
+    return res
 
 @permission("pentester")
 def insert(pentest: str, body: Dict[str, Any]) -> Union[IntervalInsertResult, Tuple[str, int]]:

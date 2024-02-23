@@ -12,7 +12,7 @@ from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
 from pollenisator.server.permission import permission
 
-import pollenisator.server.modules.activedirectory.computers as Computer
+import pollenisator.server.modules.activedirectory.computers as computers
 
 UserInsertResult = TypedDict('UserInsertResult', {'res': bool, 'iid': ObjectId})
 
@@ -146,6 +146,28 @@ class User(Element):
         res: UserInsertResult = insert(self.pentest, self.getData())
         return res
 
+    def deleteFromDb(self) -> int:
+        """
+        Delete this User object from the database and return the result of the deletion operation.
+
+        Returns:
+            int: The result count of the deletion operation.
+        """
+        dbclient = DBClient.getInstance()
+        computers_found = computers.Computer.fetchObjects(self.pentest, { "$or": [ { "users": ObjectId(self._id) }, { "admins": ObjectId(self._id) } ] })
+        for computer_o in computers_found:
+            if ObjectId(self.getId()) in computer_o.users:
+                computer_o.users.remove(ObjectId(self.getId()))
+                computer_o.update()
+            if self.getId() in computer_o.admins:
+                computer_o.admins.remove(ObjectId(self.getId()))
+                computer_o.update()
+        res = dbclient.deleteFromDb(self.pentest, "users", {"_id": ObjectId(str(self.getId())), "type":"user"}, False)
+        if res is None:
+            return 0
+        else:
+            return res
+
     @classmethod
     def replaceCommandVariables(cls, _pentest: str, command: str, data: Dict[str, Any]) -> str:
         """
@@ -187,7 +209,7 @@ class User(Element):
             lvl (str): The level of the check.
             info (Dict[str, Any]): The information needed to add the check.
         """
-        checks = CheckItem.fetchObjects({"lvl":lvl})
+        checks = CheckItem.fetchObjects("pollenisator", {"lvl":lvl})
         user_o = info.get("user")
         if user_o is None:
             logger.error("User was not found when trying to add ActiveDirectory tool ")
@@ -202,7 +224,7 @@ class User(Element):
         if dc_ip is None:
             return
         for check in checks:
-            CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "user", infos=infos)
+            CheckInstance.createFromCheckItem(self.pentest, check, ObjectId(self._id), "user", infos=infos)
 
     @classmethod
     def getTriggers(cls) -> List[str]:
@@ -319,24 +341,11 @@ def delete(pentest: str, user_iid: str) -> int:
     Returns:
         int: The result of the delete operation.
     """
-    dbclient = DBClient.getInstance()
-    user_dic = dbclient.findInDb(pentest, "users", {"_id":ObjectId(user_iid), "type":"user"}, False)
-    if user_dic is None:
+    user = User.fetchObject(pentest, {"_id":ObjectId(user_iid)})
+    if user is None:
         return 0
-    computers = dbclient.findInDb(pentest, "computers",
-                                {"type":"computer", "$or": [ { "users": str(user_iid) }, { "admins": str(user_iid) } ] }, True)
-    for computer in computers:
-        if str(user_iid) in computer["users"]:
-            computer["users"].remove(str(user_iid))
-            Computer.update(pentest, computer["_id"], computer)
-        if str(user_iid) in computer["admins"]:
-            computer["admins"].remove(str(user_iid))
-            Computer.update(pentest, computer["_id"], computer)
-    res = dbclient.deleteFromDb(pentest, "users", {"_id": ObjectId(str(user_iid)), "type":"user"}, False)
-    if res is None:
-        return 0
-    else:
-        return res
+    return user.deleteFromDb()
+    
 
 @permission("pentester")
 def insert(pentest:str, body: Dict[str, Any]) -> UserInsertResult:

@@ -163,6 +163,21 @@ class CheckInstance(Element):
         ret = doInsert(self.pentest, self.getData(), checkItem, toolInfos)
         return ret
 
+    def deleteFromDb(self) -> int:
+        """
+        Delete the CheckInstance from the database.
+
+        Returns:
+            int: The number of deleted CheckInstances.
+        """
+        dbclient = DBClient.getInstance()
+        dbclient.deleteFromDb(self.pentest, 'tools', {"check_iid": self.getId()}, many=True, notify=True)
+        res = dbclient.deleteFromDb(self.pentest, CheckInstance.coll_name, {
+                                        "_id": ObjectId(self.getId())}, many=False, notify=True)
+        if res is None:
+            return 0
+        return res
+    
     @classmethod
     def bulk_insert_for(cls, pentest: str, targets: Iterable, targets_type: str, lvls: List[str], f_get_impacted_targets: Optional[Callable] = None, toolInfos: Optional[Dict[str, Any]] = None) -> Optional[List['CheckInstance']]:
         """
@@ -431,7 +446,7 @@ def doInsert(pentest: str, data: Dict[str, Any], checkItem: Optional[CheckItem] 
             tool_model = tool.Tool(pentest)
             tool_model.initialize(ObjectId(command_pentest.getId()), ObjectId(iid), target.get("wave", ""), None, target.get("scope", ""), target.get("ip", ""), target.get("port", ""),
                                         target.get("proto", ""), checkItem.lvl, infos=toolInfos)
-            tool_model.addInDb(update_check_infos=False)
+            tool_model.addInDb(update_check=False)
     if ins_result is None:
         return {"res": False, "iid": iid}
     return {"res": True, "iid": iid}
@@ -471,21 +486,14 @@ def delete(pentest: str, iid: str) -> Union[int, ErrorStatus]:
     Returns:
        Union[int, ErrorStatus]: An error message and status code if the pentest is "pollenisator" or the CheckInstance is not found, 0 if the deletion was not successful, None otherwise.
     """
-    dbclient = DBClient.getInstance()
     if pentest == "pollenisator":
         return "Forbidden", 403
     existing = CheckInstance.fetchObject(pentest, {"_id": ObjectId(iid)})
     if existing is None:
         return "Not found", 404
     # delete tools
-    dbclient.deleteFromDb(
-        pentest, 'tools', {"check_iid": ObjectId(iid)}, many=True, notify=True)
+    return existing.deleteFromDb()
 
-    res = dbclient.deleteFromDb(pentest, CheckInstance.coll_name, {
-                                     "_id": ObjectId(iid)}, many=False, notify=True)
-    if res is None:
-        return 0
-    return res
 
 
 @permission("pentester")

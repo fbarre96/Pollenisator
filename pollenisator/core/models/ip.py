@@ -5,6 +5,7 @@ from bson import ObjectId
 import re
 from netaddr import IPNetwork, IPAddress
 from netaddr.core import AddrFormatError
+from pollenisator.core.models.defect import Defect
 from pollenisator.core.models.element import Element
 from pollenisator.core.models.port import Port
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
@@ -394,6 +395,39 @@ class Ip(Element):
         """
         res: IpInsertResult = ip_insert(self.pentest, self.getData())
         return res
+
+    def deleteFromDb(self) -> int:
+        """
+        Delete the current IP object from the database.
+
+        Returns:
+            int: 0 if the deletion was unsuccessful, otherwise the result of the deletion operation.
+        """
+        dbclient = DBClient.getInstance()
+        tools = Tool.fetchObjects(self.pentest, {"ip": self.ip})
+        if tools is not None:
+            for tool in tools:
+                tool = cast(Tool, tool)
+                tool.deleteFromDb()
+        checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": self.getId()})
+        for check in checks:
+            check.deleteFromDb()
+        defects = Defect.fetchObjects(self.pentest, {"ip": self.ip,  "$or": [{"port": {"$exists": False}}, {"port": None}]})
+        if defects is not None:
+            for defect in defects:
+                defect = cast(Defect, defect)
+                defect.deleteFromDb()
+        ports = Port.fetchObjects(self.pentest, {"ip": self.ip})
+        if ports is not None:
+            for port in ports:
+                port = cast(Port, port)
+                port.deleteFromDb()
+        res = dbclient.deleteFromDb(self.pentest, "ips", {"_id": ObjectId(self.getId())}, False)
+        if res is None:
+            return 0
+        else:
+            return res
+
 
     @classmethod
     def bulk_insert(cls, pentest: str, ips_to_add: List['Ip'], look_scopes: bool = True) -> List['Ip']:

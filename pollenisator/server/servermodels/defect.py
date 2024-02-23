@@ -9,7 +9,6 @@ from pollenisator.core.models.defect import Defect
 from pollenisator.core.models.element import Element
 from pollenisator.server.permission import permission
 from pollenisator.core.components.utils import  JSONDecoder
-import os
 import json
 DefectInsertResult = TypedDict('DefectInsertResult', {'res': bool, 'iid': ObjectId})
 RemarkInsertResult = TypedDict('RemarkInsertResult', {'res': bool, 'iid': ObjectId})
@@ -30,36 +29,12 @@ def delete(pentest: str, defect_iid: str) -> int:
     Returns:
         int: 0 if the deletion was unsuccessful, otherwise the result of the deletion operation.
     """
-    dbclient = DBClient.getInstance()
-    defect = Defect(pentest, dbclient.findInDb(pentest, "defects", {"_id": ObjectId(defect_iid)}, False))
+    defect =  Defect.fetchObject(pentest, {"_id":ObjectId(defect_iid)})
     if defect is None:
         return 0
-    if not defect.isAssigned() and pentest != "pollenisator":
-        # if not assigned to a pentest object it's a report defect (except in pollenisator db where it's a defect template)
-        globalDefects_iterator = Defect.fetchObjects(pentest, {"target_id":""})
-        if globalDefects_iterator is None:
-            globalDefects: List[Defect] = []
-        else:
-            globalDefects = cast(List[Defect], globalDefects_iterator)
-        for globalDefect in globalDefects:
-            if int(globalDefect.index) > int(defect.index):
-                update(pentest, globalDefect.getId(), {"index":str(int(globalDefect.index) - 1)})
-        thisAssignedDefects = Defect.fetchObjects(pentest, {"global_defect": ObjectId(defect_iid)})
-        if thisAssignedDefects is not None:
-            for thisAssignedDefect in thisAssignedDefects:
-                delete(pentest, thisAssignedDefect.getId())
-    if pentest != "pollenisator":
-        proofs_path = defect.getProofPath()
-        files = defect.listProofFiles()
-        for filetodelete in files:
-            filetodelete = os.path.basename(filetodelete)
-            os.remove(os.path.join(proofs_path, filetodelete))
-        os.rmdir(proofs_path)
-    res = dbclient.deleteFromDb(pentest, "defects", {"_id": ObjectId(defect_iid)}, False)
-    if res is None:
-        return 0
-    else:
-        return res
+    defect = cast(Defect, defect)
+    return defect.deleteFromDb()
+
 
 @permission("pentester")
 def insert(pentest: str, body: Dict[str, Any]) -> Union[DefectInsertResult, Tuple[str, int]]:
