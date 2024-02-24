@@ -6,6 +6,7 @@ from flask import send_file
 import tempfile
 import re
 import shutil
+from uuid import UUID, uuid4
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.parser import Parser, ParseError, Term
 from pollenisator.core.components.tag import Tag
@@ -572,9 +573,10 @@ def importDb(orig_name, upfile, **kwargs):
     tmpfile = os.path.join(dirpath, os.path.basename(upfile.filename))
     with open(tmpfile, "wb") as f:
         f.write(upfile.stream.read())
-    new_name = os.path.basename(upfile.filename)
-    new_name = os.path.splitext(new_name)[0]
-    success = dbclient.importDatabase(username, tmpfile, nsFrom=orig_name, nsTo=new_name)
+    
+    filename = os.path.basename(upfile.filename)
+    filename = os.path.splitext(filename)[0]
+    success = dbclient.importDatabase(username, tmpfile, orig_name, filename)
     shutil.rmtree(dirpath)
     return success
 

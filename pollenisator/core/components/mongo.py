@@ -1098,46 +1098,48 @@ class DBClient:
                 del ret["hash"] # pylint: disable=unsupported-delete-operation
         return ret
 
-    def copyDb(self, fromCopy: str, toCopy: str, checkPentestName: bool = True) -> Tuple[str, int]:
+    def copyDb(self, fromCopyUUID: str, toCopyName: str, checkPentestName: bool = True) -> Tuple[str, int]:
         """
         Copy a database.
 
         Args:
-            fromCopy (str): The name of the database to be copied.
-            toCopy (str): The name of the new database.
+            fromCopyUUID (str): The UUID of the database to be copied.
+            toCopyName (str): The new pentset name of the new database.
             checkPentestName (bool, optional): Whether to check if the pentest name exists. Defaults to True.
 
         Returns:
             Tuple[str, int]: A tuple containing a message and a status code. The message indicates the result of the operation, and the status code is a HTTP-like status code.
         """
         self.connect()
-        if fromCopy == "":
+        if fromCopyUUID == "":
             return "database to copy : empty name", 400
-        if toCopy == "":
+        if toCopyName == "":
             return "database destination name is empty", 400
         if self.client is None:
             return "No database connected", 400
         pentest_uuids = self.listPentestUuids()
         if pentest_uuids is None:
             return "API has trouble connecting to db. Check api server config.", 500
-        if fromCopy not in pentest_uuids and checkPentestName:
+        if fromCopyUUID not in pentest_uuids and checkPentestName:
             return "database to copy : not found", 404
-        
+        pentest_data = self.findInDb("pollenisator", "pentests", {"uuid": fromCopyUUID }, False)
+        if pentest_data is None:
+            return "API has trouble connecting to db. Check api server config.", 500
+        old_pentest_nom =  pentest_data.get("nom", "")
         major_version = ".".join(self.client.server_info()["version"].split(".")[:2])
-        
         if float(major_version) < 4.2:
-            succeed, msg = self.registerPentest(self.getPentestOwner(fromCopy),
-                    toCopy, True, True)
+            succeed, msg = self.registerPentest(self.getPentestOwner(fromCopyUUID),
+                    toCopyName, True, True)
             if not succeed:
                 return msg, 403
-            toCopy = msg
+            toCopyUUID = msg
             self.client.admin.command('copydb',
-                                        fromdb=fromCopy,
-                                        todb=toCopy)
+                                        fromdb=fromCopyUUID,
+                                        todb=toCopyUUID)
             return "Database copied", 200
         else:
-            outpath = self.dumpDb(fromCopy)
-            return self.importDatabase(self.getPentestOwner(fromCopy), outpath, nsFrom=fromCopy, nsTo=toCopy)
+            outpath = self.dumpDb(fromCopyUUID)
+            return self.importDatabase(self.getPentestOwner(fromCopyUUID), outpath, toCopyName, fromCopyUUID)
 
     def dumpDb(self, dbName: str, collection: str= "") -> str:
         """
@@ -1193,7 +1195,7 @@ class DBClient:
             return False
         return str(uuid_obj) == uuid_to_test
 
-    def importDatabase(self, owner: str, filename: str, **kwargs: Any) -> Tuple[str, int]:
+    def importDatabase(self, owner: str, filename: str, pentest_name: str, orig_uuid: str) -> Tuple[str, int]:
         """
         Import a database dump into a pentest database.
         It uses the mongorestore utility installed with mongodb-org-tools.
@@ -1201,24 +1203,25 @@ class DBClient:
         Args:
             owner (str): The owner's username.
             filename (str): The gzip archive name that was exported to be reimported.
-            **kwargs (Any): Optional arguments that can be used to specify additional details like 'nsFrom' and 'nsTo'.
+            pentest_name (str): The name of the pentest to import the database into.
+           orig_name (str): the original name of the database to import.
 
         Returns:
             Tuple[str, int]: A tuple containing a message and a status code. The message indicates the result of the operation, and the status code is a HTTP-like status code.
         """
         from pollenisator.core.components.utils import execute
-        if kwargs.get("nsTo", None) is not None:
-            toDbName = kwargs.get("nsTo")
-        else:
-            toDbName = os.path.splitext(os.path.basename(filename))[0]
-        success, msg = self.registerPentest(owner, str(toDbName), True, False)
-        uuid_name = msg
-        if not self.try_uuid(uuid_name):
+        # if kwargs.get("nsTo", None) is not None:
+        #     toDbName = kwargs.get("nsTo")
+        # else:
+        #     toDbName = os.path.splitext(os.path.basename(filename))[0]
+        success, msg = self.registerPentest(owner, str(pentest_name), True, False)
+        new_pentest_uuid = msg
+        if not self.try_uuid(new_pentest_uuid):
             return msg, 403
         pentest_uuids = self.listPentestUuids()
         if pentest_uuids is None:
             return "API has trouble connecting to db. Check api server config.", 500
-        if uuid_name not in pentest_uuids:
+        if new_pentest_uuid not in pentest_uuids:
             return "Database not found", 404
         if success:
             connectionString = '' if self.user == '' else "-u "+self.user + \
@@ -1228,13 +1231,10 @@ class DBClient:
             if self.ssl.strip() != "":
                 cmd += " --ssl --sslPEMKeyFile "+self.ssldir+"/client.pem --sslCAFile " + \
                     self.ssldir+"/ca.pem --sslAllowInvalidHostnames"
-            if kwargs.get("nsFrom", None) is not None and kwargs.get("nsTo", None) is not None:
-                nsfrom = str(kwargs.get("nsFrom"))
-                if self.try_uuid(nsfrom) and nsfrom in pentest_uuids:
-                    cmd += " --nsFrom='"+nsfrom+".*' --nsTo='"+uuid_name+".*'"
+            if self.try_uuid(orig_uuid):
+                cmd += " --nsFrom='"+orig_uuid+".*' --nsTo='"+new_pentest_uuid+".*'"
             execute(cmd, None, True)
         return msg, 200 if success else 403
-    
 
     def getRegisteredTags(self, pentest: str) -> List[str]:
         """
