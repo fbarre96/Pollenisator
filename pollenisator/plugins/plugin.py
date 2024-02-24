@@ -1,5 +1,6 @@
 """A registry for all subclasses of Plugin"""
 from typing import IO, Any, BinaryIO, Dict, List, Optional, Tuple, Type
+from abc import ABCMeta, abstractmethod
 import shlex
 import os
 from pollenisator.core.components.tag import Tag
@@ -20,9 +21,12 @@ class MetaPlugin(type):
         if name not in REGISTRY:
             register_class(cls)
         return cls
+# Create a new metaclass that inherits from both ABCMeta and the custom MetaPlugin
+class AbstractMetaPlugin(ABCMeta, MetaPlugin):
+    pass
 
 
-class Plugin(metaclass=MetaPlugin):
+class Plugin(metaclass=AbstractMetaPlugin):
     """
     Parent base plugin to be inherited
     Attributes:
@@ -51,6 +55,7 @@ class Plugin(metaclass=MetaPlugin):
         """
         return cls.__name__
 
+    @abstractmethod
     def getFileOutputArg(self) -> str:
         """
         Returns the command line parameter giving the output file
@@ -60,6 +65,7 @@ class Plugin(metaclass=MetaPlugin):
         """
         return " | tee "
 
+    @abstractmethod
     def getFileOutputExt(self) -> str:
         """
         Returns the expected file extension for this command result file
@@ -86,6 +92,7 @@ class Plugin(metaclass=MetaPlugin):
             return command + self.getFileOutputArg()+outputDir+toolname
         return command
 
+    @abstractmethod
     def getFileOutputPath(self, commandExecuted: str) -> str:
         """
         Returns the output file path given in the executed command using getFileOutputArg
@@ -98,6 +105,7 @@ class Plugin(metaclass=MetaPlugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip()
 
+    @abstractmethod
     def getTags(self) -> Dict[str, Tag]:
         """
         Returns a dictionnary of tags that can be added by this plugin. Useful to be able to list all tags that can be added by all plugins.
@@ -124,6 +132,7 @@ class Plugin(metaclass=MetaPlugin):
             return True
         return False
 
+    @abstractmethod
     def Parse(self, pentest: str, file_opened: IO[bytes], **_kwargs: Any) -> Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Dict[str, str]]]]:
         """
         Parse an opened file to extract information.

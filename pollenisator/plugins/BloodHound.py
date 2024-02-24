@@ -1,6 +1,8 @@
 """A plugin to parse a bloodhound scan """
+from typing import IO, Any, Dict, List, Optional, Tuple
+from pollenisator.core.components.tag import Tag
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.core.models.ip import Ip
 from pollenisator.server.modules.activedirectory.users import User
 from pollenisator.server.modules.activedirectory.computers import Computer
 from pollenisator.core.components.utils import performLookUp
@@ -67,16 +69,16 @@ def updateDatabase(pentest, users, computers):
     inserted_user = 0
     inserted_computer = 0
     for computer in computers:
-        ip_m = ServerIp(pentest).initialize(str(computer["ip"]), infos={"plugin":BloodHound.get_name()})
-        insert_ret = ip_m.addInDb()
-        comp_m = Computer(pentest).initialize(pentest, None, computer["name"], computer["ip"], computer["domain"], infos={"plugin":BloodHound.get_name()})
+        ip_m = Ip(pentest).initialize(str(computer["ip"]), infos={"plugin":BloodHound.get_name()})
+        ip_m.addInDb()
+        comp_m = Computer(pentest).initialize(computer["name"], computer["ip"], computer["domain"], infos={"plugin":BloodHound.get_name()})
         comp_m.addInDb()
         inserted_computer += 1
     for user in users:
         domain = user.get("domain", "")
         username = user.get("name", "")
         password = ""
-        user_m = User(pentest).initialize(pentest, None, domain, username, password, None, user.get("desc"), infos={"plugin":BloodHound.get_name()})
+        user_m = User(pentest).initialize(domain, username, password, None, user.get("desc"), infos={"plugin":BloodHound.get_name()})
         user_m.addInDb()
         inserted_user += 1
     return inserted_user, inserted_computer
@@ -128,20 +130,21 @@ class BloodHound(Plugin):
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
 
-    def Parse(self, pentest, file_opened, **kwargs):
+    def Parse(self, pentest: str, file_opened: IO[bytes], **kwargs: Dict[str, Any]) -> Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Dict[str, str]]]]:
         """
-        Parse a opened file to extract information
-        Example file:
-      
+        Parse an opened file to extract information.
+
         Args:
-            file_opened: the open file
-            kwargs: port("") and proto("") are valid
+            pentest (str): The name of the pentest.
+            file_opened (BinaryIO): The opened file.
+            **kwargs ([str, Any]): Additional parameters (not used).
+
         Returns:
-            a tuple with 4 values (All set to None if Parsing wrong file): 
-                0. notes: notes to be inserted in tool giving direct info to pentester
-                1. tags: a list of tags to be added to tool 
-                2. lvl: the level of the command executed to assign to given targets
-                3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
+            Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Dict[str, str]]]]: A tuple with 4 values (All set to None if Parsing wrong file): 
+                0. notes (str): Notes to be inserted in tool giving direct info to pentester.
+                1. tags (List[Tag]): A list of tags to be added to tool.
+                2. lvl (str): The level of the command executed to assign to given targets.
+                3. targets (Dict[str, Dict[str, str]]): A list of composed keys allowing retrieve/insert from/into database targeted objects.
         """
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
             return None, None, None, None

@@ -1,7 +1,7 @@
 """A plugin to parse a bluekeep scan : rdpscan"""
+from pollenisator.core.models.ip import Ip
+from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.servermodels.ip import ServerIp
-from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.core.components.tag import Tag
 
 class BlueKeep(Plugin):
@@ -71,15 +71,15 @@ class BlueKeep(Plugin):
             infos = line.split(" - ")
             if len(infos) < 3:
                 return None, None, None, None
-            if not ServerIp.isIp(infos[0]):
+            if not Ip.isIp(infos[0]):
                 return None, None, None, None
             if infos[1] not in ["UNKNOWN", "SAFE", "VULNERABLE"]:
                 return None, None, None, None
             # Parse
             ip = line.split(" ")[0].strip()
             success = True
-            ServerIp(pentest).initialize(ip, infos={"plugin":BlueKeep.get_name()}).addInDb()
-            p_o = ServerPort.fetchObject(pentest, {"ip": ip, "port": kwargs.get(
+            Ip(pentest).initialize(ip, infos={"plugin":BlueKeep.get_name()}).addInDb()
+            p_o = Port.fetchObject(pentest, {"ip": ip, "port": kwargs.get(
                 "port", None), "proto": kwargs.get("proto", None)})
             if p_o is not None:
                 targets[str(p_o.getId())] = {"ip": ip, "port": kwargs.get(
@@ -88,7 +88,7 @@ class BlueKeep(Plugin):
                 ip_o.addTag(Tag(self.getTags()["pwned-bluekeep"], notes=line))
                 if p_o is not None:
                     ip_o.addTag(Tag(self.getTags()["pwned-bluekeep"], notes=line))
-                ip_o = ServerIp.fetchObject(pentest, {"ip": ip})
+                ip_o = Ip.fetchObject(pentest, {"ip": ip})
                 if ip_o is not None:
                     ip_o.addTag(Tag(self.getTags()["pwned-bluekeep"], notes=line))
                   

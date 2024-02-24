@@ -38,16 +38,16 @@ class CheckInstance(Element):
             valuesFromDb = {}
         super().__init__(pentest, valuesFromDb)
         self.status = ""
-        self.initialize(valuesFromDb.get("check_iid", ""), valuesFromDb.get("target_iid", ""), valuesFromDb.get(
+        self.initialize(valuesFromDb.get("check_iid", None), valuesFromDb.get("target_iid", None), valuesFromDb.get(
             "target_type", ""), valuesFromDb.get("status", ""), valuesFromDb.get("notes", ""))
 
-    def initialize(self, check_iid: ObjectId, target_iid: ObjectId, target_type: str, status: str, notes: str) -> 'CheckInstance':
+    def initialize(self, check_iid: Optional[ObjectId], target_iid: Optional[ObjectId], target_type: str, status: str, notes: str) -> 'CheckInstance':
         """
         Initialize a CheckInstance object.
 
         Args:
-            check_iid (ObjectId): The id of the check.
-            target_iid (ObjectId): The id of the target.
+            check_iid (Optional[ObjectId]): The id of the check.
+            target_iid (Optional[ObjectId]): The id of the target.
             target_type (str): The type of the target.
             status (str): The status of the check instance.
             notes (str): The notes for the check instance.
@@ -56,8 +56,8 @@ class CheckInstance(Element):
             CheckInstance: The initialized CheckInstance object.
         """
         self.type = "checkinstance"
-        self.check_iid = ObjectId(check_iid)
-        self.target_iid = ObjectId(target_iid)
+        self.check_iid = ObjectId(check_iid) if check_iid else None
+        self.target_iid = ObjectId(target_iid) if target_iid else None
         self.target_type = target_type
         self.status = status
         self.notes = notes
@@ -160,8 +160,46 @@ class CheckInstance(Element):
         """
         if toolInfos is None:
             toolInfos = {}
-        ret = doInsert(self.pentest, self.getData(), checkItem, toolInfos)
-        return ret
+        data = self.getData()
+        if "_id" in data:
+            del data["_id"]
+        if "type" in data:
+            del data["type"]
+        dbclient = DBClient.getInstance()
+        data["type"] = "checkinstance"
+        # CHECK EXISTING
+        data["check_iid"] = None if data.get("check_iid") is None else ObjectId(data["check_iid"])
+        data["target_iid"] = None if data.get("target_iid") is None else ObjectId(data["target_iid"])
+        existing = CheckInstance.fetchObject(self.pentest, {"check_iid": data["check_iid"], "target_iid": data["target_iid"], "target_type": data.get("target_type", "")})
+        if existing is not None:
+            return {"res": False, "iid": existing.getId()}
+        # IF NOT EXISTING INSERT
+        ins_result = dbclient.insertInDb(
+            self.pentest, CheckInstance.coll_name, data, notify=True)
+        iid = ins_result.inserted_id
+        self._id = iid
+        if checkItem is None or ObjectId(checkItem.getId()) != ObjectId(data["check_iid"]):
+            checkItem = CheckItem.fetchObject("pollenisator", {"_id": ObjectId(data["check_iid"])})
+
+        target_class = Element.classFactory(data["target_type"])
+        if target_class is None:
+            return "Invalid target type", 404
+        target = dbclient.findInDb(self.pentest, target_class.coll_name, {
+                                        "_id": ObjectId(data["target_iid"])}, False)
+        if target is None:
+            return "Invalid target, not found", 404
+        if checkItem is None:
+            return "Check Item not found", 404
+        for command in checkItem.commands:
+            command_pentest = Command.fetchObject(self.pentest, {"original_iid": ObjectId(command)})
+            if command_pentest is not None:
+                tool_model = tool.Tool(self.pentest)
+                tool_model.initialize(ObjectId(command_pentest.getId()), ObjectId(iid), target.get("wave", ""), None, target.get("scope", ""), target.get("ip", ""), target.get("port", ""),
+                                            target.get("proto", ""), checkItem.lvl, infos=toolInfos)
+                tool_model.addInDb(update_check=False)
+        if ins_result is None:
+            return {"res": False, "iid": iid}
+        return {"res": True, "iid": iid}
 
     def deleteFromDb(self) -> int:
         """
@@ -204,7 +242,7 @@ class CheckInstance(Element):
         targets = list(targets)
         commands_pentest = Command.fetchObjects(pentest, {})
         checks_lkp: Dict[str, CheckItem] = {str(check.getId()): check for check in checks}
-        commands_lkp = {command_pentest.original_iid: command_pentest for command_pentest in commands_pentest}
+        commands_lkp = {str(command_pentest.original_iid): command_pentest for command_pentest in commands_pentest}
         check_command_lkp: Dict[str, List[Command]] = {}
         for checkItem in checks_lkp.values():
             if callable(f_get_impacted_targets):
@@ -215,7 +253,7 @@ class CheckInstance(Element):
                 checkinstance = CheckInstance(pentest).initialize(ObjectId(checkItem.getId()), ObjectId(target.getId()), targets_type, "", "")
                 checks_to_add.append(checkinstance)
             for command in checkItem.commands:
-                if commands_lkp.get(command, None) is not None:
+                if commands_lkp.get(str(command), None) is not None:
                     check_command_lkp[str(checkItem.getId())] = check_command_lkp.get(str(checkItem.getId()), []) + [commands_lkp[command]]
                 else:
                     check_command_lkp[str(checkItem.getId())] = check_command_lkp.get(str(checkItem.getId()), [])
@@ -400,56 +438,6 @@ class CheckInstance(Element):
             self.update()
         return None
 
-def doInsert(pentest: str, data: Dict[str, Any], checkItem: Optional[CheckItem] = None, toolInfos: Optional[Dict[str, Any]] = None) -> Union[CheckInstanceInsertResult, ErrorStatus]:
-    """
-    Insert a new check instance into the database.
-
-    Args:
-        pentest (str): The name of the pentest.
-        data (Dict[str, Any]): The data to insert.
-        checkItem (Optional[CheckItem], optional): The check item to add. Defaults to None.
-        toolInfos (Optional[Dict[str, Any]], optional): The tool information to add. Defaults to None.
-
-    Returns:
-        Union[CheckInstanceInsertResult, ErrorStatus]: The result of the insertion or an error message and status code.
-    """
-    if "_id" in data:
-        del data["_id"]
-    dbclient = DBClient.getInstance()
-    data["type"] = "checkinstance"
-    # CHECK EXISTING
-    existing = CheckInstance.fetchObject(pentest, {"check_iid": str(data["check_iid"]), "target_iid": data.get(
-        "target_iid", ""), "target_type": data.get("target_type", "")})
-    if existing is not None:
-        return {"res": False, "iid": existing.getId()}
-    # IF NOT EXISTING INSERT
-    ins_result = dbclient.insertInDb(
-        pentest, CheckInstance.coll_name, data, notify=True)
-    ins_check = CheckInstance(pentest, data)
-    iid = ins_result.inserted_id
-    ins_check._id = iid
-    if checkItem is None or ObjectId(checkItem.getId()) != ObjectId(data["check_iid"]):
-        checkItem = CheckItem.fetchObject("pollenisator", {"_id": ObjectId(data["check_iid"])})
-
-    target_class = Element.classFactory(data["target_type"])
-    if target_class is None:
-        return "Invalid target type", 404
-    target = dbclient.findInDb(pentest, target_class.coll_name, {
-                                    "_id": ObjectId(data["target_iid"])}, False)
-    if target is None:
-        return "Invalid target, not found", 404
-    if checkItem is None:
-        return "Check Item not found", 404
-    for command in checkItem.commands:
-        command_pentest = Command.fetchObject(pentest, {"original_iid": ObjectId(command)})
-        if command_pentest is not None:
-            tool_model = tool.Tool(pentest)
-            tool_model.initialize(ObjectId(command_pentest.getId()), ObjectId(iid), target.get("wave", ""), None, target.get("scope", ""), target.get("ip", ""), target.get("port", ""),
-                                        target.get("proto", ""), checkItem.lvl, infos=toolInfos)
-            tool_model.addInDb(update_check=False)
-    if ins_result is None:
-        return {"res": False, "iid": iid}
-    return {"res": True, "iid": iid}
 
 @permission("pentester")
 def insert(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, CheckInstanceInsertResult]:
@@ -463,15 +451,10 @@ def insert(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, CheckInstan
     Returns:
         Union[ErrorStatus, CheckInstanceInsertResult]: An error message and status code if the pentest is "pollenisator", otherwise the result of the insertion.
     """
-    if "type" in body:
-        del body["type"]
-    if "_id" in body:
-        del body["_id"]
     if pentest == "pollenisator":
         return "Forbidden", 403
     checkinstance = CheckInstance(pentest, body)
-    data = checkinstance.getData()
-    return doInsert(pentest, data)
+    return checkinstance.addInDb()
 
 
 @permission("pentester")

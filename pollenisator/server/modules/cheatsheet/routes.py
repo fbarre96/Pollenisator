@@ -2,7 +2,7 @@
 CheckItem in cheatsheet module,
 routes for the checkitem object.
 """
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Tuple, Union, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 import json
@@ -11,12 +11,11 @@ import pymongo
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.command import Command
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
-from pollenisator.server.servermodels.command import doInsert as commandDoInsert
 from pollenisator.server.permission import permission
 from pollenisator.core.components.utils import JSONDecoder
 
 CheckItemInsertResult = TypedDict('CheckItemInsertResult', {'res': bool, 'iid': ObjectId})
-
+ErrorStatus = Tuple[str, int]
 
 @permission("user")
 def insert(body: Dict[str, Any]) -> CheckItemInsertResult:
@@ -29,16 +28,12 @@ def insert(body: Dict[str, Any]) -> CheckItemInsertResult:
     Returns:
         CheckItemInsertResult: A dictionary with the result of the insertion.
     """
-    if "type" in body:
-        del body["type"]
-    if "_id" in body:
-        del body["_id"]
     checkitem = CheckItem("pollenisator", body)
     res: CheckItemInsertResult = checkitem.addInDb()
     return res
 
 @permission("user")
-def delete(iid: str) -> Union[Tuple[str, int], int]:
+def delete(iid: str) -> Union[ErrorStatus, int]:
     """
     Delete a cheatsheet item.
 
@@ -48,14 +43,13 @@ def delete(iid: str) -> Union[Tuple[str, int], int]:
     Returns:
        int: Returns "Not found" and 404 if the item is not found, 0 if the deletion failed, or the result of the deletion operation.
     """
-    dbclient = DBClient.getInstance()
     existing = CheckItem.fetchObject("pollenisator", {"_id":ObjectId(iid)})
     if existing is None:
         return "Not found", 404
     return existing.deleteFromDb()
 
 @permission("user")
-def update(iid: str, body: Dict[str, Any]) -> Union[Tuple[str, int], bool]:
+def update(iid: str, body: Dict[str, Any]) -> Union[ErrorStatus, bool]:
     """
     Update a cheatsheet item.
 
@@ -64,7 +58,7 @@ def update(iid: str, body: Dict[str, Any]) -> Union[Tuple[str, int], bool]:
         body (Dict[str, Any]): The data to update.
 
     Returns:
-        Union[Tuple[str, int], bool]: Returns "Not found" and 404 if the item is not found, or True if the update was successful.
+        Union[ErrorStatus, bool]: Returns "Not found" and 404 if the item is not found, or True if the update was successful.
     """
     # Check if the checkitem to update exists
     existing = CheckItem.fetchObject("pollenisator", {"_id": ObjectId(iid)})
@@ -85,7 +79,7 @@ def update(iid: str, body: Dict[str, Any]) -> Union[Tuple[str, int], bool]:
 
 
 @permission("user")
-def find(body: Dict[str,Any]) -> Union[Tuple[str, int], List[Dict[str, Any]], Dict[str, Any]]:
+def find(body: Dict[str,Any]) -> Union[ErrorStatus, List[Dict[str, Any]], Dict[str, Any]]:
     """
     Find checkitems in the database.
 
@@ -93,7 +87,7 @@ def find(body: Dict[str,Any]) -> Union[Tuple[str, int], List[Dict[str, Any]], Di
         body (Dict[str,Any]): The body of the request. It should contain a pipeline for the search, and a boolean indicating whether to return many results.
 
     Returns:
-        Union[Tuple[str, int], List[Dict[str, Any]], Dict[str, Any]]: Returns a list of results if many is True, a single result if many is False, or ("Not found", 404) if no results are found.
+        Union[ErrorStatus, List[Dict[str, Any]], Dict[str, Any]]: Returns a list of results if many is True, a single result if many is False, or ("Not found", 404) if no results are found.
     """
     pipeline = body.get("pipeline", {})
     if isinstance(pipeline, str):
@@ -112,7 +106,7 @@ def find(body: Dict[str,Any]) -> Union[Tuple[str, int], List[Dict[str, Any]], Di
 
 
 @permission("pentester")
-def applyToPentest(pentest: str, iid: str, _body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[Tuple[str, int], Dict[str, bool]]:
+def applyToPentest(pentest: str, iid: str, _body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[ErrorStatus, Dict[str, bool]]:
     """
     Apply a cheatsheet to a pentest.
 
@@ -123,7 +117,7 @@ def applyToPentest(pentest: str, iid: str, _body: Dict[str, Any], **kwargs: Dict
         **kwargs (Dict[str, Any]): Additional keyword arguments.
 
     Returns:
-        Union[Tuple[str, int], Dict[str, bool]]: Returns "Not found" and 404 if the cheatsheet item is not found, or a dictionary with the result of the operation.
+        Union[ErrorStatus, Dict[str, bool]]: Returns "Not found" and 404 if the cheatsheet item is not found, or a dictionary with the result of the operation.
     """
     user = kwargs["token_info"]["sub"]
     check_item = CheckItem.fetchObject("pollenisator", {"_id":ObjectId(iid)})
@@ -138,6 +132,7 @@ def applyToPentest(pentest: str, iid: str, _body: Dict[str, Any], **kwargs: Dict
                 mycommand["original_iid"] = str(mycommand["_id"])
                 mycommand["_id"] = None
                 mycommand["indb"] = pentest
-                res = commandDoInsert(pentest, mycommand, user)
+                mycommand["owner"] = user
+                Command(pentest, mycommand).addInDb()
     check_item.apply_retroactively(pentest)
     return {"res": True}

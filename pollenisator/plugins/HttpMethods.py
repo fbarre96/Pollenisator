@@ -1,9 +1,8 @@
 """A plugin to parse nmap httpmethods scan"""
 
 from pollenisator.core.components.tag import Tag
-from pollenisator.server.servermodels.defect import ServerDefect
-from pollenisator.server.servermodels.ip import ServerIp
-from pollenisator.server.servermodels.port import ServerPort
+from pollenisator.core.models.ip import Ip
+from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
 import re
 
@@ -95,7 +94,7 @@ class HttpMethods(Plugin):
             string: the path to file created
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
-    
+
     def getTags(self):
         """Returns a list of tags that can be added by this plugin
         Returns:
@@ -129,11 +128,11 @@ class HttpMethods(Plugin):
             notes)
         if host == "":
             return None, None, None, None
-        ServerIp(pentest).initialize(host, infos={"plugin":HttpMethods.get_name()}).addInDb()
-        p_o = ServerPort(pentest).initialize(host, port, proto, service, infos={"plugin":HttpMethods.get_name()})
+        Ip(pentest).initialize(host, infos={"plugin":HttpMethods.get_name()}).addInDb()
+        p_o = Port(pentest).initialize(host, port, proto, service, infos={"plugin":HttpMethods.get_name()})
         insert_res = p_o.addInDb()
         if not insert_res["res"]:
-            p_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})
+            p_o = Port.fetchObject(pentest, {"_id": insert_res["iid"]})
 
         p_o.updateInfos({"Methods": ", ".join(supported_methods)})
         targets[str(p_o.getId())] = {"ip": host, "port": port, "proto": proto}

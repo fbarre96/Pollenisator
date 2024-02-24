@@ -4,8 +4,8 @@ import re
 
 from bson import ObjectId
 from pollenisator.core.components.tag import Tag
-from pollenisator.server.servermodels.ip import ServerIp
-from pollenisator.server.servermodels.port import ServerPort
+from pollenisator.core.models.ip import Ip
+from pollenisator.core.models.port import Port
 from pollenisator.server.modules.activedirectory.computers import Computer
 
 from pollenisator.server.modules.activedirectory.users import User
@@ -307,10 +307,10 @@ def editScopeIPs(pentest, hostsInfos):
                     infosToAdd["admins"] = infosToAdd.get("admins", []) + [user_model]
                 
 
-            ip_m = ServerIp(pentest).initialize(str(infos["ip"]), infos={"plugin":CME.get_name()})
+            ip_m = Ip(pentest).initialize(str(infos["ip"]), infos={"plugin":CME.get_name()})
             insert_ret = ip_m.addInDb()
             if not insert_ret["res"]:
-                ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
+                ip_m = Ip.fetchObject(pentest, {"_id": insert_ret["iid"]})
             ip_m.notes = "machine_name:" + \
                 infos["machine_name"] + "\n"+infos.get("os", "")
             if infos["type"] == "success":
@@ -320,9 +320,9 @@ def editScopeIPs(pentest, hostsInfos):
             port = str(infos["port"])
             proto = "tcp"
             service = "netbios-ssn"
-            port_m = ServerPort(pentest).initialize(host, port, proto, service, infos={"plugin":CME.get_name()})
+            port_m = Port(pentest).initialize(host, port, proto, service, infos={"plugin":CME.get_name()})
             insert_ret = port_m.addInDb()
-            port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
+            port_m = Port.fetchObject(pentest, {"_id": insert_ret["iid"]})
 
             if infos.get("powned", False):
                 port_m.addTag(Tag("pwned", "red", "high", notes=str(infos)), True)
@@ -346,13 +346,12 @@ def editScopeIPs(pentest, hostsInfos):
                 admins = infosToAdd.get("admins", [])
                 for user in admins:
                     if isinstance(user, User):
-                        user_iid = computer_m.add_admin(user.domain, user.username, user.password) 
+                        computer_m.add_admin(user.domain, user.username, user.password) 
                     else:
                         computer_m.add_admin(user[0], user[1], user[2])
                 computer_m.name = infos["machine_name"]
                 computer_m.domain = infos.get("domain")
                 d = computer_m.getData()
-                
                 comp_info = d["infos"]
                 comp_info["plugin"] = CME.get_name()
 

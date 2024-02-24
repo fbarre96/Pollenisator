@@ -1,8 +1,8 @@
 """A plugin to parse knockpy scan"""
 
 from pollenisator.core.components.tag import Tag
+from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.servermodels.ip import ServerIp
 import re
 
 
@@ -63,7 +63,7 @@ class Knockpy(Plugin):
             list of strings
         """
         return {"info-domains-knockpy": Tag("info-domains-knockpy")}
-    
+
     def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information
@@ -94,9 +94,9 @@ class Knockpy(Plugin):
             ip, domain = parse_knockpy_line(line)
             if ip is not None and domain is not None:
                 # a domain has been found
-                insert_res = ServerIp(pentest).initialize(domain, infos={"plugin":Knockpy.get_name()}).addInDb()
+                insert_res = Ip(pentest).initialize(domain, infos={"plugin":Knockpy.get_name()}).addInDb()
                 if insert_res["res"]:
-                    ServerIp(pentest).initialize(ip, infos={"plugin":Knockpy.get_name()}).addInDb()
+                    Ip(pentest).initialize(ip, infos={"plugin":Knockpy.get_name()}).addInDb()
                     notes += f"{domain} inserted ({ip})\n"
                     countFound += 1
                 # failed, domain is out of scope

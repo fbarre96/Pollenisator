@@ -1,6 +1,7 @@
 """Ip Model. Describes Hosts (not just IP now but domains too)"""
 
 from typing import Any, Dict, Iterator, List, Optional, cast
+from typing_extensions import TypedDict
 from bson import ObjectId
 import re
 from netaddr import IPNetwork, IPAddress
@@ -10,11 +11,13 @@ from pollenisator.core.models.element import Element
 from pollenisator.core.models.port import Port
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
-from pollenisator.server.servermodels.ip import IpInsertResult, update as ip_update, insert as ip_insert
 from pollenisator.core.components.utils import isNetworkIp, performLookUp
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.tool import Tool
-from pollenisator.server.servermodels.port import PortInsertResult
+
+IpInsertResult = TypedDict('IpInsertResult', {'res': bool, 'iid': ObjectId})
+PortInsertResult = TypedDict('PortInsertResult', {'res': bool, 'iid': ObjectId})
+
 
 class Ip(Element):
     """
@@ -292,7 +295,7 @@ class Ip(Element):
         """
         if ObjectId(scopeId) in self.in_scopes:
             self.in_scopes.remove(ObjectId(scopeId))
-            ip_update(pentest, self._id, self.getData())
+            self.updateInDb()
             if not self.in_scopes:
                 tools = Tool.fetchObjects(pentest, {"ip": self.ip})
                 if tools is None:
@@ -317,7 +320,7 @@ class Ip(Element):
                     tool.setInScope()
         if ObjectId(scopeId) not in self.in_scopes:
             self.in_scopes.append(ObjectId(scopeId))
-            ip_update(pentest, self._id, self.getData())
+            self.updateInDb()
 
 
     def getParentId(self) -> Optional[ObjectId]:
@@ -344,7 +347,7 @@ class Ip(Element):
             if ip_in_db is None:
                 return None
             self.parent = ObjectId(ip_in_db["_id"])
-            ip_update(self.pentest, self._id, {"parent": self.parent})
+            self.updateInDb({"parent": self.parent})
             return self.parent
         return None
 
@@ -386,6 +389,27 @@ class Ip(Element):
         """
         return ["ip:onAdd"]
 
+    def updateInDb(self, data: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Update the current IP object in the database.
+
+        Args:
+            data (Optional[Dict[str, Any]): The new data to set in the database.
+
+        Returns:
+            bool: True if the operation was successful, False otherwise.
+        """
+        dbclient = DBClient.getInstance()
+        new_data = self.getData()
+        data = {} if data is None else data
+        new_data |= data
+        if "_id" in new_data:
+            del new_data["_id"]
+        dbclient.updateInDb(self.pentest, "ips", {"_id":ObjectId(self.getId())}, {"$set":new_data}, False, True)
+        new_self = Ip(self.pentest, new_data)
+        new_self.add_ip_checks()
+        return True
+
     def addInDb(self) -> IpInsertResult:
         """
         Add the current IP object to the database.
@@ -393,8 +417,20 @@ class Ip(Element):
         Returns:
             IpInsertResult: A dictionary with the result of the insertion.
         """
-        res: IpInsertResult = ip_insert(self.pentest, self.getData())
-        return res
+        dbclient = DBClient.getInstance()
+        base = self.getDbKey()
+        existing = Ip.fetchObject(self.pentest, base)
+        if existing is not None:
+            return {"res":False, "iid":existing.getId()}
+        data = self.getData()
+        if "_id" in data:
+            del data["_id"]
+        parent = self.getParentId()
+        ins_result = dbclient.insertInDb(self.pentest, "ips", data, parent)
+        iid = ins_result.inserted_id
+        self._id = iid
+        self.add_ip_checks()
+        return {"res":True, "iid":iid}
 
     def deleteFromDb(self) -> int:
         """
@@ -499,9 +535,4 @@ class Ip(Element):
         CheckInstance.bulk_insert_for(pentest, list_ips_inserted, "ip", ["ip:onAdd"])
         return cast(List[Ip], list_ips_inserted)
 
-    def update(self)-> bool:
-        """
-        Update the current IP object in the database.
-        """
-        res: bool = ip_update(self.pentest, self._id, self.getData())
-        return res
+

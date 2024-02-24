@@ -1,10 +1,9 @@
 """A plugin to parse testssl.sh"""
 import re
 from pollenisator.core.components.tag import Tag
-
+from pollenisator.core.models.ip import Ip
+from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.servermodels.ip import ServerIp
-from pollenisator.server.servermodels.port import ServerPort
 
 def parseWarnings(pentest, file_opened):
     """
@@ -40,12 +39,12 @@ def parseWarnings(pentest, file_opened):
                 domain = ip.split("/")[0]
                 ip = "/".join(ip.split("/")[1:])
                 if ip.strip() != "" and domain.strip() != "":
-                    ServerIp(pentest).initialize(domain, infos={"plugin":TestSSL.get_name()}).addInDb()
-                    ServerPort(pentest).initialize(domain, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name()}).addInDb()
+                    Ip(pentest).initialize(domain, infos={"plugin":TestSSL.get_name()}).addInDb()
+                    Port(pentest).initialize(domain, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name()}).addInDb()
             if ip.strip() == "":
                 continue
-            ServerIp(pentest).initialize(ip, infos={"plugin":TestSSL.get_name()}).addInDb()
-            ServerPort(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name()}).addInDb()
+            Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name()}).addInDb()
+            Port(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name()}).addInDb()
             if notes not in ["OK", "INFO"]:
                 missconfiguredHosts[ip] = missconfiguredHosts.get(ip, {})
                 missconfiguredHosts[ip][port] = missconfiguredHosts[ip].get(port, [
@@ -60,7 +59,7 @@ def parseWarnings(pentest, file_opened):
     for ip in missconfiguredHosts.keys():
         if ip.strip() != "":
             for port in missconfiguredHosts[ip].keys():
-                p_o = ServerPort.fetchObject(pentest, {"ip": ip, "port": port, "proto": "tcp"})
+                p_o = Port.fetchObject(pentest, {"ip": ip, "port": port, "proto": "tcp"})
                 targets[str(p_o.getId())] = {
                     "ip": ip, "port": port, "proto": "tcp"}
                 missconfiguredHosts[ip][port].sort()

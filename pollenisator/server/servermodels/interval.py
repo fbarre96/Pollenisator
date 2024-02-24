@@ -10,10 +10,11 @@ from pollenisator.core.models.tool import Tool
 from pollenisator.core.components.utils import fitNowTime, stringToDate
 from pollenisator.server.permission import permission
 
+ErrorStatus = Tuple[str, int]
 IntervalInsertResult = TypedDict('IntervalInsertResult', {'res': bool, 'iid': ObjectId})
 
 @permission("pentester")
-def delete(pentest: str, interval_iid: str) -> Union[Tuple[str, int], int]:
+def delete(pentest: str, interval_iid: str) -> Union[ErrorStatus, int]:
     """
     Delete an interval from the database. If the interval is part of a wave and there are no other intervals in the wave 
     that fit the current time, all tools in the wave are marked as out of time.
@@ -33,7 +34,7 @@ def delete(pentest: str, interval_iid: str) -> Union[Tuple[str, int], int]:
     return res
 
 @permission("pentester")
-def insert(pentest: str, body: Dict[str, Any]) -> Union[IntervalInsertResult, Tuple[str, int]]:
+def insert(pentest: str, body: Dict[str, Any]) -> Union[IntervalInsertResult, ErrorStatus]:
     """
     Insert a new interval into the database. The interval is also added to its parent wave. If the start and end dates of 
     the interval are valid, all tools in the wave are checked to see if they fit within the new interval.
@@ -43,24 +44,14 @@ def insert(pentest: str, body: Dict[str, Any]) -> Union[IntervalInsertResult, Tu
         body (Dict[str, Any]): A dictionary containing the interval details.
 
     Returns:
-        Union[IntervalInsertResult, Tuple[str, int]]: A dictionary containing the result of the operation and 
+        Union[IntervalInsertResult, ErrorStatus]: A dictionary containing the result of the operation and 
         the id of the inserted interval, or a tuple containing an error message and status code if the dates are not valid.
     """
-    dbclient = DBClient.getInstance()
-    if "_id" in body:
-        del body["_id"]
     interval_o = Interval(pentest, body)
-    parent = interval_o.getParentId()
     try:
-        stringToDate(body.get("dated", ""))
-        stringToDate(body.get("datef", ""))
-    except ValueError as _e:
-        return "Invalid date format, expected '%d/%m/%Y %H:%M:%S'", 400
-    ins_result = dbclient.insertInDb(pentest, "intervals", body, str(parent))
-    ins_result = cast(InsertOneResult, ins_result)
-    interval_o.setToolsInTime()
-    iid = ins_result.inserted_id
-    return {"res":True, "iid":iid}
+        return interval_o.addInDb()
+    except ValueError as e:
+        return str(e), 400
 
 @permission("pentester")
 def update(pentest: str, interval_iid: str, body: Dict[str, Any]) -> bool:

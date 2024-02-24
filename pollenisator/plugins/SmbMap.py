@@ -1,14 +1,12 @@
 """A plugin to parse smbmap scan"""
+import shlex
 
 from pollenisator.core.components.tag import Tag
+from pollenisator.core.models.ip import Ip
+from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.servermodels.ip import ServerIp
-from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.server.modules.activedirectory.computers import Computer
 from pollenisator.server.modules.activedirectory.shares import Share
-
-import shlex
-from pollenisator.core.components.logger_config import logger
 
 
 def smbmap_format(row):
@@ -145,24 +143,24 @@ class SmbMap(Plugin):
             notes += "\n=====================Interesting files:=====================\n"
             notes += str(interesting_file_type)+":\n"
             for elem in interesting_files[interesting_file_type]:
-                 notes += "\t"+str(elem)+"\n"
+                notes += "\t"+str(elem)+"\n"
         if less_interesting_notes.strip() != "":
             notes += "\n=====================Other files:=====================\n"+less_interesting_notes
-        
+
         for ip, share_dict in shares.items():
-            ip_m = ServerIp(pentest).initialize(ip, infos={"plugin":SmbMap.get_name()})
+            ip_m = Ip(pentest).initialize(ip, infos={"plugin":SmbMap.get_name()})
             insert_ret = ip_m.addInDb()
             if not insert_ret["res"]:
-                ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
+                ip_m = Ip.fetchObject(pentest, {"_id": insert_ret["iid"]})
             host = str(target)
             port = str(445)
             proto = "tcp"
             service = "netbios-ssn"
-            port_m = ServerPort(pentest).initialize(host, port, proto, service, infos={"plugin":SmbMap.get_name()})
+            port_m = Port(pentest).initialize(host, port, proto, service, infos={"plugin":SmbMap.get_name()})
             insert_ret = port_m.addInDb()
             if not insert_ret["res"]:
-                port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
-            
+                port_m = Port.fetchObject(pentest, {"_id": insert_ret["iid"]})
+
             computer_m = Computer.fetchObject(pentest, {"ip":port_m.ip})
             if computer_m is not None:
                 computer_m.add_user(domain, user, password)

@@ -40,20 +40,8 @@ def insert(pentest: str, body: Dict[str, Any]) -> IpInsertResult:
     Returns:
         IpInsertResult: A dictionary containing the result of the operation and the id of the inserted IP.
     """
-    dbclient = DBClient.getInstance()
     ip_o = Ip(pentest, body)
-    base = ip_o.getDbKey()
-    existing = dbclient.findInDb(pentest, "ips", base, False)
-    if existing is not None:
-        return {"res":False, "iid":existing["_id"]}
-    if "_id" in body:
-        del body["_id"]
-    parent = ip_o.getParentId()
-    ins_result = dbclient.insertInDb(pentest, "ips", body, parent)
-    iid = ins_result.inserted_id
-    ip_o._id = iid
-    ip_o.add_ip_checks()
-    return {"res":True, "iid":iid}
+    return ip_o.addInDb()
 
 @permission("pentester")
 def update(pentest: str, ip_iid: str, body: Dict[str, Any]) -> bool:
@@ -68,9 +56,7 @@ def update(pentest: str, ip_iid: str, body: Dict[str, Any]) -> bool:
     Returns:
         bool: True if the operation was successful.
     """
-    dbclient = DBClient.getInstance()
-    dbclient.updateInDb(pentest, "ips", {"_id":ObjectId(ip_iid)}, {"$set":body}, False, True)
     new = Ip.fetchObject(pentest, {"_id":ObjectId(ip_iid)})
     new = cast(Ip, new)
-    new.add_ip_checks()
+    new.updateInDb(body)
     return True

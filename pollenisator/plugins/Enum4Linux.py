@@ -4,8 +4,8 @@ import re
 
 from bson import ObjectId
 from pollenisator.core.components.tag import Tag
-from pollenisator.server.servermodels.ip import ServerIp
-from pollenisator.server.servermodels.port import ServerPort
+from pollenisator.core.models.ip import Ip
+from pollenisator.core.models.port import Port
 from pollenisator.server.modules.activedirectory.computers import Computer
 from pollenisator.server.modules.activedirectory.users import insert as user_insert, update as user_update, User
 from pollenisator.plugins.plugin import Plugin
@@ -136,29 +136,29 @@ def updateDatabase(pentest, enum_infos):
     # Check if any ip has been found.
     if enum_infos is None:
         return
-    ip_m = ServerIp(pentest).initialize(str(enum_infos["ip"]), infos={"plugin":Enum4Linux.get_name()})
+    ip_m = Ip(pentest).initialize(str(enum_infos["ip"]), infos={"plugin":Enum4Linux.get_name()})
     insert_ret = ip_m.addInDb()
-    port_m = ServerPort(pentest).initialize(str(enum_infos["ip"]), "445", "tcp", "netbios-ssn", infos={"plugin":Enum4Linux.get_name()})
+    port_m = Port(pentest).initialize(str(enum_infos["ip"]), "445", "tcp", "netbios-ssn", infos={"plugin":Enum4Linux.get_name()})
     insert_ret = port_m.addInDb()
-    port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
+    port_m = Port.fetchObject(pentest, {"_id": insert_ret["iid"]})
     targets = {"enum4linux":{"ip": enum_infos["ip"], "port": "445", "proto": "tcp"}}
     infosToAdd = enum_infos
     if enum_infos.get("session_allowed", False):
         creds = (enum_infos.get("domain", ""), enum_infos.get("username", "anonymous"), enum_infos.get("password", ""))
         computer_m = Computer.fetchObject(pentest, {"ip":port_m.ip})
-        if computer_m is not None: 
+        if computer_m is not None:
             computer_m.add_user(creds[0], creds[1], creds[2])
     for user_account, user_add_infos in enum_infos.get("domain_users", {}).items():
         domain = user_account.split("\\")[0]
         username = user_account.split("\\")[1]
         password = ""
-        user_m = User(pentest).initialize(pentest, None, domain, username, password, user_add_infos.get("groups",[]), user_add_infos.get("desc"))
+        user_m = User(pentest).initialize( domain, username, password, user_add_infos.get("groups",[]), user_add_infos.get("desc"))
         res = user_insert(pentest, user_m.getData())
         user_update(pentest, ObjectId(res["iid"]), user_m.getData())
     for computer, computer_infos in enum_infos.get("computers", {}).items():
-        ip_m = ServerIp(pentest).initialize(str(computer_infos["ip"]), infos={"plugin":Enum4Linux.get_name()})
+        ip_m = Ip(pentest).initialize(str(computer_infos["ip"]), infos={"plugin":Enum4Linux.get_name()})
         insert_ret = ip_m.addInDb()
-        comp_m = Computer(pentest).initialize(pentest, None, computer, computer_infos["ip"], computer_infos["domain"], infos={"plugin":Enum4Linux.get_name()})
+        comp_m = Computer(pentest).initialize(computer, computer_infos["ip"], computer_infos["domain"], infos={"plugin":Enum4Linux.get_name()})
         comp_m.addInDb()
     if "users" in infosToAdd:
         del infosToAdd["users"]

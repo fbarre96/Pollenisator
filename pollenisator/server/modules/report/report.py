@@ -12,10 +12,10 @@ from typing_extensions import TypedDict
 from flask import Response, send_file
 from bson import ObjectId
 import werkzeug
+from pollenisator.core.models.defect import Defect
 import pollenisator.core.reporting.wordexport as wordexport
 import pollenisator.core.reporting.powerpointexport as powerpointexport
 from pollenisator.server import settings
-from pollenisator.server.servermodels.defect import getGlobalDefects
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.utils import getMainDir
 from pollenisator.server.permission import permission
@@ -309,7 +309,7 @@ def craftContext(pentest: str, **kwargs: Any) -> Dict[str, Any]:
     ports = [port for port in ports]
     ports.sort(key=lambda x: (x["ip"],int(x["port"])))
     context["ports"] = ports
-    defects = getGlobalDefects(pentest)
+    defects = Defect.getGlobalDefects(pentest)
     completed_defects = []
     completed_fixes = []
     defect_id = 1

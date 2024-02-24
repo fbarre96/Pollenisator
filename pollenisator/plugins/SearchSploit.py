@@ -52,7 +52,7 @@ class SearchSploit(Plugin):
             list of strings
         """
         return {"todo-searchsploit": Tag("todo-searchsploit", level="todo")}
-    
+
     def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
@@ -82,7 +82,7 @@ class SearchSploit(Plugin):
                 return notes, tags,"wave", {"wave": None}
             elif not re.match(r"\d", jsonFile["SEARCH"]):
                 return notes, tags, "wave", {"wave": None}
-            else:     
+            else:
                 for exploit in jsonFile["RESULTS_EXPLOIT"]:
                     notes += exploit["Date"] + " - " + exploit["Title"] + "\n"
                     notes += "Exploitdb path : " + exploit["Path"] + "\n"
@@ -91,4 +91,3 @@ class SearchSploit(Plugin):
                 return notes, tags, "wave", {"wave": None}
         except ValueError: # Couldn't parse json file
             return notes,None,None,None
-

@@ -1,10 +1,9 @@
 """A plugin to parse namp script ms17-010 scan"""
 
 from pollenisator.core.components.tag import Tag
+from pollenisator.core.models.ip import Ip
+from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.servermodels.defect import ServerDefect
-from pollenisator.server.servermodels.ip import ServerIp
-from pollenisator.server.servermodels.port import ServerPort
 import re
 
 
@@ -23,7 +22,7 @@ class EternalBlue(Plugin):
             string
         """
         return ".log.txt"
-    
+
     def detect_cmdline(self, cmdline):
         """Returns a boolean indicating if this plugin is able to recognize a command line as likely to output results for it.
         Args:
@@ -44,7 +43,7 @@ class EternalBlue(Plugin):
             string: the path to file created
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
-    
+
     def getTags(self):
         """Returns a list of tags that can be added by this plugin
         Returns:
@@ -81,7 +80,7 @@ class EternalBlue(Plugin):
             return None, None, None, None
         # Parsing
         ip = ip_group.group(1).strip()
-        ServerIp(pentest).initialize(ip, infos={"plugin":EternalBlue.get_name()}).addInDb()
+        Ip(pentest).initialize(ip, infos={"plugin":EternalBlue.get_name()}).addInDb()
         port_re = r"(\d+)\/(\S+)\s+open\s+microsoft-ds"
         res_search = re.search(port_re, notes)
         res_insert = None
@@ -91,7 +90,7 @@ class EternalBlue(Plugin):
         else:
             port = res_search.group(1)
             proto = res_search.group(2)
-            p_o = ServerPort(pentest)
+            p_o = Port(pentest)
             p_o.initialize(ip, port, proto, "microsoft-ds", infos={"plugin":EternalBlue.get_name()})
             insert_res = p_o.addInDb()
             res_insert = insert_res["res"]

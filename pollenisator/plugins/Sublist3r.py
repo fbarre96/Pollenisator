@@ -1,8 +1,8 @@
 """A plugin to parse sublist3r"""
 
 from pollenisator.core.components.tag import Tag
+from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.servermodels.ip import ServerIp
 import re
 
 def parseContent(file_opened):
@@ -76,7 +76,7 @@ class Sublist3r(Plugin):
         if ret is None:
             return None, None, None, None
         for domain in ret:
-            insert_res = ServerIp(pentest).initialize(domain.strip(), infos={"plugin":Sublist3r.get_name()}).addInDb()
+            insert_res = Ip(pentest).initialize(domain.strip(), infos={"plugin":Sublist3r.get_name()}).addInDb()
             # failed, domain is out of wave, still noting thi
             if not insert_res["res"]:
                 notes += domain+" exists but already added.\n"

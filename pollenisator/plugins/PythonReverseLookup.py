@@ -1,7 +1,7 @@
 """A plugin to parse python reverse lookup scan"""
 
+from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.servermodels.ip import ServerIp
 import re
 
 
@@ -41,7 +41,7 @@ class PythonReverseLookup(Plugin):
             string
         """
         return ".log.txt"
-    
+
     def detect_cmdline(self, cmdline):
         """Returns a boolean indicating if this plugin is able to recognize a command line as likely to output results for it.
         Args:
@@ -86,11 +86,11 @@ class PythonReverseLookup(Plugin):
         domain, ip = parse_reverse_python(result_socket)
         if domain is None:
             return None, None, None, None
-        ServerIp(pentest).initialize(domain, infos={"plugin":PythonReverseLookup.get_name()}).addInDb()
-        ip_m = ServerIp(pentest).initialize(ip, infos={"plugin":PythonReverseLookup.get_name()})
+        Ip(pentest).initialize(domain, infos={"plugin":PythonReverseLookup.get_name()}).addInDb()
+        ip_m = Ip(pentest).initialize(ip, infos={"plugin":PythonReverseLookup.get_name()})
         insert_res = ip_m.addInDb()
         if not insert_res["res"]:
-            ip_m = ServerIp.fetchObject(pentest, {"_id": insert_res["iid"]})
+            ip_m = Ip.fetchObject(pentest, {"_id": insert_res["iid"]})
         existing_hostnames = ip_m.infos.get("hostname", [])
         if not isinstance(existing_hostnames, list):
             existing_hostnames = [existing_hostnames]

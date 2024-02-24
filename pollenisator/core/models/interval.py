@@ -1,6 +1,7 @@
 """Interval Model. Useful to limit in a time frame some tools"""
 
 from typing import Any, Dict, Optional, cast
+from typing_extensions import TypedDict
 
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
@@ -9,7 +10,7 @@ from pollenisator.core.models.tool import Tool
 import pollenisator.core.components.utils as utils
 from datetime import datetime
 
-from pollenisator.core.models.wave import Wave
+IntervalInsertResult = TypedDict('IntervalInsertResult', {'res': bool, 'iid': ObjectId})
 
 
 class Interval(Element):
@@ -131,6 +132,32 @@ class Interval(Element):
             return ObjectId(res.get("_id", None)) if res.get("_id", None) is not None else None
         return None
 
+    def addInDb(self) -> IntervalInsertResult:
+        """
+        Adds this interval to the database.
+
+        Raises:
+            ValueError: If the date format is invalid.
+
+        Returns:
+            IntervalInsertResult: A dictionary containing the result of the operation and the id of the inserted interval.
+        """
+        dbclient = DBClient.getInstance()
+        data = self.getData()
+        if "_id" in data:
+            del data["_id"]
+        parent = self.getParentId()
+        try:
+            utils.stringToDate(data.get("dated", ""))
+            utils.stringToDate(data.get("datef", ""))
+        except ValueError as _e:
+            raise ValueError("Invalid date format, expected '%d/%m/%Y %H:%M:%S'") from _e
+        ins_result = dbclient.insertInDb(self.pentest, "intervals", data, ObjectId(parent))
+        iid = ins_result.inserted_id
+        self._id = iid
+        self.setToolsInTime()
+        return {"res":True, "iid":iid}
+
     def deleteFromDb(self) -> int:
         """
         Deletes this interval from the database.
@@ -140,11 +167,14 @@ class Interval(Element):
         """
         dbclient = DBClient.getInstance()
         res = dbclient.deleteFromDb(self.pentest, "intervals", {"_id": ObjectId(self.getId())}, False)
-        parent_wave = Wave.fetchObject(self.pentest, {"wave": self.wave})
+        wave_class = Element.classFactory("waves") # avoid circular import
+        if wave_class is None:
+            return 0
+        parent_wave = wave_class.fetchObject(self.pentest, {"wave": self.wave})
         if parent_wave is not None:
             dbclient.send_notify(self.pentest,
                                     "waves", str(parent_wave.getId()), "update", "")
-            other_intervals = Wave.fetchObjects(self.pentest, {"wave": self.wave})
+            other_intervals = wave_class.fetchObjects(self.pentest, {"wave": self.wave})
             if other_intervals is not None:
                 no_interval_in_time = True
                 for other_interval_o in other_intervals:

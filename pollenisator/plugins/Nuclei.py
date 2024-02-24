@@ -1,9 +1,7 @@
 """A plugin to parse nuclei results"""
 
 from pollenisator.core.components.tag import Tag
-from pollenisator.server.servermodels.defect import ServerDefect
-from pollenisator.server.servermodels.ip import ServerIp
-from pollenisator.server.servermodels.port import ServerPort
+from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
 import json
 
@@ -67,7 +65,7 @@ class Nuclei(Plugin):
             string: the path to file created
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
-    
+
     def getTags(self):
         """Returns a list of tags that can be added by this plugin
         Returns:
@@ -110,16 +108,14 @@ class Nuclei(Plugin):
                     tags = [self.getTags()["todo-nuclei-level"]]
                 if finding["info"].get("level", "none") in ["critical","high"]:
                     tags = [self.getTags()["todo-high-nuclei-level"]]
-            ip_o = ServerIp(pentest).initialize(host, notes, infos={"plugin":Nuclei.get_name()})
+            ip_o = Ip(pentest).initialize(host, notes, infos={"plugin":Nuclei.get_name()})
             inserted = ip_o.addInDb()
             if not inserted["res"]:
-                ip_o = ServerIp.fetchObject(pentest, {"_id": inserted["iid"]})
+                ip_o = Ip.fetchObject(pentest, {"_id": inserted["iid"]})
                 if ip_o is not None:
                     ip_o.notes += "\nNuclei:\n"+notes
-                    ip_o.update()
+                    ip_o.updateInDb()
             cumulative_notes.append(notes+"\n")
-            
-            
         notes = "\n".join(cumulative_notes)
 
         return notes, tags, "ip", targets

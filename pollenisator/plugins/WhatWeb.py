@@ -3,9 +3,9 @@
 import json
 import re
 import webbrowser
+from pollenisator.core.models.ip import Ip
+from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.servermodels.ip import ServerIp
-from pollenisator.server.servermodels.port import ServerPort
 
 class WhatWeb(Plugin):
     default_bin_names = ["whatweb", "whatweb.rb"]
@@ -30,7 +30,9 @@ class WhatWeb(Plugin):
         Args:
             _event: not used but mandatory
         """
-        port_m = ServerPort.fetchObject(
+        if self.toolmodel is None:
+            return
+        port_m = Port.fetchObject(self.toolmodel.pentest,
             {"ip": self.toolmodel.ip, "port": self.toolmodel.port, "proto": self.toolmodel.proto})
         if port_m is None:
             return
@@ -110,11 +112,11 @@ class WhatWeb(Plugin):
             else:
                 host = host_port
                 port = "443" if "https://" in website["target"] else "80"
-            ServerIp(pentest).initialize(host, infos={"plugin":WhatWeb.get_name()}).addInDb()
-            p_o = ServerPort(pentest).initialize(host, port, "tcp", service, infos={"plugin":WhatWeb.get_name()})
+            Ip(pentest).initialize(host, infos={"plugin":WhatWeb.get_name()}).addInDb()
+            p_o = Port(pentest).initialize(host, port, "tcp", service, infos={"plugin":WhatWeb.get_name()})
             insert_res = p_o.addInDb()
             if not insert_res["res"]:
-                p_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})
+                p_o = Port.fetchObject(pentest, {"_id": insert_res["iid"]})
             infosToAdd = {"URL": website["target"]}
             for plugin in website.get("plugins", {}):
                 item = website["plugins"][plugin].get("string")

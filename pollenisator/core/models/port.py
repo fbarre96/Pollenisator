@@ -1,7 +1,8 @@
 """Port Model"""
 
 import time
-from typing import Dict, Iterable, List, Tuple, Union, cast
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union, cast
+from typing_extensions import TypedDict
 
 from pymongo import UpdateOne, InsertOne
 from pollenisator.core.components.mongo import DBClient
@@ -13,8 +14,9 @@ from pollenisator.core.models.tool import Tool
 from pollenisator.server.modules.activedirectory.computers import Computer
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
-from pollenisator.server.servermodels.port import PortInsertResult, insert as port_insert, update as port_update
 from pollenisator.core.components.logger_config import logger
+
+PortInsertResult = TypedDict('PortInsertResult', {'res': bool, 'iid': ObjectId})
 
 
 class Port(Element):
@@ -168,18 +170,65 @@ class Port(Element):
         Returns:
             PortInsertResult: A dictionary containing the result of the operation and the id of the inserted port.
         """
-        res: PortInsertResult = port_insert(self.pentest, self.getData())
-        return res
+        dbclient = DBClient.getInstance()
+        base = self.getDbKey()
+        existing = Port.fetchObject(self.pentest, base)
+        if existing is not None:
+            return {"res":False, "iid":existing.getId()}
+        data = self.getData()
+        if "_id" in data:
+            del data["_id"]
+        parent = self.getParentId()
+        ins_result = dbclient.insertInDb(self.pentest, "ports", data, parent)
+        iid = ins_result.inserted_id
+        self._id = iid
+        if int(self.port) == 445:
+            computer_o = Computer(self.pentest, {"name":"", "ip":self.ip, "domain":"", "admins":[], "users":[], "infos":{"is_dc":False}})
+            computer_o.addInDb()
+        if int(self.port) == 88:
+            computer_o = Computer(self.pentest, {"name":"", "ip":self.ip, "domain":"", "admins":[], "users":[], "infos":{"is_dc":True}})
+            res = computer_o.addInDb()
+            if not res["res"]:
+                comp_existing_o = Computer.fetchObject(self.pentest, {"_id":ObjectId(res["iid"])})
+                if comp_existing_o is not None:
+                    comp_existing_o.infos.is_dc = True
+                    comp_existing_o.update()
+        if int(self.port) == 1433 or (self.service == "ms-sql"):
+            computer_o = Computer(self.pentest, {"name":"", "ip":self.ip, "domain":"", "admins":[], "users":[], "infos":{"is_sqlserver":True}})
+            res = computer_o.addInDb()
+            if not res["res"]:
+                comp_existing_o = Computer.fetchObject(self.pentest, {"_id":ObjectId(res["iid"])})
+                if comp_existing_o is not None:
+                    comp_existing_o.infos.is_sqlserver = True
+                    comp_existing_o.update()
+        self.add_port_checks()
+        return {"res":True, "iid":iid}
 
-    def update(self) -> bool:
+    def updateInDb(self, data: Optional[Dict[str, Any]]) -> bool:
         """
         Update port in the database with the current object's data.
+
+        Args:
+            data (Optional[Dict[str, Any]]): A dictionary containing the new port details.
         
         Returns:
             bool: True if the update was successful, False otherwise.
         """
-        res: bool = port_update(self.pentest, ObjectId(self._id), self.getData())
-        return res
+        dbclient = DBClient.getInstance()
+        new_data = self.getData()
+        data = {} if data is None else data
+        new_data |= data
+        if "_id" in new_data:
+            del new_data["_id"]
+        dbclient.updateInDb(self.pentest, "ports", {"_id":ObjectId(self.getId())}, {"$set":new_data}, False, True)
+        new_self = Port(self.pentest, new_data)
+        if self.service != new_self.service:
+            dbclient.deleteFromDb(self.pentest, "tools", {
+                                    "lvl": "port:onServiceUpdate", "ip": self.ip, "port": self.port, "proto": self.proto, "status":{"$ne":"done"}}, many=True)
+            dbclient.deleteFromDb(self.pentest, "checkinstances", {
+                                    "lvl": "port:onServiceUpdate", "ip": self.ip, "port": self.port, "proto": self.proto, "status":{"$ne":"done"}}, many=True)     
+            new_self.add_port_checks()
+        return True
 
     def deleteFromDb(self) -> int:
         """
@@ -215,8 +264,7 @@ class Port(Element):
         Returns:
             bool: True if the update was successful, False otherwise.
         """
-        res: bool = port_update(self.pentest, self._id, {"service": self.service})
-        return res
+        return self.updateInDb({"service": self.service})
 
     @staticmethod
     def get_allowed_ports(checkitem: 'CheckItem', ports: List['Port']) -> List['Port']:

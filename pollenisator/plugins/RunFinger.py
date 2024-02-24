@@ -2,8 +2,8 @@
 
 import re
 from pollenisator.core.components.tag import Tag
-from pollenisator.server.servermodels.ip import ServerIp
-from pollenisator.server.servermodels.port import ServerPort
+from pollenisator.core.models.ip import Ip
+from pollenisator.core.models.port import Port
 from pollenisator.server.modules.activedirectory.computers import Computer
 from pollenisator.plugins.plugin import Plugin
 
@@ -86,20 +86,20 @@ def editScopeIPs(pentest, hostsInfos):
             mssql = infos.get("mssql", "")
             if mssql != "":
                 infosToAdd["mssql"] = mssql
-            ip_m = ServerIp(pentest).initialize(str(infos["ip"]), infos={"plugin":RunFinger.get_name()})
+            ip_m = Ip(pentest).initialize(str(infos["ip"]), infos={"plugin":RunFinger.get_name()})
             insert_ret = ip_m.addInDb()
             if not insert_ret["res"]:
-                ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
+                ip_m = Ip.fetchObject(pentest, {"_id": insert_ret["iid"]})
             host = str(infos["ip"])
             port = str(445)
             proto = "tcp"
             service = "netbios-ssn"
-            port_m = ServerPort(pentest).initialize(host, port, proto, service, infos={"plugin":RunFinger.get_name()})
+            port_m = Port(pentest).initialize(host, port, proto, service, infos={"plugin":RunFinger.get_name()})
             insert_ret = port_m.addInDb()
-            port_m = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
+            port_m = Port.fetchObject(pentest, {"_id": insert_ret["iid"]})
             port_m.updateInfos(infosToAdd)
             computer_m = Computer.fetchObject(pentest, {"ip":port_m.ip})
-            if computer_m is not None: 
+            if computer_m is not None:
                 computer_m.domain = infos.get("domain")
                 d = computer_m.getData()
                 comp_info = d["infos"]
@@ -143,7 +143,7 @@ class RunFinger(Plugin):
             list of strings
         """
         return {"info-runfinger": Tag("info-runfinger")}
-    
+
     def Parse(self, pentest, file_opened, **_kwargs):
         """
         Parse a opened file to extract information

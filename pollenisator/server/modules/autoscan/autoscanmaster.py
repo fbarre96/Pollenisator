@@ -4,7 +4,7 @@ from itertools import chain
 from threading import Thread
 from datetime import datetime
 import traceback
-from typing import Any, Dict, Iterator, List, Literal, Set, Union, Tuple, Optional, cast
+from typing import Any, Dict, List, Literal, Set, Tuple, cast
 from typing_extensions import TypedDict
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
@@ -17,7 +17,6 @@ from pollenisator.core.models.ip import Ip
 from pollenisator.core.models.tool import Tool
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
-from pollenisator.server.servermodels.tool import launchTask, stopTask, isLaunchable, queueTasks
 from pollenisator.server.permission import permission
 from pollenisator.server.token import encode_token
 from pollenisator.core.components.logger_config import logger
@@ -57,7 +56,7 @@ def startAutoScan(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Tuple[st
     encoded = encode_token(kwargs["token_info"])
     # queue auto commands
     tools_lauchable = findLaunchableTools(pentest)
-    queueTasks(pentest, [tool_model["tool"].getId() for tool_model in tools_lauchable])
+    Tool.queueTasks(pentest, set([tool_model["tool"].getId() for tool_model in tools_lauchable]))
     autoscan = Thread(target=autoScan, args=(pentest, encoded, autoqueue))
     try:
         logger.debug("Autoscan : start")
@@ -96,8 +95,7 @@ def autoScan(pentest: str, endoded_token: str, autoqueue: bool) -> None:
                 continue
             if autoqueue:
                 tools_lauchable = findLaunchableTools(pentest)
-                queueTasks(pentest, [tool_model["tool"].getId()
-                        for tool_model in tools_lauchable])
+                Tool.queueTasks(pentest, set([tool_model["tool"].getId() for tool_model in tools_lauchable]))
             launchableTools = []
             queue = dbclient.findInDb(pentest, "autoscan", {
                                       "type": "queue"}, False)
@@ -124,8 +122,12 @@ def autoScan(pentest: str, endoded_token: str, autoqueue: bool) -> None:
                 if autoscan_threads - len(toLaunch) - running_tools_count <= 0:
                     break
                 logger.debug("Autoscan : launch task tools: %s", str(launchableToolIid))
-                msg, statuscode = isLaunchable(
-                    pentest, launchableToolIid, authorized_commands, force)
+                tool_o = Tool.fetchObject(
+                    pentest, {"_id": ObjectId(launchableToolIid)})
+                if tool_o is None:
+                    continue
+                tool_o = cast(Tool, tool_o)
+                msg, statuscode = tool_o.isLaunchable(authorized_commands, force)
                 if statuscode == 404:
                     dbclient.updateInDb(pentest, "autoscan", {"type": "queue"}, {
                                         "$pull": {"tools": {"iid": launchableToolIid}}})
@@ -143,7 +145,7 @@ def autoScan(pentest: str, endoded_token: str, autoqueue: bool) -> None:
                     toLaunch.append((launchableToolIid, msg))
                     # the tool will be launched, we can remove it from the queue, let the worker set it as running
             for tool in toLaunch:
-                launchTask(pentest, tool[0], tool[1], endoded_token)
+                Tool.launchTask(pentest, tool[0], tool[1], endoded_token)
             check = getAutoScanStatus(pentest)
             time.sleep(6)
     except (KeyboardInterrupt, SystemExit):
@@ -172,17 +174,18 @@ def stopAutoScan(pentest: str) -> Literal["Success"]:
     """
     logger.debug("Autoscan : stop autoscan received ")
     dbclient = DBClient.getInstance()
-    toolsRunning = []
+    toolsRunning: List[Tool] = []
     workers = dbclient.getWorkers({"pentest": pentest})
     if workers is not None:
         for worker in workers:
-            tools = dbclient.findInDb(
-                pentest, "tools", {"scanner_ip": worker["name"], "status": "running"}, True)
-            for tool in tools:
-                toolsRunning.append(tool["_id"])
+            tools = Tool.fetchObjects(pentest, {"scanner_ip": worker["name"], "status": "running"})
+            if tools is not None:
+                for tool in tools:
+                    toolsRunning.append(cast(Tool, tool))
     dbclient.deleteFromDb(pentest, "autoscan", {}, True)
-    for toolId in toolsRunning:
-        _res, _msg = stopTask(pentest, toolId, {"forceReset": True})
+    for tool_o in toolsRunning:
+        tool_o = cast(Tool, tool_o)
+        _res, _msg = tool_o.stopTask(forceReset=True)
     return "Success"
 
 

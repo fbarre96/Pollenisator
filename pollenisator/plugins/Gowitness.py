@@ -1,12 +1,9 @@
 """A plugin to parse gowitness"""
 
-import json
-import re
 import webbrowser
 from pollenisator.core.components.tag import Tag
+from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.servermodels.ip import ServerIp
-from pollenisator.server.servermodels.port import ServerPort
 
 class Gowitness(Plugin):
     autoDetect = False
@@ -31,13 +28,14 @@ class Gowitness(Plugin):
         Args:
             _event: not used but mandatory
         """
-        port_m = ServerPort.fetchObject(
-            {"ip": self.toolmodel.ip, "port": self.toolmodel.port, "proto": self.toolmodel.proto})
-        if port_m is None:
-            return
-        url = port_m.infos.get("URL", None)
-        if url is not None:
-            webbrowser.open_new_tab(url)
+        if self.toolmodel is not None:
+            port_m = Port.fetchObject(self.toolmodel.pentest,
+                {"ip": self.toolmodel.ip, "port": self.toolmodel.port, "proto": self.toolmodel.proto})
+            if port_m is None:
+                return
+            url = port_m.infos.get("URL", None)
+            if url is not None:
+                webbrowser.open_new_tab(url)
 
     def changeCommand(self, command, outputDir, toolname):
         """

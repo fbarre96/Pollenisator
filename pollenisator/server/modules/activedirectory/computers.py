@@ -58,7 +58,7 @@ class Computer(Element):
 
     def initialize(self, name: Optional[str] = None, 
                    ip: Optional[str] = None, domain: Optional[str] = None, admins: Optional[List[ObjectId]] = None, 
-                   users: Optional[List[ObjectId]] = None, infos: Optional[Dict[str, Any]] = None) -> None:
+                   users: Optional[List[ObjectId]] = None, infos: Optional[Dict[str, Any]] = None) -> 'Computer':
         """
         Initialize the Computer object with the provided values. If a value is not provided, the corresponding attribute 
         is set to None. The pentest attribute is set to the current pentest if it is not provided.
@@ -73,6 +73,9 @@ class Computer(Element):
 
         Raises:
             ValueError: If an empty pentest name was given and the database is not set in mongo instance.
+        
+        Returns:
+            Computer: The initialized Computer object.
         """
 
         self.name = name
@@ -81,6 +84,7 @@ class Computer(Element):
         self.admins = admins if admins is not None else []
         self.users = users if users is not None else []
         self._infos = ComputerInfos(infos)
+        return self
 
     def __str__(self) -> str:
         """
@@ -164,14 +168,46 @@ class Computer(Element):
 
     def addInDb(self) -> ComputerInsertResult:
         """
-        Add the Computer object to the database. The insert method of the database is called with the current pentest and 
-        the data of the Computer object.
+        Add the Computer object to the database. 
+        If one already exists with the same IP, it is updated with the new information.
 
         Returns:
             ComputerInsertResult: The result of the insert operation.
         """
-        res: ComputerInsertResult = insert(self.pentest, self.getData())
-        return res
+        dbclient = DBClient.getInstance()
+        existing = Computer.fetchObject(self.pentest, {"ip":self.ip})
+        data = self.getData()
+        if "_id" in data:
+            del data["_id"]
+        data["type"] = "computer"
+        if existing is not None:
+            if self.infos.is_dc is True:
+                existing.infos.is_dc = True
+                existing.update()
+                self.add_dc_checks()
+                self.add_domain_checks()
+            if self.infos.is_sqlserver is True:
+                existing.infos.is_sqlserver = True
+                existing.update()
+                self.add_sqlserver_checks()
+            return {"res": False, "iid": existing.getId()}
+
+        ins_result = dbclient.insertInDb(self.pentest, "computers", data)
+        if self.infos.is_dc:
+            self.add_dc_checks()
+            self.add_domain_checks()
+        if self.infos.is_sqlserver:
+            self.add_sqlserver_checks()
+        domain = data.get("domain", None)
+        if domain is not None:
+            domain = domain.lower()
+            data["domain"] = domain
+        if domain is not None and domain != "":
+            existingDomain = Computer.fetchObject(self.pentest, {"domain":domain.lower()})
+            if existingDomain is None:
+                self.addCheck("AD:onNewDomainDiscovered", {"domain":domain.lower()})
+        iid = ins_result.inserted_id
+        return {"res": True, "iid": iid}
 
     def deleteFromDb(self) -> int:
         """
@@ -534,42 +570,8 @@ def insert(pentest: str, body: Dict[str, Any]) -> ComputerInsertResult:
         ComputerInsertResult: The result of the insert operation.
     """
     computer = Computer(pentest, body)
-    dbclient = DBClient.getInstance()
-    existing = dbclient.findInDb(pentest,
-        "computers", {"type":"computer", "ip":computer.ip}, False)
-    if existing is not None:
-        if body.get("infos", {}).get("is_dc", False) is True:
-            existing["infos"]["is_dc"] = True
-            dbclient.updateInDb(pentest, "computers", {"_id": existing["_id"]}, {"$set": {"infos": existing["infos"]}}, False, True)
-            computer.add_dc_checks()
-            computer.add_domain_checks()
-        if body.get("infos", {}).get("is_sqlserver", False) is True:
-            existing["infos"]["is_sqlserver"] = True
-            dbclient.updateInDb(pentest, "computers", {"_id": existing["_id"]}, {"$set": {"infos": existing["infos"]}}, False, True)
-            computer.add_sqlserver_checks()
-        return {"res": False, "iid": existing["_id"]}
-    if "_id" in body:
-        del body["_id"]
-    body["type"] = "computer"
-
-    ins_result = dbclient.insertInDb(pentest,
-        "computers", body, True)
-    if computer.infos.is_dc:
-        computer.add_dc_checks()
-        computer.add_domain_checks()
-    if computer.infos.is_sqlserver:
-        computer.add_sqlserver_checks()
-    domain = body.get("domain", None)
-    if domain is not None:
-        domain = domain.lower()
-        body["domain"] = domain
-    if domain is not None and domain != "":
-        existingDomain = dbclient.findInDb(pentest,
-             "computers", {"type":"computer", "domain":domain.lower()}, False)
-        if existingDomain is None:
-            computer.addCheck("AD:onNewDomainDiscovered", {"domain":domain.lower()})
-    iid = ins_result.inserted_id
-    return {"res": True, "iid": iid}
+    return computer.addInDb()
+    
 
 @permission("pentester")
 def getUsers(pentest: str, computer_iid: ObjectId) -> Union[ErrorCode, UsersAdminsListing]:

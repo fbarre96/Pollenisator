@@ -1,9 +1,9 @@
 """A plugin to parse a dirsearch scan"""
 
 from pollenisator.core.components.tag import Tag
+from pollenisator.core.models.ip import Ip
+from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.servermodels.ip import ServerIp
-from pollenisator.server.servermodels.port import ServerPort
 import re
 import os
 
@@ -136,14 +136,14 @@ class Dirsearch(Plugin):
                 return None, None, None, None
             targets = {}
             for host in hosts:
-                ServerIp(pentest).initialize(host, infos={"plugin":Dirsearch.get_name()}).addInDb()
+                Ip(pentest).initialize(host, infos={"plugin":Dirsearch.get_name()}).addInDb()
                 for port in hosts[host]:
-                    port_o = ServerPort(pentest)
+                    port_o = Port(pentest)
                     port_o.initialize(host, port, "tcp",
                                       hosts[host][port]["service"], infos={"plugin":Dirsearch.get_name()})
                     insert_ret = port_o.addInDb()
                     if not insert_ret["res"]:
-                        port_o = ServerPort.fetchObject(pentest, {"_id": insert_ret["iid"]})
+                        port_o = Port.fetchObject(pentest, {"_id": insert_ret["iid"]})
                     targets[str(port_o.getId())] = {
                         "ip": host, "port": port, "proto": "tcp"}
                     hosts[host][port]["paths"].sort(key=lambda x: int(x[0]))

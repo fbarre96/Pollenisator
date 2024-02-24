@@ -2,10 +2,9 @@
 
 import json
 from pollenisator.core.components.tag import Tag
+from pollenisator.core.models.ip import Ip
+from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.servermodels.ip import ServerIp
-from pollenisator.server.servermodels.port import ServerPort
-from pollenisator.server.servermodels.defect import ServerDefect
 
 class SSHScan(Plugin):
     default_bin_names = ["ssh-scan", "ssh_scan"]
@@ -41,7 +40,7 @@ class SSHScan(Plugin):
         return {"info-sshscan": Tag("info-sshscan"), 
                 "pwned-ssh-nopassword": Tag("pwned-ssh-nopassword", level="high", color="red"),
                 "SSH-flaw": Tag("SSH-flaw", level="low", color="yellow")}
-    
+
     def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
@@ -75,11 +74,11 @@ class SSHScan(Plugin):
                 for ip in ips:
                     if ip.strip() == "":
                         continue
-                    ServerIp(pentest).initialize(ip, infos={"plugin":SSHScan.get_name()}).addInDb()
-                    port_o = ServerPort(pentest).initialize(ip, port, "tcp", "ssh", infos={"plugin":SSHScan.get_name()})
+                    Ip(pentest).initialize(ip, infos={"plugin":SSHScan.get_name()}).addInDb()
+                    port_o = Port(pentest).initialize(ip, port, "tcp", "ssh", infos={"plugin":SSHScan.get_name()})
                     insert_res = port_o.addInDb()
                     if not insert_res["res"]:
-                        port_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})
+                        port_o = Port.fetchObject(pentest, {"_id": insert_res["iid"]})
                     if port_o is None:
                         continue
                     notes = "\n".join(

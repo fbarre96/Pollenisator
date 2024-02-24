@@ -2,7 +2,7 @@
 handle the command related API calls
 """
 
-from typing import Dict, Any, List, Union, Tuple, Optional
+from typing import Dict, Any, List, Union, Tuple
 from typing_extensions import TypedDict
 from bson import ObjectId
 import json
@@ -77,32 +77,6 @@ def delete(pentest: str, command_iid: str, **_kwargs: Any) -> Union[Tuple[str, i
     return command.deleteFromDb()
 
 
-def doInsert(_pentest: str, body: Dict[str, Any], user: str) -> CommandInsertResult:
-    """
-    Insert a new command into the database. If a command with the same name already exists, 
-    the function will return the id of the existing command.
-
-    Args:
-        _pentest (str): The name of the pentest.
-        body (Dict[str, Any]): A dictionary containing the command details.
-        user (str): The name of the user who owns the command.
-
-    Returns:
-        CommandInsertResult: A dictionary containing the result of the operation and the id of the inserted command.
-    """
-    dbclient = DBClient.getInstance()
-    existing = dbclient.findInDb(
-        body["indb"], "commands", {"name": body["name"]}, False)
-    if existing is not None:
-        return {"res": False, "iid": existing["_id"]}
-    if "_id" in body:
-        del body["_id"]
-    body["owners"] = [user]
-    ins_result = dbclient.insertInDb(
-        body["indb"], "commands", body, '', True)
-    iid = ins_result.inserted_id
-    return {"res": True, "iid": iid}
-
 @permission("pentester")
 def insert(pentest: str, body: Dict[str, Any], **kwargs: Any) -> CommandInsertResult:
     """
@@ -117,7 +91,9 @@ def insert(pentest: str, body: Dict[str, Any], **kwargs: Any) -> CommandInsertRe
         CommandInsertResult: A dictionary containing the result of the operation and the id of the inserted command.
     """
     user = kwargs["token_info"]["sub"]
-    return doInsert(pentest, body, user)
+    body["owners"] = [str(user)]
+    command_o = Command(pentest, body)
+    return command_o.addInDb()
 
 
 @permission("pentester")
@@ -165,28 +141,3 @@ def addToMyCommands(command_iid: str, **kwargs: Any) -> Tuple[str, int]:
     dbclient.updateInDb("pollenisator", "commands", {
                                  "_id": ObjectId(command_iid)}, {"$push":{"owners":user}})
     return "OK", 200
-
-def addUserCommandsToPentest(pentest: str, user: str) -> bool:
-    """
-    Add all commands owned by a user to the pentest database.
-
-    Args:
-        pentest (str): The name of the pentest.
-        user (str): The name of the user whose commands will be added.
-
-    Returns:
-        bool: True if the operation was successful, False otherwise.
-    """
-    """Add all commands owned by user to pentest database."""
-    dbclient = DBClient.getInstance()
-    commands = dbclient.findInDb(
-        "pollenisator", "commands", {}, True)
-    for command in commands:
-        mycommand = command
-        mycommand["original_iid"] = str(command["_id"])
-        mycommand["indb"] = pentest
-        res = doInsert(pentest, mycommand, user)
-        if not res["res"]:
-            dbclient.updateInDb(pentest, "commands", {
-                                 "_id": ObjectId(res["iid"])}, {"$push":{"owners":user}})
-    return True

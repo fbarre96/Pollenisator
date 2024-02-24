@@ -72,9 +72,19 @@ class Share(Element):
         Returns:
             ShareInsertResult: The result of the insert operation.
         """
-        res: ShareInsertResult = insert(self.pentest, self.getData())
-        self._id = ObjectId(res["iid"])
-        return res
+        dbclient = DBClient.getInstance()
+        existing = Share.fetchObject(self.pentest, {"share":self.share, "ip":self.ip})
+        if existing is not None:
+            return {"res": False, "iid": existing.getId()}
+        data = self.getData()
+        if "_id" in data:
+            del data["_id"]
+        data["type"] = "share"
+        ins_result = dbclient.insertInDb(self.pentest,
+            "shares", data)
+        iid = ins_result.inserted_id
+        self._id = iid
+        return {"res": True, "iid": iid}
 
     def update(self, iid: Optional[ObjectId] = None) -> Union[bool, Tuple[str, int]]:
         """
@@ -294,18 +304,7 @@ def insert(pentest: str, body: Dict[str, Any]) -> ShareInsertResult:
         ShareInsertResult: The result of the insert operation.
     """
     share = Share(pentest, body)
-    dbclient = DBClient.getInstance()
-    existing = dbclient.findInDb(pentest, 
-        "shares", {"type":"share", "share":share.share, "ip":share.ip}, False)
-    if existing is not None:
-        return {"res": False, "iid": existing["_id"]}
-    if "_id" in body:
-        del body["_id"]
-    body["type"] = "share"
-    ins_result = dbclient.insertInDb(pentest,
-        "shares", body, True)
-    iid = ins_result.inserted_id
-    return {"res": True, "iid": iid}
+    return share.addInDb()
 
 @permission("pentester")
 def update(pentest: str, share_iid: str, body: Dict[str, Any]) -> Union[bool, Tuple[str, int]]:

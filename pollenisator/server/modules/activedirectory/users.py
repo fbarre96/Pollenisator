@@ -143,8 +143,33 @@ class User(Element):
         Returns:
             UserInsertResult: The UserInsertResult of the inserted document.
         """
-        res: UserInsertResult = insert(self.pentest, self.getData())
-        return res
+        dbclient = DBClient.getInstance()
+        domain = self.domain.lower() if self.domain is not None else ""
+        username = self.username.lower() if self.username is not None else ""
+        username = username.strip()
+        password = self.password if self.password is not None else ""
+        password = password.strip()
+        existing = User.fetchObject(self.pentest, {"type":"user", "domain":{"$regex":domain}, "username":username})
+        if existing is not None:
+            if existing.password != "":
+                return {"res": False, "iid": existing.getId()}
+            else:
+                existing.infos |= self.infos
+                existing.password = password
+                existing.update()
+                return {"res": False, "iid": existing.getId()}
+        data = self.getData()
+        if "_id" in data:
+            del data["_id"]
+        data["type"] = "user"
+        
+        ins_result = dbclient.insertInDb(self.pentest, 
+            "users", data)
+        iid = ins_result.inserted_id
+        self._id = iid
+        self.add_user_checks()
+        return {"res": True, "iid": iid}
+
 
     def deleteFromDb(self) -> int:
         """
@@ -167,6 +192,13 @@ class User(Element):
             return 0
         else:
             return res
+
+    def update(self) -> None:
+        """
+        Update this User object in the database.
+        """
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb(self.pentest, "users", {"_id": ObjectId(self.getId()), "type":"user"}, {"$set": self.getData()})
 
     @classmethod
     def replaceCommandVariables(cls, _pentest: str, command: str, data: Dict[str, Any]) -> str:
@@ -360,31 +392,7 @@ def insert(pentest:str, body: Dict[str, Any]) -> UserInsertResult:
         UserInsertResult: The user inserted dictionnary with "res" and "iid"
     """
     user = User(pentest, body)
-    dbclient = DBClient.getInstance()
-    domain = user.domain.lower() if user.domain is not None else ""
-    username = user.username.lower() if user.username is not None else ""
-    username = username.strip()
-    password = user.password if user.password is not None else ""
-    password = password.strip()
-    existing = dbclient.findInDb(pentest,
-        "users", {"type":"user", "domain":{"$regex":domain}, "username":username}, False)
-    if existing is not None:
-        if existing["password"] != "":
-            return {"res": False, "iid": existing["_id"]}
-        else:
-            existing["infos"] |= user.infos
-            dbclient.updateInDb(pentest, "users", {"_id":ObjectId(existing["_id"])}, {"$set":{"password":password, "infos":existing["infos"]}})
-            return {"res": False, "iid": existing["_id"]}
-    if "_id" in body:
-        del body["_id"]
-    body["type"] = "user"
-    
-    ins_result = dbclient.insertInDb(pentest, 
-        "users", body, True)
-    iid = ins_result.inserted_id
-    user._id = iid
-    user.add_user_checks()
-    return {"res": True, "iid": iid}
+    return user.addInDb()
 
 @permission("pentester")
 def update(pentest: str, user_iid: str, body: Dict[str, Any]) -> Union[bool, Tuple[str, int]]:

@@ -1,12 +1,11 @@
 """A plugin to parse nmap scan"""
 import re
-from pollenisator.core.components.mongo import DBClient
-from pollenisator.core.components.tag import Tag
-from pollenisator.server.servermodels.ip import ServerIp
-from pollenisator.server.servermodels.port import ServerPort
-from pollenisator.plugins.plugin import Plugin
 import shlex
 import time
+from pollenisator.core.components.tag import Tag
+from pollenisator.core.models.ip import Ip
+from pollenisator.core.models.port import Port
+from pollenisator.plugins.plugin import Plugin
 from pollenisator.core.components.logger_config import logger
 
 def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
@@ -18,7 +17,6 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
         Returns:
             notes about inseted ip and ports
     """
-    dbclient = DBClient.getInstance()
     notes = ""
     countOpen = 0
     ports_to_add = []
@@ -69,11 +67,11 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
                 2) if ip.group(2) is not None else ""]
             notes_ip = "ip:" + \
                 str(lastIp[1]) if lastIp[1] != "" and lastIp[1] is not None else ""
-            ipCIDR_m = ServerIp(pentest, {"in_scopes":[]}).initialize(str(lastIp[0]), notes=notes_ip, in_scopes=[], infos={"plugin":Nmap.get_name()})
+            ipCIDR_m = Ip(pentest, {"in_scopes":[]}).initialize(str(lastIp[0]), notes=notes_ip, in_scopes=[], infos={"plugin":Nmap.get_name()})
             if not keep_only_open:#add directly
                 ips_to_add.append(ipCIDR_m)
             if lastIp[1].strip() != "" and lastIp[1] is not None:
-                ipDom_m = ServerIp(pentest, {"in_scopes":[]}).initialize(
+                ipDom_m = Ip(pentest, {"in_scopes":[]}).initialize(
                     str(lastIp[1]), notes="domain:"+str(lastIp[0]), in_scopes=[], infos={"plugin":Nmap.get_name()})
                 if not keep_only_open:#add directly
                     ips_to_add.append(ipDom_m)
@@ -110,7 +108,7 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
                 for ipFound in validIps:
                     if ip == "":
                         continue
-                    port_o = ServerPort(pentest).initialize(ipFound, port_number, proto, service, product, infos={"plugin":Nmap.get_name()})
+                    port_o = Port(pentest).initialize(ipFound, port_number, proto, service, product, infos={"plugin":Nmap.get_name()})
                     ports_to_add.append(port_o)
     bulk_insertions(pentest, ips_to_add, ports_to_add)
     notes = str(countOpen)+" open ports found\n"+notes
@@ -120,11 +118,11 @@ def bulk_insertions(pentest, ips_to_add, ports_to_add):
     """Bulk insertions of ips and ports
     """
     start = time.time()
-    ServerIp.bulk_insert(pentest, ips_to_add, look_scopes=True)
-    logger.info("Insertion of ips took "+str(time.time()-start)+" seconds")
+    Ip.bulk_insert(pentest, ips_to_add, look_scopes=True)
+    logger.info("Insertion of ips took %s seconds", str(time.time()-start))
     start = time.time()
-    results = ServerPort.bulk_insert(pentest, ports_to_add)
-    logger.info("Insertion of ports took "+str(time.time()-start)+" seconds")
+    Port.bulk_insert(pentest, ports_to_add)
+    logger.info("Insertion of ports took %s seconds", str(time.time()-start))
     
 class Nmap(Plugin):
     default_bin_names = ["nmap"]
@@ -192,7 +190,6 @@ class Nmap(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
-        
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
             return None, None, None, None
         tags = [self.getTags()["info-nmap"]]

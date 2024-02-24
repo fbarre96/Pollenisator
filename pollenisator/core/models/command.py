@@ -1,10 +1,12 @@
 """Command Model."""
 from typing import Any, Dict, Iterator, List, Optional
+from typing_extensions import TypedDict
 
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.element import Element
 
+CommandInsertResult = TypedDict('CommandInsertResult', {'res': bool, 'iid': ObjectId})
 
 class Command(Element):
     """Represents a command object to be run on designated scopes/ips/ports.
@@ -35,7 +37,7 @@ class Command(Element):
                             valuesFromDb.get("original_iid"), valuesFromDb.get("owners", []), valuesFromDb.get("timeout", 300), valuesFromDb.get("infos", {}))
 
     def initialize(self, name: str, bin_path: str, plugin: str = "Default", text: str = "", indb: str = "pollenisator", 
-                   original_iid: Optional[str] = None, owners: Optional[List[str]] = None, timeout: int = 300, 
+                   original_iid: Optional[ObjectId] = None, owners: Optional[List[str]] = None, timeout: int = 300, 
                    infos: Optional[Dict[str, Any]] = None) -> 'Command':
         """
         Set values of command.
@@ -46,7 +48,7 @@ class Command(Element):
             plugin (str, optional): Plugin that goes with this command. Defaults to "Default".
             text (str, optional): The command line options. Defaults to "".
             indb (str, optional): DB name : global (pollenisator database) or local pentest database..
-            original_iid (Optional[str], optional): Original iid as string. Defaults to None.
+            original_iid (Optional[ObjectId], optional): Original iid as string. Defaults to None.
             owners (Optional[List[str]], optional): The user owning this command. Defaults to None.
             timeout (int, optional): A timeout to kill stuck tools and retry them later. Defaults to 300 (in seconds).
             infos (Optional[Dict[str, Any]], optional): A dictionary with key values as additional information. Defaults to None.
@@ -58,7 +60,7 @@ class Command(Element):
         self.bin_path = bin_path
         self.plugin = plugin
         self.text = text
-        self.original_iid = original_iid
+        self.original_iid = ObjectId(original_iid) if original_iid is not None else None
         self.infos = infos if infos is not None else {}
         self.indb: str = indb
         self.owners = owners if owners is not None else []
@@ -73,8 +75,27 @@ class Command(Element):
             Dict[str, Any]: A dictionary containing the data of the command.
         """
         return {"name": self.name, "bin_path":self.bin_path, "plugin":self.plugin,  "text": self.text,
-                "timeout": self.timeout,
+                "timeout": self.timeout, "owners": self.owners,
                 "indb":self.indb, "_id": self.getId(),  "infos": self.infos}
+
+    def addInDb(self) -> CommandInsertResult:
+        """
+        Insert the command into the database.
+
+        Returns:
+            CommandInsertResult: A dictionary containing the result of the operation and the id of the inserted command.
+        """
+        dbclient = DBClient.getInstance()
+        existing_command = Command.fetchObject(self.indb, {"name": self.name})
+        if existing_command is not None:
+            return {"res": False, "iid": existing_command.getId()}
+        data = self.getData()
+        if "_id" in data:
+            del data["_id"]
+        ins_result = dbclient.insertInDb(self.indb, "commands", data, None, True)
+        iid = ins_result.inserted_id
+        self._id = iid
+        return {"res": True, "iid": iid}
 
     def deleteFromDb(self) -> int:
         """
@@ -193,3 +214,38 @@ class Command(Element):
         if pipeline is None:
             pipeline = {}
         return [command.getId() for command in cls.fetchObjects(targetdb, pipeline)]
+
+    def addOwner(self, owner: str) -> None:
+        """
+        Add an owner to the command.
+
+        Args:
+            owner (str): The owner to add.
+        """
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb(self.indb, "commands", {"_id": ObjectId(self.getId())}, {"$addToSet": {"owners": owner}})
+        self.owners.append(owner)
+
+    @classmethod
+    def addUserCommandsToPentest(cls, pentest: str, user: str) -> bool:
+        """
+        Add all commands owned by a user to the pentest database.
+
+        Args:
+            pentest (str): The name of the pentest.
+            user (str): The name of the user whose commands will be added.
+
+        Returns:
+            bool: True if the operation was successful, False otherwise.
+        """
+        commands = Command.fetchObjects("pollenisator", {})
+        for command in commands:
+            mycommand = command
+            mycommand.original_iid = ObjectId(command.getId())
+            mycommand.indb = pentest
+            mycommand.owners = [user]
+            res = mycommand.addInDb()
+            if not res["res"]:
+                comm_o = Command(pentest, {"_id": ObjectId(res["iid"])})
+                comm_o.addOwner(user)
+        return True

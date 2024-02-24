@@ -1,6 +1,6 @@
 """A plugin to parse a dig scan"""
 
-from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
 
 def parse_reverse_dig(result_dig):
@@ -72,18 +72,18 @@ class DigReverseLookup(Plugin):
             return None, None, None, None
         if domain is not None:
             # Add a domain as a scope in db
-            ServerIp(pentest).initialize(domain, infos={"plugin":DigReverseLookup.get_name()}).addInDb()
-            ip_m = ServerIp(pentest).initialize(ip, infos={"plugin":DigReverseLookup.get_name()})
+            Ip(pentest).initialize(domain, infos={"plugin":DigReverseLookup.get_name()}).addInDb()
+            ip_m = Ip(pentest).initialize(ip, infos={"plugin":DigReverseLookup.get_name()})
             insert_ret = ip_m.addInDb()
             if not insert_ret["res"]:
-                ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
+                ip_m = Ip.fetchObject(pentest, {"_id": insert_ret["iid"]})
             hostnames = ip_m.infos.get("hostname", [])
             hostnames = list(set(hostnames + [domain]))
             ip_m.updateInfos({"hostname": hostnames, "plugin":DigReverseLookup.get_name()})
             ip_m.notes = "reversed dig give this domain : "+domain+"\n"+ip_m.notes
             notes += "Domain found :"+domain+"\n"
             targets["ip"] = {"ip": ip}
-            ip_m.update()
+            ip_m.updateInDb()
         if notes == "":
             notes = "No domain found\n"
         return notes, tags, "ip", targets

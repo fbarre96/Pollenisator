@@ -169,6 +169,8 @@ class CheckItem(Element):
         """
         if "_id" in data:
             del data["_id"]
+        if "type" in data:
+            del data["type"]
         dbclient = DBClient.getInstance()
         data["type"] = "checkitem"
         existing = CheckItem.fetchObject("pollenisator", {"title":data["title"]})

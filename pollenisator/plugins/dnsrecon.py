@@ -1,10 +1,9 @@
 """A plugin to parse dnsrecon scan"""
 
 # 1. Imports
-import re
 import json
 from pollenisator.core.components.tag import Tag
-from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
 
 
@@ -105,15 +104,15 @@ class dnsrecon(Plugin):
                 ip = record["address"]
                 name = record["name"]
                 infosToAdd = {"hostname": [name], "plugin":dnsrecon.get_name()}
-                ip_m = ServerIp(pentest).initialize(ip, infos=infosToAdd)
+                ip_m = Ip(pentest).initialize(ip, infos=infosToAdd)
                 ip_m.addInDb()
                 infosToAdd = {"ip": [ip], "plugin":dnsrecon.get_name()}
-                ip_m = ServerIp(pentest).initialize(name, infos=infosToAdd)
+                ip_m = Ip(pentest).initialize(name, infos=infosToAdd)
                 insert_ret = ip_m.addInDb()
                 # failed, domain is out of scope
                 if not insert_ret["res"]:
                     notes += name+" exists but already added.\n"
-                    ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
+                    ip_m = Ip.fetchObject(pentest, {"_id": insert_ret["iid"]})
                     existing_ips = ip_m.infos.get("ip", [])
                     if not isinstance(existing_ips, list):
                         existing_ips = [existing_ips]

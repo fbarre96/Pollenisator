@@ -1,13 +1,10 @@
 """A plugin to parse nmap XML scan"""
-import re
-from pollenisator.core.components.mongo import DBClient
-from pollenisator.core.components.tag import Tag
-from pollenisator.server.servermodels.ip import ServerIp
-from pollenisator.server.servermodels.port import ServerPort
-from pollenisator.plugins.plugin import Plugin
 import shlex
-import time
 from defusedxml import ElementTree as ET 
+from pollenisator.core.components.tag import Tag
+from pollenisator.core.models.ip import Ip
+from pollenisator.core.models.port import Port
+from pollenisator.plugins.plugin import Plugin
 from pollenisator.core.components.logger_config import logger
 
 def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
@@ -38,7 +35,7 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
         if scan_info['scanner'] != 'nmap':
             logger.error("Not a nmap scan")
             return None
-        
+
         for host in root.findall('host'):
             addedIps = []
             addr = host.find('address').get('addr')
@@ -50,8 +47,8 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
                 ports_to_add = []
             notes_ip = "ip:" + \
                 str(addr) if addr!= "" and addr is not None else ""
-            
-            ipCIDR_m = ServerIp(pentest, {"in_scopes":[]}).initialize(str(addr), notes=notes_ip, in_scopes=[], infos={"hostname":", ".join([host.get("name") for host in hostnames]), "plugin":NmapXML.get_name()})
+
+            ipCIDR_m = Ip(pentest, {"in_scopes":[]}).initialize(str(addr), notes=notes_ip, in_scopes=[], infos={"hostname":", ".join([host.get("name") for host in hostnames]), "plugin":NmapXML.get_name()})
             if not keep_only_open:#add directly
                 ips_to_add.append(ipCIDR_m)     
                 addedIps.append(ipCIDR_m)
@@ -60,7 +57,7 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
                     continue
                 notes_hostname = "hostname:" + \
                     str(hostname.get('name')) if hostname.get('name') != "" and hostname.get('name') is not None else ""
-                hostname_m = ServerIp(pentest, {"in_scopes":[]}).initialize(str(hostname.get('name')), notes=notes_hostname, in_scopes=[], infos={"plugin":NmapXML.get_name()})
+                hostname_m = Ip(pentest, {"in_scopes":[]}).initialize(str(hostname.get('name')), notes=notes_hostname, in_scopes=[], infos={"plugin":NmapXML.get_name()})
                 ips_to_add.append(hostname_m)    
                 addedIps.append(hostname_m) 
             ports = host.find('ports').findall('port')
@@ -96,7 +93,7 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
                     product = port_info.get("product", "")
                     if  product != "" and port_info.get("version", "") != "":
                         product = product + " "+port_info.get("version", "")
-                    port_o = ServerPort(pentest).initialize(ip.ip, port_info["portid"], port_info["protocol"], port_info["service"], product, infos={"plugin":NmapXML.get_name()})
+                    port_o = Port(pentest).initialize(ip.ip, port_info["portid"], port_info["protocol"], port_info["service"], product, infos={"plugin":NmapXML.get_name()})
                     ports_to_add.append(port_o)
     except ET.ParseError:
         logger.error("Error parsing nmap xml file")
@@ -109,8 +106,8 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
 def bulk_insertions(pentest, ips_to_add, ports_to_add):
     """Bulk insertions of ips and ports
     """
-    ServerIp.bulk_insert(pentest, ips_to_add, look_scopes=True)
-    results = ServerPort.bulk_insert(pentest, ports_to_add)
+    Ip.bulk_insert(pentest, ips_to_add, look_scopes=True)
+    results = Port.bulk_insert(pentest, ports_to_add)
     
 class NmapXML(Plugin):
     default_bin_names = ["nmap"]
@@ -128,7 +125,6 @@ class NmapXML(Plugin):
             string
         """
         return ".xml"
-        
 
     def getFileOutputPath(self, commandExecuted):
         """Returns the output file path given in the executed command using getFileOutputArg
@@ -138,7 +134,7 @@ class NmapXML(Plugin):
             string: the path to file created
         """
         return (commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0])
-    
+
     def changeCommand(self, command, outputDir, toolname):
         """
         Summary: Complete the given command with the tool output file option and filename absolute path.
@@ -178,7 +174,6 @@ class NmapXML(Plugin):
                 2. lvl: the level of the command executed to assign to given targets
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
-        
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
             return None, None, None, None
         tags = [self.getTags()["info-nmap"]]

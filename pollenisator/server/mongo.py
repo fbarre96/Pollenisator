@@ -3,31 +3,25 @@ Handles all generic interactions with the database
 """
 import json
 from typing import Any, Dict, List, Set, Tuple, Union
-
-from lark import Tree
-import os
-from bson import ObjectId
-from flask import Response, send_file
 import tempfile
 import re
 import shutil
-
+import os
+from lark import Tree
+from bson import ObjectId
+from flask import Response, send_file
 import werkzeug
-from uuid import UUID, uuid4
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.parser import Parser, ParseError, Term
 from pollenisator.core.components.tag import Tag
 from pollenisator.core.components.utils import JSONDecoder, getMainDir, isIp, JSONEncoder
 from pollenisator.core.models.command import Command
+from pollenisator.core.models.defect import Defect
 from pollenisator.core.models.element import Element
 from pollenisator.core.models.interval import Interval
+from pollenisator.core.models.scope import Scope
 from pollenisator.core.models.wave import Wave
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
-from pollenisator.server.servermodels.command import  addUserCommandsToPentest, doInsert as command_insert
-from pollenisator.server.servermodels.wave import insert as insert_wave
-from pollenisator.server.servermodels.interval import insert as insert_interval
-from pollenisator.server.servermodels.scope import insert as insert_scope
-from pollenisator.server.servermodels.defect import insert as insert_defect
 from pollenisator.server.permission import permission
 from pollenisator.core.components.logger_config import logger
 
@@ -665,15 +659,15 @@ def preparePentest(pentest, _pentest_name, pentest_type, start_date, end_date, s
     pentester_list = [x.strip() for x in pentesters.replace("\n",",").split(",")]
     pentester_list.insert(0, owner)
     dbclient.insertInDb(pentest, "settings", {"key":"pentesters", "value": pentester_list}, notify=False)
-    addUserCommandsToPentest(pentest, user)  
+    Command.addUserCommandsToPentest(pentest, user)  
     #addCheckInstancesToPentest(pentest, pentest_type)
     commands = Command.getList({}, pentest)
     if not commands:
         commands = []
     wave_o = Wave(pentest).initialize("Main", commands)
-    insert_wave(pentest, wave_o.getData())
+    wave_o.addInDb()
     interval_o = Interval(pentest).initialize(wave_o.wave, start_date, end_date)
-    msg, status_code = insert_interval(pentest, interval_o.getData())
+    msg, status_code = interval_o.addInDb()
     if status_code != 200:
         return msg, False
     scope = scope.replace("https://", "").replace("http://","")
@@ -681,9 +675,10 @@ def preparePentest(pentest, _pentest_name, pentest_type, start_date, end_date, s
     for scope_item in scope:
         if scope_item.strip() != "":
             if isIp(scope_item.strip()):
-                insert_scope(pentest, {"wave":"Main", "scope":scope_item.strip()+"/32"})
+                scope_o = Scope(pentest, {"wave":"Main", "scope":scope_item.strip()+"/32"})
             else:
-                insert_scope(pentest, {"wave":"Main", "scope":scope_item.strip()})
+                scope_o = Scope(pentest, {"wave":"Main", "scope":scope_item.strip()})
+            scope_o.addInDb()
     return "", True
 
 @permission("user")
@@ -949,7 +944,8 @@ def doImportCommands(data: str, user: str) -> Union[ErrorStatus, List[Dict[str, 
         save_id = str(command["_id"])
         del command["_id"]
         command["owners"] = command.get("owners", []) + [user]
-        obj_ins = command_insert("pollenisator", command, user)
+        command_o = Command("pollenisator", command)
+        obj_ins = command_o.addInDb()
         if obj_ins["res"]:
             matchings[save_id] = str(obj_ins["iid"])
         else:
@@ -991,16 +987,21 @@ def doImportCheatsheet(data: str, user: str) -> Union[ErrorStatus, List[Dict[str
     for command in checks["commands"]:
         save_id = str(command["_id"])
         del command["_id"]
-        obj_ins = command_insert("pollenisator", command, user)
+        command_o = Command("pollenisator", command)
+        obj_ins = command_o.addInDb()
+        command_o.addOwner(user)
         matching_commands[save_id] = str(obj_ins["iid"])
         if not obj_ins["res"]:
             failed.append(command)
     for defect in checks["defects"]:
         save_id = str(defect["_id"])
         del defect["_id"]
-        obj_ins = insert_defect("pollenisator", defect)
-        matching_defects[save_id] = str(obj_ins["iid"])
-        if not obj_ins["res"]:
+        try:
+            obj_ins = Defect("pollenisator", defect).addInDb()
+            matching_defects[save_id] = str(obj_ins["iid"])
+            if not obj_ins["res"]:
+                failed.append(defect)
+        except ValueError as _e:
             failed.append(defect)
     for check in checks["checkitems"]:
         save_id = str(check["_id"])

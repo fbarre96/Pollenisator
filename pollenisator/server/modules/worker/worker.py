@@ -8,8 +8,8 @@ import docker
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.socketmanager import SocketManager
+from pollenisator.core.models.command import Command
 from pollenisator.core.models.tool import Tool
-from pollenisator.server.servermodels.command import addUserCommandsToPentest
 from pollenisator.server.permission import permission
 from pollenisator.core.components.logger_config import logger
 
@@ -54,7 +54,7 @@ def doSetInclusion(name: str, pentest: str, setInclusionVal: bool) -> bool:
     if pentest == "":
         return False
     if setInclusionVal:
-        addUserCommandsToPentest(pentest, name)
+        Command.addUserCommandsToPentest(pentest, name)
     return dbclient.setWorkerInclusion(name, pentest, setInclusionVal)
 
 @permission("pentester", "body.db")

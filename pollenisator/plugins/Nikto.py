@@ -1,9 +1,9 @@
 """A plugin to parse nikto scan"""
 
 from pollenisator.core.components.tag import Tag
+from pollenisator.core.models.ip import Ip
+from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.servermodels.ip import ServerIp
-from pollenisator.server.servermodels.port import ServerPort
 import re
 
 
@@ -97,11 +97,11 @@ class Nikto(Plugin):
         host, port, service, infos = parse_nikto_plain_text(notes)
         if host:
             if port:
-                ServerIp(pentest).initialize(host, infos={"plugin":Nikto.get_name()}).addInDb()
-                p_o = ServerPort(pentest).initialize(host, port, "tcp", service, infos={"plugin":Nikto.get_name()})
+                Ip(pentest).initialize(host, infos={"plugin":Nikto.get_name()}).addInDb()
+                p_o = Port(pentest).initialize(host, port, "tcp", service, infos={"plugin":Nikto.get_name()})
                 insert_res = p_o.addInDb()
                 if not insert_res["res"]:
-                    p_o = ServerPort.fetchObject(pentest, {"_id": insert_res["iid"]})
+                    p_o = Port.fetchObject(pentest, {"_id": insert_res["iid"]})
                 p_o.updateInfos(
                     {"Nikto": infos, "SSL": "True" if service == "https" else "False"})
                 targets[str(insert_res["iid"])] = {

@@ -1,11 +1,9 @@
 """A plugin to parse nikto scan"""
 
 from pollenisator.core.components.tag import Tag
+from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.servermodels.ip import ServerIp
-from pollenisator.server.servermodels.port import ServerPort
 from pollenisator.server.modules.activedirectory.computers import Computer
-from pollenisator.core.components.mongo import DBClient
 import re
 
 def parse_host_plain_text(text):
@@ -83,11 +81,11 @@ class Host(Plugin):
         if infos is None:
             return None, None, None, None
         for domain, ip in infos.items():
-            ServerIp(pentest).initialize(domain, infos={"plugin":Host.get_name()}).addInDb()
-            ip_m = ServerIp(pentest).initialize(ip, infos={"plugin":Host.get_name()})
+            Ip(pentest).initialize(domain, infos={"plugin":Host.get_name()}).addInDb()
+            ip_m = Ip(pentest).initialize(ip, infos={"plugin":Host.get_name()})
             insert_res = ip_m.addInDb()
             if not insert_res["res"]:
-                ip_m = ServerIp.fetchObject(pentest, {"_id": insert_res["iid"]})
+                ip_m = Ip.fetchObject(pentest, {"_id": insert_res["iid"]})
             existing_hostnames = ip_m.infos.get("hostname", [])
             if not isinstance(existing_hostnames, list):
                 existing_hostnames = [existing_hostnames]
@@ -103,7 +101,7 @@ class Host(Plugin):
                 # host "domain name" gave an answer, probably domain controller
                 computer_dc = Computer.fetchObject(pentest, {"ip":ip, "domain":domain})
                 if computer_dc is None:
-                    Computer(pentest).initialize(pentest, None, name="", ip=ip, domain=domain, infos={"is_dc":True, "plugin":Host.get_name()}).addInDb()
+                    Computer(pentest).initialize(name="", ip=ip, domain=domain, infos={"is_dc":True, "plugin":Host.get_name()}).addInDb()
                 else:
                     computer_dc.infos.is_dc = True
                     computer_dc.update()

@@ -5,11 +5,14 @@ import os
 import re
 import threading
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, cast
+from typing_extensions import TypedDict
 from bson.objectid import ObjectId
 import pollenisator.core.components.utils as utils
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.element import Element
-from pollenisator.server.servermodels.defect import DefectInsertResult, getTargetRepr as getTargetRepr_defect, insert as insert_defect, update as update_defect
+
+DefectInsertResult = TypedDict('DefectInsertResult', {'res': bool, 'iid': ObjectId})
+
 
 sem = threading.Semaphore() 
 
@@ -190,12 +193,15 @@ class Defect(Element):
         """
         return self.target_id != ""
 
-    def addInDb(self) -> Union[DefectInsertResult, Tuple[str, int]]:
+    def addInDb(self) -> DefectInsertResult:
         """
         Add this defect into database.
 
+        Raises:
+            ValueError: If the target_id is not specified but the target_type is.
+
         Returns:
-            Union[DefectInsertResult, Tuple[str, int]]: The ObjectId of the inserted document in the database, or None if the operation was not successful.
+            DefectInsertResult: The ObjectId of the inserted document in the database, or None if the operation was not successful.
         """
         try:
             self.creation_time = datetime.now()
@@ -208,7 +214,7 @@ class Defect(Element):
                 return {"res":False, "iid": existing.getId()}
             if self.target_id is not None and self.target_type == "":
                 sem.release()
-                return "If a target_id is specified, a target_type should be specified to", 400
+                raise ValueError("If a target_id is specified, a target_type should be specified to")
             parent = self.getParentId()
             if self.pentest != "pollenisator" and not self.isAssigned():
                 insert_pos = Defect.findInsertPosition(self.pentest, self.risk)
@@ -236,7 +242,7 @@ class Defect(Element):
             if isinstance(self.mtype, str):
                 self.mtype = self.mtype.split(",")
             dbclient = DBClient.getInstance()
-            ins_result = dbclient.insertInDb(self.pentest, "defects", self.getData(), str(parent))
+            ins_result = dbclient.insertInDb(self.pentest, "defects", self.getData(), ObjectId(parent))
             iid = ins_result.inserted_id
             self._id = iid
 
@@ -425,10 +431,13 @@ class Defect(Element):
         Returns:
             str: A string representation of the target of this defect.
         """
-        result: (Tuple[str, int] | Dict[str, str]) = getTargetRepr_defect(self.pentest, [self.target_id])
-        if isinstance(result, tuple):
-            raise ValueError(result[0])
-        return result.get(str(self.target_id), "Target not found")
+        class_element = Element.classFactory(self.target_type)
+        if class_element is None:
+            return "Target not found"
+        target_elem = class_element.fetchObject(self.pentest, {"_id": ObjectId(self.target_id)})
+        if target_elem is None:
+            return "Target not found"
+        return target_elem.getDetailedString()
 
     @classmethod
     def getGlobalDefects(cls, pentest: str) -> List[Dict[str, Any]]:

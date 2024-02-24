@@ -3,7 +3,7 @@
 # 1. Imports
 import re
 from pollenisator.core.components.tag import Tag
-from pollenisator.server.servermodels.ip import ServerIp
+from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
 
 def parse_crtsh_line(line):
@@ -47,7 +47,7 @@ class Crtsh(Plugin):
             string: the path to file created
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip()
-    
+
     def getTags(self):
         """Returns a list of tags that can be added by this plugin
         Returns:
@@ -83,12 +83,12 @@ class Crtsh(Plugin):
             if domain is not None:
                 # a domain has been found
                 infosToAdd = {"hostname": ip, "plugin":Crtsh.get_name()}
-                ip_m = ServerIp(pentest).initialize(domain, infos=infosToAdd)
+                ip_m = Ip(pentest).initialize(domain, infos=infosToAdd)
                 insert_ret = ip_m.addInDb()
                 # failed, domain is out of scope
                 if not insert_ret["res"]:
                     notes += domain+" exists but already added.\n"
-                    ip_m = ServerIp.fetchObject(pentest, {"_id": insert_ret["iid"]})
+                    ip_m = Ip.fetchObject(pentest, {"_id": insert_ret["iid"]})
                     hostname = ip_m.infos.get("hostname", [])
                     if not isinstance(hostname, list):
                         hostname = [hostname]

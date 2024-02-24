@@ -294,7 +294,7 @@ def getTargetRepr(pentest: str, body: Union[str, List[str]]) -> Union[Tuple[str,
     Returns:
         Dict[str, str]: A dictionary mapping each defect id to a string representation of its target.
     """
-    dbclient = DBClient.getInstance()
+    
     if isinstance(body, str):
         body = json.loads(body, cls=JSONDecoder)
     if not isinstance(body, list):
@@ -306,17 +306,12 @@ def getTargetRepr(pentest: str, body: Union[str, List[str]]) -> Union[Tuple[str,
         else:
             iid = ObjectId(str_iid)
         iids_list.append(iid)
-    defects = dbclient.findInDb(pentest, "defects", {"_id": {"$in": iids_list}}, True)
-    ret = {}
-    for data in defects:
-        class_element = Element.classFactory(data["target_type"])
-        if class_element is not None:
-            elem = class_element.fetchObject(pentest, {"_id": ObjectId(data["target_id"])})
-            if elem is None:
-                ret_str = "Target not found"
-            else:
-                ret_str = elem.getDetailedString()
-            ret[str(data["_id"])] = ret_str
-        else:
-            ret[str(data["_id"])] = "Target not found"
+    defects = Defect.fetchObjects(pentest, {"_id": {"$in": iids_list}})
+    ret: Dict[str, str] = {}
+    if defects is None:
+        return ret
+    for defect_o in defects:
+        defect_o = cast(Defect, defect_o)
+        ret_str = defect_o.getTargetRepr()
+        ret[str(defect_o.getId())] = ret_str
     return ret
