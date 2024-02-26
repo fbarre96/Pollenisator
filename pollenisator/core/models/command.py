@@ -77,7 +77,7 @@ class Command(Element):
             Dict[str, Any]: A dictionary containing the data of the command.
         """
         return {"name": self.name, "bin_path":self.bin_path, "plugin":self.plugin,  "text": self.text,
-                "timeout": self.timeout, "owners": self.owners,
+                "timeout": self.timeout, "owners": self.owners, "original_iid": self.original_iid,
                 "indb":self.indb, "_id": self.getId(),  "infos": self.infos}
 
     def addInDb(self) -> CommandInsertResult:

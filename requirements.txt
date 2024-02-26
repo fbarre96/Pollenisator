@@ -24,3 +24,4 @@ markdowntodocx>=0.1.4.1
 docker
 ruamel.yaml
 redis[hiredis]
+typing-extensions

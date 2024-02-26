@@ -417,9 +417,8 @@ def bulk_delete(pentest: str, body: Union[str, Dict[str, List[str]]]) -> Union[i
     deleted = 0
     for obj_type in data:
         for obj_id_str in data[obj_type]:
-            if not isinstance(obj_id_str, ObjectId):
-                if str(obj_id_str).startswith("ObjectId|"):
-                    obj_id = ObjectId(str(obj_id_str).split("ObjectId|")[1])
+            if not isinstance(obj_id_str, ObjectId) and str(obj_id_str).startswith("ObjectId|"):
+                obj_id = ObjectId(str(obj_id_str).split("ObjectId|")[1])
             else:
                 obj_id = ObjectId(obj_id_str)
             res = dbclient.deleteFromDb(pentest, obj_type, {"_id": ObjectId(obj_id)}, False, True)

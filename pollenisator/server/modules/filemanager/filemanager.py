@@ -25,7 +25,7 @@ from pollenisator.server.permission import permission
 POSSIBLE_TYPES = ["proof", "result"]
 
 dbclient = DBClient.getInstance()
-local_path = os.path.join(getMainDir(), "files")
+local_path = os.path.normpath(os.path.join(getMainDir(), "files"))
 try:
     os.makedirs(local_path)
 except FileExistsError:
@@ -179,8 +179,14 @@ def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage
                 ip = none_or_str(target.get("ip", None))
                 port = none_or_str(target.get("port", None))
                 proto = none_or_str(target.get("proto", None))
-                check_iid = None if target.get("check_iid", None) is None else ObjectId(target["check_iid"])
-                tool_iid = None if target.get("tool_iid", None) is None else ObjectId(target["tool_iid"])
+                try:
+                    check_iid = None if target.get("check_iid", None) is None else ObjectId(target["check_iid"])
+                except bson.errors.InvalidId:
+                    check_iid = None
+                try:
+                    tool_iid = None if target.get("tool_iid", None) is None else ObjectId(target["tool_iid"])
+                except bson.errors.InvalidId:
+                    tool_iid = None
             if wave is None:
                 wave = result.get("plugin", "")+"-Imported"
             if dbclient.findInDb(pentest, "waves", {"wave":wave}, False) is None:

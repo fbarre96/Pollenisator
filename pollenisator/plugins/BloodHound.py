@@ -134,7 +134,7 @@ class BloodHound(Plugin):
         Returns:
             list of Tag
         """
-        return []
+        return {}
 
 
     def Parse(self, pentest: str, file_opened: IO[bytes], **kwargs: Dict[str, Any]) -> Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Optional[Dict[str, Optional[str]]]]]]:

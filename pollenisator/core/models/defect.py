@@ -483,7 +483,7 @@ class Defect(Element):
         Returns:
             str: The local path for the proof of the defect.
         """
-        local_path = os.path.join(utils.getMainDir(), "files")
+        local_path = os.path.normpath(os.path.join(utils.getMainDir(), "files"))
         filepath = os.path.join(local_path, self.pentest, "proofs", str(self.getId()))
         filepath = os.path.normpath(filepath)
         if not filepath.startswith(local_path):

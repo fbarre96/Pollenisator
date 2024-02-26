@@ -80,7 +80,7 @@ class DBClient:
         """Reset client connection"""
         self.client = None
 
-    def bulk_write(self, pentest: str, collection: str, update_operations: List[Union[InsertOne, UpdateOne]], notify: bool = True) -> pymongo.results.BulkWriteResult:
+    def bulk_write(self, pentest: str, collection: str, update_operations: List[Union[InsertOne, UpdateOne]], notify: bool = True) -> Optional[pymongo.results.BulkWriteResult]:
         """
         Bulk write data to the MongoDB database.
 
@@ -97,7 +97,7 @@ class DBClient:
             ValueError: If pentest is None.
             IOError: If the client is unable to connect.
         Returns:
-            results.BulkWriteResult: The result of the bulk write operation.
+            Optional[results.BulkWriteResult]: The result of the bulk write operation.
             
         """
         self.connect()
@@ -106,6 +106,8 @@ class DBClient:
         if pentest is None:
             raise ValueError("Pentest cannot be None")
         db = self.client[pentest]
+        if not update_operations:
+            return None
         result: pymongo.results.BulkWriteResult = db[collection].bulk_write(update_operations)
         if notify:
             if result.upserted_ids is None:
@@ -508,7 +510,7 @@ class DBClient:
         ret = self._insert(self.current_pentest, collection, values, notify, parent)
         return ret
 
-    def insertManyInDb(self, db: str, collection: str, values: List[Dict[str, Any]], parent: Optional[ObjectId] = None, notify: bool = True) ->pymongo.results.InsertManyResult:
+    def insertManyInDb(self, db: str, collection: str, values: List[Dict[str, Any]], parent: Optional[ObjectId] = None, notify: bool = True) -> pymongo.results.InsertManyResult:
         """
         Insert many documents in the database.
 
@@ -1375,7 +1377,7 @@ class DBClient:
             Tuple[str, int, str]: A tuple containing a message indicating the result of the operation, a HTTP-like status code, and the path of the uploaded file if succeedeed only.
         """
         dbclient = DBClient.getInstance()
-        local_path = os.path.join(utils.getMainDir(), "files")
+        local_path = os.path.normpath(os.path.join(utils.getMainDir(), "files"))
         try:
             os.makedirs(local_path)
         except FileExistsError:

@@ -269,6 +269,8 @@ class Computer(Element):
         if not update_operations:
             return None
         result = dbclient.bulk_write(pentest, "computers", list(update_operations))
+        if result is None:
+            return None
         upserted_ids = result.upserted_ids
         if upserted_ids is None:
             return None

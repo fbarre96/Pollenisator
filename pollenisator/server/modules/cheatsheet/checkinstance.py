@@ -242,7 +242,7 @@ class CheckInstance(Element):
         targets = list(targets)
         commands_pentest = Command.fetchObjects(pentest, {})
         checks_lkp: Dict[str, CheckItem] = {str(check.getId()): check for check in checks}
-        commands_lkp = {str(command_pentest.original_iid): command_pentest for command_pentest in commands_pentest}
+        commands_lkp: Dict[str, Command] = {str(command_pentest.original_iid): command_pentest for command_pentest in commands_pentest}
         check_command_lkp: Dict[str, List[Command]] = {}
         for checkItem in checks_lkp.values():
             if callable(f_get_impacted_targets):
@@ -254,7 +254,7 @@ class CheckInstance(Element):
                 checks_to_add.append(checkinstance)
             for command in checkItem.commands:
                 if commands_lkp.get(str(command), None) is not None:
-                    check_command_lkp[str(checkItem.getId())] = check_command_lkp.get(str(checkItem.getId()), []) + [commands_lkp[command]]
+                    check_command_lkp[str(checkItem.getId())] = check_command_lkp.get(str(checkItem.getId()), []) + [commands_lkp[str(command)]]
                 else:
                     check_command_lkp[str(checkItem.getId())] = check_command_lkp.get(str(checkItem.getId()), [])
         if not checks_to_add:
@@ -544,7 +544,7 @@ def getInformations(pentest: str, iid: str) -> Union[Dict[str, Any], ErrorStatus
     done = 0
     dbclient = DBClient.getInstance()
     dbclient.create_index(pentest, "tools", [("check_iid",1)])
-    tools_to_add = tool.Tool.fetchObjects(pentest, {"check_iid": str(iid)})
+    tools_to_add = tool.Tool.fetchObjects(pentest, {"check_iid": ObjectId(iid)})
     if tools_to_add is not None:
         for tool_model in tools_to_add:
             tool_model = cast(tool.Tool, tool_model)

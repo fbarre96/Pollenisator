@@ -23,11 +23,14 @@ def parse(opened_file):
             data = json.loads(line)
             if "template-id" in data and "info" in data and "name" in data["info"] and "author" in data["info"] and "tags" in data["info"]:
                 host = data.get("host", "")
+                if data.get("type", "") == "dns":
+                    if host.endswith("."):
+                        host = host[:-1]
                 host = host.split("://")[-1]
                 parts = host.split(":")
                 if len(parts) == 2:
                     host = parts[0]
-                
+
                 ret[host] = ret.get(host,[]) + [data]
             else:
                 return None

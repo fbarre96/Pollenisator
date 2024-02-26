@@ -69,7 +69,6 @@ def create_app(debug: bool, async_mode: str) -> Flask:
     flask_app = app.app
     # Now that the cache is initialized, set up the cached version of `findInDb`
     sm = SocketManager.getInstance()
-    logger.info('Running ...')
     sm.socketio.init_app(flask_app, log_output=False, logger=False,
                     engineio_logger=False, async_mode=async_mode)
     @sm.socketio.event
@@ -216,6 +215,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         dbclient.updateInDb(pentest, "documents", {"pentest":pentest}, {"$set":{"data":data}})
 
     flask_app.json_encoder = JSONEncoder
+    logger.info('Running ...')
     CORS(flask_app)
     return flask_app
 
@@ -313,6 +313,8 @@ def migrate():
         version = migrate_2_6()
     if version == "2.6":
         version = migrate_2_7()
+    if version == "2.7":
+        version = migrate_2_8()
 
 def migrate_0():
     dbclient = mongo.DBClient.getInstance()
@@ -379,6 +381,92 @@ def migrate_2_7():
     db["cheatsheet"].rename("checkitems")
     dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.7"}})
     return "2.7"
+
+
+def migrate_2_8():
+    dbclient = mongo.DBClient.getInstance()
+    # update iid strings to ObjectIds
+    logger.info("Converting Checkitems in pollenisator")
+    checks = dbclient.findInDb("pollenisator","checkitems",{}, True)
+    if checks:
+        for check in checks:
+            new_commands = []
+            new_defects = []
+            new_defect_tags = []
+            for command in check.get("commands", []):
+                new_commands.append(ObjectId(command))
+            for defect in check.get("defects", []):
+                new_defects.append(ObjectId(defect))
+            for defect_tag in check.get("defect_tags", []):
+                if len(defect_tag) > 1:
+                    defect_tag[1] = ObjectId(defect_tag[1])
+                new_defect_tags.append(defect_tag)
+            dbclient.updateInDb("pollenisator","checkitems",{"_id":ObjectId(check["_id"])},{"$set":{"commands":new_commands, "defects":new_defects, "defect_tags":new_defect_tags}})
+    # iterate pentests
+    logger.info("Start iterating pentests.")
+    pentests = list(dbclient.findInDb("pollenisator","pentests",{}, True))
+    for pentest in pentests:
+        pentest_uuid = pentest["uuid"]
+        logger.info("Migrating pentest %s (%s) %d/%d", pentest["nom"], pentest_uuid, pentests.index(pentest), len(pentests))
+        # update iid strings to ObjectIds
+        check_instances = dbclient.findInDb(pentest_uuid,"checkinstances", {}, True)
+        updates = []
+        if check_instances:
+            for check_instance in check_instances:
+                try:
+                    check_instance["check_iid"] = ObjectId(check_instance["check_iid"])
+                except Exception:
+                    pass
+                try:
+                    check_instance["target_iid"] = ObjectId(check_instance["target_iid"])
+                except Exception:
+                    pass
+                updates.append(pymongo.UpdateOne({"_id":ObjectId(check_instance["_id"])},{"$set":{"check_iid":check_instance["check_iid"], "target_iid":check_instance["target_iid"]}}))
+            dbclient.bulk_write(pentest_uuid, "checkinstances", updates)
+        updates = []
+        commands = dbclient.findInDb(pentest_uuid,"commands", {}, True)
+        if commands:
+            for command in commands:
+                try:
+                    command["original_iid"] = ObjectId(command["original_iid"])
+                except Exception:
+                    pass
+                updates.append(pymongo.UpdateOne({"_id":ObjectId(command["_id"])},{"$set":{"original_iid":command.get("original_iid")}}))
+            dbclient.bulk_write(pentest_uuid, "commands", updates)
+        defects = dbclient.findInDb(pentest_uuid,"defects", {}, True)
+        updates = []
+        if defects:
+            for defect in defects:
+                try:
+                    defect["target_id"] = ObjectId(defect["target_id"])
+                except Exception:
+                    pass
+                updates.append(pymongo.UpdateOne({"_id":ObjectId(defect["_id"])}, {"$set":{"target_id":defect.get("target_id")}}))
+                dbclient.bulk_write(pentest_uuid, "defects", updates)
+        ips = dbclient.findInDb(pentest_uuid,"ips", {}, True)
+        updates = []
+        if ips:
+            for ip in ips:
+                new_in_scopes = []
+                for in_scope in ip.get("in_scopes", []):
+                    new_in_scopes.append(ObjectId(in_scope))
+                updates.append(pymongo.UpdateOne({"_id":ObjectId(ip["_id"])},{"$set":{"in_scopes":new_in_scopes}}))
+            dbclient.bulk_write(pentest_uuid, "ips", updates)
+        updates = []
+        tools = dbclient.findInDb(pentest_uuid, "tools", {}, True)
+        if tools:
+            for tool in tools:
+                try:
+                    tool["check_iid"] = ObjectId(tool["check_iid"])
+                except Exception:
+                    pass
+                try:
+                    tool["command_iid"] = ObjectId(tool["command_iid"])
+                except Exception:
+                    pass
+                updates.append(pymongo.UpdateOne({"_id":ObjectId(tool["_id"])},{"$set":{"check_iid":tool.get("check_iid"), "command_iid":tool.get("command_iid")}}))
+            dbclient.bulk_write(pentest_uuid, "tools", updates)
+    dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.8"}})
 
 def init_db() -> None:
     """

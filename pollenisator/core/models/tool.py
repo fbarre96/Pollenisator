@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union, cast
 from typing_extensions import TypedDict
 import bson
 from pymongo import InsertOne, UpdateOne
+import pymongo
 from pollenisator.core.components.socketmanager import SocketManager
 import pollenisator.server.modules.cheatsheet.checkinstance as checkinstance
 from pollenisator.core.components.mongo import DBClient
@@ -261,7 +262,6 @@ class Tool(Element):
         """
         dbclient = DBClient.getInstance()
         body = self.getData()
-        self.name = ""
         # Checking unicity
         db_base = self.getDbKey()
         if base is not None:
@@ -777,17 +777,32 @@ class Tool(Element):
             return []
         dbclient = DBClient.getInstance()
         dbclient.create_index(pentest, "tools", [("wave", 1), ("name", 1), ("lvl", 1), ("check_iid", 1)])
-        update_operations: List[Union[InsertOne, UpdateOne]] = []
+        #### CHECKING UNICITY ####
+        check_keys = set()
+        or_conditions = []
+        lkp = {}
         for tool in tools_to_add:
-            data: Any = tool.getData()
-            if "_id" in data:
-                del data["_id"]
-            update_operations.append(InsertOne(data))
-        result = dbclient.bulk_write(pentest, "tools", update_operations)
-        upserted_ids = result.upserted_ids
-        if upserted_ids is None:
+            hashable_key = tool.getHashableDbKey()
+            lkp[hashable_key] = tool.getData()
+            del lkp[hashable_key]["_id"]
+            check_keys.add(hashable_key)
+            or_conditions.append(tool.getDbKey())
+        existing_tools = Tool.fetchObjects(pentest, {"$or": or_conditions})
+        existing_checks_as_keys = set([]) if existing_tools is None else set([ existing_tool.getHashableDbKey() for existing_tool in existing_tools])
+        to_add = check_keys - existing_checks_as_keys
+        things_to_insert = [lkp[check] for check in to_add]
+        #UPDATE EXISTING
+        # Insert new
+        if not things_to_insert:
             return []
-        return [ObjectId(val) for val in upserted_ids.values()]
+        result: pymongo.results.InsertManyResult = dbclient.insertManyInDb(pentest, Tool.coll_name, things_to_insert)
+        ####
+        if result is None:
+            return []
+        inserted_ids = result.inserted_ids
+        if inserted_ids is None:
+            return []
+        return [ObjectId(val) for val in inserted_ids]
 
     def update(self) -> bool:
         """
@@ -806,8 +821,8 @@ class Tool(Element):
         Returns:
             List[str]: A list of all results for this tool.
         """
-        local_path = os.path.join(utils.getMainDir(), "files")
-        filepath = os.path.join(local_path, self.pentest, "results", str(self.getId()))
+        local_path = os.path.normpath(os.path.join(utils.getMainDir(), "files"))
+        filepath = os.path.join(local_path, self.pentest, "result", str(self.getId()))
         filepath = os.path.normpath(filepath)
         if not filepath.startswith(local_path):
             raise ValueError("Invalid path")

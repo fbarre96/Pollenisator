@@ -327,6 +327,8 @@ class Port(Element):
         start = time.time()
         result = dbclient.bulk_write(pentest, "ports", cast(List[Union[InsertOne, UpdateOne]], update_operations))
         logger.info("Bluk writing ports took %s", time.time() - start)
+        if result is None:
+            return
         upserted_ids = result.upserted_ids
         if not upserted_ids and result.modified_count == 0:
             return
