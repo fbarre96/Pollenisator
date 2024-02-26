@@ -34,7 +34,7 @@ def getCommands(body: Dict[str, Any]) -> List[Dict[str, Any]]:
     return [x for x in results]
 
 @permission("user")
-def deleteCommand(command_iid: str, **_kwargs: Any) -> Union[Tuple[str, int],int]:
+def deleteCommand(command_iid: str, **kwargs: Any) -> Union[Tuple[str, int],int]:
     """
     Delete a command from the database using its id.
 
@@ -55,7 +55,7 @@ def deleteCommand(command_iid: str, **_kwargs: Any) -> Union[Tuple[str, int],int
     return command.deleteFromDb()
 
 @permission("pentester")
-def delete(pentest: str, command_iid: str, **_kwargs: Any) -> Union[Tuple[str, int], int]:
+def delete(pentest: str, command_iid: str, **kwargs: Any) -> Union[Tuple[str, int], int]:
     """
     Delete a command from the database using its id.
 
@@ -97,7 +97,7 @@ def insert(pentest: str, body: Dict[str, Any], **kwargs: Any) -> CommandInsertRe
 
 
 @permission("pentester")
-def update(pentest: str, command_iid: str, body: Dict[str, Any], **_kwargs: Any) -> bool:
+def update(pentest: str, command_iid: str, body: Dict[str, Any], **kwargs: Any) -> bool:
     """
     Update a command in the database using its id. The "owners" and "_id" fields in the body are ignored.
 

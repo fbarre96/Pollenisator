@@ -65,6 +65,8 @@ class Command(Element):
         self.indb: str = indb
         self.owners = owners if owners is not None else []
         self.timeout = timeout
+        self.repr_string = self.getDetailedString()
+        
         return self
 
     def getData(self) -> Dict[str, Any]:
@@ -182,7 +184,7 @@ class Command(Element):
             yield Command(pentest, result)
 
     @classmethod
-    def fetchObject(cls, pentest: Any, pipeline: Dict[str, Any]) -> Optional['Command']:
+    def fetchObject(cls, pentest: str, pipeline: Dict[str, Any]) -> Optional['Command']:
         """
         Fetch one command from database and return a Command object.
 

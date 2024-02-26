@@ -63,6 +63,7 @@ class Port(Element):
         self.product = product
         self.notes = notes
         self.infos = infos if infos is not None else {}
+        self.repr_string = self.getDetailedString()
         return self
 
     def getData(self):

@@ -292,6 +292,8 @@ class CheckInstance(Element):
             checkItem_o = checks_lkp.get(str(check.check_iid), None)
             if checkItem_o is None:
                 lvl = "unknown"
+            else:
+                lvl = checkItem_o.lvl
             commands = check_command_lkp.get(str(checkitem_id), [])
             for command_o in commands:
                 tool_model = tool.Tool(pentest)

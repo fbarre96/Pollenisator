@@ -4,7 +4,7 @@ import inspect
 from pollenisator.server.token import checkTokenValidity
 # permission decorator
 
-def permission(*dec_args, **dec_kwargs):
+def permission(*dec_args, **deckwargs):
     def _permission(function):
         def wrapper(*args, **kwargs):
             scope = dec_args[0]

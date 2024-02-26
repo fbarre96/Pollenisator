@@ -189,7 +189,7 @@ def importDefectTemplates(upfile: Any) -> Union[Tuple[str, int], bool]:
     return True
 
 @permission("user")
-def exportDefectTemplates(**_kwargs: Any) -> ExportDefectTemplates:
+def exportDefectTemplates(**kwargs: Any) -> ExportDefectTemplates:
     """
     Export all defect and remark templates. The templates are extracted from the "pollenisator" database.
 

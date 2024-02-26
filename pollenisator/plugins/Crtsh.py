@@ -55,7 +55,7 @@ class Crtsh(Plugin):
         """
         return {"info-found-domains": Tag("info-found-domains")}
 
-    def Parse(self, pentest, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
 
@@ -63,7 +63,7 @@ class Crtsh(Plugin):
         blog.test.fr.	10800	IN	CNAME	22.33.44.55
         Args:
             file_opened: the open file
-            _kwargs: not used
+            kwargs: not used
         Returns:
             a tuple with 4 values (All set to None if Parsing wrong file): 
                 0. notes: notes to be inserted in tool giving direct info to pentester

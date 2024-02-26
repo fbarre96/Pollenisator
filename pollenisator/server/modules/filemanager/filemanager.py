@@ -149,8 +149,9 @@ def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage
         notes = "" if notes is None else notes
         tags = result.get('tags', [])
         tags = [] if tags is None else tags
-        lvl = result.get('lvl')
-        lvl = "imported" if lvl is None else lvl
+        lvl = result.get('lvl', "imported") 
+        if lvl is None: # because result["lvl"] = None is defined
+            lvl = "imported"
         targets = result.get('targets', {})
         targets = {} if targets is None else targets
         if default_target:
@@ -172,7 +173,7 @@ def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage
                 port = None
                 proto = None
             else:
-                lvl = target.get("lvl", lvl)
+                lvl = str(target.get("lvl", lvl))
                 wave = none_or_str(target.get("wave", None))
                 scope = none_or_str(target.get("scope", None))
                 ip = none_or_str(target.get("ip", None))
@@ -193,8 +194,11 @@ def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage
                 tool_iid = tool_m.getId()
 
             if tool_m is None: # tool not found, create it
-                tool_m = Tool(pentest).initialize(None, check_iid, wave, name=toolName, scope=scope, ip=ip, port=port, proto=proto, lvl=lvl, text="",
-                                            dated=date, datef=date, scanner_ip=user, status=["done"], notes=notes)
+                tool_m = Tool(pentest).initialize(None, check_iid, wave, name=toolName,
+                                                  scope=scope, ip=ip, port=port, proto=proto,
+                                                  lvl=str(lvl), text="",
+                                                  dated=date, datef=date, scanner_ip=user,
+                                                  status=["done"], notes=notes)
                 ret = tool_m.addInDb()
                 tool_iid = ObjectId(ret["iid"])
             if tool_m is not None:

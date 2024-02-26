@@ -1,7 +1,7 @@
 """Tool Model. A tool is an instanciation of a command against a target"""
 
 import os
-from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Set, Tuple, Union, cast
 from typing_extensions import TypedDict
 import bson
 from pymongo import InsertOne, UpdateOne
@@ -134,6 +134,7 @@ class Tool(Element):
         elif isinstance(status, str):
             status = [status]
         self.status = status
+        self.repr_string = self.getDetailedString()
         return self
 
     def getData(self) -> Dict[str, Any]:
@@ -247,7 +248,7 @@ class Tool(Element):
             self.status.append("OOS")
             self.updateInDb( {"status": self.status})
 
-    def addInDb(self, base: Optional[Dict[str, Any]] = None, update_check: bool = False) -> Union[ErrorStatus, ToolInsertResult]:
+    def addInDb(self, base: Optional[Dict[str, Any]] = None, update_check: bool = False) -> ToolInsertResult:
         """
         Inserts a tool into the database.
 
@@ -256,11 +257,9 @@ class Tool(Element):
             update_check (bool): Whether to update the check associated with the tool.
 
         Returns:
-            Union[ErrorStatus, ToolInsertResult]: A string indicating an error or a dictionary containing the result of the operation and the id of the inserted tool.
+            ToolInsertResult: A string indicating an error or a dictionary containing the result of the operation and the id of the inserted tool.
         """
         dbclient = DBClient.getInstance()
-        if not dbclient.isUserConnected():
-            return "Not connected", 503
         body = self.getData()
         self.name = ""
         # Checking unicity
@@ -943,7 +942,7 @@ class Tool(Element):
         return results
 
     @classmethod
-    def unqueueTasks(cls, pentest: str, tools_iids: Set[ObjectId], **_kwargs: Any) -> QueueTasksResult:
+    def unqueueTasks(cls, pentest: str, tools_iids: Set[ObjectId], **kwargs: Any) -> QueueTasksResult:
         """
         Remove tasks from the queue for a pentest. The tasks are fetched from the body and removed from the queue. If a task 
         is successfully removed from the queue, it is added to the successes list. If a task fails to be removed from the 
@@ -952,7 +951,7 @@ class Tool(Element):
         Args:
             pentest (str): The name of the pentest.
             tools_iids (Set[ObjectId]): A list of task ids to be removed from the queue.
-            **_kwargs (Any): Additional keyword arguments.
+            **kwargs (Any): Additional keyword arguments.
 
         Returns:
             QueueTasksResult: A dictionary containing the successes and 

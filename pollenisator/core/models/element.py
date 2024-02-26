@@ -1,9 +1,11 @@
 """Element parent Model. Common ground for every model"""
 from bson.objectid import ObjectId
+from abc import ABCMeta, abstractmethod
 from datetime import datetime
 from typing import Any, Dict, Iterator, List, Optional, Union, cast
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.tag import Tag
+
 
 REGISTRY: Dict[str, 'Element'] = {}
 
@@ -22,9 +24,13 @@ class MetaElement(type):
         cls = type.__new__(mcs, name, bases, class_dict)
         if name not in REGISTRY:
             register_class(cls)
-        return cls
+        return cls  
+# Create a new metaclass that inherits from both ABCMeta and the custom MetaPlugin
+class AbstractMetaElement(ABCMeta, MetaElement):
+    pass
 
-class Element(metaclass=MetaElement):
+
+class Element(metaclass=AbstractMetaElement):
     """
     Parent element for all model. This class should only be inherited.
 
@@ -61,8 +67,12 @@ class Element(metaclass=MetaElement):
             self._id: Union[None, ObjectId] = ObjectId(valuesFromDb.get("_id", None)) if valuesFromDb.get("_id", None) is not None else None
             self.parent: Union[None, ObjectId] = ObjectId(valuesFromDb.get("parent", None)) if valuesFromDb.get("parent", None) is not None else None
         self.cachedIcon = None
-        self.repr_string = self.getDetailedString()
 
+    @abstractmethod
+    def initialize(self, *args, **kwargs) -> 'Element':
+        pass
+
+    @abstractmethod
     def getData(self):
         """
         Returns a dictionary of the data stored in this object.
@@ -71,7 +81,7 @@ class Element(metaclass=MetaElement):
             Dict[str, Any]: A dictionary of the data stored in this object.
         """
         return {"_id":self._id, "infos":self.infos, "parent":self.parent}
-    
+
     @classmethod
     def classFactory(cls, name: str) -> Optional['Element']:
         """

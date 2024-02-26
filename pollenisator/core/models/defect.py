@@ -107,6 +107,8 @@ class Defect(Element):
         self.fixes = fixes if fixes is not None else []
         self.index = index
         self.creation_time = datetime.now() if creation_time is None else creation_time
+        self.repr_string = self.getDetailedString()
+
         return self
 
     def getData(self) -> Dict[str, Any]:

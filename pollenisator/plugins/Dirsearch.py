@@ -109,12 +109,12 @@ class Dirsearch(Plugin):
         """
         return {"todo-dirsearch": Tag("todo-dirsearch", "blue", "todo")}
 
-    def Parse(self, pentest, file_opened, **_kwargs):
+    def Parse(self, pentest, file_opened, **kwargs):
         """
         Parse a opened file to extract information
         Args:
             file_opened: the open file
-            _kwargs: not used
+            kwargs: not used
         Returns:
             a tuple with 4 values (All set to None if Parsing wrong file): 
                 0. notes: notes to be inserted in tool giving direct info to pentester

@@ -208,7 +208,7 @@ def login(body: Dict[str, str]) -> ErrorStatus:
             return getTokenFor(username), 200
     return "Authentication failure", 401
 
-def connectToPentest(pentest: str, _body: Dict[str, Any], **kwargs: Any) -> Union[Dict[str, Any], ErrorStatus]:
+def connectToPentest(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union[Dict[str, Any], ErrorStatus]:
     """
     Connect to a pentest with the given details.
 

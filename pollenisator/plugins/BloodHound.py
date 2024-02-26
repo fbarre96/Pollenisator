@@ -129,8 +129,15 @@ class BloodHound(Plugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
+    def getTags(self):
+        """Returns the tags possibly returned by this plugin
+        Returns:
+            list of Tag
+        """
+        return []
 
-    def Parse(self, pentest: str, file_opened: IO[bytes], **kwargs: Dict[str, Any]) -> Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Dict[str, str]]]]:
+
+    def Parse(self, pentest: str, file_opened: IO[bytes], **kwargs: Dict[str, Any]) -> Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Optional[Dict[str, Optional[str]]]]]]:
         """
         Parse an opened file to extract information.
 
@@ -144,9 +151,10 @@ class BloodHound(Plugin):
                 0. notes (str): Notes to be inserted in tool giving direct info to pentester.
                 1. tags (List[Tag]): A list of tags to be added to tool.
                 2. lvl (str): The level of the command executed to assign to given targets.
-                3. targets (Dict[str, Dict[str, str]]): A list of composed keys allowing retrieve/insert from/into database targeted objects.
+                3. targets (Optional[Dict[str, Optional[Dict[str, Optional[str]]]]]]):
+                     A list of composed keys allowing retrieve/insert from/into database targeted objects.
         """
-        if kwargs.get("ext", "").lower() != self.getFileOutputExt():
+        if str(kwargs.get("ext", "")).lower() != self.getFileOutputExt():
             return None, None, None, None
         path = kwargs.get("filename")
         if path is None:

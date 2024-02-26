@@ -280,7 +280,7 @@ def _evaluateCondition(searchable_collections_to_use: Set[str], condition_list: 
                         value += "s"
                     searchable_collections_to_use.add(value)
                 else:
-                    raise Exception(f"When filtering type, only == is a valid operators")
+                    raise Exception("When filtering type, only == is a valid operators")
             else:
                 if operato_trans[operator] == "":
                     currentCondition[str(termToSearch)] = str(value)
@@ -440,7 +440,7 @@ def bulk_delete_commands(body: Union[str, Dict[str, List[str]]], **kwargs: Dict[
     Returns:
         Union[int, ErrorStatus]: The number of commands deleted if the operation was successful, otherwise an error message and status code.
     """
-    user = kwargs["token_info"]["sub"]
+    #user = kwargs["token_info"]["sub"]
     data = body
     if isinstance(data, str):
         data = json.loads(data, cls=JSONDecoder)
@@ -548,7 +548,7 @@ def registerPentest(pentest: str, body: Dict[str, Any], **kwargs: Dict[str, Any]
         #token = connectToPentest(pentest, **kwargs)
         #kwargs["token_info"] = decode_token(token[0])
         uuid = msg
-        msgerror, success = preparePentest(uuid, pentest, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username, **kwargs)
+        msgerror, success = preparePentest(uuid, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username, **kwargs)
         if not success:
             return msgerror, 400
         return msg, 200
@@ -556,7 +556,7 @@ def registerPentest(pentest: str, body: Dict[str, Any], **kwargs: Dict[str, Any]
         return msg, 403
 
 @permission("owner")
-def editPentest(pentest: str, body: Dict[str, str], **_kwargs: Dict[str, Any]) -> Union[Dict[str, str], Tuple[Dict[str, str], int]]:
+def editPentest(pentest: str, body: Dict[str, str], **kwargs: Dict[str, Any]) -> Union[Dict[str, str], Tuple[Dict[str, str], int]]:
     """
     Edit the name of a pentest.
 
@@ -576,13 +576,13 @@ def editPentest(pentest: str, body: Dict[str, str], **_kwargs: Dict[str, Any]) -
     return {"message": "Pentest name changed"}, 200
 
 @permission("pentester")
-def getPentestInfo(pentest: str, **_kwargs: Dict[str, Any]) -> Dict[str, Any]:
+def getPentestInfo(pentest: str, **kwargs: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get information about a pentest.
 
     Args:
         pentest (str): The UUID of the pentest.
-        **_kwargs (Dict[str, Any]): Additional keyword arguments. Not used in this function.
+        **kwargs (Dict[str, Any]): Additional keyword arguments. Not used in this function.
 
     Returns:
         Dict[str, Any]: A dictionary containing information about the pentest.
@@ -632,52 +632,59 @@ def getPentestInfo(pentest: str, **_kwargs: Dict[str, Any]) -> Dict[str, Any]:
     ret["checks_total"] = dbclient.countInDb(pentest, "checkinstances", {})
     return ret
 
-def preparePentest(pentest, _pentest_name, pentest_type, start_date, end_date, scope, settings, pentesters, owner, **kwargs):
+def preparePentest(pentest_uuid: str, pentest_type: str, start_date: str, end_date: str, scope: str, settings: Dict[str, Union[str, int]], pentesters: str, owner: str, **kwargs: Dict[str, Any]) -> ErrorStatus:
     """
-    Initiate a pentest database with wizard info
+    Initiate a pentest database with wizard info.
+
     Args:
-        pentest: the pentest (pentest uuid)
-        pentest_name : the pentest name
-        pentest_type: a pentest type choosen from settings pentest_types. Used to select commands that will be launched by default
-        start_date: a begining date and time for the pentest
-        end_date: ending date and time for the pentest
-        scope: a list of scope valid string (IP, network IP or host name)
-        settings: a dict of settings with keys:
-            * "Add domains whose IP are in scope": if 1, will do a dns lookup on new domains and check if found IP is in scope
-            * "Add domains who have a parent domain in scope": if 1, will add a new domain if a parent domain is in scope
+        pentest_uuid (str): The pentest (pentest uuid).
+        pentest_type (str): A pentest type chosen from settings pentest_types. Used to select commands that will be launched by default.
+        start_date (str): A beginning date and time for the pentest.
+        end_date (str): Ending date and time for the pentest.
+        scope (str): A list of scope valid string (IP, network IP or host name).
+        settings (Dict[str, Union[str, int]]): A dict of settings with keys:
+            * "Add domains whose IP are in scope": if 1, will do a dns lookup on new domains and check if found IP is in scope.
+            * "Add domains who have a parent domain in scope": if 1, will add a new domain if a parent domain is in scope.
             * "Add all domains found":  Unsafe. if 1, all new domains found by tools will be considered in scope.
+        pentesters (str): A string of pentesters, separated by commas or newlines.
+        owner (str): The owner of the pentest.
+        **kwargs (Dict[str, Any]): Additional keyword arguments. This should include a "token_info" key with a dictionary containing a "sub" key with the user's information.
+
+    Returns:
+        ErrorStatus: A tuple containing a string message and a boolean indicating the success of the operation.
     """
     user = kwargs["token_info"]["sub"]
-    dbclient.insertInDb(pentest, "settings", {"key":"pentest_type", "value":pentest_type}, notify=False)
-    dbclient.insertInDb(pentest, "settings", {"key":"include_domains_with_ip_in_scope", "value": settings['Add domains whose IP are in scope'] == 1}, notify=False)
-    dbclient.insertInDb(pentest, "settings", {"key":"include_domains_with_topdomain_in_scope", "value":settings["Add domains who have a parent domain in scope"] == 1}, notify=False)
-    dbclient.insertInDb(pentest, "settings", {"key":"include_all_domains", "value":settings["Add all domains found"] == 1}, notify=False)
-    dbclient.insertInDb(pentest, "settings", {"key":"client_name", "value":settings["client_name"]}, notify=False)
-    dbclient.insertInDb(pentest, "settings", {"key":"mission_name", "value":settings["mission_name"]}, notify=False)
-    dbclient.insertInDb(pentest, "settings", {"key":"lang", "value":settings["lang"]}, notify=False)
-    dbclient.insertInDb(pentest, "settings", {"key":"autoscan_threads", "value":4}, notify=False)
+    dbclient.insertInDb(pentest_uuid, "settings", {"key":"pentest_type", "value":pentest_type}, notify=False)
+    dbclient.insertInDb(pentest_uuid, "settings", {"key":"include_domains_with_ip_in_scope", "value": settings['Add domains whose IP are in scope'] == 1}, notify=False)
+    dbclient.insertInDb(pentest_uuid, "settings", {"key":"include_domains_with_topdomain_in_scope", "value":settings["Add domains who have a parent domain in scope"] == 1}, notify=False)
+    dbclient.insertInDb(pentest_uuid, "settings", {"key":"include_all_domains", "value":settings["Add all domains found"] == 1}, notify=False)
+    dbclient.insertInDb(pentest_uuid, "settings", {"key":"client_name", "value":settings["client_name"]}, notify=False)
+    dbclient.insertInDb(pentest_uuid, "settings", {"key":"mission_name", "value":settings["mission_name"]}, notify=False)
+    dbclient.insertInDb(pentest_uuid, "settings", {"key":"lang", "value":settings["lang"]}, notify=False)
+    dbclient.insertInDb(pentest_uuid, "settings", {"key":"autoscan_threads", "value":4}, notify=False)
     pentester_list = [x.strip() for x in pentesters.replace("\n",",").split(",")]
     pentester_list.insert(0, owner)
-    dbclient.insertInDb(pentest, "settings", {"key":"pentesters", "value": pentester_list}, notify=False)
-    Command.addUserCommandsToPentest(pentest, user)  
+    dbclient.insertInDb(pentest_uuid, "settings", {"key":"pentesters", "value": pentester_list}, notify=False)
+    Command.addUserCommandsToPentest(pentest_uuid, user)
     #addCheckInstancesToPentest(pentest, pentest_type)
-    commands = Command.getList({}, pentest)
+    commands = Command.getList({}, pentest_uuid)
     if not commands:
         commands = []
-    wave_o = Wave(pentest).initialize("Main", commands)
+    wave_o = Wave(pentest_uuid).initialize("Main", commands)
     wave_o.addInDb()
-    interval_o = Interval(pentest).initialize(wave_o.wave, start_date, end_date)
-    msg, status_code = interval_o.addInDb()
-    if status_code != 200:
-        return msg, False
+    interval_o = Interval(pentest_uuid).initialize(wave_o.wave, start_date, end_date)
+    try:
+        interval_o.addInDb()
+    except ValueError as e:
+        return str(e), False
     scope = scope.replace("https://", "").replace("http://","")
-    scope = scope.replace("\n", ",").split(",")
-    for scope_item in scope:
+    scope_list = scope.replace("\n", ",").split(",")
+    for scope_item in scope_list:
         if scope_item.strip() != "":
             if isIp(scope_item.strip()):
-                scope_o = Scope(pentest, {"wave":"Main", "scope":scope_item.strip()+"/32"})
+                scope_o = Scope(pentest_uuid, {"wave":"Main", "scope":scope_item.strip()+"/32"})
             else:
-                scope_o = Scope(pentest, {"wave":"Main", "scope":scope_item.strip()})
+                scope_o = Scope(pentest_uuid, {"wave":"Main", "scope":scope_item.strip()})
             scope_o.addInDb()
     return "", True
 
@@ -1110,7 +1117,7 @@ def doExportCheatsheet() -> Dict[str, List[Dict[str, Any]]]:
     return res
 
 @permission("user")
-def exportCommands(**_kwargs) -> Dict[str, List[Dict[str, Any]]]:
+def exportCommands(**kwargs) -> Dict[str, List[Dict[str, Any]]]:
     """
     Export all commands from the database.
 
@@ -1120,7 +1127,7 @@ def exportCommands(**_kwargs) -> Dict[str, List[Dict[str, Any]]]:
     return doExportCommands()
 
 @permission("user")
-def exportCheatsheet(**_kwargs) -> Dict[str, List[Dict[str, Any]]]:
+def exportCheatsheet(**kwargs) -> Dict[str, List[Dict[str, Any]]]:
     """
     Export all checkitems, defects, and commands from the database.
 

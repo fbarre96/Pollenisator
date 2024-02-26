@@ -58,6 +58,7 @@ class Scope(Element):
         self.scope = scope
         self.notes = notes
         self.infos = infos if infos is not None else {}
+        self.repr_string = self.getDetailedString()
         return self
 
     def getData(self) -> Dict[str, Any]:

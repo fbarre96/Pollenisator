@@ -66,6 +66,7 @@ class Ip(Element):
         self.notes = notes
         self.in_scopes: List[ObjectId] = in_scopes if in_scopes is not None else self.getScopesFittingMe()
         self.infos = infos if infos is not None else {}
+        self.repr_string = self.getDetailedString()
         return self
 
     def getData(self) -> Dict[str, Any]:

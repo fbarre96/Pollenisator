@@ -243,7 +243,7 @@ def listPlugins() -> List[Dict[str, Any]]:
     return results
 
 @permission("pentester")
-def importResult(pentest: str, tool_iid: str, upfile: Any, _body: Dict[str, Any]) -> Tuple[str, int]:
+def importResult(pentest: str, tool_iid: str, upfile: Any, body: Dict[str, Any]) -> Tuple[str, int]:
     """
     Import the result of a tool. The result file is uploaded and the tool is fetched from the database. If the tool has a 
     plugin, the plugin is used to parse the result file. The notes and tags from the plugin are set in the tool and the 
@@ -333,7 +333,7 @@ def queueTasks(pentest: str, body: List[str], **kwargs: Any) -> QueueTasksResult
 
 
 @permission("pentester")
-def unqueueTasks(pentest: str, body: List[str], **_kwargs: Any) -> QueueTasksResult:
+def unqueueTasks(pentest: str, body: List[str], **kwargs: Any) -> QueueTasksResult:
     """
     Remove tasks from the queue for a pentest. The tasks are fetched from the body and removed from the queue. If a task 
     is successfully removed from the queue, it is added to the successes list. If a task fails to be removed from the 
@@ -342,7 +342,7 @@ def unqueueTasks(pentest: str, body: List[str], **_kwargs: Any) -> QueueTasksRes
     Args:
         pentest (str): The name of the pentest.
         body (List[str]): A list of task ids to be removed from the queue.
-        **_kwargs (Any): Additional keyword arguments.
+        **kwargs (Any): Additional keyword arguments.
 
     Returns:
         QueueTasksResult: A dictionary containing the successes and 
@@ -362,7 +362,7 @@ def unqueueTasks(pentest: str, body: List[str], **_kwargs: Any) -> QueueTasksRes
 
 
 @permission("pentester")
-def clearTasks(pentest: str, **_kwargs: Any):
+def clearTasks(pentest: str, **kwargs: Any):
     """
     Remove all tasks queue for pentest given
 

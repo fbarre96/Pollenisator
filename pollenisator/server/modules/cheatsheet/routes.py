@@ -106,7 +106,7 @@ def find(body: Dict[str,Any]) -> Union[ErrorStatus, List[Dict[str, Any]], Dict[s
 
 
 @permission("pentester")
-def applyToPentest(pentest: str, iid: str, _body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[ErrorStatus, Dict[str, bool]]:
+def applyToPentest(pentest: str, iid: str, body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[ErrorStatus, Dict[str, bool]]:
     """
     Apply a cheatsheet to a pentest.
 

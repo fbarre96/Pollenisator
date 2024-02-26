@@ -58,7 +58,18 @@ class Interval(Element):
         self.dated = dated
         self.datef = datef
         self.infos = infos if infos is not None else {}
+        self.repr_string = self.getDetailedString()
+
         return self
+
+    def getData(self) -> Dict[str, Any]:
+        """
+        Returns a dictionary with the data of this object.
+
+        Returns:
+            Dict[str, Any]: A dictionary with the data of this object.
+        """
+        return {"wave": self.wave, "dated": self.dated, "datef": self.datef, "infos": self.infos}
 
     def __str__(self) -> str:
         """

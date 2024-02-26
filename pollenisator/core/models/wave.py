@@ -56,6 +56,7 @@ class Wave(Element):
         self.wave = wave
         self.wave_commands = wave_commands if wave_commands is not None else []
         self.infos = infos if infos is not None else {}
+        self.repr_string = self.getDetailedString()
         return self
 
     def getData(self) -> Dict[str, Any]:
