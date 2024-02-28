@@ -44,7 +44,7 @@ class Defect(Element):
         self.creation_time: Optional[datetime] = None
         self.index = 0
         if valuesFromDb is not None:
-            self.initialize(valuesFromDb.get("target_id", ""), valuesFromDb.get("target_type", ""),
+            self.initialize(valuesFromDb.get("target_id", None), valuesFromDb.get("target_type", ""),
                             valuesFromDb.get("title", ""), valuesFromDb.get("synthesis", ""), valuesFromDb.get("description", ""),
                             valuesFromDb.get("ease", ""), valuesFromDb.get(
                                 "impact", ""),
@@ -100,7 +100,7 @@ class Defect(Element):
             self.mtype = [self.mtype]
         self.language = language
         self.notes = notes
-        self.target_id: Optional[ObjectId] = ObjectId(target_id)
+        self.target_id: Optional[ObjectId] = ObjectId(target_id) if target_id is not None else None
         self.target_type = target_type
         self.infos = infos if infos is not None else {}
         self.proofs = proofs if proofs is not None else []
@@ -244,7 +244,10 @@ class Defect(Element):
             if isinstance(self.mtype, str):
                 self.mtype = self.mtype.split(",")
             dbclient = DBClient.getInstance()
-            ins_result = dbclient.insertInDb(self.pentest, "defects", self.getData(), ObjectId(parent))
+            data = self.getData()
+            if "_id" in data:
+                del data["_id"]
+            ins_result = dbclient.insertInDb(self.pentest, "defects", data, ObjectId(parent))
             iid = ins_result.inserted_id
             self._id = iid
 
