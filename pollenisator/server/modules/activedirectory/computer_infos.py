@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Union, List
 
 class ComputerInfos():
     """ComputerInfos class."""
-    def __init__(self, valuesFromDb: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(self, valuesFromDb: Union['ComputerInfos', Optional[Dict[str, Any]]] = None) -> None:
         """
         Initialize a ComputerInfos object. If valuesFromDb is not provided, an empty dictionary is used. The values for the 
         attributes of the ComputerInfos object are fetched from the valuesFromDb dictionary using the get method.
@@ -26,6 +26,8 @@ class ComputerInfos():
         """
         if valuesFromDb is None:
             valuesFromDb = {}
+        elif isinstance(valuesFromDb, ComputerInfos):
+            valuesFromDb = valuesFromDb.getData()
         self.initialize(valuesFromDb.get("os"), valuesFromDb.get("signing"),valuesFromDb.get("smbv1"), \
              valuesFromDb.get("is_dc"), valuesFromDb.get("secrets", []), valuesFromDb.get("is_sqlserver"))
 
@@ -136,6 +138,8 @@ class ComputerInfos():
         Returns:
             Optional[bool]: The is_dc of this ComputerInfos.
         """
+        if self._is_dc is None:
+            return False
         return self._is_dc
 
     @is_dc.setter
@@ -157,6 +161,9 @@ class ComputerInfos():
         Returns:
             Optional[bool]: The is_sqlserver of this ComputerInfos.
         """
+        if self._is_sqlserver is None:
+            return False
+        
         return self._is_sqlserver
 
     @is_sqlserver.setter
