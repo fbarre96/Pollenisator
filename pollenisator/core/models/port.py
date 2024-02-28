@@ -219,10 +219,10 @@ class Port(Element):
         new_data = self.getData()
         data = {} if data is None else data
         new_data |= data
+        new_self = Port(self.pentest, new_data)
         if "_id" in new_data:
             del new_data["_id"]
         dbclient.updateInDb(self.pentest, "ports", {"_id":ObjectId(self.getId())}, {"$set":new_data}, False, True)
-        new_self = Port(self.pentest, new_data)
         if self.service != new_self.service:
             dbclient.deleteFromDb(self.pentest, "tools", {
                                     "lvl": "port:onServiceUpdate", "ip": self.ip, "port": self.port, "proto": self.proto, "status":{"$ne":"done"}}, many=True)
