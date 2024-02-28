@@ -314,10 +314,12 @@ class Tool(Element):
             bool: True if the update was successful, False otherwise.
         """
         dbclient = DBClient.getInstance()
+        new_data = self.getData()
         data = {} if data is None else data
-        if "_id" in data:
-            del data["_id"]
-        dbclient.updateInDb(self.pentest, "tools", {"_id":ObjectId(self.getId())}, {"$set":data})
+        new_data |= data
+        if "_id" in new_data:
+            del new_data["_id"]
+        dbclient.updateInDb(self.pentest, "tools", {"_id":ObjectId(self.getId())}, {"$set":new_data})
         if self.check_iid is not None:
             check_o = checkinstance.CheckInstance.fetchObject(self.pentest, {"_id":ObjectId(self.check_iid)})
             if check_o is not None:

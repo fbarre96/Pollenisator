@@ -155,6 +155,28 @@ class CheckItem(Element):
             return 0
         return res
 
+    def updateInDb(self, data: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Update the tool in the database with the provided data.
+        
+        Args:
+            data (Optional[Dict[str, Any]]): The data to update the tool with.
+            
+        Returns:
+            bool: True if the update was successful, False otherwise.
+        """
+        dbclient = DBClient.getInstance()
+        new_data = self.getData()
+        data = {} if data is None else data
+        new_data |= data
+        if "_id" in new_data:
+            del new_data["_id"]
+        if "type" in new_data:
+            del new_data["type"]
+        dbclient.updateInDb("pollenisator", CheckItem.coll_name, {"_id":ObjectId(self.getId())}, {"$set":new_data})
+        return True
+
+
     @classmethod
     def doInsert(cls, pentest: str, data: Dict[str, Any]) -> CheckItemInsertResult:
         """

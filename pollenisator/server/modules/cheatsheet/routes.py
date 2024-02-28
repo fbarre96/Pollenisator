@@ -64,18 +64,7 @@ def update(iid: str, body: Dict[str, Any]) -> Union[ErrorStatus, bool]:
     existing = CheckItem.fetchObject("pollenisator", {"_id": ObjectId(iid)})
     if existing is None:
         return "Not found", 404
-    # Check if the title of the checkitem to update is the same as the one provided in the body
-    checkitem = CheckItem("pollenisator", body)
-    data = checkitem.getData()
-    # Remove the type and _id from the body because they can't be updated
-    if "type" in data:
-        del data["type"]
-    if "_id" in data:
-        del data["_id"]
-    # Update the checkitem
-    dbclient = DBClient.getInstance()
-    dbclient.updateInDb("pollenisator", CheckItem.coll_name, {"_id": ObjectId(iid), "type":"checkitem"}, {"$set": data}, False, True)
-    return True
+    return existing.updateInDb(body)
 
 
 @permission("user")
