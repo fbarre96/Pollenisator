@@ -165,7 +165,7 @@ class SmbMap(Plugin):
             if computer_m is not None:
                 computer_m.add_user(domain, user, password)
             for share_name in share_dict:
-                share_m = Share().initialize(pentest, None, host, share_name)
+                share_m = Share().initialize(host, share_name)
                 flagged_files = []
                 for share_info in share_dict[share_name]:
                     #share_info[] = path, isInteresting, privs, fileSize, domain, user
