@@ -9,6 +9,7 @@ import sys
 from collections.abc import Iterable
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union, cast, overload
 from uuid import UUID, uuid4
+import bson
 
 import pymongo
 import redis
@@ -577,7 +578,12 @@ class DBClient:
                         list(map(str, res_many.inserted_ids)), "insert_many", str(parentId))
         else:
             db = self.client[dbName]
-            res_solo: pymongo.results.InsertOneResult = db[collection].insert_one(values)
+            try:
+                res_solo: pymongo.results.InsertOneResult = db[collection].insert_one(values)
+            except bson.errors.InvalidDocument as e:
+                new_values_str = json.dumps(values, cls=utils.JSONEncoder)
+                values = json.loads(new_values_str, cls=utils.JSONDecoder)
+                res_solo = db[collection].insert_one(values)
             if res_solo.inserted_id is not None and collection in self.cache_collections:
                 cache_key = dbName+"."+collection+"."+str(res_solo.inserted_id)
                 try:
@@ -1387,11 +1393,7 @@ class DBClient:
             res = dbclient.findInDb(pentest, "tools", {"_id": ObjectId(attached_iid)}, False)
             if res is None:
                 return "The given iid does not match an existing tool", 404, ""
-            else:
-                if os.path.isdir(filepath):
-                    files = os.listdir(filepath)
-                    while files:
-                        os.remove(os.path.join(filepath, files[0]))
+            
         elif filetype == "proof":
             res = dbclient.findInDb(pentest, "defects", {"_id": ObjectId(attached_iid)}, False)
             if res is None:
