@@ -341,6 +341,9 @@ class Ip(Element):
             return None
         except ValueError:
             return None
+        except AttributeError:
+            if IPAddress(self.ip).is_ipv4_private_use():
+                return None
         ip_real = performLookUp(self.ip)
         if ip_real is not None:
             dbclient = DBClient.getInstance()
@@ -404,10 +407,11 @@ class Ip(Element):
         new_data = self.getData()
         data = {} if data is None else data
         new_data |= data
+        new_self = Ip(self.pentest, new_data)
+
         if "_id" in new_data:
             del new_data["_id"]
         dbclient.updateInDb(self.pentest, "ips", {"_id":ObjectId(self.getId())}, {"$set":new_data}, False, True)
-        new_self = Ip(self.pentest, new_data)
         new_self.add_ip_checks()
         return True
 
