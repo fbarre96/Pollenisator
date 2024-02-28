@@ -52,9 +52,10 @@ class Computer(Element):
         """
         if valuesFromDb is None:
             valuesFromDb = {}
-        super().__init__(pentest, valuesFromDb)
+        super().__init__(pentest, {"_id":valuesFromDb.get("_id"), "parent":valuesFromDb.get("parent")})
         self.initialize(valuesFromDb.get("name"), valuesFromDb.get("ip"), \
-             valuesFromDb.get("domain"),  valuesFromDb.get("admins"),  valuesFromDb.get("users"), valuesFromDb.get("infos"))
+             valuesFromDb.get("domain"),  valuesFromDb.get("admins"),  valuesFromDb.get("users"), valuesFromDb["infos"])
+
 
     def initialize(self, name: Optional[str] = None, 
                    ip: Optional[str] = None, domain: Optional[str] = None, admins: Optional[List[ObjectId]] = None, 
@@ -314,19 +315,25 @@ class Computer(Element):
         Returns:
             ComputerInfos: The infos of this Computer.
         """
-        return self._infos
+        try:
+            return self._infos
+        except AttributeError:
+            self._infos = ComputerInfos({})
+            return self._infos
 
     @infos.setter
-    def infos(self, infos: 'ComputerInfos'):
+    def infos(self, infos: Union['ComputerInfos', Dict[str, Any]]):
         """Sets the infos of this Computer.
 
         :param infos: The infos of this Computer.
         :type infos: ComputerInfos
         """
         old_infos = self.infos
-        self._infos = infos
+        self._infos = ComputerInfos(infos)
         if self.infos.is_dc and not old_infos.is_dc:
             self.add_dc_checks()
+        if self.infos.is_sqlserver and not old_infos.is_sqlserver:
+            self.add_sqlserver_checks()
 
     def checkAllTriggers(self) -> None:
         """
