@@ -11,7 +11,14 @@ from pollenisator.server.modules.activedirectory.computers import Computer
 from pollenisator.server.modules.activedirectory.users import User
 from pollenisator.plugins.plugin import Plugin
 
-def remove_term_colors(data):
+def remove_term_colors(data: str) -> str:
+    """
+    Remove terminal colors from a string
+    Args:
+        data: the string to remove colors from
+    Returns:
+        string: the string without colors
+    """
     return re.sub(r'\x1b\[[0-9;]+[a-zA-Z]', '', data)
 
 def getInfos(cme_file):
@@ -50,7 +57,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
     retour = []
     regex_info = re.compile(r"(?:LDAP|SMB)\s+(\S+)\s+(\d+)\s+\S+\s+\[\*\]\s*([^\(]+)\(name:(.*)\) \(domain:(.*)\) \(signing:(True|False)\) \(SMBv1:(False|True)\)$", re.MULTILINE)
     regex_logon_failed = re.compile(
-        r"(?:LDAP|SMB)\s+(\S+)\s+(\d+)\s+(\S+)\s+\[\-\]\s*([^\\]+)\\([^:\n]+):(.*?) [A-Z_]+$", re.MULTILINE)
+        r"(?:LDAP|SMB)\s+(\S+)\s+(\d+)\s+(\S+)\s+\[\-\]\s*([^\\]+)\\([^:\n]+):(.*?) ([A-Z_]+)$", re.MULTILINE)
     regex_success = re.compile(
         r"(?:LDAP|SMB)\s+(\S+)(?:\s+|:)(\d+)\s+(\S+)\s+\[\+\]\s*([^\\]+)\\([^:]+):(.*?)($|\(\S+\))$", re.MULTILINE)
     regex_module_lsassy = re.compile(r"^LSASSY\s+(\S+)\s+(\d+)\s+(\S+)\s+([^\\]+)\\(\S+)\s+(\S+)$")
@@ -190,8 +197,9 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                             toAdd["machine_name"] = failure_infos.group(3)
                             toAdd["domain"] = failure_infos.group(4)
                             toAdd["username"] = failure_infos.group(5)
-                            toAdd["reason"] = failure_infos.group(6).strip()
-                        
+                            #password is group 6 and its empty
+                            toAdd["reason"] = failure_infos.group(7).strip()
+
             if toAdd.keys():
                 retour.append(toAdd)
         
@@ -264,13 +272,13 @@ def editScopeIPs(pentest, hostsInfos):
                     infosToAdd["domain"] = domain
             elif infos["type"] == "failure":
                 if infos["reason"] in ["KDC_ERR_PREAUTH_FAILED", "KDC_ERR_CLIENT_REVOKED"]:
-                    user_model = User(pentest).initialize(pentest, None, infos.get("domain", ""), infos.get("username", ""), None)
+                    user_model = User(pentest).initialize(infos.get("domain"), infos.get("username"), None)
                     infosToAdd["users"] = infosToAdd.get("users", []) + [user_model]
             elif infos["type"] == "interesting":
                 if "asreproast" in infos["reason"]:
                     user_info = infos
                     user_info["asreproastable"] = True
-                    user_model = User(pentest).initialize(pentest, None, infos.get("domain", ""), infos.get("username", ""), infos=user_info)
+                    user_model = User(pentest).initialize(infos.get("domain"), infos.get("username"), infos=user_info)
                     infosToAdd["users"] = infosToAdd.get("users", []) + [user_model]
                     
             elif infos["type"] == "success":
@@ -295,12 +303,12 @@ def editScopeIPs(pentest, hostsInfos):
                             if hashLM != "aad3b435b51404eeaad3b435b51404ee":
                                 this_info["hashLM"] = hashLM
                             this_info["hashNT"] = hashNT
-                            user_model = User(pentest).initialize(pentest, None, infos.get("domain", ""), username, "", infos=this_info)
+                            user_model = User(pentest).initialize(infos.get("domain", ""), username, "", infos=this_info)
                             infosToAdd["users"] = infosToAdd.get("users", []) + [user_model]
                 hashNT = infos.get("hashNT", "")
                 if hashNT != "":
                     user_info["hashNT"] = hashNT
-                user_model = User(pentest).initialize(pentest, None, infos.get("domain", ""), infos.get("username", ""), infos.get("password"), infos=user_info)
+                user_model = User(pentest).initialize(infos.get("domain", ""), infos.get("username", ""), infos.get("password"), infos=user_info)
                 infosToAdd["users"] = infosToAdd.get("users", []) + [user_model]
                 if powned:
                     infosToAdd["powned"] = powned
@@ -352,10 +360,10 @@ def editScopeIPs(pentest, hostsInfos):
                 computer_m.name = infos["machine_name"]
                 computer_m.domain = infos.get("domain")
                 d = computer_m.getData()
-                comp_info = d["infos"]
-                comp_info["plugin"] = CME.get_name()
-
-                comp_info.update(infosToAdd)
+                if "infos" not in d:
+                    d["infos"] = {}
+                d["infos"].update(infosToAdd)
+                d["infos"]["plugins"]  = CME.get_name()
                 computer_m = Computer(pentest, d)
                 computer_m.update()
                 if d["infos"].get("signing", True) == False:
