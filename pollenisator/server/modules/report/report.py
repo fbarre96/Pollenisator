@@ -98,6 +98,10 @@ def generateReport(pentest, templateName,  mainRedactor, lang):
         mission_name = ""
     else:
         mission_name = mission_name.get("value")
+    if pentest_type is None:
+        pentest_type = "Web"
+    else:
+        pentest_type = str(pentest_type.get("value"))
     timestr = datetime.now().strftime("%Y%m")
     ext = os.path.splitext(templateName)[-1]
     basename = client_name.strip() + " - "+mission_name.strip()
