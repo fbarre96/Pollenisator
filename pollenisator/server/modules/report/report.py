@@ -148,6 +148,7 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
         return "Invalid extension for template, must be pptx, xlsx or docx", 400
     client_name = settings.find(pentest, "client_name")
     mission_name = settings.find(pentest, "mission_name")
+    pentest_type = settings.find(pentest, "pentest_type")
     if client_name is None:
         client_name = ""
     else:
@@ -173,6 +174,7 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
         lang_translation = json.loads(f.read())
     context = craftContext(pentest, mainRedac=mainRedactor,
                            client=client_name.strip(), contract=mission_name.strip())
+    context["pentest_type"] = pentest_type
     context.update(additional_context)
     manager = Manager()
     return_dict = manager.dict()
