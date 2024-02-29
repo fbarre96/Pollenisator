@@ -89,6 +89,7 @@ def generateReport(pentest, templateName,  mainRedactor, lang):
         return "Invalid extension for template, must be pptx, xlsx or docx", 400
     client_name = settings.find(pentest, "client_name")
     mission_name = settings.find(pentest, "mission_name")
+    pentest_type = settings.find(pentest, "pentest_type")
     if client_name is None:
         client_name = ""
     else:
@@ -115,6 +116,7 @@ def generateReport(pentest, templateName,  mainRedactor, lang):
         lang_translation = json.loads(f.read())
     context = craftContext(pentest, mainRedac=mainRedactor,
                            client=client_name.strip(), contract=mission_name.strip())
+    context["pentest_type"] = pentest_type
     manager = Manager()
     return_dict = manager.dict()
     p = Process(target=_generateDoc, args=(ext, context, template_to_use_path, out_name, lang_translation, return_dict))
