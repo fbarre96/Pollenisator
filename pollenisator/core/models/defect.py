@@ -105,7 +105,10 @@ class Defect(Element):
         self.infos = infos if infos is not None else {}
         self.proofs = proofs if proofs is not None else []
         self.fixes = fixes if fixes is not None else []
-        self.index = int(index)
+        try:
+            self.index = int(index)
+        except ValueError:
+            self.index = 0
         self.creation_time = datetime.now() if creation_time is None else creation_time
         self.repr_string = self.getDetailedString()
 
@@ -396,14 +399,17 @@ class Defect(Element):
             an error code otherwise.
         """
         data = Defect(self.pentest, data).getData()
+        if "_id" in data:
+            del data["_id"]
+
         dbclient = DBClient.getInstance()
         oldRisk = self.risk
         if not self.isAssigned() and self.pentest != "pollenisator":
             if data.get("risk", None) is not None and self.pentest != "pollenisator":
                 if data["risk"] != oldRisk:
-                    insert_pos = str(Defect.findInsertPosition(self.pentest, data["risk"]))
+                    insert_pos = Defect.findInsertPosition(self.pentest, data["risk"])
                     if int(insert_pos) > int(self.index):
-                        insert_pos = str(int(insert_pos)-1)
+                        insert_pos = int(insert_pos)-1
                     defectTarget = Defect.fetchObject(self.pentest, {"target_id":None, "index":insert_pos})
                     if defectTarget is not None:
                         Defect.moveDefect(self.pentest, self.getId(), defectTarget.getId())
