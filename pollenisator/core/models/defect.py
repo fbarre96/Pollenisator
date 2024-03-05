@@ -193,7 +193,7 @@ class Defect(Element):
         Returns:
             bool: True if the defect is assigned to an IP, False otherwise.
         """
-        return self.target_id != ""
+        return self.target_id is not None
 
     def addInDb(self) -> DefectInsertResult:
         """
