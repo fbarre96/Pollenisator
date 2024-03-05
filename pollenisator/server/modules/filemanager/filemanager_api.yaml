@@ -45,7 +45,7 @@ paths:
               examples:
                 Unknown defect:
                   value: '"The given iid does not match an existing defect"'
-  "/files/{pentest}/download/{filetype}/{attached_iid}":
+  "/files/{pentest}/list/{filetype}/{attached_iid}":
     get:
       operationId: pollenisator.server.modules.filemanager.filemanager.listFiles
       tags:
@@ -81,7 +81,7 @@ paths:
                 type: array
                 items:
                   type: string
-  "/files/{pentest}/download/{filetype}/{attached_iid}/{filename}":
+  "/files/{pentest}/download/{filetype}/{attached_iid}":
     get:
       operationId: pollenisator.server.modules.filemanager.filemanager.download
       tags:
@@ -108,11 +108,6 @@ paths:
             enum:
               - result
               - proof
-        - name: filename
-          in: path
-          required: true
-          schema:
-            type: string
       responses:
         "200":
           description: Successfully downloaded file

@@ -177,18 +177,13 @@ components:
 
     Defects:
       properties:
-        ip:
+        target_id:
+          type: string
+          nullable: true
+        target_type:
           type: string
         title:
           type: string
-        port:
-          type: string
-        proto:
-          type: string
-          enum:
-            - tcp
-            - udp
-            - ""
         synthesis:
           type: string
         description:

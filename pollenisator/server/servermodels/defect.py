@@ -49,6 +49,10 @@ def insert(pentest: str, body: Dict[str, Any]) -> Union[DefectInsertResult, Tupl
         Union[Dict[str, Union[bool, Any]], str]: A dictionary with keys "res" and "iid" if the operation was successful, 
         or a string error message otherwise.
     """
+    if "_id" in body:
+        del body["_id"]
+    if "index" in body:
+        del body["index"]
     defect = Defect(pentest, body)
     return defect.addInDb()
 

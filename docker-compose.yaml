@@ -12,7 +12,7 @@ services:
     env_file:
       - .env
   mongodb:
-    image: mongo:4.4.6
+    image: mongo:4.4.7
     ports:
       - "27017:27017"   # Map container port to host port
     volumes:

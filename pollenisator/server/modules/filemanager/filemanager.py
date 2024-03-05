@@ -3,9 +3,12 @@ Module to manage files upload and download.
 """
 import json
 import os
+from flask import after_this_request
+import tempfile
 import time
 import traceback
 import hashlib
+import zipfile
 from datetime import datetime
 from typing import IO, Dict, List, Optional, Tuple, Union, Any, cast
 from typing_extensions import TypedDict
@@ -241,7 +244,10 @@ def listFiles(pentest: str, attached_iid: str, filetype: str) -> Union[ErrorStat
             if defect is None:
                 return "Defect not found", 404
             defect = cast(Defect, defect)
-            files = defect.listProofFiles()
+            try:
+                files = defect.listProofFiles()
+            except FileNotFoundError:
+                files = []
         elif filetype == "result":
             tool = Tool.fetchObject(pentest, {"_id": ObjectId(attached_iid)})
             if tool is None:
@@ -257,7 +263,7 @@ def listFiles(pentest: str, attached_iid: str, filetype: str) -> Union[ErrorStat
     return files
 
 @permission("pentester")
-def download(pentest: str, attached_iid: str, filetype: str, filename: str) -> Union[ErrorStatus, Response]:
+def download(pentest: str, attached_iid: str, filetype: str) -> Union[ErrorStatus, Response]:
     """
     Download a file of a specific type attached to a specific item in a pentest.
 
@@ -265,7 +271,6 @@ def download(pentest: str, attached_iid: str, filetype: str, filename: str) -> U
         pentest (str): The name of the pentest.
         attached_iid (str): The id of the item the file is attached to.
         filetype (str): The type of the file to download.
-        filename (str): The name of the file to download.
 
     Returns:
        Union[ErrorStatus, Response]: The file to download if successful, otherwise an error message and status code.
@@ -279,20 +284,35 @@ def download(pentest: str, attached_iid: str, filetype: str, filename: str) -> U
     if not filepath.startswith(local_path):
         return "Invalid path", 400
     if filetype == "result":
-        filepath = os.path.join(local_path, pentest, filetype, str(attached_iid))
         files = os.listdir(filepath)
         if len(files) == 1:
             filepath = os.path.join(filepath, files[0])
+        elif len(files) >= 1:
+            # generate a temp zip file
+            temp_zipfile_dir = tempfile.mkdtemp()
+            temp_zipfile_path = os.path.join(temp_zipfile_dir, str(attached_iid)+".zip")
+            zipf = zipfile.ZipFile(temp_zipfile_path, 'w', zipfile.ZIP_DEFLATED)
+            @after_this_request
+            def remove_file(response):
+                try:
+                    os.remove(temp_zipfile_path)
+                except Exception as error:
+                    pass
+                return response
+            # Zip files in filepath directory and send it
+            try:
+                for root, dirs, files in os.walk(filepath):
+                    for file in files:
+                        zipf.write(os.path.join(root, file), os.path.relpath(os.path.join(root, file), filepath))
+                zipf.close()
+                return send_file(temp_zipfile_path)
+            except Exception as e:
+                return str(e), 500
+            
+
         else:
             return "No result file found for given tool", 404
-    else:
-        filepath = os.path.join(filepath, filename.replace("/", "_"))
-    if not os.path.isfile(filepath):
-        return "File not found", 404
-    try:
-        return send_file(filepath, attachment_filename=filename.replace("/", "_"))
-    except TypeError: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
-        return send_file(filepath, download_name=filename.replace("/", "_"))
+    return send_file(filepath)
 
 @permission("pentester")
 def rmProof(pentest: str, defect_iid: str, filename: str) -> ErrorStatus:

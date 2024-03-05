@@ -105,7 +105,7 @@ class Defect(Element):
         self.infos = infos if infos is not None else {}
         self.proofs = proofs if proofs is not None else []
         self.fixes = fixes if fixes is not None else []
-        self.index = index
+        self.index = int(index)
         self.creation_time = datetime.now() if creation_time is None else creation_time
         self.repr_string = self.getDetailedString()
 
@@ -123,7 +123,7 @@ class Defect(Element):
 
         return {"title": self.title, "synthesis":self.synthesis, "description":self.description, "ease": self.ease, "impact": self.impact,
                 "risk": self.risk, "redactor": self.redactor, "type": self.mtype, "language":self.language, "notes": self.notes,
-                "target_id": self.target_id, "target_type": self.target_type, "index":self.index,
+                "target_id": self.target_id, "target_type": self.target_type, "index":int(self.index),
                 "proofs": self.proofs, "creation_time": self.creation_time, "fixes":self.fixes, "_id": self.getId(), "infos": self.infos}
 
     @classmethod
@@ -293,7 +293,7 @@ class Defect(Element):
         dbclient = DBClient.getInstance()
         if not self.isAssigned() and self.pentest != "pollenisator":
             # if not assigned to a pentest object it's a report defect (except in pollenisator db where it's a defect template)
-            globalDefects_iterator = Defect.fetchObjects(self.pentest, {"target_id":""})
+            globalDefects_iterator = Defect.fetchObjects(self.pentest, {"target_id":None})
             if globalDefects_iterator is None:
                 globalDefects: List[Defect] = []
             else:
@@ -309,11 +309,17 @@ class Defect(Element):
                     thisAssignedDefect.deleteFromDb()
         if self.pentest != "pollenisator":
             proofs_path = self.getProofPath()
-            files = self.listProofFiles()
+            try:
+                files = self.listProofFiles()
+            except FileNotFoundError:
+                files = []
             for filetodelete in files:
                 filetodelete = os.path.basename(filetodelete)
                 os.remove(os.path.join(proofs_path, filetodelete))
-            os.rmdir(proofs_path)
+            try:
+                os.rmdir(proofs_path)
+            except FileNotFoundError:
+                pass
         res = dbclient.deleteFromDb(self.pentest, "defects", {"_id": ObjectId(self.getId())}, False)
         if res is None:
             return 0
@@ -339,7 +345,7 @@ class Defect(Element):
         for risklevel_i, riskLevel in enumerate(riskLevels):
             if risklevel_i > riskLevelPos:
                 break
-            globalDefects = Defect.fetchObjects(pentest, {"target_id":"", "risk":riskLevel})
+            globalDefects = Defect.fetchObjects(pentest, {"target_id":None, "risk":riskLevel})
             globalDefects = cast(Iterator[Defect], globalDefects)
             for globalDefect in globalDefects:
                 highestInd = max(int(globalDefect.index)+1, highestInd)
@@ -406,7 +412,10 @@ class Defect(Element):
         if self.pentest != "pollenisator":
             data["proofs"] = set()
             proof_groups = Defect._findProofsInDescription(data.get("description", ""))
-            existing_proofs_to_remove = self.listProofFiles()
+            try:
+                existing_proofs_to_remove = self.listProofFiles()
+            except FileNotFoundError:
+                existing_proofs_to_remove = []
             for proof_group in proof_groups:
                 if proof_group.group(1) in existing_proofs_to_remove:
                     existing_proofs_to_remove.remove(proof_group.group(1))
@@ -455,7 +464,7 @@ class Defect(Element):
         Returns:
             List[Dict[str, Any]]: A list of dictionaries, each representing a global defect. The defects are ordered by their index.
         """
-        defects = Defect.fetchObjects(pentest, {"target_id": ""})
+        defects = Defect.fetchObjects(pentest, {"target_id": None})
         if defects is None:
             return []
         defects_ordered = []
