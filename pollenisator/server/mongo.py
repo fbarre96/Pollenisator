@@ -105,7 +105,7 @@ def update(pentest: str, collection: str, body: Dict[str, Union[str, bool]]) -> 
     elif pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 403
 
-    dbclient.updateInDb(pentest, collection, pipeline, updatePipeline, body["many"], body["notify"], body.get("upsert", False))
+    dbclient.updateInDb(pentest, collection, pipeline, updatePipeline, body.get("many", False), body["notify"], body.get("upsert", False))
     return "Success", 200
 
 @permission("pentester")
