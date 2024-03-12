@@ -108,6 +108,11 @@ paths:
             enum:
               - result
               - proof
+        - name: filename
+          in: query
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: Successfully downloaded file

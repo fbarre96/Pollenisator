@@ -10,7 +10,7 @@ import traceback
 import hashlib
 import zipfile
 from datetime import datetime
-from typing import IO, Dict, List, Optional, Tuple, Union, Any, cast
+from typing import IO, Dict, List, Literal, Optional, Tuple, Union, Any, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 import bson
@@ -75,13 +75,13 @@ def md5(f: IO[bytes]) -> str:
     return hash_md5.hexdigest()
 
 @permission("pentester")
-def upload(pentest: str, defect_iid: str, upfile: werkzeug.datastructures.FileStorage) -> Union[FileUploadResult, ErrorStatus]:
+def upload(pentest: str, defect_iid: Union[Literal["unassigned"], str], upfile: werkzeug.datastructures.FileStorage) -> Union[FileUploadResult, ErrorStatus]:
     """
     Upload a file as proof for a defect.
 
     Args:
         pentest (str): The name of the pentest.
-        defect_iid (str): The id of the defect.
+        defect_iid (Union[Literal["unassigned"], str]): The id of the defect.
         upfile (werkzeug.datastructures.FileStorage): The file to upload.
 
     Returns:
@@ -263,7 +263,7 @@ def listFiles(pentest: str, attached_iid: str, filetype: str) -> Union[ErrorStat
     return files
 
 @permission("pentester")
-def download(pentest: str, attached_iid: str, filetype: str) -> Union[ErrorStatus, Response]:
+def download(pentest: str, attached_iid: str, filetype: str, filename: Optional[str]=None) -> Union[ErrorStatus, Response]:
     """
     Download a file of a specific type attached to a specific item in a pentest.
 
@@ -271,19 +271,27 @@ def download(pentest: str, attached_iid: str, filetype: str) -> Union[ErrorStatu
         pentest (str): The name of the pentest.
         attached_iid (str): The id of the item the file is attached to.
         filetype (str): The type of the file to download.
+        filename (Optional[str], optional): The name of the file to download. Defaults to None. If not specified and multiple files are found, 
+            the file will be zipped and the zip file will be downloaded. 
+            If specified, the file will be downloaded directly.
 
     Returns:
        Union[ErrorStatus, Response]: The file to download if successful, otherwise an error message and status code.
     """
     if filetype not in POSSIBLE_TYPES:
         return "Invalid filetype", 400
-    if not is_valid_object_id(attached_iid):
+    if not is_valid_object_id(attached_iid) and attached_iid != "unassigned":
         return "Invalid attached_iid", 400
     filepath = os.path.join(local_path, pentest, filetype, str(attached_iid))
     filepath = os.path.normpath(filepath)
     if not filepath.startswith(local_path):
         return "Invalid path", 400
-    if filetype == "result":
+    if filename is not None:
+        filename = filename.replace("/", "_")
+        filepath = os.path.join(filepath, os.path.basename(filename))
+        if os.path.exists(filepath):
+            return send_file(filepath)
+    else:
         files = os.listdir(filepath)
         if len(files) == 1:
             filepath = os.path.join(filepath, files[0])
@@ -308,11 +316,9 @@ def download(pentest: str, attached_iid: str, filetype: str) -> Union[ErrorStatu
                 return send_file(temp_zipfile_path)
             except Exception as e:
                 return str(e), 500
-            
-
-        else:
-            return "No result file found for given tool", 404
-    return send_file(filepath)
+    if os.path.exists(filepath):
+        return send_file(filepath)
+    return "File not found", 404
 
 @permission("pentester")
 def rmProof(pentest: str, defect_iid: str, filename: str) -> ErrorStatus:

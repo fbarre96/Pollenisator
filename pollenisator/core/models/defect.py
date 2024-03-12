@@ -3,6 +3,7 @@
 from datetime import datetime
 import os
 import re
+import shutil
 import threading
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, cast
 from typing_extensions import TypedDict
@@ -243,6 +244,7 @@ class Defect(Element):
                 self.description = ""
                 self.synthesis = ""
                 self.fixes = []
+
             self.creation_time = datetime.now()
             if isinstance(self.mtype, str):
                 self.mtype = self.mtype.split(",")
@@ -253,7 +255,18 @@ class Defect(Element):
             ins_result = dbclient.insertInDb(self.pentest, "defects", data, ObjectId(parent))
             iid = ins_result.inserted_id
             self._id = iid
-
+            if self.pentest != "pollenisator":
+                local_proofs = set()
+                proof_groups = Defect._findProofsInDescription(self.description)
+                try:
+                    unassigned_proofs = self.listProofFiles(getUnassigned=True)
+                except FileNotFoundError:
+                    unassigned_proofs = []
+                for proof_group in proof_groups:
+                    if proof_group.group(1) in unassigned_proofs:
+                        self.assignProof(proof_group.group(1))
+                        local_proofs.add(proof_group.group(1))
+                self.proofs = list(local_proofs)
             if self.isAssigned():
                 # Edit to global defect and insert it
                 global_defect = Defect(self.pentest, self.getData())
@@ -494,19 +507,44 @@ class Defect(Element):
         return re.finditer(regex_images, description)
 
 
-    def getProofPath(self) -> str:
+    def getProofPath(self, getUnassigned: bool = False) -> str:
         """
         Get the local path for the proof of a defect.
+
+        Args:
+            getUnassigned (bool, optional): Whether to get the path for unassigned defects. Defaults to False.
 
         Returns:
             str: The local path for the proof of the defect.
         """
+        defect_iid = "unassigned" if getUnassigned else str(self.getId())
         local_path = os.path.normpath(os.path.join(utils.getMainDir(), "files"))
-        filepath = os.path.join(local_path, self.pentest, "proofs", str(self.getId()))
+        filepath = os.path.join(local_path, self.pentest, "proof", defect_iid)
         filepath = os.path.normpath(filepath)
         if not filepath.startswith(local_path):
             raise ValueError("Invalid path")
         return filepath
+
+    def assignProof(self, filename: str):
+        """
+        Assign a proof to this defect and remove it from unassigned
+        
+        Args:
+            filename (str): The filename of the proof to assign.
+        
+        """
+        filename = str(filename)
+        filename = os.path.basename(filename.replace("/", "_"))
+        my_proof_dir = self.getProofPath()
+        unassigned_proof_dir = self.getProofPath(True)
+        proof_path = os.path.join(unassigned_proof_dir, filename)
+        if not os.path.isfile(proof_path):
+            raise FileNotFoundError("File not found")
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb(self.pentest, "defects", {"_id": ObjectId(self.getId())}, {"$push":{"proofs":filename}})
+        new_proof_path = os.path.join(my_proof_dir, filename)
+        os.makedirs(my_proof_dir, exist_ok=True)
+        shutil.move(proof_path, new_proof_path)
 
     def rmProof(self, filename: str) -> None:
         """
@@ -528,10 +566,12 @@ class Defect(Element):
         dbclient.updateInDb(self.pentest, "defects", {"_id": ObjectId(self.getId())}, {"$pull":{"proofs":filename}})
         os.remove(proof_path)
 
-    def listProofFiles(self) -> List[str]:
+    def listProofFiles(self, getUnassigned=False) -> List[str]:
         """
         List all proofs for this defect.
 
+        Args:
+            getUnassigned (bool): get proof that are not assigned to a defect. Defaults to False.
         Raises:
             FileNotFoundError: If the proof path is not found.
             ValueError: If the proof path is invalid.
@@ -539,7 +579,7 @@ class Defect(Element):
             List[str]: A list of all proofs for this defect.
         """
         try:
-            proofpath = self.getProofPath()
+            proofpath = self.getProofPath(getUnassigned)
             files = os.listdir(proofpath)
         except FileNotFoundError as e:
             raise e

@@ -63,7 +63,7 @@ class Nikto(Plugin):
             string: the path to file created
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
-    
+
     def getTags(self):
         """Returns a list of tags that can be added by this plugin
         Returns:

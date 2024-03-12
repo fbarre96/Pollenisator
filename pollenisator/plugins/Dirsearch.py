@@ -1,11 +1,12 @@
 """A plugin to parse a dirsearch scan"""
 
+from abc import abstractmethod
+from typing import IO, Any, Tuple, Optional, List, Dict, cast
 from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
 import re
-import os
 
 
 def parse_dirsearch_file(notes):
@@ -100,8 +101,8 @@ class Dirsearch(Plugin):
             string: the path to file created
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
-    
-    
+
+
     def getTags(self):
         """Returns a list of tags that can be added by this plugin
         Returns:
@@ -109,18 +110,22 @@ class Dirsearch(Plugin):
         """
         return {"todo-dirsearch": Tag("todo-dirsearch", "blue", "todo")}
 
-    def Parse(self, pentest, file_opened, **kwargs):
+    @abstractmethod
+    def Parse(self, pentest: str, file_opened: IO[bytes], **kwargs: Any) -> Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Optional[Dict[str, Optional[str]]]]]]:
         """
-        Parse a opened file to extract information
+        Parse an opened file to extract information.
+
         Args:
-            file_opened: the open file
-            kwargs: not used
+            pentest (str): The name of the pentest.
+            file_opened (BinaryIO): The opened file.
+            **kwargs (Any): Additional parameters (not used).
+
         Returns:
-            a tuple with 4 values (All set to None if Parsing wrong file): 
-                0. notes: notes to be inserted in tool giving direct info to pentester
-                1. tags: a list of tags to be added to tool 
-                2. lvl: the level of the command executed to assign to given targets
-                3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
+            Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Dict[str, str]]]]: A tuple with 4 values (All set to None if Parsing wrong file): 
+                0. notes (str): Notes to be inserted in tool giving direct info to pentester.
+                1. tags (List[Tag]): A list of tags to be added to tool.
+                2. lvl (str): The level of the command executed to assign to given targets.
+                3. targets (Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Optional[Dict[str, Optional[str]]]]]]): A list of composed keys allowing retrieve/insert from/into database targeted objects.
         """
         tags = []
         try:
@@ -136,16 +141,20 @@ class Dirsearch(Plugin):
                 return None, None, None, None
             targets = {}
             for host in hosts:
-                Ip(pentest).initialize(host, infos={"plugin":Dirsearch.get_name()}).addInDb()
+                ip_m = Ip(pentest).initialize(host, infos={"plugin":Dirsearch.get_name()})
+                ip_m.addInDb()
                 for port in hosts[host]:
                     port_o = Port(pentest)
                     port_o.initialize(host, port, "tcp",
                                       hosts[host][port]["service"], infos={"plugin":Dirsearch.get_name()})
                     insert_ret = port_o.addInDb()
                     if not insert_ret["res"]:
-                        port_o = Port.fetchObject(pentest, {"_id": insert_ret["iid"]})
-                    targets[str(port_o.getId())] = {
-                        "ip": host, "port": port, "proto": "tcp"}
+                        port_db = Port.fetchObject(pentest, {"_id": insert_ret["iid"]})
+                        if port_db is not None:
+                            port_o = cast(Port, port_db)
+                        else:
+                            continue
+                    targets[str(port_o.getId())] = port_o.getDbKey()
                     hosts[host][port]["paths"].sort(key=lambda x: int(x[0]))
                     results = "\n".join(hosts[host][port]["paths"])
                     notes += results
@@ -153,10 +162,9 @@ class Dirsearch(Plugin):
                     atLeastOne = False
                     for statuscode in hosts[host][port]:
                         if isinstance(statuscode, int):
-                            if statuscode != 404:
-                                if hosts[host][port].get(statuscode, []):
-                                    newInfos["Dirsearch_"+str(statuscode)
-                                            ] = hosts[host][port][statuscode]
+                            if hosts[host][port].get(statuscode, []):
+                                newInfos["Dirsearch_"+str(statuscode)
+                                        ] = hosts[host][port][statuscode]
                         else:
                             atLeastOne = True
                     newInfos["SSL"] = "True" if hosts[host][port]["service"] == "https" else "False"

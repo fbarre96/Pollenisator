@@ -1369,13 +1369,13 @@ class DBClient:
         from pollenisator.app_factory import notify_clients
         notify_clients({"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now()})
 
-    def do_upload(self, pentest: str, attached_iid: str, filetype: str, upfile: Any) -> Tuple[str, int, str]:
+    def do_upload(self, pentest: str, attached_iid:  Union[Literal["unassigned"], str], filetype: str, upfile: Any) -> Tuple[str, int, str]:
         """
         Upload a file and attach it to a specific tool or defect in a pentest.
 
         Args:
             pentest (str): The name of the pentest.
-            attached_iid (str): The id of the tool or defect to which the file is attached.
+            attached_iid ( Union[Literal["unassigned"], str]): The id of the tool or defect to which the file is attached.
             filetype (str): The type of the file, either 'result' or 'proof'.
             upfile (Any): The file to be uploaded.
 
@@ -1390,14 +1390,18 @@ class DBClient:
             pass
         filepath = os.path.join(local_path, pentest, filetype, attached_iid)
         if filetype == "result":
+            if attached_iid == "unassigned":
+                return "The given iid is unassigned", 400, ""
             res = dbclient.findInDb(pentest, "tools", {"_id": ObjectId(attached_iid)}, False)
             if res is None:
                 return "The given iid does not match an existing tool", 404, ""
-            
-        elif filetype == "proof":
+
+        elif filetype == "proof" and attached_iid != "unassigned":
             res = dbclient.findInDb(pentest, "defects", {"_id": ObjectId(attached_iid)}, False)
             if res is None:
                 return "The given iid does not match an existing defect", 404, ""
+        elif filetype == "proof" and attached_iid == "unassigned":
+            pass
         else:
             return "Filetype is not proof nor result", 400, ""
 
@@ -1412,5 +1416,6 @@ class DBClient:
         upfile.stream.seek(0)
 
         if filetype == "proof":
-            dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(attached_iid)}, {"$push":{"proofs":name}})
+            if attached_iid != "unassigned":
+                dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(attached_iid)}, {"$push":{"proofs":name}})
         return name + " was successfully uploaded", 200, filepath
