@@ -1,4 +1,17 @@
-"""A registry for all subclasses of Plugin"""
+"""A registry for all subclasses of Plugin
+A plugin should:
+1. return None values if not able to parse the file
+2. parse the file to extract useful information
+3. Add corresponding objects to database:
+    * Ip (hostname are considered IPs too)
+    * Port
+    * Modules:
+        * ActiveDirectory:
+            * User
+            * Computer
+            * Share
+
+"""
 from typing import IO, Any, Dict, List, Optional, Tuple, Type
 from abc import ABCMeta, abstractmethod
 import shlex

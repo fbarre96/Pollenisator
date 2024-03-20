@@ -59,7 +59,7 @@ class Computer(Element):
 
     def initialize(self, name: Optional[str] = None, 
                    ip: Optional[str] = None, domain: Optional[str] = None, admins: Optional[List[ObjectId]] = None, 
-                   users: Optional[List[ObjectId]] = None, infos: Optional[Dict[str, Any]] = None) -> 'Computer':
+                   users: Optional[List[ObjectId]] = None, infos: Optional[Union[ComputerInfos, Dict[str, Any]]] = None) -> 'Computer':
         """
         Initialize the Computer object with the provided values. If a value is not provided, the corresponding attribute 
         is set to None. The pentest attribute is set to the current pentest if it is not provided.
