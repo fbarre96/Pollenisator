@@ -477,7 +477,7 @@ def init_db() -> None:
     dbclient = mongo.DBClient.getInstance()
     dbclient.deleteFromDb("pollenisator", "sockets", {}, many=True, notify=False)
     res = dbclient.findInDb("pollenisator", "settings", {}, True)
-    if res is None:
+    if res is None or len(res) == 0:
         dbclient.insertInDb("pollenisator", "settings", {"key":"pentest_types", "value":'{"Web": ["Base", "Application", "Data", "Policy"], "LAN": ["Base", "Application", "Infrastructure", "Active Directory", "Data", "Policy"]}'})
         dbclient.insertInDb("pollenisator", "settings", {"key":"tags", "value":'{"todo": {"color": "orange", "level": "todo"}, "pwned": {"color": "red", "level": "high"}, "Interesting": {"color": "dark green", "level": "medium"}, "Uninteresting": {"color": "sky blue", "level": "low"}, "neutral": {"color": "transparent", "level": ""}}'})
     any_user = dbclient.findInDb("pollenisator", "users", {}, False)
