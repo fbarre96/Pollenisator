@@ -62,7 +62,7 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
                     if re_match.group(1).strip() in proofs_by_name:
                         proof = proofs_by_name[re_match.group(1).strip()]
                         if not os.path.isfile(proof):
-                            return False, f"Proof file not found : {str(proof)} for defect {str(defect.get('title', ''))}"
+                            return False, f"Proof file not found : {str(re_match.group(1).strip())} for defect {str(defect.get('title', ''))}"
                         defect["description_paragraphs"][i] = InlineImage(doc, proof, width=Cm(17))
         for instance in defect.get("instances", []):
             for i,proof in enumerate(instance.get("proofs", [])):
