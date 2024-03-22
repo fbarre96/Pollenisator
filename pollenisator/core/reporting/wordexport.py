@@ -51,7 +51,7 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
     jinja_env.filters['translate'] = translate
     jinja_env.filters['getInitials'] = getInitials
     for defect in context["defects"]:
-        proofs = defect.get("proofs", [])
+        proofs =  defect.get("proofs", [])
         proofs_by_name = {}
         for proof in proofs:
             proofs_by_name[os.path.basename(proof)] = proof
@@ -61,6 +61,8 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
                 for re_match in re_matches:
                     if re_match.group(1).strip() in proofs_by_name:
                         proof = proofs_by_name[re_match.group(1).strip()]
+                        if not os.path.isfile(proof):
+                            return False, f"Proof file not found : {str(proof)} for defect {str(defect.get('title', ''))}"
                         defect["description_paragraphs"][i] = InlineImage(doc, proof, width=Cm(17))
         for instance in defect.get("instances", []):
             for i,proof in enumerate(instance.get("proofs", [])):
