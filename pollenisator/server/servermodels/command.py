@@ -139,5 +139,5 @@ def addToMyCommands(command_iid: str, **kwargs: Any) -> Tuple[str, int]:
     if res is None:
         return "Not found", 404
     dbclient.updateInDb("pollenisator", "commands", {
-                                 "_id": ObjectId(command_iid)}, {"$push":{"owners":user}})
+                                 "_id": ObjectId(command_iid)}, {"$addToSet":{"owners":user}})
     return "OK", 200

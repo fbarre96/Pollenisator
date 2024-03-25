@@ -1417,5 +1417,5 @@ class DBClient:
 
         if filetype == "proof":
             if attached_iid != "unassigned":
-                dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(attached_iid)}, {"$push":{"proofs":name}})
+                dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(attached_iid)}, {"$addToSet":{"proofs":name}})
         return name + " was successfully uploaded", 200, filepath
