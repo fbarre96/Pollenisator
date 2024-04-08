@@ -114,6 +114,7 @@ def loadPlugin(pluginName: str) -> Plugin:
     except ModuleNotFoundError:
         __import__("Default")
         return REGISTRY["Default"]
+    
 
 def listPlugin() -> List[str]:
     """

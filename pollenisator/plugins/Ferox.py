@@ -182,7 +182,7 @@ class Ferox(Plugin):
             return None, None, None, None
 
         targets = {}    # The targets dict
-        for host in hosts.items():
+        for host in hosts:
             ip_object = Ip(pentest)
             ip_object.initialize(host, infos={"plugin": Ferox.get_name()})
 
@@ -211,8 +211,8 @@ class Ferox(Plugin):
 
             # Add status code, host and path of the current host to the notes
             results = "\n"
-            for status, path in zip(hosts[host]["status"], hosts[host]["paths"]):
-                results += f"{status} - {host} - {path}\n"
+            for status, path, response in zip(hosts[host]["status"], hosts[host]["paths"], hosts[host]["responses"]):
+                results += f"""{status} - {host} - {path} - #Words: {response["words"]}\n"""
             notes += results
 
             # Check if the connection is SSL or not

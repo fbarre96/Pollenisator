@@ -142,6 +142,7 @@ def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage
         except Exception as e:
             error_msg = e
             logger.error("Plugin exception : %s", str(e))
+            logger.error("Plugin exception : %s", traceback.format_exc())
             traceback.print_exc()
             notes = tags = lvl = targets = None
     if error_msg:

@@ -48,18 +48,18 @@ class Computer(Element):
             domain (str): The domain of this Computer.
             admins (List[ObjectId]): The admins of this Computer.
             users (List[ObjectId]): The users of this Computer.
-            infos (Dict[str, Union[str, bool, List[str]]]): The infos of this Computer.
+            infos (ComputerInfos | Dict[str, Union[str, bool, List[str]]]): The infos of this Computer.
         """
         if valuesFromDb is None:
             valuesFromDb = {}
         super().__init__(pentest, {"_id":valuesFromDb.get("_id"), "parent":valuesFromDb.get("parent")})
         self.initialize(valuesFromDb.get("name"), valuesFromDb.get("ip"), \
-             valuesFromDb.get("domain"),  valuesFromDb.get("admins"),  valuesFromDb.get("users"), valuesFromDb["infos"])
+             valuesFromDb.get("domain"),  valuesFromDb.get("admins"),  valuesFromDb.get("users"), valuesFromDb.get("infos"))
 
 
     def initialize(self, name: Optional[str] = None, 
                    ip: Optional[str] = None, domain: Optional[str] = None, admins: Optional[List[ObjectId]] = None, 
-                   users: Optional[List[ObjectId]] = None, infos: Optional[Dict[str, Any]] = None) -> 'Computer':
+                   users: Optional[List[ObjectId]] = None, infos: Optional[Union[ComputerInfos, Dict[str, Any]]] = None) -> 'Computer':
         """
         Initialize the Computer object with the provided values. If a value is not provided, the corresponding attribute 
         is set to None. The pentest attribute is set to the current pentest if it is not provided.
@@ -70,7 +70,7 @@ class Computer(Element):
             domain (Optional[str], optional): The domain of the Computer object. Defaults to None.
             admins (Optional[List[str]], optional): The admins of the Computer object. Defaults to None.
             users (Optional[List[str]], optional): The users of the Computer object. Defaults to None.
-            infos (Optional[Dict[str, Any]], optional): The infos of the Computer object. Defaults to None.
+            infos (Optional[Union[ComputerInfos, Dict[str, Any]]], optional): The infos of the Computer object. Defaults to None.
 
         Raises:
             ValueError: If an empty pentest name was given and the database is not set in mongo instance.

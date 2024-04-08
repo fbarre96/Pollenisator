@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any, Dict, Iterator, List, Optional, Union, cast
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.tag import Tag
+from pollenisator.server.modules.activedirectory.computer_infos import ComputerInfos
 
 
 REGISTRY: Dict[str, 'Element'] = {}
@@ -347,7 +348,10 @@ class Element(metaclass=AbstractMetaElement):
             del newInfos[""]
         self.infos.update(newInfos)
         dbclient = DBClient.getInstance()
-        dbclient.updateInDb(self.pentest, self.__class__.coll_name, {"_id":ObjectId(self.getId())}, {"$set":{"infos":self.infos}})
+        if isinstance(self.infos, ComputerInfos):
+            dbclient.updateInDb(self.pentest, self.__class__.coll_name, {"_id":ObjectId(self.getId())}, {"$set":{"infos":self.infos.getData()}})
+        else:
+            dbclient.updateInDb(self.pentest, self.__class__.coll_name, {"_id":ObjectId(self.getId())}, {"$set":{"infos":self.infos}})
 
     def getId(self) -> ObjectId:
         """
