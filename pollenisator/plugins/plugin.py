@@ -35,6 +35,7 @@ class Plugin(metaclass=AbstractMetaPlugin):
     """
     autoDetect = True  # Authorize parsing function be used for autodetection
     default_bin_names = ["default"]
+    default_plugin_flags = ["default"]
 
     def autoDetectEnabled(self) -> bool:
         """
@@ -115,7 +116,7 @@ class Plugin(metaclass=AbstractMetaPlugin):
         """
         return {"todo": Tag("todo", "transparent", "todo", None)}
 
-    def detect_cmdline(self, cmdline: str) -> bool:
+    def detect_cmdline(self, cmdline: str) -> bool|str:
         """
         Returns a boolean indicating if this plugin is able to recognize a command line as likely to output results for it.
 
@@ -128,8 +129,14 @@ class Plugin(metaclass=AbstractMetaPlugin):
         cmd_args = shlex.split(cmdline)
         if not cmd_args:
             return False
-        if os.path.basename(cmd_args[0].lower()) in self.__class__.default_bin_names:
+        if os.path.basename(cmd_args[0].lower()) in self.__class__.default_bin_names \
+            and all(flag in cmd_args for flag in self.default_plugin_flags):
+            print(f"Detected {self.__class__.__name__} plugin")
             return True
+        elif os.path.basename(cmd_args[0].lower()) in self.__class__.default_bin_names \
+            and "default" in self.default_plugin_flags:
+            print(f"Detected {self.__class__.__name__} default plugin")
+            return "Default"
         return False
 
     @abstractmethod

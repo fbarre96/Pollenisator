@@ -175,14 +175,23 @@ def detectPluginsWithCmd(cmdline: str) -> List[str]:
     Returns:
         List[str]: A list of detected plugin names. If no plugins are detected, returns ["Default"].
     """
+    find_non_default_plugin = False
     foundPlugins = []
     for pluginName in listPlugin():
         mod = loadPlugin(pluginName)
         if mod.autoDetectEnabled():
-            if mod.detect_cmdline(cmdline):
+            print("Valeur de find_non_default_plugin 1 : ", find_non_default_plugin)
+            if mod.detect_cmdline(cmdline) is True:
+                print("### DETECTED PLUGIN : ", pluginName)
+                find_non_default_plugin = True
                 foundPlugins.append(pluginName)
+            print("Valeur de find_non_default_plugin 2: ", find_non_default_plugin)
+            if mod.detect_cmdline(cmdline) == "Default" and not find_non_default_plugin:
+                print("### DETECTED DEFAULT PLUGIN : ", pluginName)
+                foundPlugins = [pluginName]
     if not foundPlugins:
         return ["Default"]
+    print("### FOUND PLUGINGS : ", foundPlugins)
     return foundPlugins
 
 def isIp(domain_or_networks: str) -> bool:

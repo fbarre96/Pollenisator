@@ -1,6 +1,7 @@
 """A plugin to parse a NetExec SpiderPlus module scan"""
 
 import json
+import os
 import shlex
 from typing import cast
 from pollenisator.plugins.plugin import Plugin
@@ -32,13 +33,14 @@ class NXCSpiderPlus(Plugin):
     """A plugin to parse a NetExec SpiderPlus module scan"""
 
     default_bin_names = ['nxc', 'nxc.exe', 'netexec', 'netexec.exe']
+    default_plugin_flags = ["-M", "spider_plus"]
 
     def getFileOutputArg(self):
-        """Returns the command line paramater giving the output file
+        """Returns the command line parameter giving the output file
         Returns:
             string
         """
-        print("Je passe ici")
+
         return " -o OUTPUT_FOLDER=./ && mv *.json "
 
     def getFileOutputExt(self):
@@ -57,8 +59,6 @@ class NXCSpiderPlus(Plugin):
         """
 
         ip = commandExecuted.split(" ")[2]
-
-        print("Je passe là")
 
         path = commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
 
