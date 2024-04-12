@@ -532,6 +532,9 @@ paths:
                 email:
                   type: string
                   default: ""
+                mustChangePassword:
+                  type: boolean
+                  default: true
       responses:
         '200':
           description: successfully created a new user
@@ -696,6 +699,9 @@ paths:
                   type: string
                 newPwd:
                   type: string
+                mustChangePassword:
+                  type: boolean
+                  default: true
       responses:
         "200":
           description: successfully changed another user password
@@ -802,7 +808,7 @@ paths:
             application/json:
               examples:
                 Success:
-                  value: '"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjY3MDE0MjcsImV4cCI6MTYyNjcwNTAyNywic3ViIjoiYWRtaW4iLCJzY29wZSI6WyJhZG1pbiIsInVzZXIiXX0.tmv96VqKyqBa_xYjnfOqM7deKn6-UKmTB-rY9IrKX1M"'
+                  value: '{"token": "JWT valuer here", "mustChangePassword": false}'
         '400':
           description: Missing parameters
           content:
