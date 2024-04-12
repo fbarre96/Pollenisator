@@ -156,6 +156,8 @@ def changePassword(body: Dict[str, str], **kwargs: Any) -> ErrorStatus:
         return "oldPwd is required", 400
     elif newPwd == "":
         return "newPwd is required", 400
+    elif oldPwd == newPwd:
+        return "The new password must be different from the old password", 400
     check_res = password_check(newPwd)
     if not check_res["password_ok"]:
         if check_res["length_error"]:
