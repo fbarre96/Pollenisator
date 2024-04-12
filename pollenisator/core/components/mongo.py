@@ -10,7 +10,7 @@ from collections.abc import Iterable
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union, cast, overload
 from uuid import UUID, uuid4
 import bson
-
+from PIL import Image
 import pymongo
 import redis
 from bson import ObjectId
@@ -1409,10 +1409,16 @@ class DBClient:
             os.makedirs(filepath)
         except FileExistsError:
             pass
+
         name = upfile.filename.replace("/", "_")
+        fileext = os.path.splitext(name)[-1]
+        if fileext != ".png":
+            name+=".png"
         filepath = os.path.join(filepath, name)
         with open(filepath, "wb") as f:
             f.write(upfile.stream.read())
+        im1 = Image.open(filepath)
+        im1.save(filepath, format="png")
         upfile.stream.seek(0)
 
         if filetype == "proof":
