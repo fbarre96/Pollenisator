@@ -302,6 +302,6 @@ def connectToPentest(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union
         user = dbclient.findInDb("pollenisator", "users", {"username":username}, False, use_cache=False)
         if user is None:
             return "User not found", 404
-        if user["mustChangePassword"]:
+        if user.get("mustChangePassword", True):
             return "Forbidden : you must change your password", 403
         return {"token":getTokenFor(username, pentest, owner == username), "pentest_name":pentest_name}
