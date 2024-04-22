@@ -243,8 +243,9 @@ def create_app(debug: bool, async_mode: str) -> Flask:
                 return {"error": "Document could not be created"}
             res = ins_result.inserted_id
             doc = {}
+        join_room(pentest, sid)
         sm.socketio.emit("load-document", doc.get("data", {}), room=request.sid)
-    
+
     @sm.socketio.on("send-delta")
     def send_delta(delta):
         sid = request.sid
