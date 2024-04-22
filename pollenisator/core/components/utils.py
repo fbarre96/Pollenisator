@@ -180,14 +180,10 @@ def detectPluginsWithCmd(cmdline: str) -> List[str]:
     for pluginName in listPlugin():
         mod = loadPlugin(pluginName)
         if mod.autoDetectEnabled():
-            print("Valeur de find_non_default_plugin 1 : ", find_non_default_plugin)
             if mod.detect_cmdline(cmdline) is True:
-                print("### DETECTED PLUGIN : ", pluginName)
                 find_non_default_plugin = True
                 foundPlugins.append(pluginName)
-            print("Valeur de find_non_default_plugin 2: ", find_non_default_plugin)
             if mod.detect_cmdline(cmdline) == "Default" and not find_non_default_plugin:
-                print("### DETECTED DEFAULT PLUGIN : ", pluginName)
                 foundPlugins = [pluginName]
     if not foundPlugins:
         return ["Default"]
