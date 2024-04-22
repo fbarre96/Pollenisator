@@ -5,6 +5,7 @@ from typing_extensions import TypedDict
 
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
+from pollenisator.core.models.defect import Defect
 from pollenisator.core.models.element import Element
 import pollenisator.core.components.utils as utils
 from pollenisator.core.models.ip import Ip
@@ -192,6 +193,27 @@ class Scope(Element):
         if res is None:
             return None
         return ObjectId(res["_id"])
+
+    def get_children(self) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Returns the children of this scope.
+
+        Returns:
+            Dict[str, List[Dict[str, Any]]]: A list of dictionaries containing the children of this scope.
+        """
+        children:  Dict[str, List[Dict[str, Any]]] = {"checkinstances":[], "defects":[]}
+        checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": ObjectId(self.getId()), "target_type": "scope"})
+        if checks is not None:
+            for check in checks:
+                check = cast(CheckInstance, check)
+                children["checkinstances"].append(check.getData())
+        defects = Defect.fetchObjects(self.pentest, {"target_id": ObjectId(self.getId()), "target_type": "scope"})
+        if defects is not None:
+            for defect in defects:
+                defect = cast(Defect, defect)
+                defect_data = defect.getData()
+                children["defects"].append(defect_data)
+        return children
 
     def addInDb(self) -> ScopeInsertResult:
         """

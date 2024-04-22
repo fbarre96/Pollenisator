@@ -81,13 +81,69 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         dbclient = mongo.DBClient.getInstance()
         workerName = data.get("name")
         supported_plugins = data.get("supported_plugins", [])
-        
-        socket = dbclient.findInDb("pollenisator","sockets", {"user":workerName}, False)
+        socket = dbclient.findInDb("pollenisator","sockets", {"user":workerName, "type":"worker"}, False)
         if socket is None:
-            dbclient.insertInDb("pollenisator", "sockets", {"sid":request.sid, "user":workerName, "pentest":""}, notify=False)
+            dbclient.insertInDb("pollenisator", "sockets", {"sid":request.sid, "user":workerName, "type":"worker", "pentest":""}, notify=False)
         else:
-            dbclient.updateInDb("pollenisator", "sockets", {"user":workerName}, {"$set":{"sid":request.sid, "pentest":""}}, notify=False)
+            dbclient.updateInDb("pollenisator", "sockets", {"user":workerName, "type":"worker"}, {"$set":{"sid":request.sid, "pentest":""}}, notify=False)
         dbclient.registerWorker(workerName, supported_plugins)
+
+    @sm.socketio.event
+    def registerAsTerminalWorker(data):
+        """Registers a terminal worker and associates it with a socket.
+
+        Args:
+            data: A dictionary containing the terminal's name.
+        """
+        from pollenisator.server.token import verifyToken, decode_token
+        dbclient = mongo.DBClient.getInstance()
+        token = data.get("token", "")
+        pentest = data.get("pentest", "")
+        sid = request.sid
+        res = verifyToken(token)
+        if res:
+            token_info = decode_token(token)
+            user = dbclient.findInDb("pollenisator", "users", {"token":token}, False)
+            if user is None:
+                return
+            username = user.get("username", None)
+            if username is None:
+                return
+            logger.info("Registering socket for user %s", str(username))
+            if pentest in token_info["scope"]:
+                dbclient = mongo.DBClient.getInstance()
+                socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid, "user":username, "type":"terminal"}, False)
+                if socket is None:
+                    dbclient.insertInDb("pollenisator", "sockets", {"sid":sid, "user":username, "type":"terminal", "pentest":pentest}, False)
+                else:
+                    dbclient.updateInDb("pollenisator", "sockets", {"sid":sid, "user":username}, {"$set":{"pentest":pentest, "user":username}}, notify=False)
+                #sm.socketio.emit("testTerminal", {"pentest":pentest}, room=request.sid)
+
+    @sm.socketio.event
+    def registerAsTerminalConsumer(data):
+        from pollenisator.server.token import verifyToken, decode_token
+        dbclient = mongo.DBClient.getInstance()
+        token = data.get("token", "")
+        pentest = data.get("pentest", "")
+        sid = request.sid
+        res = verifyToken(token)
+        if res:
+            token_info = decode_token(token)
+            user = dbclient.findInDb("pollenisator", "users", {"token":token}, False)
+            if user is None:
+                return
+            username = user.get("username", None)
+            if username is None:
+                return
+            logger.info("Registering terminal consumer for user %s", str(username))
+            if pentest in token_info["scope"]:
+                dbclient = mongo.DBClient.getInstance()
+                socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid, "user":username, "type":"terminalConsumer"}, False)
+                if socket is None:
+                    dbclient.insertInDb("pollenisator", "sockets", {"sid":sid, "user":username, "type":"terminalConsumer", "pentest":pentest}, False)
+                else:
+                    dbclient.updateInDb("pollenisator", "sockets", {"sid":sid, "user":username }, {"$set":{"pentest":pentest , "user":username}}, notify=False)
+                #sm.socketio.emit("testTerminalConsumer", {"pentest":pentest}, room=request.sid)
 
     @sm.socketio.event
     def registerForNotifications(data):
@@ -102,7 +158,6 @@ def create_app(debug: bool, async_mode: str) -> Flask:
                 None
         """
         from pollenisator.server.token import verifyToken, decode_token
-
         logger.info("Registering socket for notifications %s", str(data))
         sid = request.sid
         token = str(data.get("token", ""))
@@ -110,16 +165,15 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         res = verifyToken(token)
         if res:
             token_info = decode_token(token)
+            
             if pentest in token_info["scope"]:
                 dbclient = mongo.DBClient.getInstance()
                 socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid}, False)
                 if socket is None:
                     dbclient.insertInDb("pollenisator", "sockets", {"sid":sid, "pentest":pentest}, False)
                 else:
-                    leave_room(pentest)
                     dbclient.updateInDb("pollenisator", "sockets", {"sid":sid}, {"$set":{"pentest":pentest}}, notify=False)
-                join_room(pentest)
-
+                sm.socketio.emit("accepted-register", {"message":"Socket registered for notifications"}, room=request.sid)
     @sm.socketio.event
     def keepalive(data):
         """Keep the worker alive and update the running tasks.

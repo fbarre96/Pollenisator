@@ -112,6 +112,23 @@ class CheckInstance(Element):
         if d is None:
             return None
         return CheckInstance(pentest, d)
+    
+    def get_children(self) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Returns the children of this Port.
+
+        Returns:
+            Dict[str, List[Dict[str, Any]]]: A list of dictionaries containing the children of this Port.
+        """
+        children: Dict[str, List[Dict[str, Any]]] = {"tools":[]}
+        tools = tool.Tool.fetchObjects(self.pentest, {"check_iid": ObjectId(self.getId())})
+        if tools is not None:
+            for tool in tools:
+                tool = cast(tool.Tool, tool)
+                tool_data = tool.getData()
+                children["tools"].append(tool_data)
+
+        return children
 
     def getTargetData(self) -> Dict[str, Any]:
         """

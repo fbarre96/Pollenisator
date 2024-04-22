@@ -691,6 +691,8 @@ class Tool(Element):
         dbclient = DBClient.getInstance()
         dbclient.updateInDb("pollenisator", "workers", {"name":workerName}, {"$addToSet":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=True)
 
+
+
     def getDbKey(self) -> Dict[str, Any]:
         """
         Return a dictionary from the model to use as a unique composed key.
