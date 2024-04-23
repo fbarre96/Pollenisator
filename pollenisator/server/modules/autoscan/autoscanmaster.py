@@ -93,6 +93,7 @@ def autoScan(pentest: str, endoded_token: str, autoqueue: bool) -> None:
                     "Autoscan : skip round because too many running tools ")
                 check = getAutoScanStatus(pentest)
                 continue
+            logger.debug("Autoscan :autoqueue: %s", str(autoqueue))
             if autoqueue:
                 tools_lauchable = findLaunchableTools(pentest)
                 logger.debug("Queing tasks %s",str(len(tools_lauchable)))
