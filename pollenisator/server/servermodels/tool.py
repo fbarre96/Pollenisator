@@ -153,7 +153,7 @@ def craftCommandLine(pentest: str, tool_iid: str, commandline_options: str = "")
     if mod is None:
         return "Plugin not found for this tool", 400
     # craft outputfile name
-    comm_complete = mod.changeCommand(comm, "|outputDir|",toolModel.name)
+    comm_complete = mod.changeCommand(comm, "|outputDir|","")
     ext = mod.getFileOutputExt()
     return {"comm":comm, "ext":ext, "comm_with_output":comm_complete}
 
