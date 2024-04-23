@@ -173,6 +173,8 @@ def create_app(debug: bool, async_mode: str) -> Flask:
                     dbclient.insertInDb("pollenisator", "sockets", {"sid":sid, "pentest":pentest}, False)
                 else:
                     dbclient.updateInDb("pollenisator", "sockets", {"sid":sid}, {"$set":{"pentest":pentest}}, notify=False)
+                    leave_room(socket["pentest"], sid)
+                join_room(pentest, sid)
                 sm.socketio.emit("accepted-register", {"message":"Socket registered for notifications"}, room=request.sid)
     @sm.socketio.event
     def keepalive(data):
