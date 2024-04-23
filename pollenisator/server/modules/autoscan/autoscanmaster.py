@@ -231,15 +231,15 @@ def findLaunchableTools(pentest: str) -> List[LaunchableToolType]:
                            for x in autoscan_enr["authorized_commands"]]
     pentest_commands = Command.fetchObjects(pentest, {"_id": {"$in": authorized_commands}})
     authorized_original_commands = [
-        str(x.original_iid) for x in pentest_commands]
+        ObjectId(x.original_iid) for x in pentest_commands]
     check_items = list(CheckItem.fetchObjects("pollenisator",
         {"check_type": "auto_commands", "commands": {"$in": authorized_original_commands}}))
     check_items.sort(key=lambda c: c.priority)
     # get not done tools inside wave
     for check_item in check_items:
         check_instances = CheckInstance.fetchObjects(
-            pentest, {"check_iid": str(check_item.getId()), "status": {"$ne": "done"}})
-        check_ids = [str(x.getId()) for x in check_instances]
+            pentest, {"check_iid": ObjectId(check_item.getId()), "status": {"$ne": "done"}})
+        check_ids = [ObjectId(x.getId()) for x in check_instances]
         tools_without_ip_db = Tool.fetchObjects(pentest, {"check_iid": {
                                                    "$in": check_ids}, "ip": "", "dated": "None", "datef": "None"})
         ips_in_scopes_db = Ip.fetchObjects(
