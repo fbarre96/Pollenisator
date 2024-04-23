@@ -95,6 +95,7 @@ def autoScan(pentest: str, endoded_token: str, autoqueue: bool) -> None:
                 continue
             if autoqueue:
                 tools_lauchable = findLaunchableTools(pentest)
+                logger.debug("Queing tasks %s",str(len(tools_lauchable)))
                 Tool.queueTasks(pentest, set([tool_model["tool"].getId() for tool_model in tools_lauchable]))
             launchableTools = []
             queue = dbclient.findInDb(pentest, "autoscan", {
@@ -217,11 +218,13 @@ def findLaunchableTools(pentest: str) -> List[LaunchableToolType]:
     toolsLaunchable: List[LaunchableToolType] = []
     time_compatible_waves_id = searchForAddressCompatibleWithTime(pentest)
     if time_compatible_waves_id is None:
+        logger.debug("No wave compatible with time found")
         return toolsLaunchable
     dbclient = DBClient.getInstance()
     autoscan_enr = dbclient.findInDb(
         pentest, "autoscan", {"special": True}, False)
     if autoscan_enr is None:
+        logger.debug("No autoscan is running")
         return toolsLaunchable
     authorized_commands = [ObjectId(x)
                            for x in autoscan_enr["authorized_commands"]]
