@@ -460,6 +460,8 @@ class Tool(Element):
         check_item = self.getCheckItem()
         if check_item is None:
             priority = 0
+        else:
+            priority = check_item.priority
         if index is None:
             index=self.findQueueIndexFromPrio(queue)
             queue.insert(index, {"iid":self.getId(), "priority":priority})
