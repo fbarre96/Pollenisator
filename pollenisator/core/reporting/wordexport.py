@@ -7,8 +7,12 @@ import jinja2
 from markdowntodocx.markdownconverter import convertMarkdownInFile
 import re
 from docx.shared import Cm
-
+import base64
 translation: Dict[str, str] = {}
+
+
+def b64encode(string):
+    return base64.b64encode(string.encode()).decode()
 
 def translate(w):
     if isinstance(w, list):
@@ -49,6 +53,7 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
     doc = DocxTemplate(template)
     jinja_env = jinja2.Environment(autoescape=True)
     jinja_env.filters['translate'] = translate
+    jinja_env.filters['b64encode'] = b64encode
     jinja_env.filters['getInitials'] = getInitials
     for defect in context["defects"]:
         proofs =  defect.get("proofs", [])
