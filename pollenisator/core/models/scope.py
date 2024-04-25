@@ -202,11 +202,22 @@ class Scope(Element):
             Dict[str, List[Dict[str, Any]]]: A list of dictionaries containing the children of this scope.
         """
         children:  Dict[str, List[Dict[str, Any]]] = {"checkinstances":[], "defects":[]}
+        checkinstances_ids: List[ObjectId] = []
+        checkitems_lkp = {}
         checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": ObjectId(self.getId()), "target_type": "scope"})
         if checks is not None:
             for check in checks:
                 check = cast(CheckInstance, check)
                 children["checkinstances"].append(check.getData())
+                checkinstances_ids.append(check.getId())
+        check_items = CheckItem.fetchObjects("pollenisator", {"_id":{"$in":checkinstances_ids}})
+        if check_items is not None:
+            for check_item in check_items:
+                check_item = cast(CheckItem, check_item)
+                checkitems_lkp[check_item.getId()] = check_item
+        for checkinstance in children["checkinstances"]:
+            checkinstance["checkitem"] = checkitems_lkp[checkinstance["checkitem"]].getData()
+
         defects = Defect.fetchObjects(self.pentest, {"target_id": ObjectId(self.getId()), "target_type": "scope"})
         if defects is not None:
             for defect in defects:

@@ -2542,6 +2542,33 @@ paths:
                   value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
                 Already exist:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+  "/scopes/{pentest}/{scope_iid}/getChildren":
+    get:
+      operationId: pollenisator.server.servermodels.scope.getChildren
+      tags:
+        - Scopes
+      summary: Get children of a scope
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: scope_iid
+          in: path
+          description: scope iid to get
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get children of a scope
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"ports":[{"_id":"ObjectId|123123", ...}, "checkinstances":[...]]}'
   "/scopes/update/{pentest}/{scope_iid}":
     put:
       operationId: pollenisator.server.servermodels.scope.update

@@ -34,6 +34,11 @@ def getInitials(words):
         initials.append(word_str)
     return ", ".join(initials)
 
+def regex_findall(string, pattern):
+    print("Received for findall, string:%s, pattern:%s" % (string, pattern))
+    matches = re.findall(pattern, string)
+    return matches
+
 
 def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs: Any) -> Union[Tuple[bool, str], Tuple[bool, str]]:
     """
@@ -55,6 +60,8 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
     jinja_env.filters['translate'] = translate
     jinja_env.filters['b64encode'] = b64encode
     jinja_env.filters['getInitials'] = getInitials
+    jinja_env.filters['regex_findall'] = regex_findall
+    context["proof_by_names"] = {}
     for defect in context["defects"]:
         proofs =  defect.get("proofs", [])
         proofs_by_name = {}
@@ -69,6 +76,7 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
                         if not os.path.isfile(proof):
                             return False, f"Proof file not found : {str(re_match.group(1).strip())} for defect {str(defect.get('title', ''))}"
                         defect["description_paragraphs"][i] = InlineImage(doc, proof, width=Cm(17))
+                        context["proof_by_names"][os.path.basename(proof)] = defect["description_paragraphs"][i] 
         for instance in defect.get("instances", []):
             for i,proof in enumerate(instance.get("proofs", [])):
                 instance["proofs"][i] = InlineImage(doc, proof)

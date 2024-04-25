@@ -64,6 +64,7 @@ def update(pentest: str, scope_iid: str, body: Dict[str, Any]) -> bool:
     dbclient.updateInDb(pentest, "scopes", {"_id":ObjectId(scope_iid)}, {"$set":body}, False, True)
     return True
 
+
 @permission("pentester")
 def getChildren(pentest: str, scope_iid: str) -> Union[Dict[str, Any], ErrorStatus]:
     """
