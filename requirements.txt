@@ -7,7 +7,7 @@ connexion[swagger-ui]
 feedparser
 netaddr>=0.7.19
 pymongo>=3.11.0
-python-docx==0.8.11
+python-docx
 defusedxml
 python-pptx>=0.6.8
 requests>=2.18.4
@@ -20,7 +20,7 @@ python-jose>=3.3.0
 flask_socketio
 flask-cors
 docxtpl>=0.16.7
-markdowntodocx>=0.1.4.1
+markdowntodocx>=0.1.5.0
 docker
 ruamel.yaml
 redis[hiredis]
