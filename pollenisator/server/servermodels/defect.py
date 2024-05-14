@@ -105,7 +105,6 @@ def findInsertPosition(pentest: str, risk: str) -> int:
         int: The position to insert the new defect.
     """
     return Defect.findInsertPosition(pentest, risk)
-    
 
 
 @permission("pentester")

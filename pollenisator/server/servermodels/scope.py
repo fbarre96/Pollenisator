@@ -1,7 +1,7 @@
 """
 Handle request common to Scopes
 """
-from typing import Any, Dict, cast
+from typing import Any, Dict, Tuple, Union, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
@@ -10,6 +10,7 @@ from pollenisator.core.models.scope import Scope
 from pollenisator.server.permission import permission
 
 ScopeInsertResult = TypedDict('ScopeInsertResult', {'res': bool, 'iid': ObjectId})
+ErrorStatus = Tuple[str, int]
 
 @permission("pentester")
 def delete(pentest: str, scope_iid: str) -> int:
@@ -62,3 +63,35 @@ def update(pentest: str, scope_iid: str, body: Dict[str, Any]) -> bool:
     dbclient = DBClient.getInstance()
     dbclient.updateInDb(pentest, "scopes", {"_id":ObjectId(scope_iid)}, {"$set":body}, False, True)
     return True
+
+@permission("pentester")
+def getCommandSuggestions(pentest: str, scope_iid: str) -> Union[Dict[str, Any], ErrorStatus]:
+    """
+    Get the command suggestions for the scope.
+
+    Returns:
+        Union[Dict[str, Any], ErrorStatus]: A dictionary containing the command suggestions or an error status.
+    """
+    scope_o = Scope.fetchObject(pentest, {"_id": ObjectId(scope_iid)})
+    if scope_o is None:
+        return "Not found", 404
+    scope_o = cast(Scope, scope_o)
+    return scope_o.getCommandSuggestions()
+
+#@permission("pentester")
+# def getChildren(pentest: str, scope_iid: str) -> Union[Dict[str, Any], ErrorStatus]:
+#     """
+#     Get the children of a scope.
+
+#     Args:
+#         pentest (str): The name of the pentest.
+#         scope_iid (str): The id of the scope.
+
+#     Returns:
+#         Dict[str, Any]: A dictionary containing the children of the scope.
+#     """
+#     scope_o = Scope.fetchObject(pentest, {"_id": ObjectId(scope_iid)})
+#     if scope_o is None:
+#         return "Not found", 404
+#     scope_o = cast(Scope, scope_o)
+#     return scope_o.get_children()

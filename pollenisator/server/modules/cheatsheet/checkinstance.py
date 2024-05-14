@@ -112,6 +112,23 @@ class CheckInstance(Element):
         if d is None:
             return None
         return CheckInstance(pentest, d)
+    
+    # def get_children(self) -> Dict[str, List[Dict[str, Any]]]:
+    #     """
+    #     Returns the children of this Port.
+
+    #     Returns:
+    #         Dict[str, List[Dict[str, Any]]]: A list of dictionaries containing the children of this Port.
+    #     """
+    #     children: Dict[str, List[Dict[str, Any]]] = {"tools":[]}
+    #     tools = tool.Tool.fetchObjects(self.pentest, {"check_iid": ObjectId(self.getId())})
+    #     if tools is not None:
+    #         for tool in tools:
+    #             tool = cast(tool.Tool, tool)
+    #             tool_data = tool.getData()
+    #             children["tools"].append(tool_data)
+
+    #     return children
 
     def getTargetData(self) -> Dict[str, Any]:
         """
@@ -383,6 +400,56 @@ class CheckInstance(Element):
         """
         return tuple(self.getDbKey().values())
 
+    def getCheckInstanceInformation(self) -> Union[None, Dict[str, Any]]:
+        check_item = CheckItem.fetchObject("pollenisator", {"_id": ObjectId(self.check_iid)})
+        if check_item is None:
+            return None
+        data = self.getData()
+        check_item_data = check_item.getData()
+        data["check_item"] = check_item_data
+        data["tools_done"] = {}
+        data["tools_running"] = {}
+        data["tools_not_done"] = {}
+        data["tools_error"] = {}
+        all_complete = True
+        at_least_one = False
+        total = 0
+        done = 0
+        dbclient = DBClient.getInstance()
+        dbclient.create_index(self.pentest, "tools", [("check_iid",1)])
+        tools_to_add = tool.Tool.fetchObjects(self.pentest, {"check_iid": ObjectId(self.getId())})
+        if tools_to_add is not None:
+            for tool_model in tools_to_add:
+                tool_model = cast(tool.Tool, tool_model)
+                if "done" in tool_model.getStatus():
+                    done += 1
+                    at_least_one = True
+                    data["tools_done"][str(tool_model.getId())] = tool_model.getData()
+                elif "running" in tool_model.getStatus():
+                    at_least_one = True
+                    data["tools_running"][str(
+                        tool_model.getId())] = tool_model.getDetailedString()
+                elif "error" in tool_model.getStatus():
+                    data["tools_error"][str(
+                        tool_model.getId())] = tool_model.getData()
+                else:
+                    data["tools_not_done"][str(
+                        tool_model.getId())] = tool_model.getDetailedString()
+                total += 1
+
+        if done != total:
+            all_complete = False
+        if len(check_item.commands) > 0:
+            if at_least_one and all_complete:
+                data["status"] = "done"
+            elif at_least_one and not all_complete:
+                data["status"] = "running"
+            else:
+                data["status"] = "todo"
+        else:
+            data["status"] = ""
+        return data
+
     def updateInfosCheck(self, check_item: Optional['CheckItem'] = None) -> Optional[ErrorStatus]:
         """
         Update the information of the CheckInstance.
@@ -528,54 +595,9 @@ def getInformations(pentest: str, iid: str) -> Union[Dict[str, Any], ErrorStatus
     inst = CheckInstance.fetchObject(pentest, {"_id": ObjectId(iid)})
     if inst is None:
         return "Not found", 404
-    check_item = CheckItem.fetchObject("pollenisator", {"_id": ObjectId(inst.check_iid)})
-    if check_item is None:
-        return "Check item parent not found", 404
-    data = inst.getData()
-    check_item_data = check_item.getData()
-    data["check_item"] = check_item_data
-    data["tools_done"] = {}
-    data["tools_running"] = {}
-    data["tools_not_done"] = {}
-    data["tools_error"] = {}
-    all_complete = True
-    at_least_one = False
-    total = 0
-    done = 0
-    dbclient = DBClient.getInstance()
-    dbclient.create_index(pentest, "tools", [("check_iid",1)])
-    tools_to_add = tool.Tool.fetchObjects(pentest, {"check_iid": ObjectId(iid)})
-    if tools_to_add is not None:
-        for tool_model in tools_to_add:
-            tool_model = cast(tool.Tool, tool_model)
-            if "done" in tool_model.getStatus():
-                done += 1
-                at_least_one = True
-                data["tools_done"][str(tool_model.getId())] = tool_model.getData()
-            elif "running" in tool_model.getStatus():
-                at_least_one = True
-                data["tools_running"][str(
-                    tool_model.getId())] = tool_model.getDetailedString()
-            elif "error" in tool_model.getStatus():
-                data["tools_error"][str(
-                    tool_model.getId())] = tool_model.getData()
-            else:
-                data["tools_not_done"][str(
-                    tool_model.getId())] = tool_model.getDetailedString()
-            total += 1
-
-    if done != total:
-        all_complete = False
-    if len(check_item.commands) > 0:
-        if at_least_one and all_complete:
-            data["status"] = "done"
-        elif at_least_one and not all_complete:
-            data["status"] = "running"
-        else:
-            data["status"] = "todo"
-    else:
-        data["status"] = ""
-    return data
+    inst = cast(CheckInstance, inst)
+    return inst.getCheckInstanceInformation()
+    
 
 
 @permission("pentester")

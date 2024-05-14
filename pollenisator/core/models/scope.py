@@ -1,10 +1,12 @@
 """Scope Model"""
 
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, Set, cast
 from typing_extensions import TypedDict
 
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
+from pollenisator.core.models.command import Command
+from pollenisator.core.models.defect import Defect
 from pollenisator.core.models.element import Element
 import pollenisator.core.components.utils as utils
 from pollenisator.core.models.ip import Ip
@@ -192,6 +194,59 @@ class Scope(Element):
         if res is None:
             return None
         return ObjectId(res["_id"])
+    
+    def getCommandSuggestions(self) -> Dict[str, Any]:
+        """
+        Get the command suggestions for the scope.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the command suggestions.
+        """
+        checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": ObjectId(self.getId()), "target_type": "scope"})
+        if checks is None:
+            return {}
+        ret = {}
+        for check in checks:
+            check = cast(CheckInstance, check)
+            result = check.getCheckInstanceInformation()
+            if result is not None:
+                ret[str(check.getId())] = result
+        return ret
+
+    # def get_children(self) -> Dict[str, List[Dict[str, Any]]]:
+    #     """
+    #     Returns the children of this scope.
+
+    #     Returns:
+    #         Dict[str, List[Dict[str, Any]]]: A list of dictionaries containing the children of this scope.
+    #     """
+    #     children:  Dict[str, List[Dict[str, Any]]] = {"checkinstances":[], "defects":[]}
+    #     checkinstances_ids: Set[ObjectId] = set()
+    #     checkitems_lkp = {}
+    #     checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": ObjectId(self.getId()), "target_type": "scope"})
+    #     if checks is not None:
+    #         for check in checks:
+    #             check = cast(CheckInstance, check)
+    #             children["checkinstances"].append(check.getData())
+    #             if check.check_iid is not None:
+    #                 checkinstances_ids.add(check.check_iid)
+    #     check_items = CheckItem.fetchObjects("pollenisator", {"_id":{"$in":list(checkinstances_ids)}})
+    #     commands_iids = set()
+    #     if check_items is not None:
+    #         for check_item in check_items:
+    #             check_item = cast(CheckItem, check_item)
+    #             checkitems_lkp[check_item.getId()] = check_item
+    #             commands_iids.add(check_item.commands)
+    #     for checkinstance in children["checkinstances"]:
+    #         checkinstance["checkitem"] = checkitems_lkp[ObjectId(checkinstance["check_iid"])].getData()
+
+    #     defects = Defect.fetchObjects(self.pentest, {"target_id": ObjectId(self.getId()), "target_type": "scope"})
+    #     if defects is not None:
+    #         for defect in defects:
+    #             defect = cast(Defect, defect)
+    #             defect_data = defect.getData()
+    #             children["defects"].append(defect_data)
+    #     return children
 
     def addInDb(self) -> ScopeInsertResult:
         """

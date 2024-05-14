@@ -25,6 +25,12 @@ def permission(*dec_args, **deckwargs):
             if "admin" in token_scope and "user" not in token_scope:
                 token_scope.append("user")
                 token_info["scope"] = token_scope
+            if "admin" in token_scope and "owner" not in token_scope:
+                token_scope.append("owner")
+                token_info["scope"] = token_scope
+            if "admin" in token_scope and "pentester" not in token_scope:
+                token_scope.append("pentester")
+                token_info["scope"] = token_scope
             # Check scope inside token
             if scope not in token_scope:
                 logger.debug(f"FORBIDDEN : {scope} not in {token_info}")

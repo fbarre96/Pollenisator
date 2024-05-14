@@ -327,7 +327,8 @@ def craftContext(pentest: str, **kwargs: Any) -> Dict[str, Any]:
         for pr in defect_completed["proofs"]:
             global_proofs.append(os.path.join(proof_path, os.path.basename(pr)))
         defect_completed["proofs"] = global_proofs
-        defect_completed["description_paragraphs"] = defect_completed["description"].replace("\r","").split("\n\n")
+        defect_completed["description"] =  defect_completed["description"].replace("\r","")
+        defect_completed["description_paragraphs"] = defect_completed["description"].replace("\r","").split("\n")
         fix_id = 1
         if len(defect_completed["fixes"]) > 1:
             for fix in defect_completed["fixes"]:
@@ -336,9 +337,10 @@ def craftContext(pentest: str, **kwargs: Any) -> Dict[str, Any]:
         elif len(defect_completed["fixes"]) == 1:
             defect_completed["fixes"][0]["id"] = str(defect_id)
         else:
-            logger.warning("Warning: defect in polymathee with no fix")
+            logger.warning("Warning: defect in base with no fix")
         for i, fix in enumerate(defect_completed["fixes"]):
-            defect_completed["fixes"][i]["description_paragraphs"] = fix["description"].replace("\r","").split("\n\n")
+            defect_completed["fixes"][i]["description"] =  fix["description"].replace("\r","")
+            defect_completed["fixes"][i]["description_paragraphs"] = fix["description"].replace("\r","").split("\n")
         completed_fixes += defect_completed["fixes"]
         defect_id += 1
         assignedDefects = dbclient.findInDb(pentest, "defects", {"global_defect":ObjectId(defect_completed["_id"])}, True)
@@ -348,8 +350,10 @@ def craftContext(pentest: str, **kwargs: Any) -> Dict[str, Any]:
             proof_path = getProofPath(pentest, ObjectId(assignedDefect["_id"]))
             for pr in assignedDefect.get("proofs", []):
                 local_proofs.append(os.path.join(proof_path, os.path.basename(pr)))
-            notes_paragraphs = assignedDefect.get("notes", "").replace("\r", "").split("\n\n")
+            
+            notes_paragraphs = assignedDefect.get("notes", "").replace("\r", "").split("\n")
             assignedDefect["proofs"] = local_proofs
+            assignedDefect["notes"] = assignedDefect.get("notes", "").replace("\r", "")
             assignedDefect["notes_paragraphs"] = notes_paragraphs
             defect_completed["instances"].append(assignedDefect)
         completed_defects.append(defect_completed)

@@ -460,6 +460,8 @@ class Tool(Element):
         check_item = self.getCheckItem()
         if check_item is None:
             priority = 0
+        else:
+            priority = check_item.priority
         if index is None:
             index=self.findQueueIndexFromPrio(queue)
             queue.insert(index, {"iid":self.getId(), "priority":priority})
@@ -689,7 +691,9 @@ class Tool(Element):
         self.status = newStatus
         self.scanner_ip = workerName
         dbclient = DBClient.getInstance()
-        dbclient.updateInDb("pollenisator", "workers", {"name":workerName}, {"$push":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=True)
+        dbclient.updateInDb("pollenisator", "workers", {"name":workerName}, {"$addToSet":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=True)
+
+
 
     def getDbKey(self) -> Dict[str, Any]:
         """

@@ -541,7 +541,7 @@ class Defect(Element):
         if not os.path.isfile(proof_path):
             raise FileNotFoundError("File not found")
         dbclient = DBClient.getInstance()
-        dbclient.updateInDb(self.pentest, "defects", {"_id": ObjectId(self.getId())}, {"$push":{"proofs":filename}})
+        dbclient.updateInDb(self.pentest, "defects", {"_id": ObjectId(self.getId())}, {"$addToSet":{"proofs":filename}})
         new_proof_path = os.path.join(my_proof_dir, filename)
         os.makedirs(my_proof_dir, exist_ok=True)
         shutil.move(proof_path, new_proof_path)

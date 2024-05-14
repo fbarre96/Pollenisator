@@ -93,6 +93,9 @@ def upload(pentest: str, defect_iid: Union[Literal["unassigned"], str], upfile: 
             name = upfile.filename.replace("/", "_")
         else:
             name = "proof_"+str(time.time()).replace(".", "_")
+        fileext = os.path.splitext(name)[-1]
+        if fileext != ".png":
+            name+=".png"
         return {"remote_path": f"files/{pentest}/download/proof/{defect_iid}/{name}", "msg":msg, "status":status}
     return msg, status
 

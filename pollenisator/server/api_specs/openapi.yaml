@@ -532,6 +532,9 @@ paths:
                 email:
                   type: string
                   default: ""
+                mustChangePassword:
+                  type: boolean
+                  default: true
       responses:
         '200':
           description: successfully created a new user
@@ -696,6 +699,9 @@ paths:
                   type: string
                 newPwd:
                   type: string
+                mustChangePassword:
+                  type: boolean
+                  default: true
       responses:
         "200":
           description: successfully changed another user password
@@ -802,7 +808,7 @@ paths:
             application/json:
               examples:
                 Success:
-                  value: '"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjY3MDE0MjcsImV4cCI6MTYyNjcwNTAyNywic3ViIjoiYWRtaW4iLCJzY29wZSI6WyJhZG1pbiIsInVzZXIiXX0.tmv96VqKyqBa_xYjnfOqM7deKn6-UKmTB-rY9IrKX1M"'
+                  value: '{"token": "JWT valuer here", "mustChangePassword": false}'
         '400':
           description: Missing parameters
           content:
@@ -2536,6 +2542,33 @@ paths:
                   value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
                 Already exist:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+  "/scopes/{pentest}/{scope_iid}/getCommandSuggestions":
+    get:
+      operationId: pollenisator.server.servermodels.scope.getCommandSuggestions
+      tags:
+        - Scopes
+      summary: Get command suggestions of a scope
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: scope_iid
+          in: path
+          description: scope iid to get
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get children of a scope
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{id:data}'
   "/scopes/update/{pentest}/{scope_iid}":
     put:
       operationId: pollenisator.server.servermodels.scope.update

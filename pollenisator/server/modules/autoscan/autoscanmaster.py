@@ -93,8 +93,10 @@ def autoScan(pentest: str, endoded_token: str, autoqueue: bool) -> None:
                     "Autoscan : skip round because too many running tools ")
                 check = getAutoScanStatus(pentest)
                 continue
+            logger.debug("Autoscan :autoqueue: %s", str(autoqueue))
             if autoqueue:
                 tools_lauchable = findLaunchableTools(pentest)
+                logger.debug("Queing tasks %s",str(len(tools_lauchable)))
                 Tool.queueTasks(pentest, set([tool_model["tool"].getId() for tool_model in tools_lauchable]))
             launchableTools = []
             queue = dbclient.findInDb(pentest, "autoscan", {
@@ -217,25 +219,27 @@ def findLaunchableTools(pentest: str) -> List[LaunchableToolType]:
     toolsLaunchable: List[LaunchableToolType] = []
     time_compatible_waves_id = searchForAddressCompatibleWithTime(pentest)
     if time_compatible_waves_id is None:
+        logger.debug("No wave compatible with time found")
         return toolsLaunchable
     dbclient = DBClient.getInstance()
     autoscan_enr = dbclient.findInDb(
         pentest, "autoscan", {"special": True}, False)
     if autoscan_enr is None:
+        logger.debug("No autoscan is running")
         return toolsLaunchable
     authorized_commands = [ObjectId(x)
                            for x in autoscan_enr["authorized_commands"]]
     pentest_commands = Command.fetchObjects(pentest, {"_id": {"$in": authorized_commands}})
     authorized_original_commands = [
-        str(x.original_iid) for x in pentest_commands]
+        ObjectId(x.original_iid) for x in pentest_commands]
     check_items = list(CheckItem.fetchObjects("pollenisator",
         {"check_type": "auto_commands", "commands": {"$in": authorized_original_commands}}))
     check_items.sort(key=lambda c: c.priority)
     # get not done tools inside wave
     for check_item in check_items:
         check_instances = CheckInstance.fetchObjects(
-            pentest, {"check_iid": str(check_item.getId()), "status": {"$ne": "done"}})
-        check_ids = [str(x.getId()) for x in check_instances]
+            pentest, {"check_iid": ObjectId(check_item.getId()), "status": {"$ne": "done"}})
+        check_ids = [ObjectId(x.getId()) for x in check_instances]
         tools_without_ip_db = Tool.fetchObjects(pentest, {"check_iid": {
                                                    "$in": check_ids}, "ip": "", "dated": "None", "datef": "None"})
         ips_in_scopes_db = Ip.fetchObjects(

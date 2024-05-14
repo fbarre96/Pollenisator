@@ -81,13 +81,69 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         dbclient = mongo.DBClient.getInstance()
         workerName = data.get("name")
         supported_plugins = data.get("supported_plugins", [])
-        
-        socket = dbclient.findInDb("pollenisator","sockets", {"user":workerName}, False)
+        socket = dbclient.findInDb("pollenisator","sockets", {"user":workerName, "type":"worker"}, False)
         if socket is None:
-            dbclient.insertInDb("pollenisator", "sockets", {"sid":request.sid, "user":workerName, "pentest":""}, notify=False)
+            dbclient.insertInDb("pollenisator", "sockets", {"sid":request.sid, "user":workerName, "type":"worker", "pentest":""}, notify=False)
         else:
-            dbclient.updateInDb("pollenisator", "sockets", {"user":workerName}, {"$set":{"sid":request.sid, "pentest":""}}, notify=False)
+            dbclient.updateInDb("pollenisator", "sockets", {"user":workerName, "type":"worker"}, {"$set":{"sid":request.sid, "pentest":""}}, notify=False)
         dbclient.registerWorker(workerName, supported_plugins)
+
+    @sm.socketio.event
+    def registerAsTerminalWorker(data):
+        """Registers a terminal worker and associates it with a socket.
+
+        Args:
+            data: A dictionary containing the terminal's name.
+        """
+        from pollenisator.server.token import verifyToken, decode_token
+        dbclient = mongo.DBClient.getInstance()
+        token = data.get("token", "")
+        pentest = data.get("pentest", "")
+        sid = request.sid
+        res = verifyToken(token)
+        if res:
+            token_info = decode_token(token)
+            user = dbclient.findInDb("pollenisator", "users", {"token":token}, False)
+            if user is None:
+                return
+            username = user.get("username", None)
+            if username is None:
+                return
+            logger.info("Registering socket for user %s", str(username))
+            if pentest in token_info["scope"]:
+                dbclient = mongo.DBClient.getInstance()
+                socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid, "user":username, "type":"terminal"}, False)
+                if socket is None:
+                    dbclient.insertInDb("pollenisator", "sockets", {"sid":sid, "user":username, "type":"terminal", "pentest":pentest}, False)
+                else:
+                    dbclient.updateInDb("pollenisator", "sockets", {"sid":sid, "user":username}, {"$set":{"pentest":pentest, "user":username}}, notify=False)
+                #sm.socketio.emit("testTerminal", {"pentest":pentest}, room=request.sid)
+
+    @sm.socketio.event
+    def registerAsTerminalConsumer(data):
+        from pollenisator.server.token import verifyToken, decode_token
+        dbclient = mongo.DBClient.getInstance()
+        token = data.get("token", "")
+        pentest = data.get("pentest", "")
+        sid = request.sid
+        res = verifyToken(token)
+        if res:
+            token_info = decode_token(token)
+            user = dbclient.findInDb("pollenisator", "users", {"token":token}, False)
+            if user is None:
+                return
+            username = user.get("username", None)
+            if username is None:
+                return
+            logger.info("Registering terminal consumer for user %s", str(username))
+            if pentest in token_info["scope"]:
+                dbclient = mongo.DBClient.getInstance()
+                socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid, "user":username, "type":"terminalConsumer"}, False)
+                if socket is None:
+                    dbclient.insertInDb("pollenisator", "sockets", {"sid":sid, "user":username, "type":"terminalConsumer", "pentest":pentest}, False)
+                else:
+                    dbclient.updateInDb("pollenisator", "sockets", {"sid":sid, "user":username }, {"$set":{"pentest":pentest , "user":username}}, notify=False)
+                #sm.socketio.emit("testTerminalConsumer", {"pentest":pentest}, room=request.sid)
 
     @sm.socketio.event
     def registerForNotifications(data):
@@ -102,7 +158,6 @@ def create_app(debug: bool, async_mode: str) -> Flask:
                 None
         """
         from pollenisator.server.token import verifyToken, decode_token
-
         logger.info("Registering socket for notifications %s", str(data))
         sid = request.sid
         token = str(data.get("token", ""))
@@ -110,16 +165,17 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         res = verifyToken(token)
         if res:
             token_info = decode_token(token)
+            
             if pentest in token_info["scope"]:
                 dbclient = mongo.DBClient.getInstance()
                 socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid}, False)
                 if socket is None:
                     dbclient.insertInDb("pollenisator", "sockets", {"sid":sid, "pentest":pentest}, False)
                 else:
-                    leave_room(pentest)
                     dbclient.updateInDb("pollenisator", "sockets", {"sid":sid}, {"$set":{"pentest":pentest}}, notify=False)
-                join_room(pentest)
-
+                    leave_room(socket["pentest"], sid)
+                join_room(pentest, sid)
+                sm.socketio.emit("accepted-register", {"message":"Socket registered for notifications"}, room=request.sid)
     @sm.socketio.event
     def keepalive(data):
         """Keep the worker alive and update the running tasks.
@@ -189,8 +245,9 @@ def create_app(debug: bool, async_mode: str) -> Flask:
                 return {"error": "Document could not be created"}
             res = ins_result.inserted_id
             doc = {}
+        join_room(pentest, sid)
         sm.socketio.emit("load-document", doc.get("data", {}), room=request.sid)
-    
+
     @sm.socketio.on("send-delta")
     def send_delta(delta):
         sid = request.sid
@@ -476,6 +533,14 @@ def init_db() -> None:
     """
     dbclient = mongo.DBClient.getInstance()
     dbclient.deleteFromDb("pollenisator", "sockets", {}, many=True, notify=False)
+    res = dbclient.findInDb("pollenisator", "settings", {}, True)
+    if res is None:
+        settings = []
+    else:
+        settings = [s for s in res]
+    if len(settings) < 2 or settings[0].get("key") != "pentest_types" or settings[1].get("key") != "tags":
+        dbclient.insertInDb("pollenisator", "settings", {"key":"pentest_types", "value":'{"Web": ["Base", "Application", "Data", "Policy"], "LAN": ["Base", "Application", "Infrastructure", "Active Directory", "Data", "Policy"]}'})
+        dbclient.insertInDb("pollenisator", "settings", {"key":"tags", "value":'{"todo": {"color": "orange", "level": "todo"}, "pwned": {"color": "red", "level": "high"}, "Interesting": {"color": "dark green", "level": "medium"}, "Uninteresting": {"color": "sky blue", "level": "low"}, "neutral": {"color": "transparent", "level": ""}}'})
     any_user = dbclient.findInDb("pollenisator", "users", {}, False)
     noninteractive = False
     if any_user is None:
