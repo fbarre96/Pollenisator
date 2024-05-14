@@ -2542,12 +2542,12 @@ paths:
                   value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
                 Already exist:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
-  "/scopes/{pentest}/{scope_iid}/getChildren":
+  "/scopes/{pentest}/{scope_iid}/getCommandSuggestions":
     get:
-      operationId: pollenisator.server.servermodels.scope.getChildren
+      operationId: pollenisator.server.servermodels.scope.getCommandSuggestions
       tags:
         - Scopes
-      summary: Get children of a scope
+      summary: Get command suggestions of a scope
       parameters:
         - name: pentest
           in: path
@@ -2568,7 +2568,7 @@ paths:
             application/json:
               examples:
                 Success:
-                  value: '{"ports":[{"_id":"ObjectId|123123", ...}, "checkinstances":[...]]}'
+                  value: '{id:data}'
   "/scopes/update/{pentest}/{scope_iid}":
     put:
       operationId: pollenisator.server.servermodels.scope.update

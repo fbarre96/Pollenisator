@@ -64,21 +64,34 @@ def update(pentest: str, scope_iid: str, body: Dict[str, Any]) -> bool:
     dbclient.updateInDb(pentest, "scopes", {"_id":ObjectId(scope_iid)}, {"$set":body}, False, True)
     return True
 
-
 @permission("pentester")
-def getChildren(pentest: str, scope_iid: str) -> Union[Dict[str, Any], ErrorStatus]:
+def getCommandSuggestions(pentest: str, scope_iid: str) -> Union[Dict[str, Any], ErrorStatus]:
     """
-    Get the children of a scope.
-
-    Args:
-        pentest (str): The name of the pentest.
-        scope_iid (str): The id of the scope.
+    Get the command suggestions for the scope.
 
     Returns:
-        Dict[str, Any]: A dictionary containing the children of the scope.
+        Union[Dict[str, Any], ErrorStatus]: A dictionary containing the command suggestions or an error status.
     """
     scope_o = Scope.fetchObject(pentest, {"_id": ObjectId(scope_iid)})
     if scope_o is None:
         return "Not found", 404
     scope_o = cast(Scope, scope_o)
-    return scope_o.get_children()
+    return scope_o.getCommandSuggestions()
+
+#@permission("pentester")
+# def getChildren(pentest: str, scope_iid: str) -> Union[Dict[str, Any], ErrorStatus]:
+#     """
+#     Get the children of a scope.
+
+#     Args:
+#         pentest (str): The name of the pentest.
+#         scope_iid (str): The id of the scope.
+
+#     Returns:
+#         Dict[str, Any]: A dictionary containing the children of the scope.
+#     """
+#     scope_o = Scope.fetchObject(pentest, {"_id": ObjectId(scope_iid)})
+#     if scope_o is None:
+#         return "Not found", 404
+#     scope_o = cast(Scope, scope_o)
+#     return scope_o.get_children()

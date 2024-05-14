@@ -259,29 +259,29 @@ class Port(Element):
         else:
             return res
         
-    def get_children(self) -> Dict[str, List[Dict[str, Any]]]:
-        """
-        Returns the children of this Port.
+    # def get_children(self) -> Dict[str, List[Dict[str, Any]]]:
+    #     """
+    #     Returns the children of this Port.
 
-        Returns:
-            Dict[str, List[Dict[str, Any]]]: A list of dictionaries containing the children of this Port.
-        """
-        children: Dict[str, List[Dict[str, Any]]] = {"checkinstances":[], "defects": []}
-        checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": ObjectId(self.getId()), "target_type": "port"})
-        if checks is not None:
-            for check in checks:
-                check = cast(CheckInstance, check)
-                check_data = check.getData()
-                check_data["children"] = check.get_children()
-                children["checkinstances"].append(check_data)
-        defects = Defect.fetchObjects(self.pentest, {"target_id": ObjectId(self.getId()), "target_type": "port"})
-        if defects is not None:
-            for defect in defects:
-                defect = cast(Defect, defect)
-                defect_data = defect.getData()
-                children["defects"].append(defect_data)
-        return children
-        return children
+    #     Returns:
+    #         Dict[str, List[Dict[str, Any]]]: A list of dictionaries containing the children of this Port.
+    #     """
+    #     children: Dict[str, List[Dict[str, Any]]] = {"checkinstances":[], "defects": []}
+    #     checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": ObjectId(self.getId()), "target_type": "port"})
+    #     if checks is not None:
+    #         for check in checks:
+    #             check = cast(CheckInstance, check)
+    #             check_data = check.getData()
+    #             check_data["children"] = check.get_children()
+    #             children["checkinstances"].append(check_data)
+    #     defects = Defect.fetchObjects(self.pentest, {"target_id": ObjectId(self.getId()), "target_type": "port"})
+    #     if defects is not None:
+    #         for defect in defects:
+    #             defect = cast(Defect, defect)
+    #             defect_data = defect.getData()
+    #             children["defects"].append(defect_data)
+    #     return children
+    #     return children
 
     def update_service(self) -> bool:
         """
