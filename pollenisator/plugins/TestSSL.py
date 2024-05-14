@@ -18,6 +18,7 @@ def parseWarnings(pentest, file_opened):
     """
     targets = {}
     missconfiguredHosts = {}
+    
     firstLine = True
     for line in file_opened:
         line = line.decode("utf-8", errors="ignore")
@@ -29,12 +30,19 @@ def parseWarnings(pentest, file_opened):
             continue
         # Search ip in file
         warn = re.search(
-            r"^\"[^\"]*\", ?\"([^\"]*)\", ?\"([^\"]*)\", ?\"(OK|INFO|NOT ok|WARN|LOW|MEDIUM|HIGH|CRITICAL)\", ?\"[^\"]*\", ?\"[^\"]*\", ?\"[^\"]*\"$", line)
+            r"^\"([^\"]*)\", ?\"([^\"]*)\", ?\"([^\"]*)\", ?\"(OK|INFO|NOT ok|WARN|LOW|MEDIUM|HIGH|CRITICAL)\", ?\"([^\"]*)\", ?\"([^\"]*)\", ?\"([^\"]*)\"$", line)
         if warn is not None:
-            ip = warn.group(1)
+            subject = warn.group(1)
+            ip = warn.group(2)
             domain = None
-            port = warn.group(2)
-            notes = warn.group(3)
+            port = warn.group(3)
+            level = warn.group(4)
+            details = warn.group(5)
+            cve = warn.group(6)
+            cwe = warn.group(7)
+            # crop details if too long
+            if len(details) > 50:
+                details = details[:100]+" [...] "+details[-100:]
             if "/" in ip:
                 domain = ip.split("/")[0]
                 ip = "/".join(ip.split("/")[1:])
@@ -45,27 +53,39 @@ def parseWarnings(pentest, file_opened):
                 continue
             Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name()}).addInDb()
             Port(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name()}).addInDb()
-            if notes not in ["OK", "INFO"]:
+            
+            if level not in ["OK", "INFO"]:
+                information = {"defect": subject, "criticity": level, "details": details}
+                if cve.strip() != "":
+                    information["cve"] = cve
+                if cwe.strip() != "":
+                    information["cwe"] = cwe
                 missconfiguredHosts[ip] = missconfiguredHosts.get(ip, {})
                 missconfiguredHosts[ip][port] = missconfiguredHosts[ip].get(port, [
                 ])
-                missconfiguredHosts[ip][port].append(notes+" : "+line)
+                missconfiguredHosts[ip][port].append(information)
                 if domain is not None:
                     missconfiguredHosts[domain] = missconfiguredHosts.get(
                         domain, {})
                     missconfiguredHosts[domain][port] = missconfiguredHosts[domain].get(
-                        port, [])
-                    missconfiguredHosts[domain][port].append(notes+" : "+line)
-    for ip in missconfiguredHosts.keys():
+                        port, [])         
+                    missconfiguredHosts[domain][port].append(information)
+    for ip, _ in missconfiguredHosts.items():
         if ip.strip() != "":
             for port in missconfiguredHosts[ip].keys():
                 p_o = Port.fetchObject(pentest, {"ip": ip, "port": port, "proto": "tcp"})
                 targets[str(p_o.getId())] = {
                     "ip": ip, "port": port, "proto": "tcp"}
-                missconfiguredHosts[ip][port].sort()
-                notes = "\n".join(missconfiguredHosts[ip][port])
+                notes = ""
+                for warning in missconfiguredHosts[ip][port]:
+                    notes += warning["defect"] + " : " + warning["details"] + " (Criticity : " + warning["criticity"] + ")\n"
+                    if "cve" in warning:
+                        notes += "CVE  : " + warning["cve"] + "\n"
+                    if "cwe" in warning:
+                        notes += "CWE : " + warning["cwe"] + "\n"
                 p_o.addTag(Tag("SSL/TLS-flaws", None, "low", notes=notes))
-                p_o.updateInfos({"compliant": "False"})
+                p_o.updateInfos({TestSSL.get_name(): missconfiguredHosts[domain][port]})
+                print("NOTES: ", notes)
         if firstLine:
             return None, None
     return str(len(missconfiguredHosts.keys()))+" misconfigured hosts found. Defects created.", targets
