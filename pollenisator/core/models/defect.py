@@ -98,7 +98,7 @@ class Defect(Element):
         self.redactor = redactor
         self.mtype = mtype if mtype is not None else []
         if isinstance(self.mtype, str):
-            self.mtype = [self.mtype]
+            self.mtype = [x.strip() for x in self.mtype.split(",")]
         self.language = language
         self.notes = notes
         self.target_id: Optional[ObjectId] = ObjectId(target_id) if target_id is not None else None
