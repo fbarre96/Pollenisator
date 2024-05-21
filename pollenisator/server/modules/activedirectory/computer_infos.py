@@ -29,7 +29,7 @@ class ComputerInfos():
         elif isinstance(valuesFromDb, ComputerInfos):
             valuesFromDb = valuesFromDb.getData()
         self.initialize(valuesFromDb.get("os"), valuesFromDb.get("signing"),valuesFromDb.get("smbv1"), \
-             valuesFromDb.get("is_dc"), valuesFromDb.get("secrets", []), valuesFromDb.get("is_sqlserver"))
+                valuesFromDb.get("is_dc"), valuesFromDb.get("secrets", []), valuesFromDb.get("is_sqlserver"))
 
 
     def initialize(self, os: Optional[str] = None, signing: Optional[bool] = None, smbv1: Optional[bool] = None, 
@@ -67,6 +67,21 @@ class ComputerInfos():
             Dict[str, Union[str, bool, List[str]]]: A dictionary containing the data of the ComputerInfos object.
         """
         return {"os":self.os, "signing": self.signing, "smbv1":self.smbv1, "is_dc":self.is_dc,  "is_sqlserver":self.is_sqlserver, "secrets":self.secrets}
+    
+    def update(self, values: Dict[str, Any]) -> None:
+        """
+        Update the ComputerInfos object with the provided values. The values are fetched from the values dictionary using the 
+        get method.
+
+        Args:
+            values (Dict[str, Any]): A dictionary containing the values to update the ComputerInfos object.
+        """
+        self.os = values.get("os", self.os)
+        self.signing = values.get("signing", self.signing)
+        self.smbv1 = values.get("smbv1", self.smbv1)
+        self.is_dc = values.get("is_dc", self.is_dc)
+        self.is_sqlserver = values.get("is_sqlserver", self.is_sqlserver)
+        self.secrets = values.get("secrets", self.secrets)
 
     @property
     def os(self) -> Optional[str]:

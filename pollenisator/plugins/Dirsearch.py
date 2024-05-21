@@ -125,7 +125,7 @@ class Dirsearch(Plugin):
                 0. notes (str): Notes to be inserted in tool giving direct info to pentester.
                 1. tags (List[Tag]): A list of tags to be added to tool.
                 2. lvl (str): The level of the command executed to assign to given targets.
-                3. targets (Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Optional[Dict[str, Optional[str]]]]]]): A list of composed keys allowing retrieve/insert from/into database targeted objects.
+                3. targets (Dict[str, Optional[Dict[str, Optional[str]]]]]): A list of composed keys allowing retrieve/insert from/into database targeted objects.
         """
         tags = []
         try:

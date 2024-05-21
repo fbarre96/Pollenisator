@@ -1,10 +1,10 @@
 """
-Active directory mdule to handle sharefiles
+Active directory module to handle sharefiles
 """
 # coding: utf-8
 
 from __future__ import absolute_import
-from typing import List, Optional, Dict, Any, Tuple, cast
+from typing import List, Optional, Union, Dict, Any, Tuple, cast
 
 from pollenisator.core.models.element import Element
 
@@ -34,7 +34,7 @@ class ShareFile(Element):
         self.users: List[UserTuple] = []
         self.initialize(valuesFromDb.get("path"), valuesFromDb.get("flagged"), valuesFromDb.get("size") , valuesFromDb.get("users"), valuesFromDb.get("infos") )
 
-    def initialize(self, path: Optional[str]=None, flagged: Optional[bool] = None, size: Optional[int]=None,  users: Optional[List[UserTuple]]=None, infos: Optional[Dict[str, Any]]=None) -> 'ShareFile':
+    def initialize(self, path: Optional[str]=None, flagged: Optional[bool] = None, size: Optional[Union[int, float]]=None,  users: Optional[List[UserTuple]]=None, infos: Optional[Dict[str, Any]]=None) -> 'ShareFile':
         """
         Initialize a ShareFile object with the provided values. If a value is not provided, the corresponding attribute is 
         initialized with a default value.

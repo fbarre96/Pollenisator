@@ -114,6 +114,7 @@ def loadPlugin(pluginName: str) -> Plugin:
     except ModuleNotFoundError:
         __import__("Default")
         return REGISTRY["Default"]
+    
 
 def listPlugin() -> List[str]:
     """
@@ -174,14 +175,19 @@ def detectPluginsWithCmd(cmdline: str) -> List[str]:
     Returns:
         List[str]: A list of detected plugin names. If no plugins are detected, returns ["Default"].
     """
+    find_non_default_plugin = False
     foundPlugins = []
     for pluginName in listPlugin():
         mod = loadPlugin(pluginName)
         if mod.autoDetectEnabled():
-            if mod.detect_cmdline(cmdline):
+            if mod.detect_cmdline(cmdline) is True:
+                find_non_default_plugin = True
                 foundPlugins.append(pluginName)
+            if mod.detect_cmdline(cmdline) == "Default" and not find_non_default_plugin:
+                foundPlugins = [pluginName]
     if not foundPlugins:
         return ["Default"]
+    print("### FOUND PLUGINGS : ", foundPlugins)
     return foundPlugins
 
 def isIp(domain_or_networks: str) -> bool:
