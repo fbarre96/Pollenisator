@@ -240,10 +240,6 @@ class Defect(Element):
                     defect_to_edit = cast(Defect, defect_to_edit)
                     defect_to_edit.update_index(int(defect_to_edit.index)+1)
                 self.index = int(save_insert_pos)
-            else:
-                self.description = ""
-                self.synthesis = ""
-                self.fixes = []
 
             self.creation_time = datetime.now()
             if isinstance(self.mtype, str):
