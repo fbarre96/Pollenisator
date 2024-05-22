@@ -9,9 +9,10 @@ debug = bool(os.environ.get("FLASK_DEBUG", False))
 if debug:
     async_mode = "threading" # Be aware thats sockets does not seems to work when debugging
 else:
-    async_mode = "eventlet"
     import eventlet
     eventlet.monkey_patch()
+    async_mode = "eventlet"
+
 import pollenisator.app_factory as app_factory
 from typing import Any
 from flask_socketio import SocketIO
