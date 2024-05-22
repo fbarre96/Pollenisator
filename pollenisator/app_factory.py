@@ -372,6 +372,8 @@ def migrate():
         version = migrate_2_7()
     if version == "2.7":
         version = migrate_2_8()
+    if version == "2.8":
+        version = migrate_2_9()
 
 def migrate_0():
     dbclient = mongo.DBClient.getInstance()
@@ -524,6 +526,29 @@ def migrate_2_8():
                 updates.append(pymongo.UpdateOne({"_id":ObjectId(tool["_id"])},{"$set":{"check_iid":tool.get("check_iid"), "command_iid":tool.get("command_iid")}}))
             dbclient.bulk_write(pentest_uuid, "tools", updates)
     dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.8"}})
+
+
+def migrate_2_9():
+    dbclient = mongo.DBClient.getInstance()
+    defects = dbclient.findInDb("pollenisator","defects",{}, True)
+    updates = []
+    for defect in defects:
+        types = defect.get("type", None)
+        newType = set()
+        if isinstance(types, str):
+            newType = newType.union(set([x.strip() for x in types.split(",")]))
+        elif isinstance(types, list):
+            for item in types:
+                if isinstance(item, str):
+                    newType = newType.union(set([x.strip() for x in item.split(",")]))
+        newTypeList = list(newType)
+        perimeter = defect.get("perimeter", None)
+        if perimeter is None:
+            perimeter = "all"
+        updates.append(pymongo.UpdateOne({"_id":ObjectId(defect["_id"])},{"$set":{"type":newTypeList, "perimeter":perimeter}}))
+    dbclient.bulk_write("pollenisator", "defects", updates)
+    dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.9"}})
+
 
 def init_db() -> None:
     """

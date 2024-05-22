@@ -98,7 +98,7 @@ class Defect(Element):
         self.redactor = redactor
         self.mtype = mtype if mtype is not None else []
         if isinstance(self.mtype, str):
-            self.mtype = [self.mtype]
+            self.mtype = [x.strip() for x in self.mtype.split(",")]
         self.language = language
         self.notes = notes
         self.target_id: Optional[ObjectId] = ObjectId(target_id) if target_id is not None else None
@@ -240,7 +240,6 @@ class Defect(Element):
                     defect_to_edit = cast(Defect, defect_to_edit)
                     defect_to_edit.update_index(int(defect_to_edit.index)+1)
                 self.index = int(save_insert_pos)
-
 
             self.creation_time = datetime.now()
             if isinstance(self.mtype, str):
