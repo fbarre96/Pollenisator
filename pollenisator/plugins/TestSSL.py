@@ -4,6 +4,7 @@ from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.core.models.defect import Defect
 
 def parseWarnings(pentest, file_opened):
     """
@@ -42,56 +43,82 @@ def parseWarnings(pentest, file_opened):
             cwe = warn.group(7)
             # crop details if too long
             if len(details) > 50:
-                details = details[:100]+" [...] "+details[-100:]
+                details = details[:25]+" [...] "+details[-25:]
             if "/" in ip:
                 domain = ip.split("/")[0]
                 ip = "/".join(ip.split("/")[1:])
                 if ip.strip() != "" and domain.strip() != "":
-                    Ip(pentest).initialize(domain, infos={"plugin":TestSSL.get_name()}).addInDb()
-                    Port(pentest).initialize(domain, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name()}).addInDb()
+                    Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name(), "FQDN": domain}).addInDb()
+                    Port(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name(), "FQDN": domain}).addInDb()
             if ip.strip() == "":
                 continue
-            Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name()}).addInDb()
-            Port(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name()}).addInDb()
-            
-            if level not in ["OK", "INFO"]:
-                information = {"defect": subject, "criticity": level, "details": details}
-                if cve.strip() != "":
-                    information["cve"] = cve
-                if cwe.strip() != "":
-                    information["cwe"] = cwe
+            else:
+                Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name()}).addInDb()
+                Port(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name()}).addInDb()
+
+            information = {"defect": subject, "criticity": level, "details": details}
+            if cve.strip() != "":
+                information["cve"] = cve
+            if cwe.strip() != "":
+                information["cwe"] = cwe
+            if domain is not None:
                 missconfiguredHosts[ip] = missconfiguredHosts.get(ip, {})
-                missconfiguredHosts[ip][port] = missconfiguredHosts[ip].get(port, [
-                ])
+                missconfiguredHosts[ip][domain] = missconfiguredHosts[ip].get(domain, {})
+                missconfiguredHosts[ip][domain][port] = missconfiguredHosts[ip][domain].get(port, [])
+                missconfiguredHosts[ip][domain][port].append(information)
+            else:
+                missconfiguredHosts[ip] = missconfiguredHosts.get(ip, {})
+                missconfiguredHosts[ip][port] = missconfiguredHosts[ip].get(port, [])
                 missconfiguredHosts[ip][port].append(information)
-                if domain is not None:
-                    missconfiguredHosts[domain] = missconfiguredHosts.get(
-                        domain, {})
-                    missconfiguredHosts[domain][port] = missconfiguredHosts[domain].get(
-                        port, [])         
-                    missconfiguredHosts[domain][port].append(information)
+
+    print("Missconfigured hosts : ", missconfiguredHosts)
+
     for ip, _ in missconfiguredHosts.items():
         if ip.strip() != "":
-            for port in missconfiguredHosts[ip].keys():
-                p_o = Port.fetchObject(pentest, {"ip": ip, "port": port, "proto": "tcp"})
-                targets[str(p_o.getId())] = {
-                    "ip": ip, "port": port, "proto": "tcp"}
-                notes = ""
-                for warning in missconfiguredHosts[ip][port]:
-                    notes += warning["defect"] + " : " + warning["details"] + " (Criticity : " + warning["criticity"] + ")\n"
-                    if "cve" in warning:
-                        notes += "CVE  : " + warning["cve"] + "\n"
-                    if "cwe" in warning:
-                        notes += "CWE : " + warning["cwe"] + "\n"
-                p_o.addTag(Tag("SSL/TLS-flaws", None, "low", notes=notes))
-                p_o.updateInfos({TestSSL.get_name(): missconfiguredHosts[domain][port]})
-                print("NOTES: ", notes)
+            print("IP : ", ip)
+            for item, value in missconfiguredHosts[ip].items():
+                print("ITEM : ", item)
+                if isinstance(value, dict):
+                    # Means that the item is a domain
+                    print("VALUE : ", value)
+                    for port in value.keys():
+                        print("PORT : ", port)
+                        p_o = Port.fetchObject(pentest, {"ip": ip, "port": port, "proto": "tcp"})
+                        print("OBJET PORT : ", p_o)
+                        targets[str(p_o.getId())] = {
+                            "ip": ip, "port": port, "proto": "tcp"}
+                        notes = ""
+                        for warning in value[port]:
+                            notes += warning["defect"] + " : " + warning["details"] + " (Criticity : " + warning["criticity"] + ")\n"
+                            if "cve" in warning:
+                                notes += "CVE  : " + warning["cve"] + "\n"
+                            if "cwe" in warning:
+                                notes += "CWE : " + warning["cwe"] + "\n"
+                        p_o.addTag(Tag("SSL/TLS-flaws", None, "low", notes=notes))
+                        p_o.updateInfos({TestSSL.get_name()+':'+ip: missconfiguredHosts[ip][item][port]})
+                else:
+                    # Means that the item is a port
+                    print("VALUE : ", value)
+                    p_o = Port.fetchObject(pentest, {"ip": ip, "port": item, "proto": "tcp"})
+                    print("OBJET PORT : ", p_o)
+                    targets[str(p_o.getId())] = {
+                        "ip": ip, "port": item, "proto": "tcp"}
+                    notes = ""
+                    for warning in value:
+                        notes += warning["defect"] + " : " + warning["details"] + " (Criticity : " + warning["criticity"] + ")\n"
+                        if "cve" in warning:
+                            notes += "CVE  : " + warning["cve"] + "\n"
+                        if "cwe" in warning:
+                            notes += "CWE : " + warning["cwe"] + "\n"
+                    p_o.addTag(Tag("SSL/TLS-flaws", None, "low", notes=notes))
+                    p_o.updateInfos({TestSSL.get_name()+':'+ip: missconfiguredHosts[ip][item]})
         if firstLine:
             return None, None
     return str(len(missconfiguredHosts.keys()))+" misconfigured hosts found. Defects created.", targets
 
-
 class TestSSL(Plugin):
+    """A plugin to parse testssl.sh output files"""
+
     default_bin_names = ["testssl", "testssl.sh"]
     def getFileOutputArg(self):
         """
