@@ -227,7 +227,7 @@ components:
           items:
             type: string
         index:
-          type: int
+          type: integer
           default: 0
         fixes:
           type: array
