@@ -239,7 +239,7 @@ def listPlugins() -> List[Dict[str, Any]]:
         mod = loadPlugin(plugin)
         default_bin_names = mod.default_bin_names
         tags = [tag for tag in mod.getTags().values()]
-        results.append({"plugin":plugin, "default_bin_names":default_bin_names, "tags":tags})
+        results.append({"plugin":plugin, "default_bin_names":default_bin_names, "tags":tags, "ext":mod.getFileOutputExt()})
     return results
 
 @permission("pentester")

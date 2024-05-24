@@ -2636,7 +2636,7 @@ paths:
             application/json:
               examples:
                 List of plugins available and default bins:
-                  value: '[{"plugin":"Nmap.py", "default_bin_names":["nmap"]}, {"plugin":"WhatWeb.py", "default_bin_names":["whatweb","whatweb.rb"]}, ...]'
+                  value: '[{"plugin":"Nmap.py", "default_bin_names":["nmap"], "tags":[], "ext":".nmap"}, {"plugin":"WhatWeb.py", "default_bin_names":["whatweb","whatweb.rb"], "tags":[], "ext":".json"}, ...]'
   "/tools/{pentest}":
     post:
       operationId: pollenisator.server.servermodels.tool.insert
