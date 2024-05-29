@@ -7,7 +7,7 @@ connexion[swagger-ui]
 feedparser
 netaddr>=0.7.19
 pymongo>=3.11.0
-python-docx
+python-docx>=1.1.2
 defusedxml
 python-pptx>=0.6.8
 requests>=2.18.4
