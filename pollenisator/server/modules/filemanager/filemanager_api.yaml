@@ -195,6 +195,7 @@ paths:
                 plugin:
                   description: plugin name to use or auto-detect
                   type: string
+                  default: "auto-detect"
                 default_target:
                   description: Default pentest object to affect to
                   type: string
