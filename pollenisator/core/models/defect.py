@@ -407,6 +407,8 @@ class Defect(Element):
             Union[bool, Tuple[str, int]]: True if the operation was successful, or a tuple containing an error message and 
             an error code otherwise.
         """
+        if "_id" in data:
+            del data["_id"]
         data = Defect(self.pentest, data).getData()
         if "_id" in data:
             del data["_id"]
