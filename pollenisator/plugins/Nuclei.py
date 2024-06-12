@@ -94,6 +94,7 @@ class Nuclei(Plugin):
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
             return None, None, None, None
         parsed_by_hosts = parse(file_opened)
+        print("PARSEDBYHOSTS", parsed_by_hosts)
         if parsed_by_hosts is None:
             return None, None, None, None
         tags = [self.getTags()["info-nuclei"]]
@@ -111,13 +112,18 @@ class Nuclei(Plugin):
                     tags = [self.getTags()["todo-nuclei-level"]]
                 if finding["info"].get("level", "none") in ["critical","high"]:
                     tags = [self.getTags()["todo-high-nuclei-level"]]
-            ip_o = Ip(pentest).initialize(host, notes, infos={"plugin":Nuclei.get_name()})
+            ip_o = Ip(pentest).initialize(host, notes, infos={"plugin":Nuclei.get_name(), "findings":findings})
+            # Add a tags to the ip object
+            nuclei_tag = Tag("used-nuclei", level="info")
             inserted = ip_o.addInDb()
+            ip_o.addTag(nuclei_tag)
             if not inserted["res"]:
                 ip_o = Ip.fetchObject(pentest, {"_id": inserted["iid"]})
                 if ip_o is not None:
                     ip_o.notes += "\nNuclei:\n"+notes
+                    ip_o.infos = {"plugin":Nuclei.get_name(), "findings":findings}
                     ip_o.updateInDb()
+                
             cumulative_notes.append(notes+"\n")
         notes = "\n".join(cumulative_notes)
 
