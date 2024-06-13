@@ -374,6 +374,7 @@ def migrate():
         version = migrate_2_8()
     if version == "2.8":
         version = migrate_2_9()
+    logger.info("DB version is now %s", version)
 
 def migrate_0():
     dbclient = mongo.DBClient.getInstance()
@@ -525,6 +526,7 @@ def migrate_2_8():
                     pass
                 updates.append(pymongo.UpdateOne({"_id":ObjectId(tool["_id"])},{"$set":{"check_iid":tool.get("check_iid"), "command_iid":tool.get("command_iid")}}))
             dbclient.bulk_write(pentest_uuid, "tools", updates)
+    logger.info("End of Migrating pentest")
     dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.8"}})
     return "2.8"
 
