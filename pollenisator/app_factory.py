@@ -374,6 +374,8 @@ def migrate():
         version = migrate_2_8()
     if version == "2.8":
         version = migrate_2_9()
+    if version == "2.9":
+        version = migrate_2_10()
     logger.info("DB version is now %s", version)
 
 def migrate_0():
@@ -551,6 +553,29 @@ def migrate_2_9():
     dbclient.bulk_write("pollenisator", "defects", updates)
     dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.9"}})
     return "2.9"
+
+
+def migrate_2_10():
+    dbclient = mongo.DBClient.getInstance()
+    defects = dbclient.findInDb("pollenisator","defects",{}, True)
+    updates = []
+    for defect in defects:
+        perimeters = defect.get("perimeter", None)
+        newPerimeters = set()
+        if isinstance(perimeters, str):
+            newPerimeters = newPerimeters.union(set([x.strip() for x in perimeters.split(",")]))
+        elif isinstance(perimeters, list):
+            for item in perimeters:
+                if isinstance(item, str):
+                    newPerimeters = newPerimeters.union(set([x.strip() for x in item.split(",")]))
+        newPerimeterList = list(newPerimeters)
+        perimeter = defect.get("perimeter", None)
+        if perimeter is None:
+            perimeter = ["all"]
+        updates.append(pymongo.UpdateOne({"_id":ObjectId(defect["_id"])},{"$set":{"perimeter":newPerimeterList}}))
+    dbclient.bulk_write("pollenisator", "defects", updates)
+    dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.10"}})
+    return "2.10"
 
 def init_db() -> None:
     """
