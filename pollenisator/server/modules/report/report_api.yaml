@@ -486,7 +486,9 @@ paths:
                             - Major
                             - Critical
                         perimeter:
-                          type: string
+                          type: array
+                          items:
+                            type: string
                         risk:
                           type: string
                           enum:
@@ -502,10 +504,6 @@ paths:
                           type: string
                         language:
                           type: string
-                        perimeter:
-                          type: array
-                          items:
-                            type: string
                         fixes:
                           type: array
                           items:
