@@ -35,8 +35,8 @@ class Defect(Element):
             valuesFromDb (Optional[Dict[str, Any]], optional): A dict holding values to load into the object. 
                 A mongo fetched defect is optimal. Possible keys with default values are : _id (None), parent (None), 
                 infos({}), target_id, target_type, title(""), synthesis(""), description(""), ease(""), impact(""), 
-                risk(""), redactor("N/A"), type([]),  language(""), notes(""), proofs([]), fixes([]), creation_time, 
-                infos, index(None). Defaults to None.
+                risk(""), redactor("N/A"), type([]),  language(""),, notes(""), proofs([]), fixes([]), creation_time, 
+                infos, index(None),  perimeter([]). Defaults to None.
         """
         if valuesFromDb is None:
             valuesFromDb = {}
@@ -56,14 +56,14 @@ class Defect(Element):
                                 "proofs", []),
                             valuesFromDb.get("fixes", []), valuesFromDb.get("creation_time", None),
                             valuesFromDb.get("infos", {}),
-                            valuesFromDb.get("index", 0))
+                            valuesFromDb.get("index", 0), valuesFromDb.get("perimeter", []))
 
     def initialize(self, target_id: Optional[ObjectId] = None, target_type: str = "", title: str = "", synthesis: str = "",
                    description: str = "", ease: str = "", impact: str = "", risk: str = "", redactor: str = "N/A",
                    mtype: Optional[Union[str, List[str]]] = None, language: str = "", notes: str = "",
                    proofs: Optional[List[str]] = None, fixes: Optional[List[Dict[str, Any]]] = None,
                    creation_time: Optional[datetime] = None, infos: Optional[Dict[str, Any]] = None,
-                   index: int = 0) -> 'Defect':
+                   index: int = 0, perimeter: Optional[List[str]] = None) -> 'Defect':
         """
         Set values of defect.
 
@@ -85,7 +85,7 @@ class Defect(Element):
             creation_time (Optional[datetime], optional): The time this defect was created. Default to None, will be auto filled if None.
             infos (Optional[Dict[str, Any]], optional): A dictionary with key values as additional information. Default to None.
             index (int, optional): The index of this defect in global defect table (only for unassigned defect). Defaults to 0.
-
+            perimeter (Optional[List[str]], optional): A list of perimeters for this defect. Defaults to None.
         Returns:
             Defect: This object.
         """
@@ -106,6 +106,9 @@ class Defect(Element):
         self.infos = infos if infos is not None else {}
         self.proofs = proofs if proofs is not None else []
         self.fixes = fixes if fixes is not None else []
+        self.perimeter = perimeter if perimeter is not None else []
+        if isinstance(self.perimeter, str):
+            self.perimeter = [x.strip() for x in self.perimeter.split(",")]
         try:
             self.index = int(index)
         except ValueError:
@@ -128,7 +131,7 @@ class Defect(Element):
         return {"title": self.title, "synthesis":self.synthesis, "description":self.description, "ease": self.ease, "impact": self.impact,
                 "risk": self.risk, "redactor": self.redactor, "type": self.mtype, "language":self.language, "notes": self.notes,
                 "target_id": self.target_id, "target_type": self.target_type, "index":int(self.index),
-                "proofs": self.proofs, "creation_time": self.creation_time, "fixes":self.fixes, "_id": self.getId(), "infos": self.infos}
+                "proofs": self.proofs, "creation_time": self.creation_time, "fixes":self.fixes, "perimeter":self.perimeter, "_id": self.getId(), "infos": self.infos}
 
     @classmethod
     def getSearchableTextAttribute(cls) -> List[str]:

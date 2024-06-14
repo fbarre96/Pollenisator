@@ -388,6 +388,10 @@ components:
             type: string
         language:
           type: string
+        perimeter:
+          type: array
+          items:
+            type: string
         fixes:
           type: array
           items:
