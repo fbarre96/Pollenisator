@@ -1415,13 +1415,15 @@ class DBClient:
         if filetype == "proof":
             if fileext != ".png":
                 name+=".png"
-        filepath = os.path.join(filepath, name)
-        with open(filepath, "wb") as f:
+        full_filepath = os.path.join(filepath, name)
+        while os.path.exists(full_filepath):
+            full_filepath = os.path.join(filepath, str(uuid4())+name)
+        with open(full_filepath, "wb") as f:
             f.write(upfile.stream.read())
         if filetype == "proof":
-            im1 = Image.open(filepath)
-            im1.save(filepath, format="png")
+            im1 = Image.open(full_filepath)
+            im1.save(full_filepath, format="png")
             upfile.stream.seek(0)
             if attached_iid != "unassigned":
                 dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(attached_iid)}, {"$addToSet":{"proofs":name}})
-        return name + " was successfully uploaded", 200, filepath
+        return name + " was successfully uploaded", 200, full_filepath

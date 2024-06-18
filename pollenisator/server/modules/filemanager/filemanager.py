@@ -87,15 +87,9 @@ def upload(pentest: str, defect_iid: Union[Literal["unassigned"], str], upfile: 
     Returns:
         Union[FileUploadResult, ErrorStatus]: A dictionary containing the remote path, message, and status if the upload was successful, otherwise a tuple containing the message and status.
     """
-    msg, status, _filepath = dbclient.do_upload(pentest, defect_iid, "proof", upfile)
+    msg, status, filepath = dbclient.do_upload(pentest, defect_iid, "proof", upfile)
     if status == 200:
-        if upfile.filename is not None:
-            name = upfile.filename.replace("/", "_")
-        else:
-            name = "proof_"+str(time.time()).replace(".", "_")
-        fileext = os.path.splitext(name)[-1]
-        if fileext != ".png":
-            name+=".png"
+        name = os.path.basename(filepath)
         return {"remote_path": f"files/{pentest}/download/proof/{defect_iid}/{name}", "msg":msg, "status":status}
     return msg, status
 
