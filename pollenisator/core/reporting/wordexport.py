@@ -39,6 +39,9 @@ def regex_findall(string, pattern):
     matches = re.findall(pattern, string)
     return matches
 
+def debug(string):
+    print(string)
+    return string
 
 def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs: Any) -> Union[Tuple[bool, str], Tuple[bool, str]]:
     """
@@ -61,6 +64,7 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
     jinja_env.filters['b64encode'] = b64encode
     jinja_env.filters['getInitials'] = getInitials
     jinja_env.filters['regex_findall'] = regex_findall
+    jinja_env.filters['debug'] = debug
     context["proof_by_names"] = {}
     for defect in context["defects"]:
         proofs =  defect.get("proofs", [])

@@ -75,6 +75,26 @@ def md5(f: IO[bytes]) -> str:
     return hash_md5.hexdigest()
 
 @permission("pentester")
+def upload_replace(pentest: str, defect_iid: Union[Literal["unassigned"], str], upfile: werkzeug.datastructures.FileStorage) -> Union[FileUploadResult, ErrorStatus]:
+    """
+    Upload a file as proof for a defect.
+
+    Args:
+        pentest (str): The name of the pentest.
+        defect_iid (Union[Literal["unassigned"], str]): The id of the defect.
+        upfile (werkzeug.datastructures.FileStorage): The file to upload.
+
+    Returns:
+        Union[FileUploadResult, ErrorStatus]: A dictionary containing the remote path, message, and status if the upload was successful, otherwise a tuple containing the message and status.
+    """
+    msg, status, filepath = dbclient.do_upload(pentest, defect_iid, "proof", upfile, True)
+    if status == 200:
+        name = os.path.basename(filepath)
+        return {"remote_path": f"files/{pentest}/download/proof/{defect_iid}/{name}", "msg":msg, "status":status}
+    return msg, status
+
+
+@permission("pentester")
 def upload(pentest: str, defect_iid: Union[Literal["unassigned"], str], upfile: werkzeug.datastructures.FileStorage) -> Union[FileUploadResult, ErrorStatus]:
     """
     Upload a file as proof for a defect.
@@ -87,7 +107,7 @@ def upload(pentest: str, defect_iid: Union[Literal["unassigned"], str], upfile: 
     Returns:
         Union[FileUploadResult, ErrorStatus]: A dictionary containing the remote path, message, and status if the upload was successful, otherwise a tuple containing the message and status.
     """
-    msg, status, filepath = dbclient.do_upload(pentest, defect_iid, "proof", upfile)
+    msg, status, filepath = dbclient.do_upload(pentest, defect_iid, "proof", upfile, False)
     if status == 200:
         name = os.path.basename(filepath)
         return {"remote_path": f"files/{pentest}/download/proof/{defect_iid}/{name}", "msg":msg, "status":status}
@@ -212,7 +232,7 @@ def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage
                 tool_m = cast(Tool, tool_m)
                 tool_m.setTags(tags)
                 upfile.stream.seek(0)
-                _msg, status, filepath = dbclient.do_upload(pentest, str(tool_iid), "result", upfile)
+                _msg, status, filepath = dbclient.do_upload(pentest, str(tool_iid), "result", upfile, True)
                 if status == 200:
                     tool_m.plugin_used = plugin
                     tool_m._setStatus(["done"], filepath)

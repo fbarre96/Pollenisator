@@ -260,7 +260,7 @@ def importResult(pentest: str, tool_iid: str, upfile: Any, body: Dict[str, Any])
     """
     dbclient = DBClient.getInstance()
     #STORE FILE
-    res, status, filepath = dbclient.do_upload(pentest, tool_iid, "result", upfile)
+    res, status, filepath = dbclient.do_upload(pentest, tool_iid, "result", upfile, True)
     if status != 200:
         return res, status
     # Analyze

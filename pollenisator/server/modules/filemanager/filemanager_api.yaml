@@ -4,7 +4,53 @@ paths:
       operationId: pollenisator.server.modules.filemanager.filemanager.upload
       tags:
         - FileManager
-      summary: Upload a file
+      summary: Upload a new file (file will be renamed if already exists)
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: defect_iid
+          in: path
+          description: file will be tied to given iid
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                upfile:
+                  description: The file to upload
+                  type: string
+                  format: binary
+              required:
+                - upfile
+      responses:
+        "200":
+          description: Successfully uploaded file
+          content:
+            application/json:
+              examples:
+                Successful:
+                  value: '"{filename} was successfully uploaded"'
+        "404":
+          description: defect not found
+          content:
+            application/json:
+              examples:
+                Unknown defect:
+                  value: '"The given iid does not match an existing defect"'
+  "/files/{pentest}/edit/proof/{defect_iid}":
+    post:
+      operationId: pollenisator.server.modules.filemanager.filemanager.upload_replace
+      tags:
+        - FileManager
+      summary: Upload a file and replace existing one
       parameters:
         - name: pentest
           in: path

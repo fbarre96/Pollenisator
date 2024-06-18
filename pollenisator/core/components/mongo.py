@@ -1369,7 +1369,7 @@ class DBClient:
         from pollenisator.app_factory import notify_clients
         notify_clients({"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now()})
 
-    def do_upload(self, pentest: str, attached_iid:  Union[Literal["unassigned"], str], filetype: str, upfile: Any) -> Tuple[str, int, str]:
+    def do_upload(self, pentest: str, attached_iid:  Union[Literal["unassigned"], str], filetype: str, upfile: Any, replace: bool) -> Tuple[str, int, str]:
         """
         Upload a file and attach it to a specific tool or defect in a pentest.
 
@@ -1378,6 +1378,7 @@ class DBClient:
             attached_iid ( Union[Literal["unassigned"], str]): The id of the tool or defect to which the file is attached.
             filetype (str): The type of the file, either 'result' or 'proof'.
             upfile (Any): The file to be uploaded.
+            replace (bool): replace file with the same name if it exists. If False, a uuid will be generated and appended to the name before the extension.
 
         Returns:
             Tuple[str, int, str]: A tuple containing a message indicating the result of the operation, a HTTP-like status code, and the path of the uploaded file if succeedeed only.
@@ -1416,7 +1417,7 @@ class DBClient:
             if fileext != ".png":
                 name+=".png"
         full_filepath = os.path.join(filepath, name)
-        while os.path.exists(full_filepath):
+        while os.path.exists(full_filepath) and not replace:
             full_filepath = os.path.join(filepath, str(uuid4())+name)
         with open(full_filepath, "wb") as f:
             f.write(upfile.stream.read())
