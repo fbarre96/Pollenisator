@@ -1,5 +1,6 @@
 """A plugin to parse the output of feroxbuster tool"""
 
+import re
 from abc import abstractmethod
 from typing import Any, Dict, IO, List, Optional, Tuple, cast
 from pollenisator.core.models.ip import Ip
@@ -26,29 +27,34 @@ def parse_ferox_file(notes):
                 - redirect: the redirect location if any (str)
     """
 
+    regex_ferox = re.compile(r"^(\d\d\d)\s*(\S*)\s*(\d*)\D*(\d*)\D*(\d*)\D\s*(\S*)$", re.MULTILINE)
+
     hosts = {}
 
     # Split the notes into lines and iterate over them
     lines = notes.split("\n")
     for line in lines:
-        if line == "":                                      # Skip empty lines
+        print("LINE", line)
+        if line == "":                            # Skip empty lines
             continue
-        list_keywords = line.split()                        # Split the line into words
-        status = int(list_keywords[0])                      # The 1st word is the status code
-        #method = list_keywords[1]                           # The 2nd word is the method used
-        lines = int(list_keywords[2].replace("l", ""))      # The 3rd word is number of lines
-        words = int(list_keywords[3].replace("w", ""))      # The 4th word is number of words
-        chars = int(list_keywords[4].replace("c", ""))      # The 5th word is number of characters
-        url = list_keywords[5]                              # The 6th word is the URL
-        service = url.split("://")[0]                       # Get the service from the URL
-        host = url.split("://")[1].split("/")[0]            # Get the host from the URL
-        path = url.split(host)[1]                           # Get the path from the URL
+        match = regex_ferox.match(line)           # Match the line with the regex
+        if match is None:                         # Skip lines that don't match the regex
+            continue
+        status = int(match.group(1))              # The 1st word is the status code
+        method = match.group(2)                   # The 2nd word is the method used
+        lines = int(match.group(3))               # The 3rd word is number of lines
+        words = int(match.group(4))               # The 4th word is number of words
+        chars = int(match.group(5))               # The 5th word is number of characters
+        url = match.group(6)                      # The 6th word is the URL
+        service = url.split("://")[0]             # Get the service from the URL
+        host = url.split("://")[1].split("/")[0]  # Get the host from the URL
+        path = url.split(host)[1]                 # Get the path from the URL
 
         # Detect if port is in url
         if ":" in host:
             host, port = host.split(":")[0], host.split(":")[1]
         else:
-            port = 80 if service == "http" else 443
+            port = '80' if service == "http" else '443'
 
         if host not in hosts:       # If the host is not in the hosts dict, add it
             hosts[host] = {
