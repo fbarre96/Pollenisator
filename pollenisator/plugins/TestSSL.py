@@ -22,10 +22,10 @@ def parseWarnings(pentest, file_opened):
     
     firstLine = True
     for line in file_opened:
-        line = line.decode("utf-8", errors="ignore")
+        line = line.decode("utf-8", errors="ignore").strip()
         if firstLine:
-            if line.strip() != '"id", "fqdn/ip", "port", "severity", "finding", "cve", "cwe"' and \
-                    line.strip() != '"id","fqdn/ip","port","severity","finding","cve","cwe"':
+            if line != '"id", "fqdn/ip", "port", "severity", "finding", "cve", "cwe"' and \
+                    line != '"id","fqdn/ip","port","severity","finding","cve","cwe"':
                 return None, None
             firstLine = False
             continue
@@ -95,7 +95,7 @@ def parseWarnings(pentest, file_opened):
                             if "cwe" in warning:
                                 notes += "CWE : " + warning["cwe"] + "\n"
                         p_o.addTag(Tag("SSL/TLS-flaws", None, "low", notes=notes))
-                        p_o.updateInfos({TestSSL.get_name()+':'+ip: missconfiguredHosts[ip][item][port]})
+                        p_o.updateInfos({TestSSL.get_name(): missconfiguredHosts[ip][item][port]})
                 else:
                     # Means that the item is a port
                     print("VALUE : ", value)
@@ -111,7 +111,7 @@ def parseWarnings(pentest, file_opened):
                         if "cwe" in warning:
                             notes += "CWE : " + warning["cwe"] + "\n"
                     p_o.addTag(Tag("SSL/TLS-flaws", None, "low", notes=notes))
-                    p_o.updateInfos({TestSSL.get_name()+':'+ip: missconfiguredHosts[ip][item]})
+                    p_o.updateInfos({TestSSL.get_name(): missconfiguredHosts[ip][item]})
         if firstLine:
             return None, None
     return str(len(missconfiguredHosts.keys()))+" misconfigured hosts found. Defects created.", targets
