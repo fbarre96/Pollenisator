@@ -88,7 +88,13 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
     out_path = os.path.join(dir_path, "../../exports/", out_name+".docx")
     doc.save(out_path)
     logger.info("Converting Markdown of %s", str(out_path))
-    result, msg = convertMarkdownInFile(out_path, out_path, {"Header":"Sous-défaut"})
+    result, msg = convertMarkdownInFile(out_path, out_path, {"Header":"Sous-défaut",
+        "Header1":"Sous-défaut",
+        "Header2":"Sous-défaut",
+        "Header3":"Sous-défaut",
+        "Header4":"Sous-défaut",
+        "Header5":"Sous-défaut",
+        "Header6":"Sous-défaut"})
     if not result:
         return False, "Error in Markdown conversion : "+str(msg)
     logger.info("Generated report at %s", str(out_path))
