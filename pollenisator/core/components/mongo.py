@@ -1411,13 +1411,19 @@ class DBClient:
         except FileExistsError:
             pass
 
-        name = upfile.filename.replace("/", "_")
-        fileext = os.path.splitext(name)[-1]
+        name, _ext = os.path.splitext(upfile.filename.replace("/", "_"))
+        basename = os.path.basename(name)
         if filetype == "proof":
-            if fileext != ".png":
-                name+=".png"
+            if replace:
+                name = basename+".png"
+            else:
+                name = basename+"-"+str(uuid4())+".png"
         full_filepath = os.path.join(filepath, name)
         while os.path.exists(full_filepath) and not replace:
+            if filetype == "proof":
+                name = basename+"-"+str(uuid4())+".png"
+            else:
+                name = str(uuid4())+name
             full_filepath = os.path.join(filepath, str(uuid4())+name)
         with open(full_filepath, "wb") as f:
             f.write(upfile.stream.read())

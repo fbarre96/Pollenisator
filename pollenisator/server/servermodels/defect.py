@@ -121,6 +121,8 @@ def update(pentest: str, defect_iid: str, body: Dict[str, Any]) -> Union[bool, T
         Union[bool, Tuple[str, int]]: True if the operation was successful, or a tuple containing an error message and 
         an error code otherwise.
     """
+    if "_id" in body:
+        del body["_id"]
     defect = Defect.fetchObject(pentest, {"_id":ObjectId(defect_iid)})
     if defect is None:
         return "This defect does not exist", 404

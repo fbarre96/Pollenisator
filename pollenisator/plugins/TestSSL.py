@@ -22,10 +22,10 @@ def parseWarnings(pentest, file_opened):
     
     firstLine = True
     for line in file_opened:
-        line = line.decode("utf-8", errors="ignore")
+        line = line.decode("utf-8", errors="ignore").strip()
         if firstLine:
-            if line.strip() != '"id", "fqdn/ip", "port", "severity", "finding", "cve", "cwe"' and \
-                    line.strip() != '"id","fqdn/ip","port","severity","finding","cve","cwe"':
+            if line != '"id", "fqdn/ip", "port", "severity", "finding", "cve", "cwe"' and \
+                    line != '"id","fqdn/ip","port","severity","finding","cve","cwe"':
                 return None, None
             firstLine = False
             continue
