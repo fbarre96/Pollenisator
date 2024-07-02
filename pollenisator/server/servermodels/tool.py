@@ -128,34 +128,8 @@ def craftCommandLine(pentest: str, tool_iid: str, commandline_options: str = "")
     if toolModel is None:
         return "Tool does not exist : "+str(tool_iid), 404
     toolModel = cast(Tool, toolModel)
-    if commandline_options != "":
-        toolModel.text = commandline_options
-        dbclient = DBClient.getInstance()
-        dbclient.updateInDb(pentest, "tools", {"_id":ObjectId(tool_iid)}, {"$set":{"text":commandline_options}}, False, True)
-    # GET COMMAND OBJECT FOR THE TOOL
-    if toolModel.text == "":
-        try:
-            command_o: Optional[Union[Command, str]] = Command.fetchObject(pentest, {"_id": ObjectId(toolModel.command_iid)})
-            if command_o is None:
-                return "Associated command was not found", 404
-        except InvalidId:
-            return "No command was not found", 404
-    else:
-        command_o = str(toolModel.text)
-    # Replace vars in command text (command line)
-    comm = toolModel.getCommandToExecute(command_o)
-    # Read file to execute for given tool and prepend to final command
-    if comm == "":
-        return "An empty command line was crafted", 400
-    # Load the plugin
-    ext = ""
-    mod = toolModel.getPlugin()
-    if mod is None:
-        return "Plugin not found for this tool", 400
-    # craft outputfile name
-    comm_complete = mod.changeCommand(comm, "|outputDir|", mod.getFileOutputExt())
-    ext = mod.getFileOutputExt()
-    return {"comm":comm, "ext":ext, "comm_with_output":comm_complete}
+    return toolModel.getCommandToExecute(commandline_options)
+
 
 @permission("pentester")
 def completeDesiredOuput(pentest: str, tool_iid: str, plugin: str, command_line_options: str) -> Union[Tuple[str, int], Dict[str, str]]:

@@ -195,12 +195,12 @@ class Scope(Element):
             return None
         return ObjectId(res["_id"])
     
-    def getCommandSuggestions(self) -> Dict[str, Any]:
+    def getChecksData(self) -> Dict[str, Any]:
         """
-        Get the command suggestions for the scope.
+        Get the getChecksData for the scope.
 
         Returns:
-            Dict[str, Any]: A dictionary containing the command suggestions.
+            Dict[str, Any]: A dictionary containing the checkinstance useful data.
         """
         checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": ObjectId(self.getId()), "target_type": "scope"})
         if checks is None:

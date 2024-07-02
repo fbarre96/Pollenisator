@@ -109,7 +109,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
             username = user.get("username", None)
             if username is None:
                 return
-            logger.info("Registering socket for user %s", str(username))
+            logger.info("Registering terminal worker for user %s", str(username))
             if pentest in token_info["scope"]:
                 dbclient = mongo.DBClient.getInstance()
                 socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid, "user":username, "type":"terminal"}, False)
@@ -118,10 +118,14 @@ def create_app(debug: bool, async_mode: str) -> Flask:
                 else:
                     dbclient.updateInDb("pollenisator", "sockets", {"sid":sid, "user":username}, {"$set":{"pentest":pentest, "user":username}}, notify=False)
                 #sm.socketio.emit("testTerminal", {"pentest":pentest}, room=request.sid)
-
+                socket_terminal_consumer = dbclient.findInDb("pollenisator", "sockets", {"user":username, "type":"terminalConsumer"}, False)
+                if socket_terminal_consumer is not None:
+                    logger.info("sending pollterminal_connected to consumer")
+                    sm.socketio.emit("pollterminal_connected", {"pentest":pentest}, room=socket_terminal_consumer["sid"])
     @sm.socketio.event
     def registerAsTerminalConsumer(data):
         from pollenisator.server.token import verifyToken, decode_token
+        logger.info("received registerAsTerminalConsumer")
         dbclient = mongo.DBClient.getInstance()
         token = data.get("token", "")
         pentest = data.get("pentest", "")
@@ -144,6 +148,10 @@ def create_app(debug: bool, async_mode: str) -> Flask:
                 else:
                     dbclient.updateInDb("pollenisator", "sockets", {"sid":sid, "user":username }, {"$set":{"pentest":pentest , "user":username}}, notify=False)
                 #sm.socketio.emit("testTerminalConsumer", {"pentest":pentest}, room=request.sid)
+            socket_terminal_worker = dbclient.findInDb("pollenisator", "sockets", {"user":username, "type":"terminal"}, False)
+            if socket_terminal_worker is not None:
+                logger.info("sending pollterminal_connected to consumer")
+                sm.socketio.emit("pollterminal_connected", {"pentest":pentest}, room=sid)
 
     @sm.socketio.event
     def registerForNotifications(data):
@@ -226,7 +234,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
     def test(data):
         logger.info("TEST received : %s", str(data))
         logger.debug(data)
-        sm.socketio.emit("test", {"test":"HELLO"}, to=data.get("pentest"))
+        sm.socketio.emit("test", {"test":"HELLO"}, room=request.sid)
         
     @sm.socketio.on('get-document')
     def get_document(data):

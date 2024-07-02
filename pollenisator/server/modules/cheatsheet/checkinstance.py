@@ -434,7 +434,9 @@ class CheckInstance(Element):
                         tool_model.getId())] = tool_model.getData()
                 else:
                     data["tools_not_done"][str(
-                        tool_model.getId())] = tool_model.getDetailedString()
+                        tool_model.getId())] = tool_model.getData()
+                    data["tools_not_done"][str(
+                        tool_model.getId())]["commandline"] = tool_model.getCommandLine()
                 total += 1
 
         if done != total:
@@ -446,8 +448,11 @@ class CheckInstance(Element):
                 data["status"] = "running"
             else:
                 data["status"] = "todo"
+            data["commands"] = [command.getData() for command in Command.fetchObjects(self.pentest, {"original_iid": {"$in": [ObjectId(x) for x in check_item.commands]}})]
+
         else:
             data["status"] = ""
+        data["forced_status"] = self.status
         return data
 
     def updateInfosCheck(self, check_item: Optional['CheckItem'] = None) -> Optional[ErrorStatus]:
@@ -564,19 +569,18 @@ def update(pentest: str, iid: str, body: Dict[str, Any]) -> Union[ErrorStatus, b
     if pentest == "pollenisator":
         return "Forbidden", 403
     checkinstance = CheckInstance(pentest, body)
-    data = checkinstance.getData()
-    if "_id" in data:
-        del data["_id"]
-    if "type" in data:
-        del data["type"]
-    if "check_iid" in data:
-        del data["check_iid"]
+    data = {"status": checkinstance.status, "notes": checkinstance.notes}
+
     dbclient = DBClient.getInstance()
     existing = CheckInstance.fetchObject(pentest, {"_id": ObjectId(iid)})
     if existing is None:
         return "Not found", 404
+    existing_data = existing.getData()
+    existing_data |= data
+    if "_id" in existing_data:
+        del existing_data["_id"]
     dbclient.updateInDb(pentest, CheckInstance.coll_name, {"_id": ObjectId(
-        iid), "type": "checkinstance"}, {"$set": data}, many=False, notify=True)
+        iid), "type": "checkinstance"}, {"$set": existing_data}, many=False, notify=True)
     return True
 
 

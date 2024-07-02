@@ -175,7 +175,7 @@ type == "port" and port != 443 and port != 80
 type == "defect"
 type == "defect" and "Foo" in title
 type == "ip" and ip regex "[A-Za-z]"
-type == "ip" and ip regex "^1\.2"
+type == "ip" and ip regex "^1\\.2"
 type == "tool" and "done" in status
 type == "tool" and "done" not in status
 type == "tool" and "ready" in status

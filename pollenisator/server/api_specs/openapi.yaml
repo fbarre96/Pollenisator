@@ -2546,12 +2546,12 @@ paths:
                   value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
                 Already exist:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
-  "/scopes/{pentest}/{scope_iid}/getCommandSuggestions":
+  "/scopes/{pentest}/{scope_iid}/getChecksData":
     get:
-      operationId: pollenisator.server.servermodels.scope.getCommandSuggestions
+      operationId: pollenisator.server.servermodels.scope.getChecksData
       tags:
         - Scopes
-      summary: Get command suggestions of a scope
+      summary: Get check instances data for a scope
       parameters:
         - name: pentest
           in: path
@@ -2567,12 +2567,8 @@ paths:
             type: string
       responses:
         "200":
-          description: Get children of a scope
-          content:
-            application/json:
-              examples:
-                Success:
-                  value: '{id:data}'
+          description: Get data on a checkisntance
+          
   "/scopes/update/{pentest}/{scope_iid}":
     put:
       operationId: pollenisator.server.servermodels.scope.update

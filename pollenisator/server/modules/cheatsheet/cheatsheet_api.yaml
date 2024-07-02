@@ -234,7 +234,6 @@ paths:
               examples:
                 success:
                   value: '[{"_id": "60a3aaa129926f9ad7197919", "parent": "ObjectId|60a3aaa129926f9ad7197915",  "scope": "test",   "wave": "Testina" },  { "_id": "60f58598d8357e0f40e7fa66","scope": "test.fr" }]'
-    
 
 components:
   schemas:

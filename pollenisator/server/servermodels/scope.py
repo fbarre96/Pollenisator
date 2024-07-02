@@ -65,7 +65,7 @@ def update(pentest: str, scope_iid: str, body: Dict[str, Any]) -> bool:
     return True
 
 @permission("pentester")
-def getCommandSuggestions(pentest: str, scope_iid: str) -> Union[Dict[str, Any], ErrorStatus]:
+def getChecksData(pentest: str, scope_iid: str) -> Union[Dict[str, Any], ErrorStatus]:
     """
     Get the command suggestions for the scope.
 
@@ -76,7 +76,7 @@ def getCommandSuggestions(pentest: str, scope_iid: str) -> Union[Dict[str, Any],
     if scope_o is None:
         return "Not found", 404
     scope_o = cast(Scope, scope_o)
-    return scope_o.getCommandSuggestions()
+    return scope_o.getChecksData()
 
 #@permission("pentester")
 # def getChildren(pentest: str, scope_iid: str) -> Union[Dict[str, Any], ErrorStatus]:

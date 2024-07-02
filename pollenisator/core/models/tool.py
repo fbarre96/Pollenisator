@@ -499,6 +499,36 @@ class Tool(Element):
         dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":[]}})
         return True, "Cleared queue"
 
+    def getCommandLine(self, commandline_options: str = "") -> Union[ErrorStatus, Dict[str,str]]:
+        if commandline_options != "":
+            self.text = commandline_options
+            self.updateInDb({"text":commandline_options})
+        # GET COMMAND OBJECT FOR THE TOOL
+        command_o: Union[str, Command]
+        if self.text == "":
+            try:
+                command_o = Command(self.pentest, self.getCommand())
+                if command_o is None:
+                    return "Associated command was not found", 404
+            except:
+                return "No command was not found", 404
+        else:
+            command_o = str(self.text)
+        # Replace vars in command text (command line)
+        comm = self.getCommandToExecute(command_o)
+        # Read file to execute for given tool and prepend to final command
+        if comm == "":
+            return "An empty command line was crafted", 400
+        # Load the plugin
+        ext = ""
+        mod = self.getPlugin()
+        if mod is None:
+            return "Plugin not found for this tool", 400
+        # craft outputfile name
+        comm_complete = mod.changeCommand(comm, "|outputDir|", mod.getFileOutputExt())
+        ext = mod.getFileOutputExt()
+        return {"comm":comm, "ext":ext, "comm_with_output":comm_complete}
+
     def getCommandToExecute(self, command_o: Union[str, Command]) -> str:
         """
         Get the tool bash command to execute.
