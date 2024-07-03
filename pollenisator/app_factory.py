@@ -122,6 +122,10 @@ def create_app(debug: bool, async_mode: str) -> Flask:
                 if socket_terminal_consumer is not None:
                     logger.info("sending pollterminal_connected to consumer")
                     sm.socketio.emit("pollterminal_connected", {"pentest":pentest}, room=socket_terminal_consumer["sid"])
+                    sm.socketio.emit("consumer_connected", {"pentest":pentest}, room=request.sid)
+                    dbclient.updateInDb("pollenisator", "sockets", {"user":username, "type":"terminal"}, {"$set":{"consumer_sid":socket_terminal_consumer["sid"]}}, notify=False)
+                    dbclient.updateInDb("pollenisator", "sockets", {"user":username, "type":"terminalConsumer"}, {"$set":{"worker_sid":request.sid}}, notify=False)
+
     @sm.socketio.event
     def registerAsTerminalConsumer(data):
         from pollenisator.server.token import verifyToken, decode_token
@@ -152,7 +156,9 @@ def create_app(debug: bool, async_mode: str) -> Flask:
             if socket_terminal_worker is not None:
                 logger.info("sending pollterminal_connected to consumer")
                 sm.socketio.emit("pollterminal_connected", {"pentest":pentest}, room=sid)
-
+                sm.socketio.emit("consumer_connected", {"pentest":pentest}, room=socket_terminal_worker["sid"])
+                dbclient.updateInDb("pollenisator", "sockets", {"user":username, "type":"terminal"}, {"$set":{"consumer_sid":sid}}, notify=False)
+                dbclient.updateInDb("pollenisator", "sockets", {"user":username, "type":"terminalConsumer"}, {"$set":{"worker_sid":socket_terminal_worker["sid"]}}, notify=False)
     @sm.socketio.event
     def registerForNotifications(data):
         """Register the socket for notifications for a specific pentest.
@@ -279,11 +285,24 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         pentest = socket["pentest"]
         dbclient.updateInDb(pentest, "documents", {"pentest":pentest}, {"$set":{"data":data}})
 
+    @sm.socketio.on("start-terminal-session")
+    def start_terminal_session(data):
+        from pollenisator.server.token import verifyToken, decode_token
+        dbclient = mongo.DBClient.getInstance()
+        socket = dbclient.findInDb("pollenisator", "sockets", {"sid":request.sid, "type":"terminalConsumer"}, False)
+        if socket is None:
+            return {"error":"Forbidden"}
+        if socket["pentest"] == "":
+            return {"error":"Forbidden"}
+        pentest = socket["pentest"]
+        sm.socketio.emit("start-terminal-session", data, room=socket["worker_sid"])
+
     flask_app.json_encoder = JSONEncoder
     logger.info('Running ...')
     CORS(flask_app)
     return flask_app
 
+    
 
 def load_modules(app: Any, main_file: str)->None:
     """Loads all YAML files in the modules folder and merges them into one file.

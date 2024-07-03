@@ -6,6 +6,9 @@ from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.core.models.defect import Defect
 
+
+warning_regex = re.compile(r"^\"([^\"]*)\", ?\"([^\"]*)\", ?\"([^\"]*)\", ?\"(OK|INFO|NOT ok|WARN|LOW|MEDIUM|HIGH|CRITICAL)\", ?\"([^\"]*)\", ?\"([^\"]*)\", ?\"([^\"]*)\"$")
+
 def parseWarnings(pentest, file_opened):
     """
     Parse the result of a testssl json output file
@@ -31,7 +34,7 @@ def parseWarnings(pentest, file_opened):
             continue
         # Search ip in file
         warn = re.search(
-            r"^\"([^\"]*)\", ?\"([^\"]*)\", ?\"([^\"]*)\", ?\"(OK|INFO|NOT ok|WARN|LOW|MEDIUM|HIGH|CRITICAL)\", ?\"([^\"]*)\", ?\"([^\"]*)\", ?\"([^\"]*)\"$", line)
+            warning_regex, line)
         if warn is not None:
             subject = warn.group(1)
             ip = warn.group(2)
