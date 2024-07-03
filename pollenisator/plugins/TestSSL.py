@@ -24,6 +24,7 @@ def parseWarnings(pentest, file_opened):
     missconfiguredHosts = {}
     
     firstLine = True
+    items_to_add = {}
     for line in file_opened:
         line = line.decode("utf-8", errors="ignore").strip()
         if firstLine:
@@ -51,13 +52,15 @@ def parseWarnings(pentest, file_opened):
                 domain = ip.split("/")[0]
                 ip = "/".join(ip.split("/")[1:])
                 if ip.strip() != "" and domain.strip() != "":
-                    Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name(), "FQDN": domain}).addInDb()
-                    Port(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name(), "FQDN": domain}).addInDb()
+                    items_to_add[ip] = Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name(), "FQDN": domain})
+                    items_to_add[ip+str(port)] = Port(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name(), "FQDN": domain})
             if ip.strip() == "":
                 continue
             else:
-                Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name()}).addInDb()
-                Port(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name()}).addInDb()
+                if ip not in items_to_add:
+                    items_to_add[ip] = Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name()})
+                if ip+str(port) not in items_to_add:
+                    items_to_add[ip+str(port)] = Port(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name()})
 
             information = {"defect": subject, "criticity": level, "details": details}
             if cve.strip() != "":
@@ -75,7 +78,9 @@ def parseWarnings(pentest, file_opened):
                 missconfiguredHosts[ip][port].append(information)
 
     print("Missconfigured hosts : ", missconfiguredHosts)
-
+    for item in items_to_add.values():
+        item.addInDb()
+    cache = {}
     for ip, _ in missconfiguredHosts.items():
         if ip.strip() != "":
             print("IP : ", ip)
@@ -86,7 +91,11 @@ def parseWarnings(pentest, file_opened):
                     print("VALUE : ", value)
                     for port in value.keys():
                         print("PORT : ", port)
-                        p_o = Port.fetchObject(pentest, {"ip": ip, "port": port, "proto": "tcp"})
+                        if (ip, port) in cache:
+                            p_o = cache[(ip, port)]
+                        else:
+                            p_o = Port.fetchObject(pentest, {"ip": ip, "port": port, "proto": "tcp"})
+                            cache[(ip, port)] = p_o
                         print("OBJET PORT : ", p_o)
                         targets[str(p_o.getId())] = {
                             "ip": ip, "port": port, "proto": "tcp"}
@@ -102,7 +111,12 @@ def parseWarnings(pentest, file_opened):
                 else:
                     # Means that the item is a port
                     print("VALUE : ", value)
-                    p_o = Port.fetchObject(pentest, {"ip": ip, "port": item, "proto": "tcp"})
+                    port = item
+                    if (ip, port) in cache:
+                        p_o = cache[(ip, port)]
+                    else:
+                        p_o = Port.fetchObject(pentest, {"ip": ip, "port": port, "proto": "tcp"})
+                        cache[(ip, port)] = p_o
                     print("OBJET PORT : ", p_o)
                     targets[str(p_o.getId())] = {
                         "ip": ip, "port": item, "proto": "tcp"}
