@@ -425,6 +425,7 @@ class CheckInstance(Element):
                     done += 1
                     at_least_one = True
                     data["tools_done"][str(tool_model.getId())] = tool_model.getData()
+                    data["tools_done"][str(tool_model.getId())]["tags"] = tool_model.getTags()
                 elif "running" in tool_model.getStatus():
                     at_least_one = True
                     data["tools_running"][str(
