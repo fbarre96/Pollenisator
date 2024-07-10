@@ -64,9 +64,13 @@ def permission(*dec_args, **deckwargs):
                 try:
                     del kwargs[expected_arg_names]
                 except KeyError:
-                    if expected_arg_names in args_spec.args:
-                        value_i = args_spec.args.index(expected_arg_names)
-                        value = args[value_i]
+                    try:
+                        if expected_arg_names in args_spec.args:
+                            value_i = args_spec.args.index(expected_arg_names)
+                            value = args[value_i]
+                    except IndexError:
+                        pass
+
                 args_recalc.append(value)
             expect_kw = args_spec.varkw is not None
             if expect_kw:

@@ -1411,13 +1411,16 @@ class DBClient:
         except FileExistsError:
             pass
 
-        name, _ext = os.path.splitext(upfile.filename.replace("/", "_"))
+        name, ext = os.path.splitext(upfile.filename.replace("/", "_"))
+        ext = ext.replace("/","_")
         basename = os.path.basename(name)
         if filetype == "proof":
             if replace:
                 name = basename+".png"
             else:
                 name = basename+"-"+str(uuid4())+".png"
+        else:
+            name = name + ext
         full_filepath = os.path.join(filepath, name)
         while os.path.exists(full_filepath) and not replace:
             if filetype == "proof":

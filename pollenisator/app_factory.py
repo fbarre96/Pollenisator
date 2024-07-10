@@ -8,6 +8,7 @@ import uuid
 from getpass import getpass
 from pathlib import Path
 import json
+import connexion.jsonifier
 import ruamel.yaml
 import pymongo
 import connexion
@@ -55,7 +56,6 @@ def handle_start_terminal_session(sm: SocketManager, data: Dict[str, Any], socke
             sm.socketio.emit("proxy-term", {"action":"pty-output", "id":data.get("id"), "output":output_log}, room=request_sid)
     else:
         dbclient.insertInDb(socket["pentest"], "terminalsessions", {"user":socket["user"], "id":data.get("id"), "name":data.get("name"), "target_check_iid":data.get("target_check_iid",None), "logs":[]})
-
 def handle_stop_terminal_session(sm: SocketManager, data: Dict[str, Any], socket: Dict[str, Any], dbclient: mongo.DBClient, request_sid: str) -> None:
     existing_session = dbclient.findInDb(socket["pentest"], "terminalsessions", {"user":socket["user"], "id":data.get("id")}, False)
     if existing_session is not None:
@@ -79,6 +79,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         Flask: The initialized Flask application.
     """
     # Read the openapi.yaml file to configure the endpoints
+    connexion.jsonifier.JSONEncoder = JSONEncoder
     app = connexion.App(__name__, specification_dir=server_folder, debug=debug)
     flask_app: Flask = app.app
     flask_app.config.from_object(BaseConfig())
@@ -139,6 +140,8 @@ def create_app(debug: bool, async_mode: str) -> Flask:
                 else:
                     dbclient.updateInDb("pollenisator", "sockets", {"sid":sid, "user":username}, {"$set":{"pentest":pentest, "user":username, "supported_plugins":supported_plugins}}, notify=False)
                 #sm.socketio.emit("testTerminal", {"pentest":pentest}, room=request.sid)
+                register(data)
+                
                 socket_terminal_consumer = dbclient.findInDb("pollenisator", "sockets", {"user":username, "type":"terminalConsumer"}, False)
                 if socket_terminal_consumer is not None:
                     logger.info("sending pollterminal_connected to consumer")
@@ -252,19 +255,20 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         todel = None
         dbclient = mongo.DBClient.getInstance()
         logger.info("Disconnecting socket %s", sid)
-        todel = dbclient.findInDb("pollenisator", "sockets", {"sid":sid}, False)
-        if todel:
-            if todel.get("type") == "terminal":
-                if todel.get("consumer_sid") is not None:
-                    sm.socketio.emit("pollterminal_disconnected", {"pentest":todel["pentest"]}, room=todel["consumer_sid"])
-                    dbclient.updateInDb("pollenisator", "sockets", {"sid":todel["consumer_sid"]}, {"$unset":{"worker_sid":""}})
-            elif todel.get("type") == "terminalConsumer":
-                if todel.get("worker_sid") is not None:
-                    sm.socketio.emit("consumer_disconnected", {"pentest":todel["pentest"]}, room=todel["worker_sid"])
-                    dbclient.updateInDb("pollenisator", "sockets", {"sid":todel["worker_sid"]}, {"$unset":{"consumer_sid":""}})
-            else:
-                unregister(todel.get("worker"))
-            dbclient.deleteFromDb("pollenisator", "sockets", {"sid":sid}, False)
+        sockets = dbclient.findInDb("pollenisator", "sockets", {"sid":sid}, True)
+        if sockets:
+            for todel in sockets:
+                if todel.get("type") == "terminal":
+                    if todel.get("consumer_sid") is not None:
+                        sm.socketio.emit("pollterminal_disconnected", {"pentest":todel["pentest"]}, room=todel["consumer_sid"])
+                        dbclient.updateInDb("pollenisator", "sockets", {"sid":todel["consumer_sid"]}, {"$unset":{"worker_sid":""}})
+                elif todel.get("type") == "terminalConsumer":
+                    if todel.get("worker_sid") is not None:
+                        sm.socketio.emit("consumer_disconnected", {"pentest":todel["pentest"]}, room=todel["worker_sid"])
+                        dbclient.updateInDb("pollenisator", "sockets", {"sid":todel["worker_sid"]}, {"$unset":{"consumer_sid":""}})
+                else:
+                    unregister(todel.get("user"))
+            dbclient.deleteFromDb("pollenisator", "sockets", {"sid":sid}, True)
 
     @sm.socketio.event
     def test(data):
@@ -318,8 +322,8 @@ def create_app(debug: bool, async_mode: str) -> Flask:
     @sm.socketio.on("proxy-term")
     def proxy_terminal(data):
         dbclient = mongo.DBClient.getInstance()
-        socket = dbclient.findInDb("pollenisator", "sockets", {"sid":request.sid}, False)
-        logger.info("Receiving proxy-term %s on socket %s", str(data), str(socket))
+        socket = dbclient.findInDb("pollenisator", "sockets", {"sid":request.sid, "type":{"$in":["terminalConsumer","terminal"]}}, False)
+        #logger.info("Receiving proxy-term %s on socket %s", str(data), str(socket))
         if socket is None:
             logger.error("Socket not found %s", str(data))
             return {"error":"Forbidden"}
@@ -334,8 +338,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
             handle_stop_terminal_session(sm, data, socket, dbclient, request.sid)
         elif action == "pty-output":
             handle_pty_output(sm, data, socket, dbclient)
-        logger.info("Receiving proxy-term %s", str(data))
-        logger.info("Socket found %s", str(socket))
+        #logger.info("Receiving proxy-term %s", str(data))
         if socket["type"] == "terminalConsumer":
             if socket.get("worker_sid") is None:
                 logger.error("Socket not connected to a worker %s", str(data))
@@ -349,7 +352,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
 
     flask_app.json_encoder = JSONEncoder
     logger.info('Running ...')
-    CORS(flask_app)
+    CORS(flask_app,  expose_headers= ['Content-Disposition'])
     return flask_app
 
     
