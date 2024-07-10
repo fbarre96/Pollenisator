@@ -53,6 +53,7 @@ def insert(pentest: str, body: Dict[str, Any]) -> Union[DefectInsertResult, Tupl
         del body["_id"]
     if "index" in body:
         del body["index"]
+    body = json.loads(json.dumps(body), cls=JSONDecoder)
     defect = Defect(pentest, body)
     return defect.addInDb()
 

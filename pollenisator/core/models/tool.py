@@ -889,26 +889,38 @@ class Tool(Element):
         logger.info("Trying to stop task %s",str(self))
         dbclient = DBClient.getInstance()
         workers = dbclient.getWorkers({})
+        terminalsessionsCursor = dbclient.findInDb(self.pentest, "terminalsessions", {"target_check_iid":str(self.check_iid)+"|"+str(self._id)}, True)
         if workers is None:
             workerNames = []
         else:
             workerNames = [worker["name"] for worker in workers]
+        if terminalsessionsCursor is None:
+            terminalsessions = []
+        else:
+            terminalsessions = [session for session in terminalsessionsCursor]
         forceReset = kwargs.get("forceReset", False)
         saveScannerip = self.scanner_ip
         if forceReset:
             self.markAsNotDone()
             self.updateInDb()
-        if saveScannerip == "":
+        if saveScannerip == "" and len(terminalsessions) == 0:
             return "Empty worker field", 400
         if saveScannerip == "localhost":
             return "Tools running in localhost cannot be stopped through API", 405
-        if saveScannerip not in workerNames:
+        if saveScannerip not in workerNames and len(terminalsessions) == 0:
             return "The worker running this tool is not running anymore", 404
-        socket = dbclient.findInDb("pollenisator", "sockets", {"user":saveScannerip}, False)
-        if socket is None:
+        socketsCursor = dbclient.findInDb("pollenisator", "sockets", {"pentest":self.pentest}, True)
+        if socketsCursor is not None:
+            sockets = [x for x in socketsCursor]
+        if len(sockets) == 0:
             return "The worker running this tool is not running anymore", 404
         sm = SocketManager.getInstance()
-        sm.socketio.emit('stopCommand', {'pentest': self.pentest, "tool_iid":str(self.getId())}, room=socket["sid"])
+        for socket in sockets:
+            if socket.get("type") == "worker":
+                sm.socketio.emit('stopCommand', {'pentest': self.pentest, "tool_iid":str(self.getId())}, room=socket["sid"])
+            elif socket.get("type") == "terminal":
+                sm.socketio.emit('stop-terminal-command', {'pentest': self.pentest, "tool_iid":str(self.getId())}, room=socket["sid"])
+
         if not forceReset:
             self.markAsNotDone()
             self.updateInDb()

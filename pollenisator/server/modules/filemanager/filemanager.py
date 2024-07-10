@@ -9,6 +9,7 @@ import time
 import traceback
 import hashlib
 import zipfile
+import pathlib
 from datetime import datetime
 from typing import IO, Dict, List, Literal, Optional, Tuple, Union, Any, cast
 from typing_extensions import TypedDict
@@ -304,7 +305,7 @@ def download(pentest: str, attached_iid: str, filetype: str, filename: Optional[
     filepath = os.path.normpath(filepath)
     if not filepath.startswith(local_path):
         return "Invalid path", 400
-    if filename is not None:
+    if filename is not None and filename != "":
         filename = filename.replace("/", "_")
         filepath = os.path.join(filepath, os.path.basename(filename))
         if os.path.exists(filepath):
@@ -317,7 +318,7 @@ def download(pentest: str, attached_iid: str, filetype: str, filename: Optional[
             # generate a temp zip file
             temp_zipfile_dir = tempfile.mkdtemp()
             temp_zipfile_path = os.path.join(temp_zipfile_dir, str(attached_iid)+".zip")
-            zipf = zipfile.ZipFile(temp_zipfile_path, 'w', zipfile.ZIP_DEFLATED)
+            dir_source = pathlib.Path(filepath)
             @after_this_request
             def remove_file(response):
                 try:
@@ -325,15 +326,11 @@ def download(pentest: str, attached_iid: str, filetype: str, filename: Optional[
                 except Exception as error:
                     pass
                 return response
-            # Zip files in filepath directory and send it
-            try:
-                for root, dirs, files in os.walk(filepath):
-                    for file in files:
-                        zipf.write(os.path.join(root, file), os.path.relpath(os.path.join(root, file), filepath))
-                zipf.close()
-                return send_file(temp_zipfile_path)
-            except Exception as e:
-                return str(e), 500
+            with zipfile.ZipFile(temp_zipfile_path, mode="w") as archive:
+                for file_path in dir_source.iterdir():
+                    archive.write(file_path, arcname=file_path.name)
+            return send_file(temp_zipfile_path, mimetype="application/zip")
+
     if os.path.exists(filepath):
         return send_file(filepath)
     return "File not found", 404

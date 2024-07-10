@@ -159,6 +159,8 @@ paths:
           required: false
           schema:
             type: string
+            default: ""
+
       responses:
         "200":
           description: Successfully downloaded file

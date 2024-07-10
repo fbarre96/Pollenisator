@@ -429,7 +429,8 @@ class CheckInstance(Element):
                 elif "running" in tool_model.getStatus():
                     at_least_one = True
                     data["tools_running"][str(
-                        tool_model.getId())] = tool_model.getDetailedString()
+                        tool_model.getId())] = tool_model.getData()
+                    data["tools_running"][str(tool_model.getId())]["detailed_string"] = tool_model.getDetailedString()
                 elif "error" in tool_model.getStatus():
                     data["tools_error"][str(
                         tool_model.getId())] = tool_model.getData()
