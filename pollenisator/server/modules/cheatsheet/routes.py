@@ -13,12 +13,13 @@ from pollenisator.core.models.command import Command
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.permission import permission
 from pollenisator.core.components.utils import JSONDecoder
+import bson
 
 CheckItemInsertResult = TypedDict('CheckItemInsertResult', {'res': bool, 'iid': ObjectId})
 ErrorStatus = Tuple[str, int]
 
 @permission("user")
-def insert(body: Dict[str, Any]) -> CheckItemInsertResult:
+def insert(body: Dict[str, Any]) -> Union[ErrorStatus, CheckItemInsertResult]:
     """
     Insert cheatsheet information.
 
@@ -28,6 +29,26 @@ def insert(body: Dict[str, Any]) -> CheckItemInsertResult:
     Returns:
         CheckItemInsertResult: A dictionary with the result of the insertion.
     """
+    try:
+        defect_tags = json.loads(body.get("defect_tags", []), cls=JSONDecoder)
+        if not isinstance(defect_tags, list):
+            return "defect_tags must be a list", 400
+        for defect_tag in defect_tags:
+            if not isinstance(defect_tag, list):
+                return "defect_tags must be a list of list", 400
+            if not isinstance(defect_tag[0], str):
+                return "defect_tags must be a list of list of 2 values : string, ObjectId", 400
+            if not isinstance(defect_tag[1], ObjectId):
+                if isinstance(defect_tag[1], str):
+                    defect_tag[1] = ObjectId(defect_tag[1].replace("ObjectId|",""))
+                else:
+                    return "defect_tags must be a list of list of 2 values : string, ObjectId", 400
+                
+    except json.JSONDecodeError:
+        return "Invalid JSON", 400
+    except bson.errors.InvalidId:
+        return "Invalid ObjectId  in defect_tags", 400
+    body["defect_tags"] = defect_tags
     checkitem = CheckItem("pollenisator", body)
     res: CheckItemInsertResult = checkitem.addInDb()
     return res

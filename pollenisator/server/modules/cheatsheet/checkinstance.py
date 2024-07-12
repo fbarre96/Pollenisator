@@ -437,8 +437,13 @@ class CheckInstance(Element):
                 else:
                     data["tools_not_done"][str(
                         tool_model.getId())] = tool_model.getData()
-                    data["tools_not_done"][str(
-                        tool_model.getId())]["commandline"] = tool_model.getCommandLine()
+                    command_line = tool_model.getCommandLine()
+                    if isinstance(command_line, tuple):
+                        data["tools_not_done"][str(
+                            tool_model.getId())]["commandline"] = None
+                    else:
+                        data["tools_not_done"][str(
+                            tool_model.getId())]["commandline"] = tool_model.getCommandLine()
                 total += 1
 
         if done != total:

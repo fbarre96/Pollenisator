@@ -1,13 +1,14 @@
 """
 Handle  request common to IPs
 """
-from typing import Any, Dict, TypedDict, cast
+from typing import Any, Dict, Tuple, TypedDict, Union, cast
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.ip import Ip
 from pollenisator.server.permission import permission
 
 IpInsertResult = TypedDict('IpInsertResult', {'res': bool, 'iid': ObjectId})
+ErrorStatus = Tuple[str, int]
 
 @permission("pentester")
 def delete(pentest: str, ip_iid: str) -> int:
@@ -60,3 +61,17 @@ def update(pentest: str, ip_iid: str, body: Dict[str, Any]) -> bool:
     new = cast(Ip, new)
     new.updateInDb(body)
     return True
+
+@permission("pentester")
+def getHostData(pentest: str, ip_iid: str) -> Union[Dict[str, Any], ErrorStatus]:
+    """
+    Get dictionary containing the useful data for a host
+
+    Returns:
+        Union[Dict[str, Any], ErrorStatus]: A dictionary containing the useful data for a host
+    """
+    ip_o = Ip.fetchObject(pentest, {"_id": ObjectId(ip_iid)})
+    if ip_o is None:
+        return "Not found", 404
+    ip_o = cast(Ip, ip_o)
+    return ip_o.getHostData()

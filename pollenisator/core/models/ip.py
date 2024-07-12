@@ -569,3 +569,30 @@ class Ip(Element):
         list_ips_inserted = list(ips_inserted)
         CheckInstance.bulk_insert_for(pentest, list_ips_inserted, "ip", ["ip:onAdd"])
         return cast(List[Ip], list_ips_inserted)
+
+    def getHostData(self) -> Dict[str, Any]:
+        """
+        Get the getHostData for the ip.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the host useful data.
+        """
+        ret: Dict[str, Dict[str, Any]] = {"checks":{}, "ports":{}}
+
+        ### IP checks data
+        checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": ObjectId(self.getId()), "target_type": "ip"})
+        if checks is None:
+            return ret
+        for check in checks:
+            check = cast(CheckInstance, check)
+            result = check.getCheckInstanceInformation()
+            if result is not None:
+                ret["checks"][str(check.getId())] = result
+        ### PORTS data
+        ports = Port.fetchObjects(self.pentest, {"ip": self.ip})
+        if ports is None:
+            return ret
+        for port in ports:
+            port = cast(Port, port)
+            ret["ports"][str(port.getId())] = port.getPortData()
+        return ret

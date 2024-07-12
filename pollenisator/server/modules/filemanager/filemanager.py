@@ -130,7 +130,10 @@ def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage
     """
     user = kwargs["token_info"]["sub"]
     plugin = body.get("plugin", "auto-detect")
-    default_target = json.loads(body.get("default_target", {}))
+    try:
+        default_target = json.loads(body.get("default_target", {}))
+    except json.JSONDecodeError:
+        return "Invalid default_target", 400
     cmdline = body.get("cmdline", "")
 
     md5File = md5(upfile.stream)

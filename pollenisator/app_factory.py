@@ -55,11 +55,11 @@ def handle_start_terminal_session(sm: SocketManager, data: Dict[str, Any], socke
         for output_log in existing_session.get("logs", []):
             sm.socketio.emit("proxy-term", {"action":"pty-output", "id":data.get("id"), "output":output_log}, room=request_sid)
     else:
-        dbclient.insertInDb(socket["pentest"], "terminalsessions", {"user":socket["user"], "id":data.get("id"), "name":data.get("name"), "target_check_iid":data.get("target_check_iid",None), "logs":[]})
+        dbclient.insertInDb(socket["pentest"], "terminalsessions", {"user":socket["user"], "id":data.get("id"), "name":data.get("name"), "target_check_iid":data.get("target_check_iid",None), "logs":[], "status":"open"})
 def handle_stop_terminal_session(sm: SocketManager, data: Dict[str, Any], socket: Dict[str, Any], dbclient: mongo.DBClient, request_sid: str) -> None:
     existing_session = dbclient.findInDb(socket["pentest"], "terminalsessions", {"user":socket["user"], "id":data.get("id")}, False)
     if existing_session is not None:
-        dbclient.deleteFromDb(socket["pentest"], "terminalsessions", { "id":data.get("id")}, False)
+        dbclient.updateInDb(socket["pentest"], "terminalsessions", { "id":data.get("id")}, {"$set":{"status":"closed"}}, False)
     
 
 def handle_pty_output(sm: SocketManager, data: Dict[str, Any], socket: Dict[str, Any], dbclient: mongo.DBClient) -> None:

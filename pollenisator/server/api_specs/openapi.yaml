@@ -2350,6 +2350,30 @@ paths:
                   value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
                 Already exist:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+
+  "/ips/{pentest}/{ip_iid}/getHostData":
+    get:
+      operationId: pollenisator.server.servermodels.ip.getHostData
+      tags:
+        - Scopes
+      summary: Get host data for a host
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: ip_iid
+          in: path
+          description: IP iid to get
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get data on a host
+
   "/ips/update/{pentest}/{ip_iid}":
     put:
       operationId: pollenisator.server.servermodels.ip.update
@@ -2568,6 +2592,8 @@ paths:
       responses:
         "200":
           description: Get data on a checkisntance
+
+  
           
   "/scopes/update/{pentest}/{scope_iid}":
     put:

@@ -507,9 +507,10 @@ class Tool(Element):
         command_o: Union[str, Command]
         if self.text == "":
             try:
-                command_o = Command(self.pentest, self.getCommand())
-                if command_o is None:
+                command_result = self.getCommand()
+                if command_result is None:
                     return "Associated command was not found", 404
+                command_o = Command(self.pentest, command_result)
             except:
                 return "No command was not found", 404
         else:

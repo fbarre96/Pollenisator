@@ -363,3 +363,24 @@ class Port(Element):
             return
         ports_inserted = Port.fetchObjects(pentest, {"_id":{"$in":list(upserted_ids.values())}})
         CheckInstance.bulk_insert_for(pentest, cast(Iterable, ports_inserted), "port", ["port:onServiceUpdate"], f_get_impacted_targets=cls.get_allowed_ports)
+
+    def getPortData(self) -> Dict[str, Any]:
+        """
+        Get the getPortData for the port.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the port useful data.
+        """
+        ret: Dict[str, Any] = {}
+        ret["port"] = self.getData()
+        ret["checks"] = {}
+        ### IP checks data
+        checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": ObjectId(self.getId()), "target_type": "port"})
+        if checks is None:
+            return ret
+        for check in checks:
+            check = cast(CheckInstance, check)
+            result = check.getCheckInstanceInformation()
+            if result is not None:
+                ret["checks"][str(check.getId())] = result
+        return ret
