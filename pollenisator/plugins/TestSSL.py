@@ -51,10 +51,15 @@ def parseWarnings(pentest, file_opened):
             if "/" in ip:
                 domain = ip.split("/")[0]
                 ip = "/".join(ip.split("/")[1:])
-                if (ip.strip() != "" and domain.strip() != "") and ip not in items_to_add:
+                if (ip.strip() != "") and ip not in items_to_add:
                     items_to_add[ip] = Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name(), "FQDN": domain})
+                    items_to_add[ip] = Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name(), "FQDN": domain})
+                if (domain.strip() != "") and domain not in items_to_add:
+                    items_to_add[domain] = Ip(pentest).initialize(domain, infos={"plugin":TestSSL.get_name(), "ip": ip})
                 if ip+str(port) not in items_to_add:
                     items_to_add[ip+str(port)] = Port(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name(), "FQDN": domain})
+                if domain+str(port) not in items_to_add:
+                    items_to_add[domain+str(port)] = Port(pentest).initialize(domain, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name(), "ip": ip})
             if ip.strip() == "":
                 continue
             else:
@@ -69,10 +74,9 @@ def parseWarnings(pentest, file_opened):
             if cwe.strip() != "":
                 information["cwe"] = cwe
             if domain is not None:
-                missconfiguredHosts[ip] = missconfiguredHosts.get(ip, {})
-                missconfiguredHosts[ip][domain] = missconfiguredHosts[ip].get(domain, {})
-                missconfiguredHosts[ip][domain][port] = missconfiguredHosts[ip][domain].get(port, [])
-                missconfiguredHosts[ip][domain][port].append(information)
+                missconfiguredHosts[domain] = missconfiguredHosts.get(domain, {})
+                missconfiguredHosts[domain][port] = missconfiguredHosts[domain].get(port, [])
+                missconfiguredHosts[domain][port].append(information)
             else:
                 missconfiguredHosts[ip] = missconfiguredHosts.get(ip, {})
                 missconfiguredHosts[ip][port] = missconfiguredHosts[ip].get(port, [])
