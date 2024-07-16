@@ -51,8 +51,9 @@ def parseWarnings(pentest, file_opened):
             if "/" in ip:
                 domain = ip.split("/")[0]
                 ip = "/".join(ip.split("/")[1:])
-                if ip.strip() != "" and domain.strip() != "":
+                if (ip.strip() != "" and domain.strip() != "") and ip not in items_to_add:
                     items_to_add[ip] = Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name(), "FQDN": domain})
+                if ip+str(port) not in items_to_add:
                     items_to_add[ip+str(port)] = Port(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name(), "FQDN": domain})
             if ip.strip() == "":
                 continue
