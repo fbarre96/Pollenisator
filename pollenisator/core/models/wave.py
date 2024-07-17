@@ -243,3 +243,21 @@ class Wave(Element):
             List[str]: List of triggers
         """
         return ["wave:onAdd"]
+
+    def getChecksData(self) -> Dict[str, Any]:
+        """
+        Get the getChecksData for the wave.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the checkinstance useful data.
+        """
+        checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": ObjectId(self.getId()), "target_type": "wave"})
+        if checks is None:
+            return {}
+        ret = {}
+        for check in checks:
+            check = cast(CheckInstance, check)
+            result = check.getCheckInstanceInformation()
+            if result is not None:
+                ret[str(check.getId())] = result
+        return ret

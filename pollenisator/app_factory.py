@@ -101,6 +101,9 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         """
         dbclient = mongo.DBClient.getInstance()
         workerName = data.get("name")
+        sid = request.sid
+        logger.info("Registering socket as worker %s", sid)
+
         supported_plugins = data.get("supported_plugins", [])
         socket = dbclient.findInDb("pollenisator","sockets", {"user":workerName, "type":"worker"}, False)
         if socket is None:
@@ -158,6 +161,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         pentest = data.get("pentest", "")
         sid = request.sid
         res = verifyToken(token)
+        logger.info("Registering socket as terminal consumer %s", sid)
         if res:
             token_info = decode_token(token)
             user = dbclient.findInDb("pollenisator", "users", {"token":token}, False)

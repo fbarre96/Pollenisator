@@ -9,6 +9,13 @@ from pollenisator.core.models.defect import Defect
 
 warning_regex = re.compile(r"^\"([^\"]*)\", ?\"([^\"]*)\", ?\"([^\"]*)\", ?\"(OK|INFO|NOT ok|WARN|LOW|MEDIUM|HIGH|CRITICAL)\", ?\"([^\"]*)\", ?\"([^\"]*)\", ?\"([^\"]*)\"$")
 
+def bulk_insertions(pentest, ips_to_add, ports_to_add):
+    """Bulk insertions of ips and ports
+    """
+    Ip.bulk_insert(pentest, ips_to_add, look_scopes=True)
+    Port.bulk_insert(pentest, ports_to_add)
+    
+
 def parseWarnings(pentest, file_opened):
     """
     Parse the result of a testssl json output file
@@ -24,7 +31,8 @@ def parseWarnings(pentest, file_opened):
     missconfiguredHosts = {}
     
     firstLine = True
-    items_to_add = {}
+    ips_to_add = {}
+    ports_to_add = {}
     for line in file_opened:
         line = line.decode("utf-8", errors="ignore").strip()
         if firstLine:
@@ -51,22 +59,22 @@ def parseWarnings(pentest, file_opened):
             if "/" in ip:
                 domain = ip.split("/")[0]
                 ip = "/".join(ip.split("/")[1:])
-                if (ip.strip() != "") and ip not in items_to_add:
-                    items_to_add[ip] = Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name(), "FQDN": domain})
-                    items_to_add[ip] = Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name(), "FQDN": domain})
-                if (domain.strip() != "") and domain not in items_to_add:
-                    items_to_add[domain] = Ip(pentest).initialize(domain, infos={"plugin":TestSSL.get_name(), "ip": ip})
-                if ip+str(port) not in items_to_add:
-                    items_to_add[ip+str(port)] = Port(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name(), "FQDN": domain})
-                if domain+str(port) not in items_to_add:
-                    items_to_add[domain+str(port)] = Port(pentest).initialize(domain, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name(), "ip": ip})
+                if (ip.strip() != "") and ip not in ips_to_add:
+                    ips_to_add[ip] = Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name(), "FQDN": domain})
+                    ips_to_add[ip] = Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name(), "FQDN": domain})
+                if (domain.strip() != "") and domain not in ips_to_add:
+                    ips_to_add[domain] = Ip(pentest).initialize(domain, infos={"plugin":TestSSL.get_name(), "ip": ip})
+                if ip+str(port) not in ports_to_add:
+                    ports_to_add[ip+str(port)] = Port(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name(), "FQDN": domain})
+                if domain+str(port) not in ports_to_add:
+                    ports_to_add[domain+str(port)] = Port(pentest).initialize(domain, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name(), "ip": ip})
             if ip.strip() == "":
                 continue
             else:
-                if ip not in items_to_add:
-                    items_to_add[ip] = Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name()})
-                if ip+str(port) not in items_to_add:
-                    items_to_add[ip+str(port)] = Port(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name()})
+                if ip not in ips_to_add:
+                    ips_to_add[ip] = Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name()})
+                if ip+str(port) not in ports_to_add:
+                    ports_to_add[ip+str(port)] = Port(pentest).initialize(ip, port, "tcp", "ssl", infos={"plugin":TestSSL.get_name()})
 
             information = {"defect": subject, "criticity": level, "details": details}
             if cve.strip() != "":
@@ -82,9 +90,7 @@ def parseWarnings(pentest, file_opened):
                 missconfiguredHosts[ip][port] = missconfiguredHosts[ip].get(port, [])
                 missconfiguredHosts[ip][port].append(information)
 
-    print("Missconfigured hosts : ", missconfiguredHosts)
-    for item in items_to_add.values():
-        item.addInDb()
+    bulk_insertions(pentest, list(ips_to_add.values()), list(ports_to_add.values()))
     cache = {}
     for ip, _ in missconfiguredHosts.items():
         if ip.strip() != "":

@@ -1,13 +1,15 @@
 """
 Handle  request common to Waves
 """
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Optional, Tuple, Union, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.wave import Wave
 from pollenisator.server.modules.cheatsheet.checkinstance import  delete as checkinstance_delete
 from pollenisator.server.permission import permission
+
+ErrorStatus = Tuple[str, int]
 
 WaveInsertResult = TypedDict('WaveInsertResult', {'res': bool, 'iid': ObjectId})
 
@@ -87,3 +89,17 @@ def addUserCommandsToWave(pentest: str, wave_iid: ObjectId, user: str) -> bool:
     wave["wave_commands"] += comms
     update(pentest, wave_iid, {"wave_commands": wave["wave_commands"]})
     return True
+
+@permission("pentester")
+def getChecksData(pentest: str, wave_iid: str) -> Union[Dict[str, Any], ErrorStatus]:
+    """
+    Get the command suggestions for the Wave.
+
+    Returns:
+        Union[Dict[str, Any], ErrorStatus]: A dictionary containing the command suggestions or an error status.
+    """
+    wave_o = Wave.fetchObject(pentest, {"_id": ObjectId(wave_iid)})
+    if wave_o is None:
+        return "Not found", 404
+    wave_o = cast(Wave, wave_o)
+    return wave_o.getChecksData()

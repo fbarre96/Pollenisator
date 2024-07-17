@@ -2792,6 +2792,28 @@ paths:
                   value : '{"res":true, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
                 Already exist:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
+  "/waves/{pentest}/{wave_iid}/getChecksData":
+    get:
+      operationId: pollenisator.server.servermodels.wave.getChecksData
+      tags:
+        - Waves
+      summary: Get check instances data for a wave
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: wave_iid
+          in: path
+          description: wave iid to get
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get data on a checkisntance
   "/waves/update/{pentest}/{wave_iid}":
     put:
       operationId: pollenisator.server.servermodels.wave.update

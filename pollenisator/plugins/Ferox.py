@@ -33,10 +33,15 @@ def parse_ferox_file(notes):
 
     # Split the notes into lines and iterate over them
     lines = notes.split("\n")
+    firstLine = True
     for line in lines:
         print("LINE", line)
-        if line == "":                            # Skip empty lines
+        if line.strip() == "":                            # Skip empty lines
             continue
+        if firstLine:                                    # Skip the first line
+            firstLine = False
+            if "Configuration {" not in line:
+                return hosts
         match = regex_ferox.match(line)           # Match the line with the regex
         if match is None:                         # Skip lines that don't match the regex
             continue
