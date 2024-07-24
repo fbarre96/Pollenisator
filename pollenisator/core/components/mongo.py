@@ -1270,7 +1270,15 @@ class DBClient:
             execute(cmd, None, True)
         return msg, 200 if success else 403
 
-    def getRegisteredTags(self, pentest: str) -> List[str]:
+
+    @overload
+    def getRegisteredTags(self, pentest: str,  only_name: Literal[False] = False) ->  List[Dict[str, Any]]:
+        ...
+    @overload
+    def getRegisteredTags(self, pentest: str,  only_name: Literal[True] = True) ->  List[str]:
+        ...
+
+    def getRegisteredTags(self, pentest: str, only_name: bool=True) -> Union[List[str], List[Dict[str, Any]]]:
         """
         Get the registered tag names for a specific pentest.
 
@@ -1286,8 +1294,12 @@ class DBClient:
         tags = tags.get("value", {})
         if isinstance(tags, str):
             tags = json.loads(tags)
-        pentest_tags = list(tags.keys())
-        global_tags = list(self.getGlobalTags().keys())
+        if only_name:
+            pentest_tags = list(tags.keys())
+            global_tags = list(self.getGlobalTags().keys())
+        else:
+            pentest_tags = [tags]
+            global_tags = [self.getGlobalTags()]
         return global_tags+pentest_tags
 
     def getGlobalTags(self) -> Dict[str, Any]:

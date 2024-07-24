@@ -1,6 +1,6 @@
 """Ip Model. Describes Hosts (not just IP now but domains too)"""
 
-from typing import Any, Dict, Iterator, List, Optional, cast
+from typing import Any, Dict, Iterator, List, Optional, Union, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 import re
@@ -577,22 +577,32 @@ class Ip(Element):
         Returns:
             Dict[str, Any]: A dictionary containing the host useful data.
         """
-        ret: Dict[str, Dict[str, Any]] = {"checks":{}, "ports":{}}
+        ret: Dict[str, Union[List[Dict[str,Any]],Dict[str, Any]]] = {"checks":{}, "ports":{}, "defects": {}, "tags":[]}
 
         ### IP checks data
         checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": ObjectId(self.getId()), "target_type": "ip"})
-        if checks is None:
-            return ret
-        for check in checks:
-            check = cast(CheckInstance, check)
-            result = check.getCheckInstanceInformation()
-            if result is not None:
-                ret["checks"][str(check.getId())] = result
+        if checks is not None:
+            for check in checks:
+                check = cast(CheckInstance, check)
+                result = check.getCheckInstanceInformation()
+                if result is not None:
+                    ret["checks"][str(check.getId())] = result
         ### PORTS data
         ports = Port.fetchObjects(self.pentest, {"ip": self.ip})
-        if ports is None:
-            return ret
-        for port in ports:
-            port = cast(Port, port)
-            ret["ports"][str(port.getId())] = port.getPortData()
+        if ports is not None:
+            for port in ports:
+                port = cast(Port, port)
+                ret["ports"][str(port.getId())] = port.getPortData()
+        ### DEFECTS data
+        defects = Defect.fetchObjects(self.pentest, {"target_id": self.getId()})
+        if defects is not None:
+            for defect in defects:
+                defect = cast(Defect, defect)
+                ret["defects"][str(defect.getId())] = defect.getData()
+
+        ### Tags
+        tags = self.getTags()
+        if tags:
+            for tag in tags:
+                ret["tags"].append(tag.getData())
         return ret

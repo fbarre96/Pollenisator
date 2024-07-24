@@ -112,3 +112,18 @@ def getTaggedBy(pentest: str, tag_name: str) -> Dict[str, List[Dict[str, Any]]]:
     for item_type, item_ids in list_of_elems.items():
         list_of_elems[item_type] = [x for x in dbclient.findInDb(pentest, item_type, {"_id": {"$in": item_ids}}, multi=True)]
     return list_of_elems
+
+@permission("pentester")
+def getRegisteredTags(pentest: str) -> List[Dict[str, Any]]:
+    """
+    Get the list of all tags that are registered in the database.
+
+    Args:
+        pentest (str): The name of the pentest.
+
+    Returns:
+        List[str]: A list of all tags that are registered in the database.
+    """
+    dbclient = DBClient.getInstance()
+    tags = dbclient.getRegisteredTags(pentest, only_name=False)
+    return tags

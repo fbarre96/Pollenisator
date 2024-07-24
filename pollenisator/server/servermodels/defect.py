@@ -124,6 +124,7 @@ def update(pentest: str, defect_iid: str, body: Dict[str, Any]) -> Union[bool, T
     """
     if "_id" in body:
         del body["_id"]
+    body = json.loads(json.dumps(body), cls=JSONDecoder)
     defect = Defect.fetchObject(pentest, {"_id":ObjectId(defect_iid)})
     if defect is None:
         return "This defect does not exist", 404

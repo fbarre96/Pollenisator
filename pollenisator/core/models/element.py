@@ -299,7 +299,7 @@ class Element(metaclass=AbstractMetaElement):
             tag (str): a string describing a tag name.
         """
         dbclient = DBClient.getInstance()
-        dbclient.updateInDb(self.pentest, "tags", {"item_id": ObjectId(self.getId())}, {"$pull":{"tags.name":tag}})
+        dbclient.updateInDb(self.pentest, "tags", {"item_id": ObjectId(self.getId())}, {"$pull":{"tags":{"name":tag}}})
 
     def setTags(self, tags: List[Tag]) -> bool:
         """

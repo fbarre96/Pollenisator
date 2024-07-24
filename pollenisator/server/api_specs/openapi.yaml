@@ -71,7 +71,21 @@ components:
               item_type:
                 type: string
               tag:
-                type: string
+                oneOf:
+                  - type: string
+                  - type: array
+                    items:
+                      type: string
+                  - type: object
+                    properties:
+                      color:
+                        type: string
+                      name:
+                        type: string
+                      level:
+                        type: string
+                      notes:
+                        type: string
               overrideGroups:
                 type: boolean
                 default: false
@@ -2895,7 +2909,29 @@ paths:
               examples:
                 'defects where tagged':
                   value: '{  "defects": [    {      "_id": "ObjectId|60f190815955e6cf385a405d",      "ease": "Moderate",      "impact": "Major",      "index": "1",      "ip": "",      "notes": "",      "parent": "",      "port": "",      "proofs": [],      "proto": "",      "redactor": "N/A",      "risk": "Major",      "title": "sql",      "type": [        "Application"      ]    },    {      "_id": "ObjectId|60f194db1255fd087c769756",      "ease": "Moderate",      "impact": "Critical",      "index": "0",      "ip": "",      "notes": "",      "parent": "",      "port": "",      "proofs": [],      "proto": "",      "redactor": "N/A",      "risk": "Critical",      "title": "XSS",      "type": [        "Application"      ]    }  ]}'
-        
+  
+  "/tags/{pentest}/getRegisteredTags":
+    get:
+      operationId: pollenisator.server.servermodels.tag.getRegisteredTags
+      tags:
+        - Tags
+      summary: "Get all registered tags global and pentest local"
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+       
+      responses:
+        "200":
+          description: list of tag dict
+          content:
+            application/json:
+              examples:
+                'tags':
+                  value: '[{"info-nmap":{"color":"transparent","level":"info"}}, ...]'
+           
 
   "/tags/{pentest}/addTag/{item_id}":
     put:
