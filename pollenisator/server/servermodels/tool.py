@@ -128,7 +128,7 @@ def craftCommandLine(pentest: str, tool_iid: str, commandline_options: str = "")
     if toolModel is None:
         return "Tool does not exist : "+str(tool_iid), 404
     toolModel = cast(Tool, toolModel)
-    return toolModel.getCommandToExecute(commandline_options)
+    return toolModel.getCommandLine(commandline_options)
 
 
 @permission("pentester")
