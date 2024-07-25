@@ -60,12 +60,12 @@ def getIpPortsMasscan(pentest, scanFile):
                     port_info["state"] = state.get("state", "closed")
                 service = port.find('service')
                 if service is None:
-                    port_info['service'] = ""
+                    port_info['service'] = "unknown"
                     port_info['method'] = ""
                     port_info['product'] = ""
                     port_info['version'] = ""
                 else:
-                    port_info['service'] = service.get('name', "")
+                    port_info['service'] = service.get('name', "unknown")
                     port_info['method'] = service.get('method', "")
                     port_info['product'] = service.get('product', "")
                     port_info['version'] = service.get('version', "")
