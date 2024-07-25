@@ -101,6 +101,8 @@ class NXCSpiderPlus(Plugin):
         # Get the ip address form the command line
         cmdline = kwargs.get("cmdline", None)
         cmd_args = shlex.split(cmdline)
+        if len(cmd_args) < 3:
+            return None, None, None, None
         ip = cmd_args[2]
 
         # Get the user and password from the command line

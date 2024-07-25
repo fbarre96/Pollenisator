@@ -137,6 +137,8 @@ class NXCNtds(Plugin):
         # Get basic info from command line
         cmdline = kwargs.get("cmdline", None)
         cmd_args = shlex.split(cmdline)
+        if len(cmd_args) < 3:
+            return None, None, None, None
         ip = cmd_args[2]
 
         data = parse_output_file_ntds_hashes(file_opened)

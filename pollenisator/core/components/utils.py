@@ -14,6 +14,7 @@ from netaddr.core import AddrFormatError
 from bson import ObjectId
 import dns.resolver
 import werkzeug
+import traceback
 
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.core.components.logger_config import logger
@@ -153,7 +154,8 @@ def detectPlugins(pentest: str, upfile: werkzeug.datastructures.FileStorage, cmd
             try:
                 notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline, ext=ext, filename=upfile.filename)
             except Exception as e:
-                logger.error("Error in plugin %s: %s", pluginName, e)
+                tb = traceback.format_exc()
+                logger.error("Error in plugin %s: %s", pluginName, tb)
                 notes, tags, lvl, targets  = None, None, None, None
             upfile.stream.seek(0)
             if notes is not None and tags is not None:
