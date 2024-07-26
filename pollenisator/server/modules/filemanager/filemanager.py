@@ -212,10 +212,10 @@ def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage
                     tool_iid = None if target.get("tool_iid", None) is None else ObjectId(target["tool_iid"])
                 except bson.errors.InvalidId:
                     tool_iid = None
-            if wave is None:
-                wave = result.get("plugin", "")+"-Imported"
-            if dbclient.findInDb(pentest, "waves", {"wave":wave}, False) is None:
-                dbclient.insertInDb(pentest, "waves", {"wave":wave, "wave_commands":[]})
+            # if wave is None:
+            #     wave = result.get("plugin", "")+"-Imported"
+            # if dbclient.findInDb(pentest, "waves", {"wave":wave}, False) is None:
+            #     dbclient.insertInDb(pentest, "waves", {"wave":wave, "wave_commands":[]})
             tool_m = None
             if tool_iid is not None:
                 tool_m = Tool.fetchObject(pentest, {"_id":ObjectId(tool_iid)})
