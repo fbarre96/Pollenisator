@@ -48,7 +48,7 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
             notes_ip = "ip:" + \
                 str(addr) if addr!= "" and addr is not None else ""
 
-            ipCIDR_m = Ip(pentest, {"in_scopes":[]}).initialize(str(addr), notes=notes_ip, in_scopes=[], infos={"hostname":", ".join([host.get("name") for host in hostnames]), "plugin":NmapXML.get_name()})
+            ipCIDR_m = Ip(pentest, {"in_scopes":[]}).initialize(str(addr), notes=notes_ip, in_scopes=[], infos={"hostname":", ".join([host.get("name") for host in hostnames]), "plugin":Jfscan.get_name()})
             if not keep_only_open:#add directly
                 ips_to_add.append(ipCIDR_m)     
                 addedIps.append(ipCIDR_m)
@@ -57,7 +57,7 @@ def getIpPortsNmap(pentest, nmapFile, keep_only_open=True):
                     continue
                 notes_hostname = "hostname:" + \
                     str(hostname.get('name')) if hostname.get('name') != "" and hostname.get('name') is not None else ""
-                hostname_m = Ip(pentest, {"in_scopes":[]}).initialize(str(hostname.get('name')), notes=notes_hostname, in_scopes=[], infos={"plugin":NmapXML.get_name()})
+                hostname_m = Ip(pentest, {"in_scopes":[]}).initialize(str(hostname.get('name')), notes=notes_hostname, in_scopes=[], infos={"plugin":Jfscan.get_name()})
                 ips_to_add.append(hostname_m)    
                 addedIps.append(hostname_m) 
             ports = host.find('ports').findall('port')
