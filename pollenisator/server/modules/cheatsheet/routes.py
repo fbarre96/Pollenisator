@@ -30,7 +30,8 @@ def insert(body: Dict[str, Any]) -> Union[ErrorStatus, CheckItemInsertResult]:
         CheckItemInsertResult: A dictionary with the result of the insertion.
     """
     try:
-        defect_tags = json.loads(body.get("defect_tags", []), cls=JSONDecoder)
+        body = json.loads(json.dumps(body), cls=JSONDecoder)
+        defect_tags = body.get("defect_tags", [])
         if not isinstance(defect_tags, list):
             return "defect_tags must be a list", 400
         for defect_tag in defect_tags:
@@ -85,6 +86,7 @@ def update(iid: str, body: Dict[str, Any]) -> Union[ErrorStatus, bool]:
     existing = CheckItem.fetchObject("pollenisator", {"_id": ObjectId(iid)})
     if existing is None:
         return "Not found", 404
+    body = json.loads(json.dumps(body), cls=JSONDecoder)
     return existing.updateInDb(body)
 
 
