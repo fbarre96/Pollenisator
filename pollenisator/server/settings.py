@@ -5,6 +5,7 @@ from typing_extensions import TypedDict
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.scope import Scope
 from pollenisator.server.permission import permission
+from pollenisator.core.components.utils import JSONDecoder
 
 SettingDict = TypedDict('SettingDict', {'key': str, 'value': Any})
 ErrorStatus = Tuple[str, int]
@@ -22,6 +23,7 @@ def upsert(pentest: str, body: Dict[str, Any]) -> ErrorStatus:
         ErrorStatus: The result of the database operation.
     """
     dbclient = DBClient.getInstance()
+    body = json.loads(json.dumps(body), cls=JSONDecoder)
     key = body.get("key", "")
     value = json.loads(body.get("value", ""))
     if key == "" or not isinstance(key, str):
