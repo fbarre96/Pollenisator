@@ -315,7 +315,7 @@ def editScopeIPs(pentest, hostsInfos):
                     infosToAdd["admins"] = infosToAdd.get("admins", []) + [user_model]
                 
 
-            ip_m = Ip(pentest).initialize(str(infos["ip"]), infos={"plugin":CME.get_name()})
+            ip_m = Ip(pentest).initialize(str(infos["ip"]), infos={"plugin":CME.get_name(),"hostname":infos.get("machine_name", "")})
             insert_ret = ip_m.addInDb()
             if not insert_ret["res"]:
                 ip_m = Ip.fetchObject(pentest, {"_id": insert_ret["iid"]})

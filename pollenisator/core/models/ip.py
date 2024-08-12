@@ -7,6 +7,7 @@ import re
 from netaddr import IPNetwork, IPAddress
 from netaddr.core import AddrFormatError
 from pollenisator.core.models.defect import Defect
+from pollenisator.server.modules.activedirectory.computers import Computer
 from pollenisator.core.models.element import Element
 from pollenisator.core.models.port import Port
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
@@ -577,7 +578,7 @@ class Ip(Element):
         Returns:
             Dict[str, Any]: A dictionary containing the host useful data.
         """
-        ret: Dict[str, Union[List[Dict[str,Any]],Dict[str, Any]]] = {"checks":{}, "ports":{}, "defects": {}, "tags":[]}
+        ret: Dict[str, Union[List[Dict[str,Any]],Dict[str, Any]]] = {"checks":{}, "ports":{}, "defects": {}, "computers":{}, "tags":[]}
 
         ### IP checks data
         checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": ObjectId(self.getId()), "target_type": "ip"})
@@ -605,4 +606,10 @@ class Ip(Element):
         if tags:
             for tag in tags:
                 ret["tags"].append(tag.getData())
+
+        computers = Computer.fetchObjects(self.pentest, {"ip": self.ip})
+        if computers is not None:
+            for computer in computers:
+                computer = cast(Computer, computer)
+                ret["computers"][str(computer.getId())] = computer.getComputerData()
         return ret

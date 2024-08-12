@@ -4,7 +4,7 @@ Active directory computer module, handle a computer with SMB port open.
 # coding: utf-8
 
 from __future__ import absolute_import
-from typing import Dict, Iterator, List, Optional, Any, Tuple, Union
+from typing import Dict, Iterator, List, Optional, Any, Tuple, Union, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 from pymongo import UpdateOne
@@ -116,6 +116,36 @@ class Computer(Element):
         return {"_id": self._id, "name":self.name, "ip":self.ip, "domain":self.domain,
             "admins":self.admins, "users": self.users, "infos":self.infos.getData()}
 
+
+    def getComputerData(self) -> Dict[str, Any]:
+        """
+        Get the computer data for the computer.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the computer useful data.
+        """
+        ret: Dict[str, Any] = {}
+        ret["computer"] = self.getData()
+        ret["users"] = {}
+        ret["checks"] = {}
+        ### Users data
+        users = User.fetchObjects(self.pentest, {"_id": {"$in": self.users}})
+        if users is not None:
+            for user in users:
+                user = cast(User, user)
+                ret["users"][str(user.getId())] = user.getUserData()
+                
+        ### checks data
+        checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": ObjectId(self.getId()), "target_type": "computer"})
+        if checks is None:
+            return ret
+        for check in checks:
+            check = cast(CheckInstance, check)
+            result = check.getCheckInstanceInformation()
+            if result is not None:
+                ret["checks"][str(check.getId())] = result
+        return ret
+    
     @classmethod
     def fetchObjects(cls, pentest: str, pipeline: Dict[str, Any]) -> Iterator['Computer']:
         """
@@ -433,7 +463,7 @@ class Computer(Element):
             user_m_db = User.fetchObject(self.pentest, {"_id":ObjectId(res["iid"])})
             if user_m_db is not None:
                 user_m_db.updateInfos(infos)
-        if str(res["iid"]) not in self.users and password.strip() != "":
+        if ObjectId(res["iid"]) not in self.users and password.strip() != "":
             self.users.append(ObjectId(res["iid"]))
             self.add_user_checks()
         self.update()

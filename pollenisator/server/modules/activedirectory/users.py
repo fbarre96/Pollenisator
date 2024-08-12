@@ -2,7 +2,7 @@
 # coding: utf-8
 
 from __future__ import absolute_import
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, cast
 from typing_extensions import TypedDict
 from pollenisator.core.components.logger_config import logger
 from bson import ObjectId
@@ -192,6 +192,29 @@ class User(Element):
             return 0
         else:
             return res
+        
+    
+    def getUserData(self) -> Dict[str, Any]:
+        """
+        Get the  data for the user.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the user useful data.
+        """
+        ret: Dict[str, Any] = {}
+        ret["user"] = self.getData()
+        ret["checks"] = {}
+      
+        ### checks data
+        checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": ObjectId(self.getId()), "target_type": "user"})
+        if checks is None:
+            return ret
+        for check in checks:
+            check = cast(CheckInstance, check)
+            result = check.getCheckInstanceInformation()
+            if result is not None:
+                ret["checks"][str(check.getId())] = result
+        return ret
 
     def update(self) -> None:
         """
