@@ -74,10 +74,8 @@ def permission(*dec_args, **deckwargs):
                 args_recalc.append(value)
             expect_kw = args_spec.varkw is not None
             if expect_kw:
-                logger.debug("Calling function with args "+str(args_recalc)+" , "+str(kwargs))
                 result = function(*args_recalc, **kwargs)
             else:
-                logger.debug("Calling function with args "+str(args_recalc))
                 result = function(*args_recalc)
             return result
         return wrapper

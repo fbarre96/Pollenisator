@@ -16,6 +16,7 @@ from typing import IO, Any, Dict, List, Optional, Tuple, Type
 from abc import ABCMeta, abstractmethod
 import shlex
 import os
+from pollenisator.core.components.logger_config import logger
 from pollenisator.core.components.tag import Tag
 
 REGISTRY: Dict[str, 'Plugin'] = {}
@@ -142,13 +143,16 @@ class Plugin(metaclass=AbstractMetaPlugin):
         cmd_args = shlex.split(cmdline)
         if not cmd_args:
             return False
-        if os.path.basename(cmd_args[0].lower()) in self.__class__.default_bin_names \
+        if os.path.basename(cmd_args[0]) == self.__class__.get_name():
+            logger.info(f"Detected {self.__class__.__name__} plugin")
+            return True
+        elif os.path.basename(cmd_args[0].lower()) in self.__class__.default_bin_names \
             and all(flag in cmd_args for flag in self.default_plugin_flags):
-            print(f"Detected {self.__class__.__name__} plugin")
+            logger.info(f"Detected {self.__class__.__name__} plugin")
             return True
         elif os.path.basename(cmd_args[0].lower()) in self.__class__.default_bin_names \
             and "default" in self.default_plugin_flags:
-            print(f"Detected {self.__class__.__name__} default plugin")
+            logger.info(f"Detected {self.__class__.__name__} default plugin")
             return "Default"
         return False
 

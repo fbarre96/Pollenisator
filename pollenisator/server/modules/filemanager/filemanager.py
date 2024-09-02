@@ -219,10 +219,11 @@ def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage
             tool_m = None
             if tool_iid is not None:
                 tool_m = Tool.fetchObject(pentest, {"_id":ObjectId(tool_iid)})
-                tool_m = cast(Tool, tool_m)
-                tool_m.notes = notes
-                tool_m.scanner_ip = user
-                tool_iid = tool_m.getId()
+                if tool_m is not None:
+                    tool_m = cast(Tool, tool_m)
+                    tool_m.notes = notes
+                    tool_m.scanner_ip = user
+                    tool_iid = tool_m.getId()
 
             if tool_m is None: # tool not found, create it
                 tool_m = Tool(pentest).initialize(None, check_iid, wave, name=toolName,
