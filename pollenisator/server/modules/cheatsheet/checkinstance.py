@@ -296,8 +296,16 @@ class CheckInstance(Element):
         if not things_to_insert:
             return None
         res = dbclient.insertManyInDb(pentest, CheckInstance.coll_name, things_to_insert)
-        checks_inserted = CheckInstance.fetchObjects(pentest, {"_id": {"$in":res.inserted_ids}})
-        if checks_inserted is None:
+        values = res.inserted_ids
+        current_slice = 0
+        nb_values = len(values)
+        checks_inserted = []
+        while current_slice < nb_values:
+            top_of_slice = min(current_slice + 1000000, nb_values)
+            checks_inserted += CheckInstance.fetchObjects(pentest, {"_id":{"$in":values[current_slice:top_of_slice]}})
+            current_slice += 1000000
+
+        if not checks_inserted:
             return None
         # for each commands, add the tool
         tools_to_add = []

@@ -798,6 +798,12 @@ class Tool(Element):
         res: bool = self.updateInDb(self.getData())
         return res
 
+    @staticmethod
+    # Split or_conditions into chunks of 500
+    def split_list(lst, chunk_size):
+        for i in range(0, len(lst), chunk_size):
+            yield lst[i:i + chunk_size]
+
     @classmethod
     def bulk_insert(cls, pentest: str, tools_to_add: List['Tool']) -> List[ObjectId]:
         """
@@ -824,7 +830,13 @@ class Tool(Element):
             del lkp[hashable_key]["_id"]
             check_keys.add(hashable_key)
             or_conditions.append(tool.getDbKey())
-        existing_tools = Tool.fetchObjects(pentest, {"$or": or_conditions})
+        logger.debug("There is "+str(len(or_conditions))+" to split into 100000 sized batches")
+        max_conditions = 100000
+        existing_tools = []
+
+        for chunk in Tool.split_list(or_conditions, max_conditions):
+            query = {"$or": chunk}
+            existing_tools.extend(Tool.fetchObjects(pentest, query))
         existing_checks_as_keys = set([]) if existing_tools is None else set([ existing_tool.getHashableDbKey() for existing_tool in existing_tools])
         to_add = check_keys - existing_checks_as_keys
         things_to_insert = [lkp[check] for check in to_add]

@@ -361,7 +361,14 @@ class Port(Element):
         logger.info("Computer update took %s", str(time.time() - start))
         if not upserted_ids:
             return
-        ports_inserted = Port.fetchObjects(pentest, {"_id":{"$in":list(upserted_ids.values())}})
+        values = list(upserted_ids.values())
+        current_slice = 0
+        nb_values = len(values)
+        ports_inserted = []
+        while current_slice < nb_values:
+            top_of_slice = min(current_slice + 100000, nb_values)
+            ports_inserted += Port.fetchObjects(pentest, {"_id":{"$in":values[current_slice:top_of_slice]}})
+            current_slice += 100000
         CheckInstance.bulk_insert_for(pentest, cast(Iterable, ports_inserted), "port", ["port:onServiceUpdate"], f_get_impacted_targets=cls.get_allowed_ports)
 
     def getPortData(self) -> Dict[str, Any]:
@@ -369,7 +376,7 @@ class Port(Element):
         Get the getPortData for the port.
 
         Returns:
-            Dict[str, Any]: A dictionary containing the port useful data.
+            Dict[str, Any]: A dictionary containing the port useful192.168.122.152 data.
         """
         ret: Dict[str, Any] = {}
         ret["port"] = self.getData()
