@@ -1084,7 +1084,8 @@ def doExportCommands() -> Dict[str, List[Dict[str, Any]]]:
     commands = dbclient.findInDb("pollenisator", "commands", {}, True)
     for command in commands:
         c = command
-        del c["owners"]
+        if "owners" in c:
+            del c["owners"]
         if "users" in c:
             del c["users"]
         res["commands"].append(c)
@@ -1109,7 +1110,8 @@ def doExportCheatsheet() -> Dict[str, List[Dict[str, Any]]]:
     commands = dbclient.findInDb("pollenisator", "commands", {}, True)
     for command in commands:
         c = command
-        del c["owners"]
+        if "owners" in c:
+            del c["owners"]
         if "users" in c:
             del c["users"]
         res["commands"].append(c)
