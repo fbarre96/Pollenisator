@@ -719,7 +719,7 @@ class DBClient:
         return res
     
 
-    def _find(self, db: pymongo.database.Database[Any], collection: str, pipeline: Optional[Dict[str, Any]] = None, multi: bool = True, skip: Optional[int] = None, limit: Optional[int] = None) -> Union[pymongo.cursor.Cursor, None, List[Dict[str, Any]]]:
+    def _find(self, db: Any, collection: str, pipeline: Optional[Dict[str, Any]] = None, multi: bool = True, skip: Optional[int] = None, limit: Optional[int] = None) -> Union[pymongo.cursor.Cursor, None, List[Dict[str, Any]]]:
         """
         Wrapper for the pymongo find and find_one.
 
@@ -754,7 +754,7 @@ class DBClient:
             logger.error("ERROR TypeError : %s", e)
             return None
 
-    def aggregate(self, collection: str, pipelines: Optional[List[Dict[str, Any]]] = None) -> pymongo.command_cursor.CommandCursor[Any]:
+    def aggregate(self, collection: str, pipelines: Optional[List[Dict[str, Any]]] = None) -> pymongo.command_cursor.CommandCursor:
         """
         Wrapper for the pymongo aggregate.
 
@@ -763,7 +763,7 @@ class DBClient:
             pipelines (Optional[List[Dict[str, Any]]], optional): The mongo pipeline for aggregation. Default to None which means empty list pipeline.
 
         Returns:
-            pymongo.command_cursor.CommandCursor[Any]: Return the pymongo result of the aggregate function.
+            pymongo.command_cursor.CommandCursor: Return the pymongo result of the aggregate function.
         """
         if pipelines is None:
             pipelines = []
@@ -771,7 +771,7 @@ class DBClient:
             raise ValueError("No pentest connected")
         return self._aggregate(self.db, collection, pipelines)
 
-    def aggregateFromDb(self, db: str, collection: str, pipelines: Optional[List[Dict[str, Any]]] = None) -> pymongo.command_cursor.CommandCursor[Any]:
+    def aggregateFromDb(self, db: str, collection: str, pipelines: Optional[List[Dict[str, Any]]] = None) -> pymongo.command_cursor.CommandCursor:
         """
         Aggregate something in the database.
 
@@ -781,7 +781,7 @@ class DBClient:
             pipelines (Optional[List[Dict[str, Any]]], optional): The mongo pipeline for aggregation. Default to None which means empty list pipeline.
 
         Returns:
-            pymongo.command_cursor.CommandCursor[Any]: Return the pymongo result of the aggregate command for the command collection.
+            pymongo.command_cursor.CommandCursor: Return the pymongo result of the aggregate command for the command collection.
         """
         if pipelines is None:
             pipelines = []
@@ -791,7 +791,7 @@ class DBClient:
         dbMongo = self.client[db]
         return self._aggregate(dbMongo, collection, pipelines)
 
-    def _aggregate(self, db: pymongo.database.Database, collection: str, pipelines: Optional[List[Dict[str, Any]]] = None) -> pymongo.command_cursor.CommandCursor[Any]:
+    def _aggregate(self, db: pymongo.database.Database, collection: str, pipelines: Optional[List[Dict[str, Any]]] = None) -> pymongo.command_cursor.CommandCursor:
         """
         Wrapper for the pymongo aggregate.
 
@@ -801,7 +801,7 @@ class DBClient:
             pipelines (Optional[List[Dict[str, Any]]], optional): The mongo pipeline for aggregation. Default to None which means empty list pipeline.
 
         Returns:
-            pymongo.command_cursor.CommandCursor[Any]: Return the pymongo result of the aggregate function.
+            pymongo.command_cursor.CommandCursor: Return the pymongo result of the aggregate function.
         """
         if pipelines is None:
             pipelines = []
