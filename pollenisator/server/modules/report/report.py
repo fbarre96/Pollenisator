@@ -328,6 +328,8 @@ def craftContext(pentest: str, **kwargs: Any) -> Dict[str, Any]:
             global_proofs.append(os.path.join(proof_path, os.path.basename(pr)))
         defect_completed["proofs"] = global_proofs
         defect_completed["description"] =  defect_completed["description"].replace("\r","")
+        defect_completed["description"] = re.sub(r"(?<!\n\n)(!\[.*\]\((.*?)\))", r"\n\1", defect_completed["description"])
+        defect_completed["description"] = re.sub(r"(!\[.*\]\((.*?)\))(?!\n\n)", r"\1\n", defect_completed["description"])
         defect_completed["description_paragraphs"] = defect_completed["description"].replace("\r","").split("\n")
         fix_id = 1
         if len(defect_completed["fixes"]) > 1:

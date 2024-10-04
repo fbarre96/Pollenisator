@@ -67,7 +67,7 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
     jinja_env.filters['debug'] = debug
     context["proof_by_names"] = {}
     for defect in context["defects"]:
-        proofs =  defect.get("proofs", [])
+        proofs = defect.get("proofs", [])
         proofs_by_name = {}
         for proof in proofs:
             proofs_by_name[os.path.basename(proof)] = proof
