@@ -35,7 +35,6 @@ def getInitials(words):
     return ", ".join(initials)
 
 def regex_findall(string, pattern):
-    print("Received for findall, string:%s, pattern:%s" % (string, pattern))
     matches = re.findall(pattern, string)
     return matches
 

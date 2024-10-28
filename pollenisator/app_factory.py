@@ -92,6 +92,10 @@ def create_app(debug: bool, async_mode: str) -> Flask:
     sm = SocketManager.getInstance()
     sm.socketio.init_app(flask_app, log_output=False, logger=False,
                     engineio_logger=False, async_mode=async_mode)
+    allowed_properties = {
+        "defects":["synthesis","description"],
+        "documents":["data"]
+    }
     @sm.socketio.event
     def register(data):
         """Registers a worker and associates it with a socket.
@@ -290,38 +294,75 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         if not(socket["pentest"] == data.get("pentest") and data.get("pentest") is not None):
             return {"error":"Forbidden"}
         pentest = data.get("pentest","")
-        doc = dbclient.findInDb(pentest, "documents", {"pentest":pentest}, False)
-        if doc is None:
-            ins_result = dbclient.insertInDb(pentest, "documents", {"data":{}, "pentest":pentest})
-            if ins_result is None:
-                return {"error": "Document could not be created"}
-            res = ins_result.inserted_id
-            doc = {}
+        doc_id = data.get("doc_id","")
+        if doc_id == "":
+            return {"error":"Document not found"}
+        doc_collection = data.get("doc_collection","")
+        doc_property = data.get("doc_property","")
+        if doc_collection not in allowed_properties:
+            return {"error":"Forbidden"}
+        if doc_property not in allowed_properties[doc_collection]:
+            return {"error":"Forbidden"}
+        if doc_id == pentest:
+            doc = dbclient.findInDb(pentest, "documents", {"pentest":pentest}, False)
+            if doc is None:
+                ins_result = dbclient.insertInDb(pentest, "documents", {"data":{}, "pentest":pentest})
+                if ins_result is None:
+                    return {"error": "Document could not be created"}
+                res = ins_result.inserted_id
+                doc = {}
+            else:
+                doc = {"data":doc.get("data", {})}
+        else:
+            doc = dbclient.findInDb(pentest, doc_collection, {"_id":ObjectId(doc_id)}, False)
+            if doc is None:
+                return {"error":"Document not found"}
+            doc = {"data":doc.get(doc_property, "")}
         join_room(pentest, sid)
-        sm.socketio.emit("load-document", doc.get("data", {}), room=request.sid)
+        sm.socketio.emit("load-document", {"doc_id":str(doc_id),"doc_property":doc_property, "doc_collection":doc_collection, "data":doc.get("data", {})}, room=request.sid)
 
     @sm.socketio.on("send-delta")
-    def send_delta(delta):
+    def send_delta_received(data):
         sid = request.sid
         dbclient = mongo.DBClient.getInstance()
+        delta = data.get("delta", {})
+        doc_id = data.get("doc_id", "")
+        doc_collection = data.get("doc_collection", "")
+        doc_property = data.get("doc_property", "")
+        if doc_collection not in allowed_properties:
+            return {"error":"Forbidden"}
+        if doc_property not in allowed_properties[doc_collection]:
+            return {"error":"Forbidden"}
         socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid}, False)
         if socket is None:
             return {"error":"Forbidden"}
         if socket["pentest"] == "":
             return {"error":"Forbidden"}
         pentest = socket["pentest"]
-        sm.socketio.emit("received-delta", delta, room=pentest, include_self=False)
+        sm.socketio.emit("received-delta", {"delta":delta, "doc_id":doc_id, "doc_collection":doc_collection, "doc_property":doc_property}, room=pentest, include_self=False)
+   
     @sm.socketio.on("save-document")
     def save_document(data):
         dbclient = mongo.DBClient.getInstance()
         sid = request.sid
+        doc_id = data.get("doc_id", "")
+        doc_collection = data.get("doc_collection", "")
+        doc_property = data.get("doc_property", "")
+        document_data = data.get("document", "")
+        if doc_collection not in allowed_properties:
+            return {"error":"Forbidden"}
+        if doc_property not in allowed_properties[doc_collection]:
+            return {"error":"Forbidden"}
         socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid}, False)
         if socket is None:
             return {"error":"Forbidden"}
         if socket["pentest"] == "":
             return {"error":"Forbidden"}
         pentest = socket["pentest"]
-        dbclient.updateInDb(pentest, "documents", {"pentest":pentest}, {"$set":{"data":data}})
+        if doc_id == pentest:
+            dbclient.updateInDb(pentest, "documents", {"pentest":pentest}, {"$set":{"data":document_data}})
+        else:
+            dbclient.updateInDb(pentest, doc_collection, {"_id":ObjectId(doc_id)}, {"$set":{doc_property: document_data}})
 
     @sm.socketio.on("proxy-term")
     def proxy_terminal(data):
@@ -460,7 +501,7 @@ def migrate():
         version = migrate_2_9()
     if version == "2.9":
         version = migrate_2_10()
-    logger.info("DB version is now %s", version)
+    logger.info("DB version is %s", version)
 
 def migrate_0():
     dbclient = mongo.DBClient.getInstance()
