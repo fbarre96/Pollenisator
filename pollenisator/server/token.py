@@ -154,7 +154,29 @@ def decode_token(token: str) -> Dict[str, Any]:
         return cast(Dict[str, Any], jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM]))
     except JWTError as e:
         print("ERROR token "+str(e))
-        logger.info("Unauthorized, token is invalid : token (%s) error (%s)", token, e)
+        logger.info("Unauthorized, token in Bearer is invalid : token (%s) error (%s)", token, e)
+        six.raise_from(Unauthorized, e)
+    return {}
+
+
+def decode_cookie(token: str) -> Dict[str, Any]:
+    """
+    Decode a JWT token from cookie into a dictionary.
+
+    Args:
+        token (str): The JWT token to decode.
+
+    Returns:
+        Dict[str, Any]: The decoded token information.
+
+    Raises:
+        Unauthorized: If the token is invalid.
+    """
+    try:
+        return cast(Dict[str, Any], jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM]))
+    except JWTError as e:
+        print("ERROR token in COOKIE"+str(e))
+        logger.info("Unauthorized, token in COOKIE is invalid : token (%s) error (%s)", token, e)
         six.raise_from(Unauthorized, e)
     return {}
 

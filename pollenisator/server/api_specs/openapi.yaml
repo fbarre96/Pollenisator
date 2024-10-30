@@ -15,7 +15,12 @@ components:
       scheme: bearer
       bearerFormat: JWT
       x-bearerInfoFunc: pollenisator.server.token.decode_token
-      
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session_token
+      x-apikeyInfoFunc: pollenisator.server.token.decode_cookie  # Custom function to decode cookie
+
   requestBodies:
     Tools:
       content:
@@ -230,6 +235,13 @@ components:
             - N/A
         redactor:
           type: string
+        redacted_state:
+          type: string
+          enum:
+            - New
+            - To review
+            - Reviewed
+            - Completed
         type:
           type: array
           items:
@@ -433,6 +445,7 @@ components:
 
 security:
   - jwt: []
+  - cookieAuth: []
 
 paths:
   /:
@@ -2236,6 +2249,33 @@ paths:
               examples:
                 success:
                   value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+  "/defects/{pentest}/review/{defect_iid}":
+    get:
+      operationId: pollenisator.server.servermodels.defect.review
+      tags:
+        - Defects
+      summary: Get defect review
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: defect_iid
+          in: path
+          description: defect iid to get
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get defect review
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '[{"_id": "ObjectId|5f9150fbed75193ef71ba47f", "ease": "Moderate", "impact": "Major", "index": "1", "ip": "", "notes": "", "parent": "", "port": "", "proofs": [], "proto": "", "redactor": "N/A", "risk": "Major", "title": "sql", "type": ["Application"]}, ...]'
   "/defects/{pentest}/{defect_iid}":
     delete:
       operationId: pollenisator.server.servermodels.defect.delete

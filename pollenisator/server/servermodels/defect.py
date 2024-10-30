@@ -122,14 +122,34 @@ def update(pentest: str, defect_iid: str, body: Dict[str, Any]) -> Union[bool, T
         Union[bool, Tuple[str, int]]: True if the operation was successful, or a tuple containing an error message and 
         an error code otherwise.
     """
-    if "_id" in body:
-        del body["_id"]
-    body = json.loads(json.dumps(body), cls=JSONDecoder)
+    
+    old = Defect.fetchObject(pentest, {"_id":ObjectId(defect_iid)})
+    if old is None:
+        return "Not found", 404
+    old = cast(Defect, old)
+    if "redacted_state" in body:
+        old.redacted_state = str(body["redacted_state"])
+        old.updateInDb(body)
+    else:
+        if old.redacted_state == "To review" :
+            old.save_review(body)
+        else:
+            old.updateInDb(body)
+
+@permission("pentester")
+def review(pentest: str, defect_iid: str) -> Dict[str, Any]:
+    """
+    Get the review of a defect. 
+    Args:
+        pentest (str): The name of the pentest.
+        defect_iid (str): The id of the defect.
+
+    Returns:
+        List[Dict[str, Any]]: A list of dictionaries, each representing a version of the defect. The versions are ordered by their index.
+    """
     defect = Defect.fetchObject(pentest, {"_id":ObjectId(defect_iid)})
-    if defect is None:
-        return "This defect does not exist", 404
     defect = cast(Defect, defect)
-    return defect.update(body)
+    return defect.get_review()
 
 @permission("pentester")
 def getGlobalDefects(pentest: str) -> List[Dict[str, Any]]:

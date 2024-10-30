@@ -96,6 +96,9 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         "defects":["synthesis","description"],
         "documents":["data"]
     }
+    collections_doc_id = {
+        "defectsreviews": "defect_iid"
+    }
     @sm.socketio.event
     def register(data):
         """Registers a worker and associates it with a socket.
@@ -314,7 +317,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
             else:
                 doc = {"data":doc.get("data", {})}
         else:
-            doc = dbclient.findInDb(pentest, doc_collection, {"_id":ObjectId(doc_id)}, False)
+            doc = dbclient.findInDb(pentest, doc_collection, {collections_doc_id.get(doc_collection, "_id"):ObjectId(doc_id)}, False)
             if doc is None:
                 return {"error":"Document not found"}
             doc = {"data":doc.get(doc_property, "")}
@@ -362,7 +365,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         if doc_id == pentest:
             dbclient.updateInDb(pentest, "documents", {"pentest":pentest}, {"$set":{"data":document_data}})
         else:
-            dbclient.updateInDb(pentest, doc_collection, {"_id":ObjectId(doc_id)}, {"$set":{doc_property: document_data}})
+            dbclient.updateInDb(pentest, doc_collection, {collections_doc_id.get(doc_collection, "_id"):ObjectId(doc_id)}, {"$set":{doc_property: document_data}})
 
     @sm.socketio.on("proxy-term")
     def proxy_terminal(data):
@@ -501,6 +504,8 @@ def migrate():
         version = migrate_2_9()
     if version == "2.9":
         version = migrate_2_10()
+    if version == "2.10":
+        version = migrate_2_11()
     logger.info("DB version is %s", version)
 
 def migrate_0():
@@ -701,6 +706,18 @@ def migrate_2_10():
     dbclient.bulk_write("pollenisator", "defects", updates)
     dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.10"}})
     return "2.10"
+
+def migrate_2_11():
+    dbclient = mongo.DBClient.getInstance()
+    logger.info("Start iterating pentests.")
+    pentests = list(dbclient.findInDb("pollenisator","pentests",{}, True))
+    for pentest in pentests:
+        pentest_uuid = pentest["uuid"]
+        logger.info("Migrating pentest %s (%s) %d/%d", pentest["nom"], pentest_uuid, pentests.index(pentest), len(pentests))
+        # update iid strings to ObjectIds
+        dbclient.updateInDb(pentest_uuid, "defects", {}, {"$set":{"redacted_state":"New"}}, many=True)
+    dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.11"}})
+    return "2.11"
 
 def init_db() -> None:
     """

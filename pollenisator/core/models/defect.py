@@ -36,7 +36,7 @@ class Defect(Element):
                 A mongo fetched defect is optimal. Possible keys with default values are : _id (None), parent (None), 
                 infos({}), target_id, target_type, title(""), synthesis(""), description(""), ease(""), impact(""), 
                 risk(""), redactor("N/A"), type([]),  language(""),, notes(""), proofs([]), fixes([]), creation_time, 
-                infos, index(None),  perimeter([]). Defaults to None.
+                redact_state("New"),infos, index(None),  perimeter([]). Defaults to None.
         """
         if valuesFromDb is None:
             valuesFromDb = {}
@@ -54,7 +54,7 @@ class Defect(Element):
                             valuesFromDb.get("language", ""),
                             valuesFromDb.get("notes", ""), valuesFromDb.get(
                                 "proofs", []),
-                            valuesFromDb.get("fixes", []), valuesFromDb.get("creation_time", None),
+                            valuesFromDb.get("fixes", []), valuesFromDb.get("creation_time", None), valuesFromDb.get("redacted_state", "New"),
                             valuesFromDb.get("infos", {}),
                             valuesFromDb.get("index", 0), valuesFromDb.get("perimeter", []))
 
@@ -62,7 +62,7 @@ class Defect(Element):
                    description: str = "", ease: str = "", impact: str = "", risk: str = "", redactor: str = "N/A",
                    mtype: Optional[Union[str, List[str]]] = None, language: str = "", notes: str = "",
                    proofs: Optional[List[str]] = None, fixes: Optional[List[Dict[str, Any]]] = None,
-                   creation_time: Optional[datetime] = None, infos: Optional[Dict[str, Any]] = None,
+                   creation_time: Optional[datetime] = None, redacted_state: str = "New", infos: Optional[Dict[str, Any]] = None,
                    index: int = 0, perimeter: Optional[List[str]] = None) -> 'Defect':
         """
         Set values of defect.
@@ -83,6 +83,7 @@ class Defect(Element):
             proofs (Optional[List[str]], optional): A list of proof files, default to None.
             fixes (Optional[List[Dict[str, Any]]], optional): A list of fixes for this defect, default to empty list. Defaults to None.
             creation_time (Optional[datetime], optional): The time this defect was created. Default to None, will be auto filled if None.
+            redacted_state (str, optional): The redacted state of this defect. Defaults to "New".
             infos (Optional[Dict[str, Any]], optional): A dictionary with key values as additional information. Default to None.
             index (int, optional): The index of this defect in global defect table (only for unassigned defect). Defaults to 0.
             perimeter (Optional[List[str]], optional): A list of perimeters for this defect. Defaults to None.
@@ -114,6 +115,7 @@ class Defect(Element):
         except ValueError:
             self.index = 0
         self.creation_time = datetime.now() if creation_time is None else creation_time
+        self.redacted_state = "New" if redacted_state is None or redacted_state == "" else redacted_state
         self.repr_string = self.getDetailedString()
 
         return self
@@ -125,13 +127,13 @@ class Defect(Element):
         Returns:
             Dict[str,Any]: A dictionary with keys title, 
             synthesis, description, ease, impact, risk, redactor, type, language, notes, target_id, target_type, index, 
-            proofs, creation_time, fixes, _id, infos.
+            proofs, creation_time, redacted_state, fixes, _id, infos.
         """
 
         return {"title": self.title, "synthesis":self.synthesis, "description":self.description, "ease": self.ease, "impact": self.impact,
                 "risk": self.risk, "redactor": self.redactor, "type": self.mtype, "language":self.language, "notes": self.notes,
                 "target_id": self.target_id, "target_type": self.target_type, "index":int(self.index),
-                "proofs": self.proofs, "creation_time": self.creation_time, "fixes":self.fixes, "perimeter":self.perimeter, "_id": self.getId(), "infos": self.infos}
+                "proofs": self.proofs, "creation_time": self.creation_time, "redacted_state":self.redacted_state, "fixes":self.fixes, "perimeter":self.perimeter, "_id": self.getId(), "infos": self.infos}
 
     @classmethod
     def getSearchableTextAttribute(cls) -> List[str]:
@@ -214,6 +216,7 @@ class Defect(Element):
         """
         try:
             self.creation_time = datetime.now()
+            self.redacted_state = "New" if self.redacted_state == "" or self.redacted_state is None else self.redacted_state
             if not self.isAssigned():
                 sem.acquire()
             base = self.getDbKey()
@@ -340,6 +343,94 @@ class Defect(Element):
             return 0
         else:
             return res
+        
+    def save_review(self, data) -> None:
+        """
+        Save current version in the database under the version collection.
+
+        """ 
+        dbclient = DBClient.getInstance()
+        new_data = self.getData()
+        data = {} if data is None else data
+        new_data |= data
+        new_self = Defect(self.pentest, new_data)
+        new_data = new_self.getData()
+        
+        new_data["defect_iid"] = new_data["_id"]
+        if "_id" in new_data:
+            del new_data["_id"]
+        new_data["time"] = datetime.now()
+        dbclient.updateInDb(self.pentest, "defectsreviews", {"defect_iid": new_data["defect_iid"]}, {"$set":new_data}, upsert=True)
+
+    def get_review(self) -> Dict[str, Any]:
+        """
+        Get the version of this defect from the database.
+
+        Returns:
+            Dict[str, Any]: A dictionary representing the version of this defect.
+        """
+        dbclient = DBClient.getInstance()
+        version = dbclient.findInDb(self.pentest, "defectsreviews", {"defect_iid": ObjectId(self.getId())}, multi=False)
+        if version is not None:
+            return version
+        # if not found, create it
+        defect = dbclient.findInDb(self.pentest, "defects", {"_id":ObjectId(self.getId())}, False)
+        if defect is not None:
+            defect["defect_iid"] = defect["_id"]
+            del defect["_id"]
+            dbclient.insertInDb(self.pentest, "defectsreviews", defect)
+            return defect
+        return {}
+
+    def updateInDb(self, data: Optional[Dict[str, Any]] = None) -> list[str]:
+        """
+        Update the current Defect object in the database.
+
+        Args:
+            data (Optional[Dict[str, Any]): The new data to set in the database.
+
+        Returns:
+            list[str]: the list of keys modified
+        """
+        dbclient = DBClient.getInstance()
+        new_data = self.getData()
+        data = {} if data is None else data
+        if "_id" in data:
+            del data["_id"]
+        new_data |= data
+        new_self = Defect(self.pentest, new_data)
+
+        if "_id" in new_data:
+            del new_data["_id"]
+        oldRisk = self.risk
+        if not new_self.isAssigned() and self.pentest != "pollenisator":
+            if data.get("risk", None) is not None and self.pentest != "pollenisator":
+                if new_data["risk"] != oldRisk:
+                    insert_pos = Defect.findInsertPosition(self.pentest, new_data["risk"])
+                    if int(insert_pos) > int(self.index):
+                        insert_pos = int(insert_pos)-1
+                    defectTarget = Defect.fetchObject(self.pentest, {"target_id":None, "index":insert_pos})
+                    if defectTarget is not None:
+                        Defect.moveDefect(self.pentest, self.getId(), defectTarget.getId())
+                if "index" in new_data:
+                    del new_data["index"]
+        if self.pentest != "pollenisator" and "description" in data:
+            new_data["proofs"] = set()
+            proof_groups = Defect._findProofsInDescription(new_data.get("description", ""))
+            try:
+                existing_proofs_to_remove = self.listProofFiles()
+            except FileNotFoundError:
+                existing_proofs_to_remove = []
+            for proof_group in proof_groups:
+                if proof_group.group(1) in existing_proofs_to_remove:
+                    existing_proofs_to_remove.remove(proof_group.group(1))
+                new_data["proofs"].add(proof_group.group(1))
+            for proof_to_remove in existing_proofs_to_remove:
+                self.rmProof(proof_to_remove)
+            new_data["proofs"] = list(new_data["proofs"])
+        
+        dbclient.updateInDb(self.pentest, "defects", {"_id":ObjectId(self.getId())}, {"$set":new_data}, False, True)
+        return list(new_data.keys())
 
     @classmethod
     def findInsertPosition(cls, pentest: str, risk: str) -> int:
