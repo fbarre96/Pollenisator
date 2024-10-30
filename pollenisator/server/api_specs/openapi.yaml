@@ -3231,9 +3231,9 @@ paths:
               examples:
                 Successful nmap craft:
                   value: '{
-  "command_line_options": "nmap -n -v -p443 www.algosecure.fr -oN |outputDir|",
-  "ext": ".nmap"
-}'
+                    "command_line_options": "nmap -n -v -p443 www.algosecure.fr -oN |outputDir|",
+                    "plugin_results": {"Nmap":{"expected_ext":".xml", "common_names":["nmap"]}}
+                  }'
         "400":
           description: Invalid parameters
           content:

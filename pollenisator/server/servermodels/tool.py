@@ -160,7 +160,7 @@ def completeDesiredOuput(pentest: str, tool_iid: str, plugin: str, command_line_
     return {"command_line_options":comm, "ext":mod.getFileOutputExt()}
 
 @permission("user")
-def getDesiredOutputForPlugin(body: Dict[str, Any]) -> Union[Tuple[str, int], Dict[str, Union[str, Dict[str, str]]]]:
+def getDesiredOutputForPlugin(body: Dict[str, Any]) -> Union[Tuple[str, int], Dict[str, Any]]:
     """
     Get the desired output for a plugin. If the plugin is 'auto-detect', the plugins are detected using the command line. 
     Otherwise, the plugin is loaded from the body. The command is changed using the plugin and the output file extension 
@@ -188,7 +188,7 @@ def getDesiredOutputForPlugin(body: Dict[str, Any]) -> Union[Tuple[str, int], Di
     for plugin in plugins_detected:
         mod = loadPlugin(plugin)
         comm = mod.changeCommand(comm, f"|{plugin}.outputDir|", "")
-        plugin_results[plugin] = mod.getFileOutputExt()
+        plugin_results[plugin] = {"expected_extension":mod.getFileOutputExt(), "common_bin_names":mod.default_bin_names}
     return {"command_line_options":comm, "plugin_results":plugin_results}
 
 @permission("user")
