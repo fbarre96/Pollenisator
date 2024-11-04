@@ -205,6 +205,8 @@ components:
           type: string
         synthesis:
           type: string
+        impacts:
+          type: string
         description:
           type: string
         notes:
@@ -381,6 +383,8 @@ components:
         title:
           type: string
         synthesis:
+          type: string
+        impacts:
           type: string
         description:
           type: string

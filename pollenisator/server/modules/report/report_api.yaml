@@ -366,7 +366,8 @@ paths:
     "risk": "Critical",
     "tags": [],
     "title": "XSS",
-    "synthesis": "An XSS or Cross-Site-Scripting attack is ..."
+    "synthesis": "An XSS or Cross-Site-Scripting attack is ...",
+    "impacts": "An attacker can execute malicious scripts on the victims browser",
     "description": "The XXX server is vulnerable to XSS in XXX form ...",
     "language": "en",
     "type": [
@@ -377,7 +378,7 @@ paths:
         "title":"Filter user input",
         "synthesis": "..",
         "description":"...",
-        "execution": "Easy"
+        "execution": "Easy",
         "gain": "Strong"
       },
     ]
@@ -497,6 +498,8 @@ paths:
                             - Major
                             - Critical
                         synthesis:
+                          type: string
+                        impacts:
                           type: string
                         title:
                           type: string

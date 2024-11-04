@@ -93,7 +93,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
     sm.socketio.init_app(flask_app, log_output=False, logger=False,
                     engineio_logger=False, async_mode=async_mode)
     allowed_properties = {
-        "defects":["synthesis","description"],
+        "defects":["synthesis","impacts", "description"],
         "documents":["data"]
     }
     collections_doc_id = {
@@ -506,6 +506,8 @@ def migrate():
         version = migrate_2_10()
     if version == "2.10":
         version = migrate_2_11()
+    if version == "2.11":
+        version = migrate_2_12()
     logger.info("DB version is %s", version)
 
 def migrate_0():
@@ -718,6 +720,19 @@ def migrate_2_11():
         dbclient.updateInDb(pentest_uuid, "defects", {}, {"$set":{"redacted_state":"New"}}, many=True)
     dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.11"}})
     return "2.11"
+
+def migrate_2_12():
+    dbclient = mongo.DBClient.getInstance()
+    logger.info("Start iterating pentests.")
+    pentests = list(dbclient.findInDb("pollenisator","pentests",{}, True))
+    for pentest in pentests:
+        pentest_uuid = pentest["uuid"]
+        logger.info("Migrating pentest %s (%s) %d/%d", pentest["nom"], pentest_uuid, pentests.index(pentest), len(pentests))
+        # update iid strings to ObjectIds
+        dbclient.updateInDb(pentest_uuid, "defects", {}, {"$set":{"impacts":""}}, many=True)
+    dbclient.updateInDb("pollenisator","defects", {}, {"$set":{"impacts":""}}, many=True)
+    dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.12"}})
+    return "2.12"
 
 def init_db() -> None:
     """

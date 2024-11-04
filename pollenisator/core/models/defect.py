@@ -34,7 +34,7 @@ class Defect(Element):
             pentest (str): An object representing a penetration test.
             valuesFromDb (Optional[Dict[str, Any]], optional): A dict holding values to load into the object. 
                 A mongo fetched defect is optimal. Possible keys with default values are : _id (None), parent (None), 
-                infos({}), target_id, target_type, title(""), synthesis(""), description(""), ease(""), impact(""), 
+                infos({}), target_id, target_type, title(""), synthesis(""), impacts(""), description(""), ease(""), impact(""), 
                 risk(""), redactor("N/A"), type([]),  language(""),, notes(""), proofs([]), fixes([]), creation_time, 
                 redact_state("New"),infos, index(None),  perimeter([]). Defaults to None.
         """
@@ -46,7 +46,7 @@ class Defect(Element):
         self.index = 0
         if valuesFromDb is not None:
             self.initialize(valuesFromDb.get("target_id", None), valuesFromDb.get("target_type", ""),
-                            valuesFromDb.get("title", ""), valuesFromDb.get("synthesis", ""), valuesFromDb.get("description", ""),
+                            valuesFromDb.get("title", ""), valuesFromDb.get("synthesis", ""), valuesFromDb.get("impacts", ""), valuesFromDb.get("description", ""),
                             valuesFromDb.get("ease", ""), valuesFromDb.get(
                                 "impact", ""),
                             valuesFromDb.get(
@@ -59,7 +59,7 @@ class Defect(Element):
                             valuesFromDb.get("index", 0), valuesFromDb.get("perimeter", []))
 
     def initialize(self, target_id: Optional[ObjectId] = None, target_type: str = "", title: str = "", synthesis: str = "",
-                   description: str = "", ease: str = "", impact: str = "", risk: str = "", redactor: str = "N/A",
+                   impacts: str= "", description: str = "", ease: str = "", impact: str = "", risk: str = "", redactor: str = "N/A",
                    mtype: Optional[Union[str, List[str]]] = None, language: str = "", notes: str = "",
                    proofs: Optional[List[str]] = None, fixes: Optional[List[Dict[str, Any]]] = None,
                    creation_time: Optional[datetime] = None, redacted_state: str = "New", infos: Optional[Dict[str, Any]] = None,
@@ -72,6 +72,7 @@ class Defect(Element):
             target_type (str, optional): Defect will be assigned to this target_type(target_id). Defaults to "".
             title (str, optional): A title for this defect describing what it is. Defaults to "".
             synthesis (str, optional): A short summary of what this defect is about. Defaults to "".
+            impacts (str, optional): The defect impact on system security. Defaults to "".
             description (str, optional): A more detailed explanation of this particular defect. Defaults to "".
             ease (str, optional): Ease of exploitation for this defect described as a string. Defaults to "".
             impact (str, optional): Impact the defect has on system. Described as a string. Defaults to "".
@@ -92,6 +93,7 @@ class Defect(Element):
         """
         self.title = title
         self.synthesis = synthesis
+        self.impacts = impacts
         self.description = description
         self.ease = ease
         self.impact = impact
@@ -126,11 +128,11 @@ class Defect(Element):
 
         Returns:
             Dict[str,Any]: A dictionary with keys title, 
-            synthesis, description, ease, impact, risk, redactor, type, language, notes, target_id, target_type, index, 
+            synthesis, impacts, description, ease, impact, risk, redactor, type, language, notes, target_id, target_type, index, 
             proofs, creation_time, redacted_state, fixes, _id, infos.
         """
 
-        return {"title": self.title, "synthesis":self.synthesis, "description":self.description, "ease": self.ease, "impact": self.impact,
+        return {"title": self.title, "synthesis":self.synthesis, "impacts":self.impacts, "description":self.description, "ease": self.ease, "impact": self.impact,
                 "risk": self.risk, "redactor": self.redactor, "type": self.mtype, "language":self.language, "notes": self.notes,
                 "target_id": self.target_id, "target_type": self.target_type, "index":int(self.index),
                 "proofs": self.proofs, "creation_time": self.creation_time, "redacted_state":self.redacted_state, "fixes":self.fixes, "perimeter":self.perimeter, "_id": self.getId(), "infos": self.infos}
@@ -361,6 +363,16 @@ class Defect(Element):
             del new_data["_id"]
         new_data["time"] = datetime.now()
         dbclient.updateInDb(self.pentest, "defectsreviews", {"defect_iid": new_data["defect_iid"]}, {"$set":new_data}, upsert=True)
+
+    def delete_review(self) -> None:
+        """
+        Delete the review of this defect from the database.
+
+        Returns:
+            None
+        """
+        dbclient = DBClient.getInstance()
+        dbclient.deleteFromDb(self.pentest, "defectsreviews", {"defect_iid": ObjectId(self.getId())}, False)
 
     def get_review(self) -> Dict[str, Any]:
         """
