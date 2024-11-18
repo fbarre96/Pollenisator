@@ -38,7 +38,7 @@ def getTokenFor(username: str, pentest: str = "", owner: bool = False) -> str:
         scopes = set()
     scopes = scopes.union(set(user_record.get("scope", [])))
     if pentest != "" and pentest not in scopes:
-        
+        scopes = set(user_record["scope"])
         scopes.add(pentest)
         if owner:
             scopes.add("owner")
