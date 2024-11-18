@@ -422,6 +422,9 @@ components:
           type: array
           items:
             type: string
+        is_suggestion:
+          type: boolean
+          default: false
         fixes:
           type: array
           items:
@@ -596,7 +599,7 @@ paths:
     post:
       operationId: pollenisator.server.auth.updateUserInfos
       tags:
-        - Admin
+        - Users
       summary: Update a user infos
       requestBody:
         content:
@@ -629,6 +632,53 @@ paths:
               examples:
                 Success:
                   value: '{parameter name} is required'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'User not found'
+  '/user/updateUserRoles':
+    post:
+      operationId: pollenisator.server.auth.updateUserRoles
+      tags:
+        - Admin
+      summary: Update a user roles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - roles
+              properties:
+                username:
+                  type: string
+                roles:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - admin
+                      - user
+                      - template_writer
+      responses:
+        '200':
+          description: successfully updated user
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Successully updated user'
+        '400':
+          description: Incorrect parameters
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{parameter username} is required'
         '404':
           description: User not found
           content:

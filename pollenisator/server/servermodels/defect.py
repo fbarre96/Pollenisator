@@ -1,6 +1,7 @@
 """
 handle the defect related API calls
 """
+import re
 from typing import Any, Dict, Iterator, List, Tuple, Union, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
@@ -10,6 +11,7 @@ from pollenisator.core.models.element import Element
 from pollenisator.server.permission import permission
 from pollenisator.core.components.utils import  JSONDecoder
 import json
+import datetime
 DefectInsertResult = TypedDict('DefectInsertResult', {'res': bool, 'iid': ObjectId})
 RemarkInsertResult = TypedDict('RemarkInsertResult', {'res': bool, 'iid': ObjectId})
 ExportDefectTemplates = TypedDict('ExportDefectTemplates', {'defects': List[Dict[str, Any]], 'remarks': List[Dict[str, Any]]})
@@ -56,6 +58,36 @@ def insert(pentest: str, body: Dict[str, Any]) -> Union[DefectInsertResult, Tupl
     body = json.loads(json.dumps(body), cls=JSONDecoder)
     defect = Defect(pentest, body)
     return defect.addInDb()
+
+def insert_template_suggestion(pentest: str, body: Dict[str, Any], username: str) -> Union[DefectInsertResult, Tuple[str, int]]:
+    """
+    Insert a new defect template suggestion into the database.
+
+    Args:
+        pentest (str): The name of the pentest.
+        body (Dict[str, Any]): A dictionary containing the details of the defect template to be inserted.
+        username (str): The id of the user who suggested the template.
+
+    Returns:
+        Union[Dict[str, Union[bool, Any]], str]: A dictionary with keys "res" and "iid" if the operation was successful, 
+        or a string error message otherwise.
+    """
+    if "_id" in body:
+        del body["_id"]
+    if "index" in body:
+        del body["index"]
+    body = json.loads(json.dumps(body), cls=JSONDecoder)
+    defect = Defect(pentest, body)
+    dbclient = DBClient.getInstance()
+    data = defect.getData()
+    data["suggested_by"] = username
+    data["creation_time"] = str(datetime.datetime.now())
+    insert_result = dbclient.insertInDb("pollenisator", "defectssuggestions", data)
+    if insert_result is None:
+        return "An error occured while inserting the defect template suggestion", 500
+    if insert_result.inserted_id is None:
+        return "An error occured while inserting the defect template suggestion", 500
+    return {"res":True, "iid":insert_result.inserted_id}
 
 
 def insert_remark(pentest: str, body: Dict[str, Any]) -> RemarkInsertResult:
@@ -140,6 +172,40 @@ def update(pentest: str, defect_iid: str, body: Dict[str, Any]) -> Union[bool, T
     return True
 
 @permission("pentester")
+def update_template_suggestion(pentest: str, defect_iid: str, body: Dict[str, Any], username: str) -> Union[bool, Tuple[str, int]]:
+    """
+    Update a defect template suggestion in the database using its id. The "_id" field in the body is ignored.
+
+    Args:
+        pentest (str): The name of the pentest.
+        defect_iid (str): The id of the defect template suggestion to be updated.
+        body (Dict[str, Any]): A dictionary containing the new defect template details.
+        username (str): The id of the user who suggested the template.
+
+    Returns:
+        Union[bool, Tuple[str, int]]: True if the operation was successful, or a tuple containing an error message and 
+        an error code otherwise.
+    """
+    dbclient = DBClient.getInstance()
+    
+    body = json.loads(json.dumps(body), cls=JSONDecoder)
+    defect = Defect(pentest, body)
+    dbclient = DBClient.getInstance()
+    new_data = defect.getData()
+    if "_id" in new_data:
+        del new_data["_id"]
+    if "index" in new_data:
+        del new_data["index"]
+    old_data = dbclient.findInDb("pollenisator", "defectssuggestions", {"_id":ObjectId(defect_iid)}, False)
+    if old_data is None:
+        old_data = {}
+    old_data |= new_data
+    old_data["suggested_by"] = username
+    old_data["creation_time"] = str(datetime.datetime.now())
+    dbclient.updateInDb("pollenisator", "defectssuggestions", {"_id":ObjectId(defect_iid)}, {"$set":old_data}, False, True, upsert=True)
+    return True
+
+@permission("pentester")
 def review(pentest: str, defect_iid: str) -> Dict[str, Any]:
     """
     Get the review of a defect. 
@@ -184,7 +250,7 @@ def moveDefect(pentest: str, defect_id_to_move: str, target_id: str) -> Union[Tu
 
     return Defect.moveDefect(pentest, ObjectId(defect_id_to_move), ObjectId(target_id))
 
-@permission("user")
+@permission("templates_redactor")
 def importDefectTemplates(upfile: Any) -> Union[Tuple[str, int], bool]:
     """
     Import defect templates from a JSON file. The file should contain a list of defects and a list of remarks. 
@@ -244,6 +310,42 @@ def exportDefectTemplates(**kwargs: Any) -> ExportDefectTemplates:
     return res
 
 @permission("user")
+def findDefectSuggestions(body: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Search for defects  or remarks suggestions in the database based on the given parameters.
+
+    Args:
+        body (Dict[str, str]): A dictionary containing the search parameters. 
+            "type" (str): The type of item to search for (either "defect" or "remark").
+            "terms" (str): The search terms.
+            "language" (str): The language of the items to search for.
+            "perimeter" (str): The perimeter of the items to search for.
+
+    Returns:
+        Union[ErrorStatus, SearchResults]: A dictionary containing any errors and the search results if successful, otherwise an error message and status code.
+    """
+    defect_type = body.get("type", "")
+    terms = body.get("terms", "")
+    lang = body.get("language", "")
+    perimeter = body.get("perimeter", "")
+    if defect_type == "remark":
+        coll = "remarkssuggestions"
+    elif defect_type == "defect":
+        coll = "defectssuggestions"
+    else:
+        return "Invalid parameter: type must be either defect or remark.", 400
+    dbclient = DBClient.getInstance()
+    p = {"title":re.compile(terms, re.IGNORECASE)}
+    if lang != "":
+        p["language"] = re.compile(lang, re.IGNORECASE)
+    if perimeter != "":
+        p["perimeter"] = re.compile(perimeter, re.IGNORECASE)
+    res = dbclient.findInDb("pollenisator", coll, p, True)
+    if res is None:
+        return {"answers":[]}
+    return {"answers": [x for x in res]}
+
+@permission("user")
 def findDefectTemplate(body: Dict[str, Any]) -> Union[Dict[str, Any], Tuple[str, int]]:
     """
     Find a defect template in the "pollenisator" database using a set of criteria. If the "_id" field is present in the 
@@ -268,7 +370,7 @@ def findDefectTemplate(body: Dict[str, Any]) -> Union[Dict[str, Any], Tuple[str,
     return  "No defect template found with this criteria", 404
 
 @permission("user")
-def insertDefectTemplate(body: Dict[str, Any]) -> Union[DefectInsertResult, Tuple[str, int]]:
+def insertDefectTemplate(body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[DefectInsertResult, Tuple[str, int]]:
     """
     Insert a new defect template into the "pollenisator" database. If a template with the same id or title already exists, 
     the function will return the id of the existing template.
@@ -280,11 +382,38 @@ def insertDefectTemplate(body: Dict[str, Any]) -> Union[DefectInsertResult, Tupl
         Union[DefectInsertResult, Tuple[str, int]]: The id of the inserted template, or a tuple containing an error message and status 
         code if the insertion was unsuccessful.
     """
-    res: Union[DefectInsertResult, Tuple[str, int]] = insert("pollenisator", body)
+    is_suggestion = "admin" not in kwargs["token_info"]["scope"] and "template_writer" not in kwargs["token_info"]["scope"]
+    res: Union[DefectInsertResult, Tuple[str, int]]
+    if is_suggestion:
+        res = insert_template_suggestion("pollenisator", body, kwargs["token_info"]["sub"])
+    else:
+        res = insert("pollenisator", body)
     return res
 
+@permission("template_writer")
+def validateDefectTemplate(iid: str) -> Union[bool, Tuple[str, int]]:
+    """
+    Validate a defect template suggestion in the "pollenisator" database using its id. The suggestion is inserted as a defect
+    The suggestion is removed
+
+    Args:
+        iid (str): The id of the defect template suggestion to be validated.
+
+    Returns:
+        Union[bool, Tuple[str, int]]: True if the operation was successful, otherwise a tuple containing an error message and status code.
+    """
+    dbclient = DBClient.getInstance()
+    suggestion = dbclient.findInDb("pollenisator", "defectssuggestions", {"_id":ObjectId(iid)}, False)
+    if suggestion is None:
+        return "Not found", 404
+    res = insert("pollenisator", suggestion)
+    if not res["res"]:
+        return res
+    dbclient.deleteFromDb("pollenisator", "defectssuggestions", {"_id":ObjectId(iid)})
+    return True
+
 @permission("user")
-def updateDefectTemplate(iid: str, body: Dict[str, Any]) -> Union[bool, Tuple[str, int]]:
+def updateDefectTemplate(iid: str, body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[bool, Tuple[str, int]]:
     """
     Update a defect template in the "pollenisator" database using its id. The "_id" field in the body is ignored.
 
@@ -296,11 +425,16 @@ def updateDefectTemplate(iid: str, body: Dict[str, Any]) -> Union[bool, Tuple[st
         Union[bool, Tuple[str, int]]: True if the operation was successful, otherwise a tuple containing an error message 
         and status code.
     """
-    res: Union[bool, Tuple[str, int]] = update("pollenisator", iid, body)
+    is_suggestion = "admin" not in kwargs["token_info"]["scope"] and "template_writer" not in kwargs["token_info"]["scope"] or body.get("is_suggestion", False)
+    res: Union[bool, Tuple[str, int]]
+    if is_suggestion:
+        res = update_template_suggestion("pollenisator", iid, body, kwargs["token_info"]["sub"])
+    else:
+        res = update("pollenisator", iid, body)
     return res
 
 @permission("user")
-def deleteDefectTemplate(iid: str) -> Union[int, Any]:
+def deleteDefectTemplate(iid: str, **kwargs) -> Union[int, Any]:
     """
     Delete a defect template from the "pollenisator" database using its id.
 
@@ -310,7 +444,25 @@ def deleteDefectTemplate(iid: str) -> Union[int, Any]:
     Returns:
         Union[int, Any]: 0 if the deletion was unsuccessful, otherwise the result of the deletion operation.
     """
-    return delete("pollenisator", iid)
+    is_suggestion = "admin" not in kwargs["token_info"]["scope"] and "template_writer" not in kwargs["token_info"]["scope"]
+    res: Union[bool, Tuple[str, int]]
+    if is_suggestion:
+        return delete_template_suggestion(iid)
+    else:
+        return delete("pollenisator", iid)
+
+def delete_template_suggestion(iid: str) -> int:
+    """
+    Delete a defect template suggestion from the "pollenisator" database using its id.
+
+    Args:
+        iid (str): The id of the defect template suggestion to be deleted.
+
+    Returns:
+        int: 0 if the deletion was unsuccessful, otherwise the result of the deletion operation.
+    """
+    dbclient = DBClient.getInstance()
+    return dbclient.deleteFromDb("pollenisator", "defectssuggestions", {"_id":ObjectId(iid)})
 
 @permission("pentester")
 def getTargetRepr(pentest: str, body: Union[str, List[str]]) -> Union[Tuple[str, int], Dict[str, str]]:

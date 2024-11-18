@@ -271,6 +271,31 @@ paths:
               examples:
                 Success:
                   value: 'Pentest|Collection argument is not a valid pollenisator collection'
+
+  "/report/DefectTemplates/validate/{iid}":
+    post:
+      operationId: pollenisator.server.servermodels.defect.validateDefectTemplate
+      tags:
+        - Defect Template
+      summary: Validate a Defect template suggestion in db
+      description: Validate a  Defect template suggestion in db, also delete the suggestion
+      parameters:
+        - name: iid
+          in: path
+          description: Defect template iid to validate
+          required: true
+          schema:
+            type: string
+              
+      responses:
+        "200":
+          description: successfully updated an item
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"n": 1, "nModified": 1, "ok": 1, "updatedExisting": true}'
+
   
               
   "/report/{pentest}/generate":
@@ -433,6 +458,124 @@ paths:
       tags:
         - Report
       summary: search a defect/remark in  templates
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - terms 
+                - type
+              properties:
+                terms:
+                  type: string
+                type:
+                  type: string
+                  enum:
+                    - defect
+                    - remark
+                perimeter:
+                  type: string
+                lang:
+                  type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    items:
+                      type: string
+                  answers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        description:
+                          type: string
+                        ease:
+                          type: string
+                          enum: 
+                            - Easy
+                            - Moderate
+                            - Difficult
+                            - Arduous
+                        impact:
+                          type: string
+                          enum:
+                            - Minor
+                            - Important
+                            - Major
+                            - Critical
+                        perimeter:
+                          type: array
+                          items:
+                            type: string
+                        risk:
+                          type: string
+                          enum:
+                            - Minor
+                            - Important
+                            - Major
+                            - Critical
+                        synthesis:
+                          type: string
+                        impacts:
+                          type: string
+                        title:
+                          type: string
+                        type:
+                          type: string
+                        language:
+                          type: string
+                        fixes:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              description:
+                                type: string
+                              execution:
+                                type: string
+                                enum:
+                                  - Quick Win
+                                  - Moderate
+                                  - Mean
+                                  - Hard
+                              gain:
+                                type: string
+                                enum:
+                                  - Weak
+                                  - Moderate
+                                  - Mean
+                                  - Strong
+                              synthesis:
+                                type: string
+                              title:
+                                type: string
+
+        "503":
+          description: Error knowledge database
+          content:
+            application/json:
+              examples:
+                No knowledge database:
+                  value: '"There is no knowledge database implemented."'
+                Unreachable:
+                  value: '"The knowledge database is unreachable"'
+                Error from knowledge db:
+                  value: '"The knowledge dabatase encountered an issue : "{response_text}'
+
+  "/report/suggestions/search":
+    post:
+      operationId: pollenisator.server.servermodels.defect.findDefectSuggestions
+      tags:
+        - DefectTemplate
+      summary: search a defect/remark in templates suggestions
       requestBody:
         content:
           application/json:

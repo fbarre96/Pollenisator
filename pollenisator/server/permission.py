@@ -28,6 +28,9 @@ def permission(*dec_args, **deckwargs):
             if "admin" in token_scope and "owner" not in token_scope:
                 token_scope.append("owner")
                 token_info["scope"] = token_scope
+            if "admin" in token_scope and "template_writer" not in token_scope:
+                token_scope.append("template_writer")
+                token_info["scope"] = token_scope
             if "admin" in token_scope and "pentester" not in token_scope:
                 token_scope.append("pentester")
                 token_info["scope"] = token_scope

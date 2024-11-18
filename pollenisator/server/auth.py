@@ -88,8 +88,8 @@ def createUser(body: Dict[str, str]) -> ErrorStatus:
     return "Successully created user", 200
 
 
-@permission("admin")
-def updateUserInfos(body: Dict[str, str]) -> ErrorStatus:
+@permission("user")
+def updateUserInfos(body: Dict[str, str], **kwargs) -> ErrorStatus:
     """
     Update the details of an existing user.
 
@@ -106,15 +106,50 @@ def updateUserInfos(body: Dict[str, str]) -> ErrorStatus:
     username = body.get("username", "")
     if username == "":
         return "Username is required", 400
+    if kwargs["token_info"]["sub"] != username and "admin" not in kwargs["token_info"]["scope"]:
+        return "Forbidden", 403
     dbclient = DBClient.getInstance()
     user = dbclient.findInDb("pollenisator", "users", {"username":username}, False)
     if user is None:
         return "User not found", 404
+
     name = body.get("name", user.get("name",""))
     surname = body.get("surname", user.get("surname",""))
     email = body.get("email", user.get("email",""))
     dbclient.updateInDb("pollenisator", "users", {"username":username}, {"$set":{"name":name, "surname":surname, "email":email}})
     return "Successully created user", 200
+
+
+@permission("admin")
+def updateUserRoles(body: Dict[str, Union[str|list[str]]], **kwargs) -> ErrorStatus:
+    """
+    Update the roles of an existing user.
+
+    Args:
+        body (Dict[str, str]): A dictionary containing the new user roles.
+            "username" (str): The username of the user to update.
+            "roles" (List[str]): The new roles of the user.
+
+    Returns:
+        ErrorStatus: A success message if the user was successfully updated, otherwise an error message and status code.
+    """
+    username = body.get("username", "")
+    if username == "":
+        return "Username is required", 400
+    if kwargs["token_info"]["sub"] != username and "admin" not in kwargs["token_info"]["scope"]:
+        return "Forbidden", 403
+    dbclient = DBClient.getInstance()
+    user = dbclient.findInDb("pollenisator", "users", {"username":username}, False)
+    if user is None:
+        return "User not found", 404
+
+    roles: list[str]|str = body.get("roles", [])
+    if isinstance(roles, str):
+        roles = [roles]
+    roles.append("user")
+    roles = list(set(roles))
+    dbclient.updateInDb("pollenisator", "users", {"username":username}, {"$set":{"scope":roles}})
+    return "Successully updated user", 200
 
 @permission("admin")
 def deleteUser(username: str) -> ErrorStatus:
