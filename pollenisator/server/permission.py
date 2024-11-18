@@ -18,7 +18,7 @@ def permission(*dec_args, **deckwargs):
                 return result
             if user == "":
                 return "Unauthorized", 401
-            if not checkTokenValidity(token_info):
+            if not checkTokenValidity(token_info, []):
                 return "Unauthorized", 401
             
             token_scope = token_info.get("scope", []) 
