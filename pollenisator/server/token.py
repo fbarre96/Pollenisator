@@ -47,7 +47,7 @@ def getTokenFor(username: str, pentest: str = "", owner: bool = False) -> str:
     if "user" not in scopes:
         scopes.add("user")
         mod = True
-    if verifyToken(user_record.get("token", "")) and not mod:
+    if verifyToken(user_record.get("token", ""), list(scopes)) and not mod:
         token = user_record.get("token", "")
     else:
         token = generateNewToken(user_record, list(scopes))
@@ -88,12 +88,13 @@ def generateNewToken(user_record: Dict[str, Union[str, ObjectId]], new_scopes: L
     return str(jwt_encoded)
 
 
-def verifyToken(access_token: str) -> bool:
+def verifyToken(access_token: str, scopes: list[str]) -> bool:
     """
     Verify the validity of a JWT token.
 
     Args:
         access_token (str): The JWT token to verify.
+        scopes (list[str]): A list of scopes the token is authorized for.
 
     Returns:
         bool: True if the token is valid, False otherwise.
@@ -102,14 +103,15 @@ def verifyToken(access_token: str) -> bool:
         jwt_decoded = jwt.decode(access_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except JWTError as _e:
         return False
-    return checkTokenValidity(jwt_decoded)
+    return checkTokenValidity(jwt_decoded, scopes)
 
-def checkTokenValidity(jwt_decoded: Dict[str, Any]) -> bool:
+def checkTokenValidity(jwt_decoded: Dict[str, Any], scopes_defined: list[str]) -> bool:
     """
     Check the validity of a decoded JWT token.
 
     Args:
         jwt_decoded (Dict[str,Any]): The decoded JWT token. It should contain an "exp" key with the expiration timestamp.
+        scopes_defined (list[str]): A list of scopes the token is authorized for.
 
     Returns:
         bool: True if the token is valid and has not expired, False otherwise.
@@ -121,6 +123,10 @@ def checkTokenValidity(jwt_decoded: Dict[str, Any]) -> bool:
         exp_timestamp = jwt_decoded.get("exp", datetime.datetime.now().timestamp())
         if datetime.datetime.now().timestamp() > exp_timestamp:
             return False
+        token_scope = jwt_decoded.get("scope", [])
+        for scope in scopes_defined:
+            if scope not in token_scope:
+                return False
         return True
     return False
 
