@@ -161,7 +161,7 @@ def update(pentest: str, defect_iid: str, body: Dict[str, Any]) -> Union[bool, T
     old = cast(Defect, old)
     if "redacted_state" in body:
         old.redacted_state = str(body["redacted_state"])
-        if old.redacted_state == "Review" or old.redacted_state == "Completed":
+        if old.redacted_state == "Reviewed" or old.redacted_state == "Completed":
             old.delete_review()
         old.updateInDb(body)
     else:
