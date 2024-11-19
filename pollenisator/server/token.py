@@ -1,7 +1,7 @@
 """
 Generate and verify JWT tokens for the Pollenisator API.
 """
-from typing import Any, Dict, List, Union, cast
+from typing import Any, Dict, List, Optional, Union, cast
 import uuid
 import datetime
 from bson import ObjectId
@@ -88,7 +88,7 @@ def generateNewToken(user_record: Dict[str, Union[str, ObjectId]], new_scopes: L
     return str(jwt_encoded)
 
 
-def verifyToken(access_token: str, scopes: list[str]) -> bool:
+def verifyToken(access_token: str, scopes: Optional[list[str]] = None) -> bool:
     """
     Verify the validity of a JWT token.
 
@@ -99,6 +99,8 @@ def verifyToken(access_token: str, scopes: list[str]) -> bool:
     Returns:
         bool: True if the token is valid, False otherwise.
     """
+    if scopes is None:
+        scopes = []
     try:
         jwt_decoded = jwt.decode(access_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except JWTError as _e:
