@@ -159,10 +159,15 @@ def update(pentest: str, defect_iid: str, body: Dict[str, Any]) -> Union[bool, T
     if old is None:
         return "Not found", 404
     old = cast(Defect, old)
-    if "redacted_state" in body:
-        old.redacted_state = str(body["redacted_state"])
-        if old.redacted_state == "Reviewed" or old.redacted_state == "Completed":
-            old.delete_review()
+    new_redacted_state = body.get("redacted_state")
+    if new_redacted_state is not None and new_redacted_state != old.redacted_state:
+        # change to other thing than to review must mean that there is no review left
+        if old.redacted_state == "To review" and new_redacted_state != "Reviewed" and not old.compare_review_equal():
+            return "There are reviews left, check them before changing the state", 400
+        elif old.redacted_state == "Reviewed" and new_redacted_state != "To review" and not old.compare_review_equal():
+            return "There are reviews left, check them before changing the state", 400
+        old.redacted_state = new_redacted_state
+
         old.updateInDb(body)
     else:
         if old.redacted_state == "To review" :

@@ -374,10 +374,12 @@ class Defect(Element):
         dbclient = DBClient.getInstance()
         dbclient.deleteFromDb(self.pentest, "defectsreviews", {"defect_iid": ObjectId(self.getId())}, False)
 
-    def get_review(self) -> Dict[str, Any]:
+    def get_review(self, force: bool = True) -> Dict[str, Any]:
         """
         Get the version of this defect from the database.
 
+        Args:
+            force (bool, optional): Whether to force the fetch from the database. Defaults to True.
         Returns:
             Dict[str, Any]: A dictionary representing the version of this defect.
         """
@@ -385,14 +387,34 @@ class Defect(Element):
         version = dbclient.findInDb(self.pentest, "defectsreviews", {"defect_iid": ObjectId(self.getId())}, multi=False)
         if version is not None:
             return version
-        # if not found, create it
-        defect = dbclient.findInDb(self.pentest, "defects", {"_id":ObjectId(self.getId())}, False)
-        if defect is not None:
-            defect["defect_iid"] = defect["_id"]
-            del defect["_id"]
-            dbclient.insertInDb(self.pentest, "defectsreviews", defect)
-            return defect
+        # if not found, create it if force
+        if force:
+            defect = dbclient.findInDb(self.pentest, "defects", {"_id":ObjectId(self.getId())}, False)
+            if defect is not None:
+                defect["defect_iid"] = defect["_id"]
+                del defect["_id"]
+                dbclient.insertInDb(self.pentest, "defectsreviews", defect)
+                return defect
         return {}
+    
+    def compare_review_equal(self) -> bool:
+        """
+        Compare the current defect with the review version.
+
+        Returns:
+            bool: True if the current defect is different from the review version, False otherwise.
+        """
+        current = self.getData()
+        review = self.get_review()
+        if review == {}:
+            return True
+        for key in current:
+            if key not in ["_id", "defect_iid", "redacted_state", "creation_time"]:
+                if key not in review:
+                    return False
+                if current[key] != review[key]:
+                    return False
+        return True
 
     def updateInDb(self, data: Optional[Dict[str, Any]] = None) -> list[str]:
         """
