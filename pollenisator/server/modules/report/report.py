@@ -56,6 +56,14 @@ def getLangList() -> List[str]:
         os.path.join(template_path, f))]
     return onlyfolders
 
+@permission("user")
+def getAllTemplateList() -> Union[ErrorStatus, Dict[str, List[str]]]:
+    """Return all templates available in the template path."""
+    langs = getLangList()
+    templates = {}
+    for lang in langs:
+        templates[lang] = getTemplateList(lang)
+    return templates
 
 @permission("user")
 def getTemplateList(lang: str) -> Union[ErrorStatus, List[str]]:
@@ -103,7 +111,7 @@ def downloadTemplate(lang: str, templateName: str) -> Union[ErrorStatus, Respons
         return send_file(template_to_download_path, download_name=fileName)
 
 
-@permission("user")
+@permission("report_template_writer")
 def uploadTemplate(upfile: werkzeug.datastructures.FileStorage, lang: str) -> ErrorStatus:
     """
     Upload a template for a given language.

@@ -4,6 +4,7 @@ import inspect
 from pollenisator.server.token import checkTokenValidity
 # permission decorator
 
+all_permissions = ["admin", "user", "owner", "pentester", "template_writer", "worker", "report_template_writer"]
 def permission(*dec_args, **deckwargs):
     def _permission(function):
         def wrapper(*args, **kwargs):
@@ -20,19 +21,11 @@ def permission(*dec_args, **deckwargs):
                 return "Unauthorized", 401
             if not checkTokenValidity(token_info, []):
                 return "Unauthorized", 401
-            
             token_scope = token_info.get("scope", []) 
-            if "admin" in token_scope and "user" not in token_scope:
-                token_scope.append("user")
-                token_info["scope"] = token_scope
-            if "admin" in token_scope and "owner" not in token_scope:
-                token_scope.append("owner")
-                token_info["scope"] = token_scope
-            if "admin" in token_scope and "template_writer" not in token_scope:
-                token_scope.append("template_writer")
-                token_info["scope"] = token_scope
-            if "admin" in token_scope and "pentester" not in token_scope:
-                token_scope.append("pentester")
+            if "admin" in token_scope:
+                for perm in all_permissions:
+                    if perm not in token_scope:
+                        token_scope.append(perm)
                 token_info["scope"] = token_scope
             # Check scope inside token
             if scope not in token_scope:

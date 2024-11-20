@@ -41,6 +41,28 @@ paths:
               examples:
                 Lang invalid:
                   value: '"There is no existing templates for this lang"'
+  /report/templates:
+    get:
+      operationId: pollenisator.server.modules.report.report.getAllTemplateList
+      tags:
+        - Report
+      summary: Get a lsit of all report template
+      responses:
+        "200":
+          description: A Dictionnary where keys are languages and values are a list of templates as string
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{fr: ["Mddel.docx", "Model2.pptx", ...], "en": ["Mddel-english.docx", "Model2-english.pptx", ...]}'
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                Lang invalid:
+                  value: '"There is no existing templates for this lang"'
+                  
   /report/{lang}/templates/download:
     get:
       operationId: pollenisator.server.modules.report.report.downloadTemplate
