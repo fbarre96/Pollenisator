@@ -4,7 +4,6 @@ import os
 from typing import Any, Dict, List, Optional, Set, Tuple, Union, cast
 from typing_extensions import TypedDict
 import bson
-from pymongo import InsertOne, UpdateOne
 import pymongo
 from pollenisator.core.components.socketmanager import SocketManager
 import pollenisator.server.modules.cheatsheet.checkinstance as checkinstance
@@ -832,11 +831,13 @@ class Tool(Element):
             or_conditions.append(tool.getDbKey())
         logger.debug("There is "+str(len(or_conditions))+" to split into 100000 sized batches")
         max_conditions = 100000
-        existing_tools = []
+        existing_tools: List[Tool] = []
 
         for chunk in Tool.split_list(or_conditions, max_conditions):
             query = {"$or": chunk}
-            existing_tools.extend(Tool.fetchObjects(pentest, query))
+            tools = cast( List[Tool], Tool.fetchObjects(pentest, query))
+            if tools is not None:
+                existing_tools.extend(tools)
         existing_checks_as_keys = set([]) if existing_tools is None else set([ existing_tool.getHashableDbKey() for existing_tool in existing_tools])
         to_add = check_keys - existing_checks_as_keys
         things_to_insert = [lkp[check] for check in to_add]
@@ -923,6 +924,7 @@ class Tool(Element):
         if saveScannerip not in workerNames and len(terminalsessions) == 0:
             return "The worker running this tool is not running anymore", 404
         socketsCursor = dbclient.findInDb("pollenisator", "sockets", {"pentest":self.pentest}, True)
+        sockets = []
         if socketsCursor is not None:
             sockets = [x for x in socketsCursor]
         if len(sockets) == 0:

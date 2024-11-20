@@ -2,12 +2,11 @@
 handle the defect related API calls
 """
 import re
-from typing import Any, Dict, Iterator, List, Tuple, Union, cast
+from typing import Any, Dict, List, Tuple, Union, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.defect import Defect
-from pollenisator.core.models.element import Element
 from pollenisator.server.permission import permission
 from pollenisator.core.components.utils import  JSONDecoder
 import json
@@ -16,6 +15,7 @@ DefectInsertResult = TypedDict('DefectInsertResult', {'res': bool, 'iid': Object
 RemarkInsertResult = TypedDict('RemarkInsertResult', {'res': bool, 'iid': ObjectId})
 ExportDefectTemplates = TypedDict('ExportDefectTemplates', {'defects': List[Dict[str, Any]], 'remarks': List[Dict[str, Any]]})
 
+ErrorStatus = Tuple[str, int]
 
 @permission("pentester")
 def delete(pentest: str, defect_iid: str) -> int:
@@ -314,8 +314,9 @@ def exportDefectTemplates(**kwargs: Any) -> ExportDefectTemplates:
         res["remarks"].append(t)
     return res
 
+returnDefectSuggestionsType = TypedDict('returnDefectSuggestionsType', {'answers': List[Dict[str, Any]]})
 @permission("user")
-def findDefectSuggestions(body: Dict[str, Any]) -> List[Dict[str, Any]]:
+def findDefectSuggestions(body: Dict[str, Any]) -> Union[ErrorStatus, returnDefectSuggestionsType]:
     """
     Search for defects  or remarks suggestions in the database based on the given parameters.
 

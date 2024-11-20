@@ -2,7 +2,7 @@
 from bson.objectid import ObjectId
 from abc import ABCMeta, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, Iterator, List, Optional, Union, cast
+from typing import Any, Dict, Generator, Iterator, List, Optional, Union, cast
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.tag import Tag
 from pollenisator.server.modules.activedirectory.computer_infos import ComputerInfos
@@ -207,7 +207,7 @@ class Element(metaclass=AbstractMetaElement):
         return str(self)
 
     @classmethod
-    def fetchObjects(cls, pentest: str, pipeline: Dict[str, Any]) -> Optional[Iterator['Element']]:
+    def fetchObjects(cls, pentest: str, pipeline: Dict[str, Any]) -> Generator[ 'Element', None, None]:
         """
         Fetch many commands from database and return a Cursor to iterate over model objects.
 

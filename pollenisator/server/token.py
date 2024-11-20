@@ -2,7 +2,6 @@
 Generate and verify JWT tokens for the Pollenisator API.
 """
 from typing import Any, Dict, List, Optional, Union, cast
-import uuid
 import datetime
 from bson import ObjectId
 import six
@@ -10,8 +9,11 @@ from werkzeug.exceptions import Unauthorized
 from jose import JWTError, jwt
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.logger_config import logger
+import secrets
+import os
 
-JWT_SECRET = str(uuid.uuid4())
+
+JWT_SECRET = os.environ.get("JWT_SECRET", secrets.token_urlsafe(32))
 JWT_LIFETIME_SECONDS = 3600*8
 JWT_ALGORITHM = 'HS256'
 
