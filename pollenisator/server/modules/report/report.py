@@ -112,17 +112,20 @@ def downloadTemplate(lang: str, templateName: str) -> Union[ErrorStatus, Respons
 
 
 @permission("report_template_writer")
-def uploadTemplate(upfile: werkzeug.datastructures.FileStorage, lang: str) -> ErrorStatus:
+def uploadTemplate(upfile: werkzeug.datastructures.FileStorage, lang: str, overwrite: bool = False) -> ErrorStatus:
     """
     Upload a template for a given language.
 
     Args:
         upfile (werkzeug.datastructures.FileStorage): The template file to upload.
         lang (str): The language of the template.
+        overwrite (bool):  allows to overwrite an existing template. Default to false to avoid accidental deletion.
 
     Returns:
         ErrorStatus: A success message if the template was successfully uploaded, otherwise an error message and status code.
     """
+    if upfile is None:
+        return "No file received", 400
     if upfile.filename is None:
         return "Empty filename received", 400
     fileName = upfile.filename.replace("/", "_")
@@ -130,11 +133,47 @@ def uploadTemplate(upfile: werkzeug.datastructures.FileStorage, lang: str) -> Er
         return "Invalid extension for template, must be pptx, xlsx or docx", 400
     lang = os.path.basename(lang)
     folder_to_upload_path = os.path.join(template_path, lang+"/")
-    os.makedirs(folder_to_upload_path)
+    os.makedirs(folder_to_upload_path, exist_ok=True)
     template_to_upload_path = os.path.join(folder_to_upload_path, fileName)
+    if os.path.isfile(template_to_upload_path) and not overwrite:
+        return "Template already exists, use edition button to replace it", 400
+    
     with open(template_to_upload_path, "wb") as f:
-        f.write(upfile.steam.read())
+        f.write(upfile.stream.read())
         return "Success", 200
+
+@permission("report_template_writer")
+def deleteTemplate(lang: str, body: Dict[str, Any]) -> ErrorStatus:
+    """
+    Delete a template for a given language.
+
+    Args:
+        lang (str): The language of the template.
+        body:
+            templateName (str): The name of the template to delete.
+
+    Returns:
+        ErrorStatus: A success message if the template was successfully deleted, otherwise an error message and status code.
+    """
+    templateName = body.get("templateName", "")
+    if not (templateName and templateName.strip() != ""):
+        return "Empty template name received", 400
+    fileName = os.path.basename(templateName)
+    if not fileName.endswith(".pptx") and not fileName.endswith(".docx") and not fileName.endswith(".xlsx"):
+        return "Invalid extension for template, must be pptx, xlsx or docx", 400
+    lang = os.path.basename(lang)
+    if not validate_lang(lang):
+        return "There is no existing templates for this lang", 400
+    template_to_delete_path = os.path.join(template_path, lang+"/"+fileName)
+    if not os.path.isfile(template_to_delete_path):
+        return "Template file not found", 404
+    if not os.path.commonprefix([template_path, template_to_delete_path]) == template_path:
+        return "Invalid path", 400
+    os.remove(template_to_delete_path)
+    if not os.listdir(os.path.join(template_path, lang)):
+        os.rmdir(os.path.join(template_path, lang))
+
+    return "Success", 200
 
 @permission("user")
 def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Response]:

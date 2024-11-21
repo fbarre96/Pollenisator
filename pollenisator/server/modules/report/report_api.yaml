@@ -115,6 +115,51 @@ paths:
               examples:
                 template not found:
                   value: '"Template file not found"'
+  /report/{lang}/templates/delete:
+    post:
+      operationId: pollenisator.server.modules.report.report.deleteTemplate
+      tags:
+        - Report
+      summary: Delete a report template
+      parameters:
+        
+        - name: lang
+          in: path
+          description: template language
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                templateName:
+                  type: string
+                  description: template name to delete
+              required:
+                - templateName
+                
+      responses:
+        "200":
+          description: An indication of success or failure for deletion
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '"Success"'
+                Failure:
+                  value: '"Failure"'
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                docx, xlsx or pptx expected:
+                  value: '"A template is either a pptx, xlsx or a docx document"'
+                no template:
+                  value: '"There is no existing templates for this lang"'
 
   /report/{lang}/templates/upload:
     post:
@@ -129,6 +174,13 @@ paths:
           required: true
           schema:
             type: string
+        - name: overwrite
+          in: query
+          description: overwrite existing template
+          required: false
+          schema:
+            type: boolean
+            default: false
       requestBody:
         content:
           multipart/form-data:
