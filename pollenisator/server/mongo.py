@@ -2,6 +2,7 @@
 Handles all generic interactions with the database
 """
 import json
+import zipfile
 from typing import Any, Dict, List, Set, Tuple, Union
 import tempfile
 import re
@@ -542,7 +543,7 @@ def registerPentest(pentest: str, body: Dict[str, Any], **kwargs: Dict[str, Any]
         ErrorStatus: The UUID of the new pentest if the registration was successful, otherwise an error message and status code.
     """
     username = kwargs["token_info"]["sub"]
-    ret, msg = dbclient.registerPentest(username, pentest, False, False)
+    ret, msg = dbclient.registerPentest(username, pentest, None, False, False)
     if ret:
         #token = connectToPentest(pentest, **kwargs)
         #kwargs["token_info"] = decode_token(token[0])
@@ -877,32 +878,59 @@ def dumpDb(dbName: str, collection: str = "") -> Union[ErrorStatus, Response]:
     Returns:
         Union[ErrorStatus, Response]: If the database or collection was not found, or if the export failed, returns an error message and status code. Otherwise, returns the file to be downloaded.
     """
-    if dbName != "pollenisator" and dbName not in dbclient.listPentestUuids():
+    dbclient_fresh = DBClient.getInstance()
+    if dbName != "pollenisator" and dbName not in dbclient_fresh.listPentestUuids():
         return "Database not found", 404
-    if dbclient.db is None:
-        dbclient.connect()
-    if dbclient.db is None:
+    dbclient_fresh.connectToDb(dbName)
+    if dbclient_fresh.db is None:
+        dbclient_fresh.connect()
+    if dbclient_fresh.db is None:
         return "Connection to database failed", 503
-    collections = dbclient.db.list_collection_names()
+    collections = dbclient_fresh.db.list_collection_names()
     if collection != "" and collection not in collections:
         return "Collection not found in database provided", 404
     if collection != "" and not re.match(r"^[a-zA-Z0-9_\-]+$", collection):
         return "Invalid collection name", 400
-    path = dbclient.dumpDb(dbName, collection)
-    if not os.path.isfile(path):
+    pentest_record = dbclient_fresh.findInDb("pollenisator", "pentests", {"uuid":dbName}, False)
+    if pentest_record is None:
+        return "Pentest not found", 404
+    dirpath = tempfile.mkdtemp()
+    
+    dump_path, status_code = dbclient_fresh.dumpDb(dbName, collection, directory=dirpath)
+    if status_code != 200:
+        return dump_path, status_code # error message and status code
+    if not os.path.isfile(dump_path):
         return "Failed to export database", 503
+    # create archive with file path, uuid and pentest name
+    with open(os.path.join(dirpath, "pentest.json"), "w", encoding="utf-8") as f:
+        if "_id" in pentest_record:
+            del pentest_record["_id"]
+        if "creation_date" in pentest_record:
+            pentest_record["creation_date"] = pentest_record["creation_date"].isoformat()
+        f.write(json.dumps(pentest_record))
+    export_files =os.path.join(dirpath, "files")
+    files_dir =  os.path.join(getMainDir(), "files", dbName)
+    if os.path.isdir(files_dir):
+        export_files = shutil.make_archive(export_files, 'zip',files_dir)
+    export_path = os.path.join(dirpath, os.path.basename(pentest_record["nom"]) + ".zip")
+    with zipfile.ZipFile(export_path, "w") as zipf:
+        zipf.write(os.path.normpath(dump_path), os.path.basename(dump_path))
+        zipf.write(os.path.join(dirpath, "pentest.json"), "pentest.json")
+        if os.path.isfile(export_files):
+            zipf.write(export_files, os.path.basename(export_files))
     try:
-        return send_file(path, mimetype="application/gzip", attachment_filename=os.path.basename(path))
+        response = send_file(export_path, mimetype="application/zip", attachment_filename=os.path.basename(export_path))
     except TypeError as _e: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
-        return send_file(path, mimetype="application/gzip", download_name=os.path.basename(path))
+        response = send_file(export_path, mimetype="application/zip", as_attachment=True, download_name=os.path.basename(export_path))
+    response.call_on_close(lambda: shutil.rmtree(dirpath))
+    return response
 
 @permission("user")
-def importDb(orig_name: str, upfile: werkzeug.datastructures.FileStorage, **kwargs: Dict[str,Any]) -> ErrorStatus:
+def importDb(upfile: werkzeug.datastructures.FileStorage, **kwargs: Dict[str,Any]) -> ErrorStatus:
     """
     Import a database dump from a file.
 
     Args:
-        orig_name (str): The original name of the database.
         upfile (Any): The file containing the database dump.
         **kwargs (Dict[str, Dict[str, str]]): Additional keyword arguments. The "token_info" key should contain a dictionary with a "sub" key representing the user.
 
@@ -913,13 +941,40 @@ def importDb(orig_name: str, upfile: werkzeug.datastructures.FileStorage, **kwar
     if upfile.filename is None:
         return "Invalid filename", 400
     dirpath = tempfile.mkdtemp()
-    tmpfile = os.path.join(dirpath, os.path.basename(upfile.filename))
+    temp_name = tempfile.mktemp()
+    tmpfile = os.path.join(dirpath, os.path.basename(temp_name))
     with open(tmpfile, "wb") as f:
         f.write(upfile.stream.read())
-    
-    filename = os.path.basename(upfile.filename)
-    filename = os.path.splitext(filename)[0]
-    success = dbclient.importDatabase(username, tmpfile, orig_name, filename)
+    pentest_archive = ""
+    with zipfile.ZipFile(tmpfile, 'r') as zip_ref:
+        for member in zip_ref.namelist():
+            member_path = os.path.join(dirpath, os.path.basename(member))
+            if not os.path.commonprefix([dirpath, os.path.abspath(member_path)]) == dirpath:
+                return "Invalid file path", 400
+            if member.endswith(".gz"):
+                pentest_archive = os.path.join(dirpath, os.path.basename(member))
+            zip_ref.extract(os.path.basename(member), dirpath)
+    if "pentest.json" not in os.listdir(dirpath):
+        return "Missing pentest.json file", 400
+    if pentest_archive == "":
+        return "Missing database dump file", 400
+    with open(os.path.join(dirpath, "pentest.json"), "r", encoding="utf-8") as f:
+        pentest = json.load(f)
+    if "uuid" not in pentest or "nom" not in pentest:
+        return "Invalid pentest file", 400
+   
+    orig_uuid = pentest["uuid"]
+    if orig_uuid == "pollenisator":
+        return "Cannot import into main database", 403
+    if orig_uuid in dbclient.listPentestUuids():
+        return "Pentest already exists", 400
+    to_name = pentest["nom"]
+    success = dbclient.importDatabase(username, pentest_archive, to_name, orig_uuid)
+    if "files.zip" in os.listdir(dirpath):
+        output_file_path = os.path.abspath(os.path.join(getMainDir(), "files", orig_uuid))
+        with zipfile.ZipFile(os.path.join(dirpath, "files.zip"), 'r') as zip_ref:
+            zip_ref.extractall(output_file_path)
+
     shutil.rmtree(dirpath)
     return success
 

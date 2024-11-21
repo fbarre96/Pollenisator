@@ -1329,12 +1329,6 @@ paths:
       tags:
         - Mongo
       summary: Import an existing database file
-      parameters:
-        - name: orig_name
-          in: query
-          required: True
-          schema:
-            type: string
       requestBody:
         content:
           multipart/form-data:

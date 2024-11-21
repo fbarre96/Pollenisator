@@ -5,6 +5,7 @@ import inspect
 import json
 import os
 import ssl
+import subprocess
 import sys
 from collections.abc import Iterable
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union, cast, overload
@@ -1042,13 +1043,14 @@ class DBClient:
             return True, ""
         return False, "Failed to edit pentest name."
 
-    def registerPentest(self, owner: str, saveAsName: str, askDeleteIfExists: bool = True, autoconnect: bool = True) -> Tuple[bool, str]:
+    def registerPentest(self, owner: str, saveAsName: str, saveAsUuid:Optional[str] = None, askDeleteIfExists: bool = True, autoconnect: bool = True) -> Tuple[bool, str]:
         """
         Register a new pentest into database.
 
         Args:
             owner (str): The owner's username.
             saveAsName (str): The pentest name to register.
+            saveAsUuid (Optional[str]): The pentest uuid to register.
             askDeleteIfExists (bool, optional): Boolean to ask the user for a deletion in case of an already existing pentest with the same name.
                                                  If false, and the case appends, pentest will not be registered. Default is True.
             autoconnect (bool, optional): Boolean indicating if the database should connect to the pentest after it is registered. Default to True.
@@ -1067,7 +1069,13 @@ class DBClient:
         self.connectToDb("pollenisator")
         if self.db is None:
             raise ValueError("Could not connect to pollenisator database")
-        uuid = str(uuid4())
+        if saveAsUuid is not None:
+            uuid = str(saveAsUuid)
+            if not self.try_uuid(uuid):
+                return False, "Invalid UUID"
+                
+        else:
+            uuid = str(uuid4())
         while self.db.pentests.find_one({"uuid": uuid}) is not None:
             uuid = str(uuid4())
         if self.db.pentests.find_one({"nom": saveAsName.strip()}) is not None and askDeleteIfExists:
@@ -1163,7 +1171,7 @@ class DBClient:
         major_version = ".".join(self.client.server_info()["version"].split(".")[:2])
         if float(major_version) < 4.2:
             succeed, msg = self.registerPentest(self.getPentestOwner(fromCopyUUID),
-                    toCopyName, True, True)
+                    toCopyName, None, True, True)
             if not succeed:
                 return msg, 403
             toCopyUUID = msg
@@ -1172,10 +1180,12 @@ class DBClient:
                                         todb=toCopyUUID)
             return "Database copied", 200
         else:
-            outpath = self.dumpDb(fromCopyUUID)
+            outpath,status_code = self.dumpDb(fromCopyUUID)
+            if status_code != 200:
+                return outpath, status_code
             return self.importDatabase(self.getPentestOwner(fromCopyUUID), outpath, toCopyName, fromCopyUUID)
 
-    def dumpDb(self, dbName: str, collection: str= "") -> str:
+    def dumpDb(self, dbName: str, collection: str= "", directory: str="") -> Tuple[str,int]:
         """
         Export a database dump into the exports/ folder as a gzip archive.
         It uses the mongodump utility installed with mongodb-org-tools.
@@ -1183,6 +1193,7 @@ class DBClient:
         Args:
             dbName (str): The database name to dump.
             collection (str = ""): The collection to dump. If not provided, the entire database is dumped. Defaults to "".
+            directory (str = ""): The directory to save the gzip archive. If not provided, the archive is saved in the exports/ folder. Defaults to "".
         Raises:
             ValueError: If the database name is not found or is invalid.
             ValueError: If the database name is not alphanumeric.
@@ -1195,9 +1206,12 @@ class DBClient:
             raise ValueError("API has trouble connecting to db. Check api server config.")
         if dbName is None or dbName not in pentest_uuids:
             raise ValueError("Database not found")
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        out_path = os.path.join(
-            dir_path, "../../exports/", dbName if collection == "" else dbName+"_"+collection)
+        if directory == "":
+            dir_path = os.path.dirname(os.path.realpath(__file__))
+            out_path = os.path.join(
+                dir_path, "../../exports/", dbName if collection == "" else dbName+"_"+collection)
+        else:
+            out_path = os.path.join(directory, dbName)
         connectionString = '' if self.user == '' else "-u "+self.user + \
             " -p "+self.password + " --authenticationDatabase admin "
         cmd = "mongodump "+connectionString+"--host " + \
@@ -1209,8 +1223,22 @@ class DBClient:
             cmd += " --ssl --sslPEMKeyFile "+self.ssldir+"/client.pem --sslCAFile " + \
                 self.ssldir+"/ca.pem --sslAllowInvalidHostnames"
         logger.info("Dumping database with cmd : %s",cmd)
-        execute(cmd)
-        return out_path+".gz"
+        try:
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            raw_stdout, raw_stderr = process.communicate(None)
+            stdout = raw_stdout.decode('utf-8')
+            stderr = raw_stderr.decode('utf-8')
+            if str(stdout) != "":
+                logger.debug(str(stdout))
+            if str(stderr) != "":
+                logger.error(str(stderr))
+            if os.path.isfile(out_path+".gz"):
+                return out_path+".gz", 200
+            return stderr, 504
+        except Exception as e:
+            logger.error("ERROR in command execution of command %s: %s", cmd, e)
+            process.kill()
+            return "The backup utility had an error or is not installed.", 500
     
     @staticmethod
     def try_uuid(uuid_to_test: str) -> bool:
@@ -1248,7 +1276,7 @@ class DBClient:
         #     toDbName = kwargs.get("nsTo")
         # else:
         #     toDbName = os.path.splitext(os.path.basename(filename))[0]
-        success, msg = self.registerPentest(owner, str(pentest_name), True, False)
+        success, msg = self.registerPentest(owner, str(pentest_name), orig_uuid, True, False)
         new_pentest_uuid = msg
         if not self.try_uuid(new_pentest_uuid):
             return msg, 403
