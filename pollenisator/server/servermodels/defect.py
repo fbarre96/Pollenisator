@@ -204,7 +204,9 @@ def update_template_suggestion(pentest: str, defect_iid: str, body: Dict[str, An
         del new_data["index"]
     old_data = dbclient.findInDb("pollenisator", "defectssuggestions", {"_id":ObjectId(defect_iid)}, False)
     if old_data is None:
-        old_data = {}
+        old_data = dbclient.findInDb("pollenisator", "defects", {"_id":ObjectId(defect_iid)}, False)
+        if old_data is None:
+            old_data = {}
     old_data |= new_data
     old_data["suggested_by"] = username
     old_data["creation_time"] = str(datetime.datetime.now())
@@ -315,6 +317,24 @@ def exportDefectTemplates(**kwargs: Any) -> ExportDefectTemplates:
         res["remarks"].append(t)
     return res
 
+@permission("user")
+def getDefectSuggestion(suggestion_iid: str) -> Union[Dict[str, Any], Tuple[str, int]]:
+    """
+    Get a defect suggestion from the "pollenisator" database using its id.
+
+    Args:
+        suggestion_iid (str): The id of the defect suggestion.
+
+    Returns:
+        Union[Dict[str, Any], Tuple[str, int]]: A dictionary containing the defect suggestion details, or a tuple containing 
+        an error message and status code if the suggestion was not found.
+    """
+    dbclient = DBClient.getInstance()
+    suggestion = dbclient.findInDb("pollenisator", "defectssuggestions", {"_id":ObjectId(suggestion_iid)}, False)
+    if suggestion is None:
+        return "Not found", 404
+    return suggestion
+
 returnDefectSuggestionsType = TypedDict('returnDefectSuggestionsType', {'answers': List[Dict[str, Any]]})
 @permission("user")
 def findDefectSuggestions(body: Dict[str, Any]) -> Union[ErrorStatus, returnDefectSuggestionsType]:
@@ -413,9 +433,15 @@ def validateDefectTemplate(iid: str) -> Union[bool, Tuple[str, int]]:
     suggestion = dbclient.findInDb("pollenisator", "defectssuggestions", {"_id":ObjectId(iid)}, False)
     if suggestion is None:
         return "Not found", 404
-    res = insert("pollenisator", suggestion)
-    if not res["res"]:
-        return res
+    existing = dbclient.findInDb("pollenisator", "defects", {"_id":ObjectId(iid)}, False)
+    if existing is not None:
+        suggestion["suggestion_type"] = "update"
+        res = update("pollenisator", iid, suggestion)
+    else:
+        suggestion["suggestion_type"] = "insert"
+        res = insert("pollenisator", suggestion)
+        if not res["res"]:
+            return res
     dbclient.deleteFromDb("pollenisator", "defectssuggestions", {"_id":ObjectId(iid)})
     return True
 
@@ -441,7 +467,7 @@ def updateDefectTemplate(iid: str, body: Dict[str, Any], **kwargs: Dict[str, Any
     return res
 
 @permission("user")
-def deleteDefectTemplate(iid: str, **kwargs) -> Union[int, Any]:
+def deleteDefectTemplate(iid: str, is_suggestion: bool=False, **kwargs) -> Union[int, Any]:
     """
     Delete a defect template from the "pollenisator" database using its id.
 
@@ -451,12 +477,15 @@ def deleteDefectTemplate(iid: str, **kwargs) -> Union[int, Any]:
     Returns:
         Union[int, Any]: 0 if the deletion was unsuccessful, otherwise the result of the deletion operation.
     """
-    is_suggestion = "admin" not in kwargs["token_info"]["scope"] and "template_writer" not in kwargs["token_info"]["scope"]
-    res: Union[bool, Tuple[str, int]]
+
+    has_no_right = ("admin" not in kwargs["token_info"]["scope"] and "template_writer" not in kwargs["token_info"]["scope"])
+    if not is_suggestion and has_no_right:
+        return 403, "Forbidden"
     if is_suggestion:
         return delete_template_suggestion(iid)
-    else:
+    if not has_no_right:
         return delete("pollenisator", iid)
+    return 200, "Nothing happened"
 
 def delete_template_suggestion(iid: str) -> int:
     """

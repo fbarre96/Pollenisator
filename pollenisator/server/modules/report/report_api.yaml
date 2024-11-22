@@ -300,6 +300,12 @@ paths:
           required: true
           schema:
             type: string
+        - name: is_suggestion
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: successfully deleted a template
@@ -643,6 +649,35 @@ paths:
                   value: '"The knowledge database is unreachable"'
                 Error from knowledge db:
                   value: '"The knowledge dabatase encountered an issue : "{response_text}'
+
+  "/report/suggestions/{suggestion_iid}":
+    get:
+      operationId: pollenisator.server.servermodels.defect.getDefectSuggestion
+      tags:
+        - DefectTemplate
+      summary: Get a defect suggestion
+      parameters:
+        - name: suggestion_iid
+          in: path
+          description: suggestion iid
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A defect suggestion
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"_id": "ObjectId|60f194db1255fd087c769756", "ease": "Moderate", "impact": "Critical", "index": "0", "infos": {}, "ip": "", "notes": "", "port": "", "proofs": [], "proto": "", "redactor": "N/A", "risk": "Critical", "tags": [], "title": "XSS", "synthesis": "An XSS or Cross-Site-Scripting attack is ...", "impacts": "An attacker can execute malicious scripts on the victims browser", "description": "The XXX server is vulnerable to XSS in XXX form ...", "language": "en", "type": ["Application"], "fixes":[{"title":"Filter user input","synthesis": "..","description":"...","execution": "Easy","gain": "Strong"}]}'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              examples:
+                not found:
+                  value: '"This defect suggestion does not exist"'
 
   "/report/suggestions/search":
     post:
