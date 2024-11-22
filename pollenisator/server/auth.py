@@ -148,7 +148,7 @@ def updateUserRoles(body: Dict[str, Union[str|list[str]]], **kwargs) -> ErrorSta
         roles = [roles]
     roles.append("user")
     roles = list(set(roles))
-    dbclient.updateInDb("pollenisator", "users", {"username":username}, {"$set":{"scope":roles}})
+    dbclient.updateInDb("pollenisator", "users", {"username":username}, {"$set":{"scope":roles, "token":""}})
     return "Successully updated user", 200
 
 @permission("admin")
