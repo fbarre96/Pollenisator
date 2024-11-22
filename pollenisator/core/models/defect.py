@@ -409,7 +409,7 @@ class Defect(Element):
         if review == {}:
             return True, ""
         for key in current:
-            if key not in ["_id", "defect_iid", "redacted_state", "creation_time"]:
+            if key not in ["_id", "defect_iid", "redacted_state", "creation_time", "index"]:
                 if key not in review:
                     return False, f"Key {key} not found in review"
                 if current[key] != review[key]:
