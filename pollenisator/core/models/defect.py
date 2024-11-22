@@ -397,24 +397,24 @@ class Defect(Element):
                 return defect
         return {}
     
-    def compare_review_equal(self) -> bool:
+    def compare_review_equal(self) -> Tuple[bool, str]:
         """
         Compare the current defect with the review version.
 
         Returns:
-            bool: True if the current defect is different from the review version, False otherwise.
+            Tuple[bool,str]: True if the current defect is different from the review version, False otherwise with a message.
         """
         current = self.getData()
         review = self.get_review()
         if review == {}:
-            return True
+            return True, ""
         for key in current:
             if key not in ["_id", "defect_iid", "redacted_state", "creation_time"]:
                 if key not in review:
-                    return False
+                    return False, f"Key {key} not found in review"
                 if current[key] != review[key]:
-                    return False
-        return True
+                    return False, f"Key {key} is different in review and in current"
+        return True, ""
 
     def updateInDb(self, data: Optional[Dict[str, Any]] = None) -> list[str]:
         """
