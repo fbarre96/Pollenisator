@@ -402,7 +402,7 @@ class Defect(Element):
                 dbclient.insertInDb(self.pentest, "defectsreviews", defect)
                 return defect
         return {}
-    
+
     def compare_review_equal(self) -> Tuple[bool, str]:
         """
         Compare the current defect with the review version.
