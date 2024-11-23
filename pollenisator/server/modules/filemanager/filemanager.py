@@ -287,7 +287,7 @@ def listFiles(pentest: str, attached_iid: str, filetype: str) -> Union[ErrorStat
 
 @permission("pentester")
 def download(pentest: str, attached_iid: str, filetype: str, filename: Optional[str]=None) -> Union[ErrorStatus, Response]:
-    """
+    """ 
     Download a file of a specific type attached to a specific item in a pentest.
 
     Args:

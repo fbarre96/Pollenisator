@@ -42,6 +42,7 @@ def debug(string):
     print(string)
     return string
 
+
 def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs: Any) -> Union[Tuple[bool, str], Tuple[bool, str]]:
     """
     Create a report based on a template and a context.

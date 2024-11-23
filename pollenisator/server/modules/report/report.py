@@ -306,6 +306,41 @@ def search(body: Dict[str, str]) -> Union[ErrorStatus, SearchResults]:
         return {"answers":[]}
     return {"answers": [x for x in res]}
 
+def getDefectColor(risk: str) -> str:
+    """
+    Get the color associated with a defect risk level.
+
+    Args:
+        risk (str): The risk level of the defect.
+
+    Returns:
+        str: The color associated with the defect risk level.
+    """
+    return {"Critical":"263232","Major":"F7453C","Important":"EE8200", "Minor":"94C600"}.get(risk, "000000")
+
+def replace_defect_links(description: str, defects: List[Dict[str, Any]]) -> str:
+    """
+    Replace defect links in a description with the defect titles.
+
+    Args:
+        description (str): The description to replace defect links in.
+        defects (List[Dict[str, Any]]): The list of defects to search for.
+
+    Returns:
+        str: The description with the defect links replaced.
+    """
+    defects_titles = {defect.get("title","").strip():defect for defect in defects}
+    for re_match in re.finditer(r"{{defect:([^}]+)}}", description):
+        if re_match.group(1).strip() in defects_titles.keys():
+            defect_id = defects_titles[re_match.group(1).strip()].get("index", 0)
+            try:
+                defect_id_str  = "D"+str(int(defect_id)+1)
+                colours = "**<color:"+str(getDefectColor(defects_titles[re_match.group(1).strip()].get("risk","")))+">"+str(defect_id_str)+"</color>**"
+                description = description.replace(re_match.group(0), colours)
+            except ValueError:
+                pass
+    return description
+
 
 def craftContext(pentest: str, **kwargs: Any) -> Dict[str, Any]:
     """
@@ -377,6 +412,7 @@ def craftContext(pentest: str, **kwargs: Any) -> Dict[str, Any]:
         defect_completed["description"] =  defect_completed["description"].replace("\r","")
         defect_completed["description"] = re.sub(r"(?<!\n\n)(!\[.*\]\((.*?)\))", r"\n\1", defect_completed["description"])
         defect_completed["description"] = re.sub(r"(!\[.*\]\((.*?)\))(?!\n\n)", r"\1\n", defect_completed["description"])
+        defect_completed["description"] = replace_defect_links(defect_completed["description"], defects)
         defect_completed["description_paragraphs"] = defect_completed["description"].replace("\r","").split("\n")
         fix_id = 1
         if len(defect_completed["fixes"]) > 1:

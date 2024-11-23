@@ -1,0 +1,99 @@
+openapi: 3.0.0
+info:
+  description: Pollenisator index api file
+  version: 1.2.0
+  title: Swagger REST Article
+
+paths:
+  '/additionalreportsections':
+    get:
+      summary: get a list of all additional report sections
+      operationId: pollenisator.server.modules.additionalreportsections.additionalreportsections.listAll
+      responses:
+        '200':
+          description: OK
+      description: Return the full list of additional report sections
+      tags:
+        - Additional Report Sections
+    post:
+      summary: create a new additional report section
+      operationId: pollenisator.server.modules.additionalreportsections.additionalreportsections.insert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdditionalReportSection'
+      responses:
+        '200':
+          description: OK
+      description: Create a new additional report section
+      tags:
+        - Additional Report Sections
+
+  '/additionalreportsections/{iid}':
+    parameters:
+        - name: iid
+          in: path
+          required: true
+          description: The id of the additional report section
+          schema:
+            type: string
+    get:
+      summary: get a specific additional report section
+      operationId: pollenisator.server.modules.additionalreportsections.additionalreportsections.getById
+      
+      responses:
+        '200':
+          description: OK
+      description: Return a specific additional report section
+      tags:
+        - Additional Report Sections
+  
+    delete:
+      summary: delete a specific additional report section
+      operationId: pollenisator.server.modules.additionalreportsections.additionalreportsections.delete
+      
+      responses:
+        '200':
+          description: OK
+      description: Delete a specific additional report section
+      tags:
+        - Additional Report Sections
+    put:
+      summary: update a specific additional report section
+      operationId: pollenisator.server.modules.additionalreportsections.additionalreportsections.update
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdditionalReportSection'
+      responses:
+        '200':
+          description: OK
+      description: Update a specific additional report section
+      tags:
+        - Additional Report Sections
+
+
+components:
+  schemas:
+    AdditionalReportSection:
+      title: Additional Report Section
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        jsonSchema:
+          type: string
+        uiSchema:
+          type: string
+        formData:
+          type: string
+      required:
+        - title
+        - description
+        - jsonSchema
+        - uiSchema
+        - formData
