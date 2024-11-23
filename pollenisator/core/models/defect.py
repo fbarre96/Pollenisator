@@ -25,6 +25,10 @@ class Defect(Element):
         coll_name: collection name in pollenisator database
     """
     coll_name = "defects"
+    reviewable_keys = {
+        "defect": ["synthesis", "title", "impacts", "description", "ease", "impact", "risk"],
+        "fixe" : ["synthesis", "description", "ease", "gain"]
+    }
 
     def __init__(self, pentest: str, valuesFromDb: Optional[Dict[str, Any]] = None) -> None:
         """
@@ -409,11 +413,13 @@ class Defect(Element):
         if review == {}:
             return True, ""
         for key in current:
-            if key not in ["_id", "defect_iid", "redacted_state", "creation_time", "index", "proofs"]:
+
+            if key in Defect.reviewable_keys["defect"]:
                 if key not in review:
                     return False, f"Key {key} not found in review"
                 if current[key] != review[key]:
                     return False, f"Key {key} is different in review and in current"
+            
         return True, ""
 
     def updateInDb(self, data: Optional[Dict[str, Any]] = None) -> list[str]:
