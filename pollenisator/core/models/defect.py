@@ -358,6 +358,8 @@ class Defect(Element):
         dbclient = DBClient.getInstance()
         new_data = self.getData()
         data = {} if data is None else data
+        if "_id" in data:
+            del data["_id"]
         new_data |= data
         new_self = Defect(self.pentest, new_data)
         new_data = new_self.getData()
