@@ -425,6 +425,7 @@ def craftContext(pentest: str, **kwargs: Any) -> Dict[str, Any]:
             logger.warning("Warning: defect in base with no fix")
         for i, fix in enumerate(defect_completed["fixes"]):
             defect_completed["fixes"][i]["description"] =  fix["description"].replace("\r","")
+            defect_completed["fixes"][i]["description"] = replace_defect_links(defect_completed["fixes"][i]["description"], defects)
             defect_completed["fixes"][i]["description_paragraphs"] = fix["description"].replace("\r","").split("\n")
         completed_fixes += defect_completed["fixes"]
         defect_id += 1
