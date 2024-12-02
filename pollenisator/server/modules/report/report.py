@@ -445,6 +445,24 @@ def craftContext(pentest: str, **kwargs: Any) -> Dict[str, Any]:
         completed_defects.append(defect_completed)
     context["defects"] = completed_defects
     context["fixes"] = completed_fixes
+    try:
+        additional_sections = dbclient.findInDb("pollenisator", "additionalreportsections", {}, True)
+        if additional_sections is None:
+            additional_sections = []
+        lookup = {}
+        for additional_section in additional_sections:
+            lookup[str(additional_section["_id"])] = additional_section.get("title", "")
+        pentest_sections = dbclient.findInDb(pentest, "additionalreportsections", {}, True)
+        if pentest_sections is None:
+            pentest_sections = []
+        for pentest_section in pentest_sections:
+            del additional_section["_id"]
+            title = lookup.get(str(pentest_section.get("section_id", "")), "")
+            if title != "":
+                context[title] = context.get(title, {}) | pentest_section
+    except Exception as e:
+        logger.error(f"Error while adding additional sections to the report: {e}")
+        
     return context
 
 def getProofPath(pentest: str, defect_iid: ObjectId) -> str:
