@@ -11,7 +11,7 @@ from pollenisator.core.models.element import Element
 from pymongo.results import InsertOneResult, UpdateResult
 from pollenisator.server.permission import permission
 
-AdditionalReportSectionResult = TypedDict('AdditionalReportSectionResult', {'res': bool, 'iid': ObjectId})
+AdditionalReportSectionResult = TypedDict('AdditionalReportSectionResult', {'res': bool, 'iid': Optional[ObjectId]})
 ErrorStatus = Tuple[str, int]
 
 class AdditionalReportSection(Element):
@@ -92,9 +92,22 @@ class AdditionalReportSection(Element):
         res: AdditionalReportSectionResult = insert(self.getData())
         return res
 
+    
+
+    def checkExistingSection(self) -> bool:
+        """
+        Check if a section with the same title already exists in the database.
+
+        Returns:
+            bool: True if a section with the same title already exists, False otherwise.
+        """
+        dbclient = DBClient.getInstance()
+        section = dbclient.findInDb("pollenisator", AdditionalReportSection.coll_name, {"title": self.title}, multi=False)
+        return section is not None
+
 
 @permission("report_template_writer")
-def insert( body: Dict[str, Any]) -> AdditionalReportSectionResult:
+def insert( body: Dict[str, Any]) -> Union[ErrorStatus,AdditionalReportSectionResult]:
     """
     Insert a new report section.
 
@@ -102,13 +115,17 @@ def insert( body: Dict[str, Any]) -> AdditionalReportSectionResult:
         body (Dict[str, Any]): The section information.
 
     Returns:
-        AdditionalReportSectionResult: The result of the insert operation as a dict with result and iid.
+         Union[ErrorStatus,AdditionalReportSectionResult]: The result of the insert operation as a dict with result and iid.
     """
     section = AdditionalReportSection(body)
     dbclient = DBClient.getInstance()
     data = section.getData()
     if "_id" in data:
         del data["_id"]
+    if (section.checkExistingSection()):
+        return "A section with the same title already exists", 409
+    if section.title.strip() == "":
+        return "Title is required", 400
     ins_result = dbclient.insertInDb("pollenisator",
         AdditionalReportSection.coll_name, data, notify=True)
     ins_result = cast(InsertOneResult, ins_result)
@@ -116,7 +133,7 @@ def insert( body: Dict[str, Any]) -> AdditionalReportSectionResult:
     return {"res": True, "iid": iid}
 
 @permission("report_template_writer")   
-def update( iid: str, body: Dict[str, Any]) -> AdditionalReportSectionResult:
+def update( iid: str, body: Dict[str, Any]) ->  Union[ErrorStatus,AdditionalReportSectionResult]:
     """
     Update a report section.
 
@@ -125,14 +142,18 @@ def update( iid: str, body: Dict[str, Any]) -> AdditionalReportSectionResult:
         body (Dict[str, Any]): The section information.
 
     Returns:
-        AdditionalReportSectionResult: The result of the update operation as a dict with result and iid.
+        Union[ErrorStatus,AdditionalReportSectionResult]: The result of the update operation as a dict with result and iid.
     """
     section = AdditionalReportSection(body)
+    if section.title.strip() == "":
+        return "Title is required", 400
     dbclient = DBClient.getInstance()
     old_data = dbclient.findInDb("pollenisator", AdditionalReportSection.coll_name, {"_id": ObjectId(iid)}, multi=False)
     if old_data is None:
         return {"res": False, "iid": ObjectId(iid)}
-    
+    if old_data.get("title") != section.title:
+        if (section.checkExistingSection()):
+            return "A section with the same title already exists", 409
     data = section.getData()
     old_data |= data
     if "_id" in old_data:
@@ -161,6 +182,50 @@ def delete(iid: str) -> int:
     ins_result = dbclient.deleteFromDb("pollenisator",
         AdditionalReportSection.coll_name, {"_id": ObjectId(iid)}, notify=True)
     return ins_result
+
+
+@permission("pentester")
+def updateData(pentest: str, iid: str, body: Dict[str, Any]) -> Union[ErrorStatus, bool]:
+    """
+    Update the data of a report section.
+
+    Args:
+        pentest (str): The name of the current pentest.
+        iid (str): The id of the section to update.
+        body (Dict[str, Any]): The section information.
+
+    Returns:
+        Union[ErrorStatus, bool]: The result of the update operation.
+    """
+    if pentest == "pollenisator":
+        return "Forbidden", 403
+    dbclient = DBClient.getInstance()
+    if "_id" in body:
+        del body["_id"]
+    if "section_id" in body:
+        del body["section_id"]
+    dbclient.updateInDb(pentest, "additionalreportsections", {"section_id": ObjectId(iid)}, {"$set": body}, many=False, upsert=True)
+    return True
+
+@permission("pentester")
+def getData(pentest: str, iid: str) -> Union[ErrorStatus, Dict[str, Any]]:
+    """
+    Get the data of a report section.
+
+    Args:
+        pentest (str): The name of the current pentest.
+        iid (str): The id of the section to get.
+
+    Returns:
+        Union[ErrorStatus, Dict[str, Any]]: The section data.
+    """
+    if pentest == "pollenisator":
+        return "Forbidden", 403
+    dbclient = DBClient.getInstance()
+    section = dbclient.findInDb(pentest, "additionalreportsections", {"section_id": ObjectId(iid)}, multi=False)
+    if section is None:
+        return "Not found", 404
+    return section
 
 @permission("user")
 def getById(iid: str) -> Union[ErrorStatus, Dict[str, Any]]:

@@ -74,6 +74,42 @@ paths:
       tags:
         - Additional Report Sections
 
+  '/additionalreportsections/{pentest}/{iid}':
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+      - schema:
+          type: string
+        name: iid
+        in: path
+        required: true
+        description: Section iid
+    post:
+      tags:
+        - Additional Report Sections
+      summary: Submit data of a report section
+      operationId: pollenisator.server.modules.additionalreportsections.additionalreportsections.updateData
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: OK
+    get:
+      tags:
+        - Additional Report Sections
+      summary: Get data of a report section
+      operationId: pollenisator.server.modules.additionalreportsections.additionalreportsections.getData
+      responses:
+        '200':
+          description: Data as json
+          
+
 
 components:
   schemas:
