@@ -175,7 +175,7 @@ def deleteTemplate(lang: str, body: Dict[str, Any]) -> ErrorStatus:
 
     return "Success", 200
 
-@permission("user")
+@permission("pentester")
 def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Response]:
     """
     Generate a report for a given pentest using a specified template.
@@ -223,15 +223,23 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
     global lang_translation
     with open(lang_file, encoding="utf8") as f:
         lang_translation = json.loads(f.read())
-    context = craftContext(pentest, mainRedac=mainRedactor,
-                           client=client_name.strip(), contract=mission_name.strip())
-    context["pentest_type"] = pentest_type
-    context.update(additional_context)
-    manager = Manager()
-    return_dict = manager.dict()
-    p = Process(target=_generateDoc, args=(ext, context, template_to_use_path, out_name, lang_translation, return_dict))
-    p.start()
-    p.join()
+    try:
+        context = craftContext(pentest, mainRedac=mainRedactor,
+                            client=client_name.strip(), contract=mission_name.strip())
+        context["pentest_type"] = pentest_type
+        context.update(additional_context)
+    
+
+        manager = Manager()
+        return_dict = manager.dict()
+        p = Process(target=_generateDoc, args=(ext, context, template_to_use_path, out_name, lang_translation, return_dict))
+        p.start()
+        p.join()
+    except KeyError as e:
+        return str(e), 400
+    except Exception as e:
+        logger.error(f"Error while generating the report: {e}")
+        return "An error occured while generating the report.", 500
     if "res" not in return_dict:
         return "An error occured while generating the report.", 500
     if return_dict["res"] is True:
@@ -339,6 +347,8 @@ def replace_defect_links(description: str, defects: List[Dict[str, Any]]) -> str
                 description = description.replace(re_match.group(0), colours)
             except ValueError:
                 pass
+        else:
+            raise KeyError(f"Defect {re_match.group(1)} is referenced and was not found")
     return description
 
 
@@ -412,7 +422,11 @@ def craftContext(pentest: str, **kwargs: Any) -> Dict[str, Any]:
         defect_completed["description"] =  defect_completed["description"].replace("\r","")
         defect_completed["description"] = re.sub(r"(?<!\n\n)(!\[.*\]\((.*?)\))", r"\n\1", defect_completed["description"])
         defect_completed["description"] = re.sub(r"(!\[.*\]\((.*?)\))(?!\n\n)", r"\1\n", defect_completed["description"])
-        defect_completed["description"] = replace_defect_links(defect_completed["description"], defects)
+        try:
+            defect_completed["description"] = replace_defect_links(defect_completed["description"], defects)
+        except KeyError as e:
+            logger.error(f"Error while replacing defect links in description: {e}")
+            raise KeyError(str(e)+" in defect "+str(defect_completed.get("title", "")))
         defect_completed["description_paragraphs"] = defect_completed["description"].replace("\r","").split("\n")
         fix_id = 1
         if len(defect_completed["fixes"]) > 1:
