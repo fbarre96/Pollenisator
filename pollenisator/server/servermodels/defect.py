@@ -169,8 +169,10 @@ def update(pentest: str, defect_iid: str, body: Dict[str, Any]) -> Union[bool, T
         #     return "There are reviews left: "+str(compare_error), 400
         #if old.is_there_review_left():
         #    return "There are reviews left", 400
+        if old.redacted_state == "To review" and new_redacted_state == "New":
+            old.delete_review()
         old.redacted_state = new_redacted_state
-
+        
         old.updateInDb(body)
     else:
         if old.redacted_state == "To review":
