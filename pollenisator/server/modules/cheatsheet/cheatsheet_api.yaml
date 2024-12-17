@@ -22,6 +22,22 @@ paths:
         description: ''
       tags:
         - Cheatsheet
+  '/cheatsheet/{pentest}/getChecksData':
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+    get:
+      tags:
+        - Cheatsheet
+      summary: get checks data
+      operationId: pollenisator.server.modules.cheatsheet.routes.getChecksData
+      description: 'get checks data'
+      responses:
+        '200':
+          description: a list of checks data in same order as iids list
   '/cheatsheet/{iid}':
     parameters:
       - schema:

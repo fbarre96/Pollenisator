@@ -11,6 +11,7 @@ import pymongo
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.command import Command
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
+from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance, getTargetRepr
 from pollenisator.server.permission import permission
 from pollenisator.core.components.utils import JSONDecoder
 import bson
@@ -115,6 +116,39 @@ def find(body: Dict[str,Any]) -> Union[ErrorStatus, List[Dict[str, Any]], Dict[s
     if isinstance(results, pymongo.cursor.Cursor):
         results = list(results)
     return results
+
+@permission("pentester")
+def getChecksData(pentest: str) -> Union[ErrorStatus, List[Dict[str, Any]]]:
+    """
+    Get all the checks data for a pentest.
+
+    Args:
+        pentest (str): The name of the pentest.
+
+    Returns:
+        Union[ErrorStatus, List[Dict[str, Any]]]: Returns "Not found" and 404 if the pentest is not found, or a list of checks data.
+    """
+    checks = CheckItem.fetchObjects(pentest, {})
+    if checks is None:
+        return "Not found", 404
+    checkinstances = CheckInstance.fetchObjects(pentest, {})
+    if checkinstances is None:
+        checkinstances = []
+    checkinstances_iids = []
+    checkinstances_list = []
+    for checkinstance in checkinstances:
+        checkinstances_iids.append(checkinstance._id)
+        checkinstances_list.append(checkinstance)
+    repres = getTargetRepr(pentest, checkinstances_iids)
+    return_values = {}
+    for check in checks:
+        return_values[check._id] = check.getData()
+        return_values[check._id]["checkinstances"] = []
+    for checkinstance in checkinstances_list:
+        inst_data = checkinstance.getData()
+        inst_data["representation"] = repres.get(str(checkinstance.target_iid), return_values[checkinstance.check_iid]["title"])
+        return_values[checkinstance.check_iid]["checkinstances"].append(inst_data)
+    return sorted([x for x in return_values.values()], key=lambda x: x["priority"])
 
 
 @permission("pentester")

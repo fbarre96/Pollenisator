@@ -181,13 +181,12 @@ def update(pentest: str, defect_iid: str, body: Dict[str, Any]) -> Union[bool, T
             old.updateInDb(body)
     return True
 
-@permission("pentester")
-def update_template_suggestion(pentest: str, defect_iid: str, body: Dict[str, Any], username: str) -> Union[bool, Tuple[str, int]]:
+@permission("user")
+def update_template_suggestion(defect_iid: str, body: Dict[str, Any], username: str) -> Union[bool, Tuple[str, int]]:
     """
     Update a defect template suggestion in the database using its id. The "_id" field in the body is ignored.
 
     Args:
-        pentest (str): The name of the pentest.
         defect_iid (str): The id of the defect template suggestion to be updated.
         body (Dict[str, Any]): A dictionary containing the new defect template details.
         username (str): The id of the user who suggested the template.
@@ -199,7 +198,7 @@ def update_template_suggestion(pentest: str, defect_iid: str, body: Dict[str, An
     dbclient = DBClient.getInstance()
     
     body = json.loads(json.dumps(body), cls=JSONDecoder)
-    defect = Defect(pentest, body)
+    defect = Defect("pollenisator", body)
     dbclient = DBClient.getInstance()
     new_data = defect.getData()
     if "_id" in new_data:
@@ -465,7 +464,7 @@ def updateDefectTemplate(iid: str, body: Dict[str, Any], **kwargs: Dict[str, Any
     is_suggestion = "admin" not in kwargs["token_info"]["scope"] and "template_writer" not in kwargs["token_info"]["scope"] or body.get("is_suggestion", False)
     res: Union[bool, Tuple[str, int]]
     if is_suggestion:
-        res = update_template_suggestion("pollenisator", iid, body, kwargs["token_info"]["sub"])
+        res = update_template_suggestion(iid, body, kwargs["token_info"]["sub"])
     else:
         res = update("pollenisator", iid, body)
     return res

@@ -6,6 +6,7 @@ import zipfile
 from typing import Any, Dict, List, Set, Tuple, Union
 import tempfile
 import re
+import urllib.parse
 import shutil
 import os
 from lark import Tree
@@ -543,6 +544,9 @@ def registerPentest(pentest: str, body: Dict[str, Any], **kwargs: Dict[str, Any]
         ErrorStatus: The UUID of the new pentest if the registration was successful, otherwise an error message and status code.
     """
     username = kwargs["token_info"]["sub"]
+
+
+    pentest = urllib.parse.unquote(pentest)
     ret, msg = dbclient.registerPentest(username, pentest, None, False, False)
     if ret:
         #token = connectToPentest(pentest, **kwargs)
