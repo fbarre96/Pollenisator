@@ -94,6 +94,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
                     engineio_logger=False, async_mode=async_mode)
     allowed_properties = {
         "defects":["synthesis","impacts", "description"],
+        "defectsreviews" : ["synthesis","impacts", "description"],
         "documents":["data"]
     }
     collections_doc_id = {
@@ -298,7 +299,9 @@ def create_app(debug: bool, async_mode: str) -> Flask:
             return {"error":"Forbidden"}
         pentest = data.get("pentest","")
         doc_id = data.get("doc_id","")
+        logger.debug("Received demand for document %s", str(data))
         if doc_id == "":
+            logger.debug("Document id not found because empty id%s", str(data))
             return {"error":"Document not found"}
         doc_collection = data.get("doc_collection","")
         doc_property = data.get("doc_property","")
@@ -311,17 +314,21 @@ def create_app(debug: bool, async_mode: str) -> Flask:
             if doc is None:
                 ins_result = dbclient.insertInDb(pentest, "documents", {"data":{}, "pentest":pentest})
                 if ins_result is None:
+                    logger.debug("Document could not be created %s", str(data))
                     return {"error": "Document could not be created"}
                 res = ins_result.inserted_id
                 doc = {}
             else:
                 doc = {"data":doc.get("data", {})}
         else:
-            doc = dbclient.findInDb(pentest, doc_collection, {collections_doc_id.get(doc_collection, "_id"):ObjectId(doc_id)}, False)
+            doc = dbclient.findInDb(pentest, doc_collection, {collections_doc_id.get(doc_collection, "_id"):ObjectId(doc_id)}, False, use_cache=False)
             if doc is None:
+                logger.debug("Document not found for pentest %s, collection %s, where %s = %s", str(pentest), str(doc_collection), str(collections_doc_id.get(doc_collection, "_id")), str(ObjectId(doc_id)))
                 return {"error":"Document not found"}
             doc = {"data":doc.get(doc_property, "")}
         join_room(pentest, sid)
+        logger.debug("Reply to for document %s is %s", str(data), str({"doc_id":str(doc_id),"doc_property":doc_property, "doc_collection":doc_collection, "data":doc.get("data", {})}))
+
         sm.socketio.emit("load-document", {"doc_id":str(doc_id),"doc_property":doc_property, "doc_collection":doc_collection, "data":doc.get("data", {})}, room=request.sid)
 
     @sm.socketio.on("send-delta")
@@ -332,6 +339,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         doc_id = data.get("doc_id", "")
         doc_collection = data.get("doc_collection", "")
         doc_property = data.get("doc_property", "")
+        logger.debug("received delta %s", str(data))
         if doc_collection not in allowed_properties:
             return {"error":"Forbidden"}
         if doc_property not in allowed_properties[doc_collection]:
@@ -352,6 +360,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         doc_collection = data.get("doc_collection", "")
         doc_property = data.get("doc_property", "")
         document_data = data.get("document", "")
+        logger.debug("Saving document %s", str(data))
         if doc_collection not in allowed_properties:
             return {"error":"Forbidden"}
         if doc_property not in allowed_properties[doc_collection]:

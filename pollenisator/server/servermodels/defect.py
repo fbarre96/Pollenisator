@@ -169,8 +169,10 @@ def update(pentest: str, defect_iid: str, body: Dict[str, Any]) -> Union[bool, T
         #     return "There are reviews left: "+str(compare_error), 400
         #if old.is_there_review_left():
         #    return "There are reviews left", 400
-        if old.redacted_state == "To review" and new_redacted_state == "New":
+        if new_redacted_state == "New" or new_redacted_state == "To review" or new_redacted_state == "Completed":
             old.delete_review()
+        if new_redacted_state == "To review":
+            old.get_review(force=True)
         old.redacted_state = new_redacted_state
         
         old.updateInDb(body)
@@ -436,7 +438,7 @@ def validateDefectTemplate(iid: str) -> Union[bool, Tuple[str, int]]:
     suggestion = dbclient.findInDb("pollenisator", "defectssuggestions", {"_id":ObjectId(iid)}, False)
     if suggestion is None:
         return "Not found", 404
-    existing = dbclient.findInDb("pollenisator", "defects", {"_id":ObjectId(iid)}, False)
+    existing = dbclient.findInDb("pollenisator", "defects", {"$or":[{"_id":ObjectId(iid)}, {"title": suggestion.get("title")}]}, False)
     if existing is not None:
         suggestion["suggestion_type"] = "update"
         res = update("pollenisator", iid, suggestion)
