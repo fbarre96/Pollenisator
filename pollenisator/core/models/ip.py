@@ -524,17 +524,23 @@ class Ip(Element):
             if scopes is None:
                 scopes = []
             settings_scope_ip = dbclient.findInDb(pentest, "settings", {"key":"include_domains_with_ip_in_scope"}, False)
-            if isinstance(settings_scope_ip.get("value", None), str):
+            if settings_scope_ip is None:
+                settings_scope_ip = False
+            elif isinstance(settings_scope_ip.get("value", None), str):
                 settings_scope_ip = settings_scope_ip.get("value", "").lower() == "true"
             else:
                 settings_scope_ip = settings_scope_ip.get("value", False)
             settings_all_domains = dbclient.findInDb(pentest,"settings", {"key":"include_all_domains"}, False)
-            if isinstance(settings_all_domains.get("value", None), str):
+            if settings_all_domains is None:
+                settings_all_domains = False
+            elif isinstance(settings_all_domains.get("value", None), str):
                 settings_all_domains = settings_all_domains.get("value", "").lower() == "true"
             else:
                 settings_all_domains = settings_all_domains.get("value", False)
             settings_top_domain = dbclient.findInDb(pentest, "settings", {"key":"include_domains_with_topdomain_in_scope"}, False)
-            if isinstance(settings_top_domain.get("value", None), str):
+            if settings_top_domain is None:
+                settings_top_domain = False
+            elif isinstance(settings_top_domain.get("value", None), str):
                 settings_top_domain = settings_top_domain.get("value", "").lower() == "true"
             else:
                 settings_top_domain = settings_top_domain.get("value", False)
