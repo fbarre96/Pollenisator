@@ -9,6 +9,7 @@ from datetime import datetime
 from multiprocessing import Process, Manager
 from typing import Any, Dict, List, Tuple, Union
 from typing_extensions import TypedDict
+from unidecode import unidecode
 from flask import Response, send_file
 from bson import ObjectId
 import werkzeug
@@ -304,15 +305,23 @@ def search(body: Dict[str, str]) -> Union[ErrorStatus, SearchResults]:
     else:
         return "Invalid parameter: type must be either defect or remark.", 400
     dbclient = DBClient.getInstance()
-    p = {"title":re.compile(terms, re.IGNORECASE)}
-    if lang != "":
-        p["language"] = re.compile(lang, re.IGNORECASE)
-    if perimeter != "":
-        p["perimeter"] = re.compile(perimeter, re.IGNORECASE)
-    res = dbclient.findInDb("pollenisator", coll, p, True)
+    searchTearms = re.compile(terms, re.IGNORECASE)
+    searchLang = re.compile(lang, re.IGNORECASE)
+    searchPerimeter = re.compile(perimeter, re.IGNORECASE)
+    res = dbclient.findInDb("pollenisator", coll, {}, True)
+    answers: SearchResults = {"answers": []}
     if res is None:
-        return {"answers":[]}
-    return {"answers": [x for x in res]}
+        return answers
+    for item in res:
+        title = unidecode(item["title"])
+        if searchTearms.match(title) is None:
+            continue
+        if searchLang.match(item.get("language", "")) is None:
+            continue
+        if searchPerimeter.match(" - ".join(item.get("perimeter", ""))) is None:
+            continue
+        answers["answers"].append(item)
+    return answers
 
 def getDefectColor(risk: str) -> str:
     """
