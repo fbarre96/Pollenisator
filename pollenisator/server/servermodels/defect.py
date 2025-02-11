@@ -161,14 +161,6 @@ def update(pentest: str, defect_iid: str, body: Dict[str, Any]) -> Union[bool, T
     old = cast(Defect, old)
     new_redacted_state = body.get("redacted_state")
     if new_redacted_state is not None and new_redacted_state != old.redacted_state:
-        # change to other thing than to review must mean that there is no review left
-        # compare_success, compare_error = old.compare_review_equal()
-        # if old.redacted_state == "To review" and new_redacted_state != "Reviewed" and not compare_success:
-        #     return "There are reviews left: "+str(compare_error), 400
-        # elif old.redacted_state == "Reviewed" and new_redacted_state != "To review" and not compare_success:
-        #     return "There are reviews left: "+str(compare_error), 400
-        #if old.is_there_review_left():
-        #    return "There are reviews left", 400
         if new_redacted_state == "New" or new_redacted_state == "To review" or new_redacted_state == "Completed":
             old.delete_review()
         if new_redacted_state == "To review":
@@ -230,6 +222,8 @@ def review(pentest: str, defect_iid: str) -> Dict[str, Any]:
         List[Dict[str, Any]]: A list of dictionaries, each representing a version of the defect. The versions are ordered by their index.
     """
     defect = Defect.fetchObject(pentest, {"_id":ObjectId(defect_iid)})
+    if defect is None:
+        return "Not found", 404
     defect = cast(Defect, defect)
     return defect.get_review()
 
