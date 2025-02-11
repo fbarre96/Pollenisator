@@ -295,9 +295,9 @@ def search(body: Dict[str, str]) -> Union[ErrorStatus, SearchResults]:
         Union[ErrorStatus, SearchResults]: A dictionary containing any errors and the search results if successful, otherwise an error message and status code.
     """
     defect_type = body.get("type", "")
-    terms = body.get("terms", "")
-    lang = body.get("language", "")
-    perimeter = body.get("perimeter", "")
+    terms = unidecode(body.get("terms", "")).lower()
+    lang = body.get("language", "").lower()
+    perimeter = body.get("perimeter", "").lower()
     if defect_type == "remark":
         coll = "remarks"
     elif defect_type == "defect":
@@ -305,24 +305,17 @@ def search(body: Dict[str, str]) -> Union[ErrorStatus, SearchResults]:
     else:
         return "Invalid parameter: type must be either defect or remark.", 400
     dbclient = DBClient.getInstance()
-    searchTearms = re.compile(terms, re.IGNORECASE)
-    if lang.strip() == "":
-        lang = ".*"
-    searchLang = re.compile(lang, re.IGNORECASE)
-    if perimeter.strip() == "":
-        perimeter = ".*"
-    searchPerimeter = re.compile(perimeter, re.IGNORECASE)
     res = dbclient.findInDb("pollenisator", coll, {}, True)
     answers: SearchResults = {"answers": []}
     if res is None:
         return answers
     for item in res:
-        title = unidecode(item["title"])
-        if searchTearms.match(title) is None:
+        title = unidecode(item["title"]).lower()
+        if terms not in title:
             continue
-        if searchLang.match(item.get("language", "")) is None:
+        if lang not in item.get("language", "").lower():
             continue
-        if searchPerimeter.match(" - ".join(item.get("perimeter", ""))) is None:
+        if perimeter not in "\n".join(list(item.get("perimeter", []))).lower():
             continue
         answers["answers"].append(item)
     return answers
