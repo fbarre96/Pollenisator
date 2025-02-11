@@ -306,10 +306,10 @@ def search(body: Dict[str, str]) -> Union[ErrorStatus, SearchResults]:
         return "Invalid parameter: type must be either defect or remark.", 400
     dbclient = DBClient.getInstance()
     searchTearms = re.compile(terms, re.IGNORECASE)
-    if lang == "":
+    if lang.strip() == "":
         lang = ".*"
     searchLang = re.compile(lang, re.IGNORECASE)
-    if perimeter == "":
+    if perimeter.strip() == "":
         perimeter = ".*"
     searchPerimeter = re.compile(perimeter, re.IGNORECASE)
     res = dbclient.findInDb("pollenisator", coll, {}, True)
