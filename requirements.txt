@@ -25,3 +25,4 @@ docker
 ruamel.yaml
 redis[hiredis]
 typing-extensions
+unidecode
