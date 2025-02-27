@@ -2288,6 +2288,12 @@ paths:
           required: true
           schema:
             type: string
+        - name: force
+          in: query
+          description: force update
+          required: false
+          schema:
+            type: boolean
       requestBody:
         $ref: "#/components/requestBodies/Defects"
       responses:

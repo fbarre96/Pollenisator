@@ -127,6 +127,12 @@ components:
           type: string
         formData:
           type: string
+        section_type:
+          type: string
+          enum:
+            - global
+            - defect
+            - fix        
       required:
         - title
         - description

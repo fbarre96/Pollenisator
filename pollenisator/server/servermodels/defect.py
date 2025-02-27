@@ -141,13 +141,14 @@ def findInsertPosition(pentest: str, risk: str) -> int:
 
 
 @permission("pentester")
-def update(pentest: str, defect_iid: str, body: Dict[str, Any]) -> Union[bool, Tuple[str, int]]:
+def update(pentest: str, defect_iid: str, force: bool, body: Dict[str, Any]) -> Union[bool, Tuple[str, int]]:
     """
     Update a defect in the database.
 
     Args:
         pentest (str): The name of the pentest.
         defect_iid (str): The id of the defect to be updated.
+        force (bool): Force the redacted state to be updated. If False, any issue will send back an error / warning as status 400.  
         body (Dict[str, Any]): A dictionary containing the details of the defect to be updated.
 
     Returns:
@@ -161,8 +162,16 @@ def update(pentest: str, defect_iid: str, body: Dict[str, Any]) -> Union[bool, T
     old = cast(Defect, old)
     new_redacted_state = body.get("redacted_state")
     if new_redacted_state is not None and new_redacted_state != old.redacted_state:
-        if new_redacted_state == "New" or new_redacted_state == "To review" or new_redacted_state == "Completed":
+        if not force:
+            order = ["New", "To review", "Reviewed", "Redacted"]
+            if order.index(new_redacted_state) < order.index(old.redacted_state):
+                return "You are trying to rewind in the redacted state, this will delete any pending review.", 400
+            elif order.index(new_redacted_state) > order.index(old.redacted_state)+1:
+                return "You are trying to skip a redaction step, this could leave some review unaccepted.", 400
+
+        if new_redacted_state == "New" or new_redacted_state == "To review":
             old.delete_review()
+            
         if new_redacted_state == "To review":
             old.get_review(force=True)
         old.redacted_state = new_redacted_state

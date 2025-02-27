@@ -37,9 +37,9 @@ class AdditionalReportSection(Element):
             valuesFromDb = {}
         super().__init__("pollenisator", valuesFromDb)
         self.initialize(valuesFromDb.get("title", ""), valuesFromDb.get("description",""), valuesFromDb.get("jsonSchema", ""),
-                        valuesFromDb.get("uiSchema", ""), valuesFromDb.get("formData", ""))
+                        valuesFromDb.get("uiSchema", ""), valuesFromDb.get("formData", ""), valuesFromDb.get("section_type", "global"))
 
-    def initialize(self, title: str = "", description: str = "", jsonSchema: str = "", uiSchema: str="", formData: str="" ) -> 'AdditionalReportSection':
+    def initialize(self, title: str = "", description: str = "", jsonSchema: str = "", uiSchema: str="", formData: str="", section_type: str="" ) -> 'AdditionalReportSection':
         """
         Initialize this Additional report section with the provided parameters.
 
@@ -49,6 +49,8 @@ class AdditionalReportSection(Element):
             jsonSchema (str, optional): The jsonSchema of this Additional report section. Defaults to "".
             uiSchema (str, optional): The uiSchema of this Additional report section. Defaults to "".
             formData (str, optional): The formData of this Additional report section. Defaults to "".
+            section_type (str, optional): The type of this Additional report section. Defaults to "global"., options: global, defect, fix
+
         Raises:
             ValueError: If jsonSchema, uiSchema or formData is not a valid json
         Returns:
@@ -59,6 +61,7 @@ class AdditionalReportSection(Element):
         self.jsonSchema = jsonSchema
         self.uiSchema = uiSchema
         self.formData = formData
+        self.section_type = "global" if section_type is None else section_type 
         try:
             json.loads(self.jsonSchema)
         except json.JSONDecodeError as e:
@@ -80,7 +83,8 @@ class AdditionalReportSection(Element):
         Returns:
             Dict[str, Any]: The data of this Additional report section object.
         """
-        return {"_id": self._id, "title":self.title, "description": self.description, "jsonSchema":self.jsonSchema, "uiSchema":self.uiSchema, "formData":self.formData }
+        return {"_id": self._id, "title":self.title, "description": self.description, "jsonSchema":self.jsonSchema, "uiSchema":self.uiSchema,
+                 "formData":self.formData, "section_type":self.section_type }
 
     def addInDb(self) -> AdditionalReportSectionResult:
         """
