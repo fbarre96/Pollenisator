@@ -97,7 +97,8 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
         "Header3":"Sous-défaut",
         "Header4":"Sous-défaut",
         "Header5":"Sous-défaut",
-        "Header6":"Sous-défaut"})
+        "Header6":"Sous-défaut",
+        "Table":"StyleTableau"})
     if not result:
         return False, "Error in Markdown conversion : "+str(msg)
     logger.info("Generated report at %s", str(out_path))
