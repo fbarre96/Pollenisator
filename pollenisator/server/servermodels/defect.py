@@ -292,7 +292,7 @@ def importDefectTemplates(upfile: Any) -> Union[Tuple[str, int], bool]:
                     del defect[invalid]
             res = insert("pollenisator", defect)
             if not res["res"]:
-                update("pollenisator", res["iid"], defect)
+                update("pollenisator", res["iid"], True, defect)
         remarks = file_content.get("remarks", [])
         for remark in remarks:
             res = insert_remark("pollenisator", remark)
@@ -446,7 +446,7 @@ def validateDefectTemplate(iid: str) -> Union[bool, Tuple[str, int]]:
     existing = dbclient.findInDb("pollenisator", "defects", {"$or":[{"_id":ObjectId(iid)}, {"title": suggestion.get("title")}]}, False)
     if existing is not None:
         suggestion["suggestion_type"] = "update"
-        res = update("pollenisator", iid, suggestion)
+        res = update("pollenisator", iid, True, suggestion)
     else:
         suggestion["suggestion_type"] = "insert"
         res = insert("pollenisator", suggestion)
@@ -473,7 +473,7 @@ def updateDefectTemplate(iid: str, body: Dict[str, Any], **kwargs: Dict[str, Any
     if is_suggestion:
         res = update_template_suggestion(iid, body, kwargs["token_info"]["sub"])
     else:
-        res = update("pollenisator", iid, body)
+        res = update("pollenisator", iid, True, body)
     return res
 
 @permission("user")
