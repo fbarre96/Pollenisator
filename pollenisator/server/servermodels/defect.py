@@ -268,7 +268,7 @@ def moveDefect(pentest: str, defect_id_to_move: str, target_id: str) -> Union[Tu
 
     return Defect.moveDefect(pentest, ObjectId(defect_id_to_move), ObjectId(target_id))
 
-@permission("templates_redactor")
+@permission("report_template_writer")
 def importDefectTemplates(upfile: Any) -> Union[Tuple[str, int], bool]:
     """
     Import defect templates from a JSON file. The file should contain a list of defects and a list of remarks. 
