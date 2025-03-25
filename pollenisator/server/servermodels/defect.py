@@ -161,7 +161,9 @@ def update(pentest: str, defect_iid: str, force: bool, body: Dict[str, Any]) -> 
         return "Not found", 404
     old = cast(Defect, old)
     new_redacted_state = body.get("redacted_state")
+    #STATE CHANGE
     if new_redacted_state is not None and new_redacted_state != old.redacted_state:
+        #check order
         if not force:
             try:
                 order = ["New", "To review", "Reviewed", "Completed"]
@@ -171,7 +173,8 @@ def update(pentest: str, defect_iid: str, force: bool, body: Dict[str, Any]) -> 
                     return "You are trying to skip a redaction step, this could leave some review unaccepted.", 400
             except ValueError:
                 return "Unknown redacted state", 400
-        if new_redacted_state == "New" or new_redacted_state == "To review":
+        # Delete review if needed
+        if new_redacted_state == "New" or new_redacted_state == "To review" and old.redacted_state == "Completed":
             old.delete_review()
             
         if new_redacted_state == "To review":
@@ -180,6 +183,7 @@ def update(pentest: str, defect_iid: str, force: bool, body: Dict[str, Any]) -> 
         
         old.updateInDb(body)
     else:
+        # Defect change
         if old.redacted_state == "To review":
             old.save_review(body)
         else:

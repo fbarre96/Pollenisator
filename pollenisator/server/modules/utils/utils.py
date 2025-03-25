@@ -43,6 +43,18 @@ def do_completion(model, text, config) -> Dict[str, Any]:
     else:
         return response.text, response.status_code
 
+@permission("user")
+def textcompletion_status(**kwargs):
+    """
+    Get text completion status
+    """
+    config = loadModuleConfig()
+    status = {"status": "ready"}
+    if not config:
+        return {"status":"unavailable"}
+    if config["apiurl"] == "":
+        return {"status":"unavailable"}
+    return status
 
 @permission("user")
 def textcompletion(body, **kwargs):

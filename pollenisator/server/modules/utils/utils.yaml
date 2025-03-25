@@ -1,5 +1,21 @@
 
 paths:
+  "/utils/textcompletion/status":
+    get:
+      operationId: pollenisator.server.modules.utils.utils.textcompletion_status
+      tags:
+        - Utils
+      summary: Get text completion status
+      responses:
+        "200":
+          description: Successfully return text completion status
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"status": "ready"}'
+                Unavailable:
+                  value: '{"status": "unavailable"}'
   "/utils/textcompletion":
     post:
       operationId: pollenisator.server.modules.utils.utils.textcompletion
