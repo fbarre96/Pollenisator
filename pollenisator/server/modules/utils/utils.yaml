@@ -1,0 +1,28 @@
+
+paths:
+  "/utils/textcompletion":
+    post:
+      operationId: pollenisator.server.modules.utils.utils.textcompletion
+      tags:
+        - Utils
+      summary: Text autocomplete
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                model:
+                  type: string
+      responses:
+        "200":
+          description: Successfully return completed text
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"completed_text": "Response to the request"}'
+       
