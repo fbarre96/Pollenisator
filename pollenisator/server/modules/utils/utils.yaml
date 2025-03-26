@@ -1,3 +1,8 @@
+openapi: 3.0.0
+info:
+  description: Pollenisator index api file
+  version: 1.2.0
+  title: Swagger REST Article
 
 paths:
   "/utils/textcompletion/status":
