@@ -1,11 +1,13 @@
 
 import os
 import shutil
-from typing import Any, Dict
+from typing import Any, Dict, Tuple, Union
 import pollenisator.core.components.utils as utils
 from pollenisator.server.permission import permission
 from pollenisator.core.components.logger_config import logger
 import requests
+
+ErrorStatus = Tuple[str, int]
 
 def loadModuleConfig() -> Dict[str, Any]:
     """
@@ -30,7 +32,7 @@ def loadModuleConfig() -> Dict[str, Any]:
             logger.warning("Config file not found inside %s, please create one based on the provided utils.cfg inside the same directory.", os.path.normpath(config_file))
     return utils.loadCfg(config_file)
 
-def do_completion(model, text, config) -> Dict[str, Any]:
+def do_completion(model, text, config) -> Union[ErrorStatus, Dict[str, Any]]:
     """
     Do text completion
     """

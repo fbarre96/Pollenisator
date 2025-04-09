@@ -21,6 +21,11 @@ from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.utils import getMainDir
 from pollenisator.server.permission import permission
 from pollenisator.core.components.logger_config import logger
+from pollenisator.server.modules.filemanager.filemanager import listFiles
+import os
+import re
+import requests
+from hashlib import md5
 
 
 main_dir = getMainDir()
@@ -373,6 +378,7 @@ def craftContext(pentest: str, **kwargs: Any) -> Dict[str, Any]:
     context = {}
     for k, v in kwargs.items():
         context[k] = v
+    context["pentest"] = pentest
     date = datetime.now()
     context["year"] = date.strftime("%Y")
     context["month"] = date.strftime("%B").lower()
@@ -482,7 +488,7 @@ def craftContext(pentest: str, **kwargs: Any) -> Dict[str, Any]:
                 context[title] = context.get(title, {}) | pentest_section
     except Exception as e:
         logger.error(f"Error while adding additional sections to the report: {e}")
-        
+    
     return context
 
 def getProofPath(pentest: str, defect_iid: ObjectId) -> str:
@@ -498,3 +504,4 @@ def getProofPath(pentest: str, defect_iid: ObjectId) -> str:
     """
     local_path = os.path.join(getMainDir(), "files")
     return os.path.join(local_path, pentest, "proof", str(defect_iid))
+

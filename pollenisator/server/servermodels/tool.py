@@ -234,9 +234,9 @@ def importResult(pentest: str, tool_iid: str, upfile: Any, body: Dict[str, Any])
     """
     dbclient = DBClient.getInstance()
     #STORE FILE
-    res, status, filepath = dbclient.do_upload(pentest, tool_iid, "result", upfile, True)
+    res, status, filepath = dbclient.do_upload(pentest, "unassigned", "result", upfile, str(tool_iid))
     if status != 200:
-        return res, status
+        return str(res.get("msg","")), status
     # Analyze
     toolModel = Tool.fetchObject(pentest, {"_id": ObjectId(tool_iid)})
     if toolModel is None:

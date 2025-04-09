@@ -8,6 +8,8 @@ from markdowntodocx.markdownconverter import convertMarkdownInFile
 import re
 from docx.shared import Cm
 import base64
+from pollenisator.core.components.utils import getMainDir
+from pollenisator.server.modules.filemanager.filemanager import listFiles
 translation: Dict[str, str] = {}
 
 
@@ -65,6 +67,7 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
     jinja_env.filters['getInitials'] = getInitials
     jinja_env.filters['regex_findall'] = regex_findall
     jinja_env.filters['debug'] = debug
+    replaceUnassignedFileImages(context, context["pentest"])
     context["proof_by_names"] = {}
     for defect in context["defects"]:
         proofs = defect.get("proofs", [])
@@ -90,6 +93,7 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
     dir_path = os.path.dirname(os.path.realpath(__file__))
     out_path = os.path.join(dir_path, "../../exports/", out_name+".docx")
     doc.save(out_path)
+    doc.save("/tmp/"+out_name+".docx")
     logger.info("Converting Markdown of %s", str(out_path))
     result, msg = convertMarkdownInFile(out_path, out_path, {"Header":"Sous-défaut",
         "Header1":"Sous-défaut",
@@ -103,3 +107,45 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
         return False, "Error in Markdown conversion : "+str(msg)
     logger.info("Generated report at %s", str(out_path))
     return True, out_path
+
+
+def replaceUnassignedFileImages(context: dict, pentest: str) -> None:
+    """
+    Recursively iterate over the context dictionary (up to 10 levels deep)
+    and download markdown images, replacing remote URLs with the local file path.
+
+    Args:
+        context (dict): The context dictionary to process.
+        pentest (str): The name of the pentest to build the local storage path.
+    """
+    pattern = r"(!\[.*\]\((.*?)\))"
+    files = listFiles(pentest, "unassigned", "file")
+    def _recursive_process(obj, depth: int):
+        if depth > 10:
+            return obj
+
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                obj[key] = _recursive_process(value, depth + 1)
+        elif isinstance(obj, list):
+            for i, item in enumerate(obj):
+                obj[i] = _recursive_process(item, depth + 1)
+        elif isinstance(obj, str):
+            # Regex to find markdown images with http/https URLs
+            obj = re.sub(r"(?<!\n\n)(!\[.*\]\((.*?)\))", r"\n\1", obj)
+            obj = re.sub(r"(!\[.*\]\((.*?)\))(?!\n\n)", r"\1\n", obj)
+            def repl(match):
+                alt_text = match.group(1)
+                url = match.group(2)
+                if url in files:
+                    base_dir = os.path.normpath(os.path.join(getMainDir(), "files", pentest, "file", "unassigned"))
+                    local_path = os.path.normpath(os.path.join(base_dir, os.path.basename(url)))
+                    if local_path.startswith(base_dir):
+                        return f"![{local_path}](file://{local_path})"
+                    else:
+                        return alt_text
+            obj = re.sub(pattern, repl, obj)
+        return obj
+
+    _recursive_process(context, 0)
+

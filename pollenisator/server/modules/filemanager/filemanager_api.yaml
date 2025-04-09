@@ -1,5 +1,5 @@
 paths:
-  "/files/{pentest}/upload/proof/{defect_iid}":
+  "/files/{pentest}/upload/{filetype}/{attached_to}":
     post:
       operationId: pollenisator.server.modules.filemanager.filemanager.upload
       tags:
@@ -12,12 +12,21 @@ paths:
           required: true
           schema:
             type: string
-        - name: defect_iid
+        - name: attached_to
           in: path
-          description: file will be tied to given iid
+          description: file will be tied to given defect id (if defect is deleted, so is this file)
           required: true
           schema:
             type: string
+        - name: filetype
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - result
+              - proof
+              - file
       requestBody:
         content:
           multipart/form-data:
@@ -37,7 +46,7 @@ paths:
             application/json:
               examples:
                 Successful:
-                  value: '"{filename} was successfully uploaded"'
+                  value: '{"msg":"{filename} was successfully uploaded", "attachment_id":"uuid-v4"}'
         "404":
           description: defect not found
           content:
@@ -45,7 +54,7 @@ paths:
               examples:
                 Unknown defect:
                   value: '"The given iid does not match an existing defect"'
-  "/files/{pentest}/edit/proof/{defect_iid}":
+  "/files/{pentest}/edit/{filetype}/{attached_to}/{attachment_id}":
     post:
       operationId: pollenisator.server.modules.filemanager.filemanager.upload_replace
       tags:
@@ -58,9 +67,24 @@ paths:
           required: true
           schema:
             type: string
-        - name: defect_iid
+        - name: filetype
           in: path
-          description: file will be tied to given iid
+          required: true
+          schema:
+            type: string
+            enum:
+              - result
+              - proof
+              - file
+        - name: attached_to
+          in: path
+          description: file will be tied to given defect id (if defect is deleted, so is this file)
+          required: true
+          schema:
+            type: string
+        - name: attachment_id
+          in: path
+          description: file to replace
           required: true
           schema:
             type: string
@@ -83,7 +107,7 @@ paths:
             application/json:
               examples:
                 Successful:
-                  value: '"{filename} was successfully uploaded"'
+                  value: '{"msg":"{filename} was successfully uploaded", "attachment_id":"uuid-v4"}'
         "404":
           description: defect not found
           content:
@@ -91,7 +115,7 @@ paths:
               examples:
                 Unknown defect:
                   value: '"The given iid does not match an existing defect"'
-  "/files/{pentest}/list/{filetype}/{attached_iid}":
+  "/files/{pentest}/list/{filetype}/{attached_to}":
     get:
       operationId: pollenisator.server.modules.filemanager.filemanager.listFiles
       tags:
@@ -104,7 +128,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: attached_iid
+        - name: attached_to
           in: path
           description: file will be tied to given iid
           required: true
@@ -118,6 +142,7 @@ paths:
             enum:
               - result
               - proof
+              - file
       responses:
         "200":
           description: Successfully listed files
@@ -127,7 +152,7 @@ paths:
                 type: array
                 items:
                   type: string
-  "/files/{pentest}/download/{filetype}/{attached_iid}":
+  "/files/{pentest}/download/{filetype}/{attached_to}":
     get:
       operationId: pollenisator.server.modules.filemanager.filemanager.download
       tags:
@@ -140,7 +165,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: attached_iid
+        - name: attached_to
           in: path
           description: file will be tied to given iid
           required: true
@@ -154,6 +179,7 @@ paths:
             enum:
               - result
               - proof
+              - file
         - name: filename
           in: query
           required: false
@@ -177,9 +203,9 @@ paths:
               examples:
                 file not found:
                   value: '"File not found"'
-  "/files/{pentest}/{defect_iid}/{filename}":
+  "/files/{pentest}/{filetype}/{attached_to}/{filename}":
     delete:
-      operationId: pollenisator.server.modules.filemanager.filemanager.rmProof
+      operationId: pollenisator.server.modules.filemanager.filemanager.rmFile
       tags:
         - FileManager
       summary: Remove a proof file
@@ -190,12 +216,21 @@ paths:
           required: true
           schema:
             type: string
-        - name: defect_iid
+        - name: attached_to
           in: path
-          description: object iid which have the file to delete
+          description: defect iid which have the file to delete
           required: true
           schema:
             type: string
+        - name: filetype
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - result
+              - proof
+              - file
         - name: filename
           in: path
           required: true

@@ -1409,16 +1409,16 @@ class DBClient:
         from pollenisator.app_factory import notify_clients
         notify_clients({"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now()})
 
-    def do_upload(self, pentest: str, attached_iid:  Union[Literal["unassigned"], str], filetype: str, upfile: Any, replace: bool) -> Tuple[str, int, str]:
+    def do_upload(self, pentest: str, attachement_iid:  Union[Literal["unassigned"], str], filetype: str, upfile: Any, attached_to: Union[Literal["unassigned"], str]) -> Tuple[Dict[str, Any], int, str]:
         """
         Upload a file and attach it to a specific tool or defect in a pentest.
 
         Args:
             pentest (str): The name of the pentest.
-            attached_iid ( Union[Literal["unassigned"], str]): The id of the tool or defect to which the file is attached.
+            attachement_iid ( Union[Literal["unassigned"], str]): The id of attachment if replacing, else "unassigned".
             filetype (str): The type of the file, either 'result' or 'proof'.
             upfile (Any): The file to be uploaded.
-            replace (bool): replace file with the same name if it exists. If False, a uuid will be generated and appended to the name before the extension.
+            attached_to ( Union[Literal["unassigned"], str]): The id of the tool or defect to which the file is attached.
 
         Returns:
             Tuple[str, int, str]: A tuple containing a message indicating the result of the operation, a HTTP-like status code, and the path of the uploaded file if succeedeed only.
@@ -1429,23 +1429,32 @@ class DBClient:
             os.makedirs(local_path)
         except FileExistsError:
             pass
-        filepath = os.path.join(local_path, pentest, filetype, attached_iid)
+        filepath = os.path.join(local_path, pentest, filetype, attached_to)
         if filetype == "result":
-            if attached_iid == "unassigned":
-                return "The given iid is unassigned", 400, ""
-            res = dbclient.findInDb(pentest, "tools", {"_id": ObjectId(attached_iid)}, False)
+            if attached_to == "unassigned":
+                return {"msg":"The given iid is unassigned", "attachment_id":None}, 400, ""
+            res = dbclient.findInDb(pentest, "tools", {"_id": ObjectId(attached_to)}, False)
             if res is None:
-                return "The given iid does not match an existing tool", 404, ""
+                return {"msg":"The given iid does not match an existing tool", "attachment_id":None}, 404, ""
 
-        elif filetype == "proof" and attached_iid != "unassigned":
-            res = dbclient.findInDb(pentest, "defects", {"_id": ObjectId(attached_iid)}, False)
+        elif filetype == "proof" and attached_to != "unassigned":
+            res = dbclient.findInDb(pentest, "defects", {"_id": ObjectId(attached_to)}, False)
             if res is None:
-                return "The given iid does not match an existing defect", 404, ""
-        elif filetype == "proof" and attached_iid == "unassigned":
+                return {"msg":"The given iid does not match an existing defect", "attachment_id":None}, 404, ""
+        elif filetype == "proof" and attached_to == "unassigned":
+            pass
+        elif filetype == "file" and attached_to != "unassigned":
+            return {"msg":"Files cannot be assigned", "attachment_id":None}, 400, ""
+        elif filetype == "file" and attached_to == "unassigned":
             pass
         else:
-            return "Filetype is not proof nor result", 400, ""
-
+            return {"msg":"Filetype is not proof nor result", "attachment_id":None}, 400, ""
+        if attachement_iid != "unassigned":
+            replace = True
+            attachment_id = str(attachement_iid)
+        else:
+            replace = False
+            attachment_id = str(uuid4())
         try:
             os.makedirs(filepath)
         except FileExistsError:
@@ -1458,22 +1467,27 @@ class DBClient:
             if replace:
                 name = basename+".png"
             else:
-                name = basename+"-"+str(uuid4())+".png"
+                name = basename+"-"+attachment_id +".png"
+        elif filetype == "file":
+            name = attachment_id + ext
         else:
             name = name + ext
         full_filepath = os.path.join(filepath, name)
         while os.path.exists(full_filepath) and not replace:
+            attachment_id = str(uuid4())
             if filetype == "proof":
-                name = basename+"-"+str(uuid4())+".png"
+                name = basename+"-"+attachment_id+".png"
+            elif filetype == "file":
+                name = attachment_id+ext
             else:
-                name = str(uuid4())+name
-            full_filepath = os.path.join(filepath, str(uuid4())+name)
+                name = attachment_id+name
+            full_filepath = os.path.join(filepath, attachment_id+name)
         with open(full_filepath, "wb") as f:
             f.write(upfile.stream.read())
         if filetype == "proof":
             im1 = Image.open(full_filepath)
             im1.save(full_filepath, format="png")
             upfile.stream.seek(0)
-            if attached_iid != "unassigned":
-                dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(attached_iid)}, {"$addToSet":{"proofs":name}})
-        return name + " was successfully uploaded", 200, full_filepath
+            if attachment_id != "unassigned":
+                dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(attached_to)}, {"$addToSet":{"proofs":name}})
+        return {"msg":name + " was successfully uploaded", "attachment_id":attachment_id}, 200, full_filepath
