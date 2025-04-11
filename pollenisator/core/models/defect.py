@@ -356,7 +356,9 @@ class Defect(Element):
 
         """ 
         dbclient = DBClient.getInstance()
-        new_data = self.getData()
+        new_data =  dbclient.findInDb(self.pentest, "defectsreviews", {"defect_iid": ObjectId(self.getId())}, False)
+        if data is None:
+            raise ValueError("No review found")
         data = {} if data is None else data
         if "_id" in data:
             del data["_id"]
@@ -364,7 +366,7 @@ class Defect(Element):
         new_self = Defect(self.pentest, new_data)
         new_data = new_self.getData()
         
-        new_data["defect_iid"] = new_data["_id"]
+        new_data["defect_iid"] = self.getId()
         if "_id" in new_data:
             del new_data["_id"]
         new_data["time"] = datetime.now()
