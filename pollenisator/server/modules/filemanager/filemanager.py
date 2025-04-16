@@ -296,7 +296,7 @@ def listFiles(pentest: str, attached_to: str, filetype: FileType) -> Union[Error
             try:
                 files = os.listdir(filepath)
             except FileNotFoundError as e:
-                logger.error("Error listing files: %s", str(e))
+                ##logger.error("Error listing files: %s", str(e))
                 return "File not found", 404
         else:
             return "Invalid filetype", 400

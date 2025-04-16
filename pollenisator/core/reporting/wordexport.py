@@ -67,7 +67,6 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
     jinja_env.filters['getInitials'] = getInitials
     jinja_env.filters['regex_findall'] = regex_findall
     jinja_env.filters['debug'] = debug
-    replaceUnassignedFileImages(context, context["pentest"])
     context["proof_by_names"] = {}
     for defect in context["defects"]:
         proofs = defect.get("proofs", [])
@@ -86,6 +85,8 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
         for instance in defect.get("instances", []):
             for i,proof in enumerate(instance.get("proofs", [])):
                 instance["proofs"][i] = InlineImage(doc, proof)
+    replaceUnassignedFileImages(context, context["pentest"])
+    
     try:
         doc.render(context, jinja_env)
     except jinja2.exceptions.TemplateSyntaxError as e:
@@ -120,6 +121,8 @@ def replaceUnassignedFileImages(context: dict, pentest: str) -> None:
     """
     pattern = r"(!\[.*\]\((.*?)\))"
     files = listFiles(pentest, "unassigned", "file")
+    if files is None or not isinstance(files, list):
+        files = []
     def _recursive_process(obj, depth: int):
         if depth > 10:
             return obj
@@ -144,6 +147,8 @@ def replaceUnassignedFileImages(context: dict, pentest: str) -> None:
                         return f"![{local_path}](file://{local_path})"
                     else:
                         return alt_text
+                else:
+                    return match.string
             obj = re.sub(pattern, repl, obj)
         return obj
 
