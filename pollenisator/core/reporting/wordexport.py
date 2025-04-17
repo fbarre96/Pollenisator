@@ -85,7 +85,7 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
         for instance in defect.get("instances", []):
             for i,proof in enumerate(instance.get("proofs", [])):
                 instance["proofs"][i] = InlineImage(doc, proof)
-    #replaceUnassignedFileImages(context, context["pentest"])
+    replaceUnassignedFileImages(context, context["pentest"])
     
     try:
         doc.render(context, jinja_env)
@@ -148,7 +148,7 @@ def replaceUnassignedFileImages(context: dict, pentest: str) -> None:
                     else:
                         return alt_text
                 else:
-                    return match.string
+                    return match.group(0)
             obj = re.sub(pattern, repl, obj)
         return obj
 
