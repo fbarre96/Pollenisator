@@ -67,6 +67,7 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
     jinja_env.filters['getInitials'] = getInitials
     jinja_env.filters['regex_findall'] = regex_findall
     jinja_env.filters['debug'] = debug
+    # TODO : MAYBE This code could removed now that the file:/// is supported in markwdown (see replaceUnassingedFIleImages)
     context["proof_by_names"] = {}
     for defect in context["defects"]:
         proofs = defect.get("proofs", [])
@@ -85,6 +86,7 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
         for instance in defect.get("instances", []):
             for i,proof in enumerate(instance.get("proofs", [])):
                 instance["proofs"][i] = InlineImage(doc, proof)
+    # TODO : END
     replaceUnassignedFileImages(context, context["pentest"])
     
     try:
@@ -123,6 +125,9 @@ def replaceUnassignedFileImages(context: dict, pentest: str) -> None:
     files = listFiles(pentest, "unassigned", "file")
     if files is None or not isinstance(files, list):
         files = []
+    pollenisator_files = listFiles("pollenisator", "unassigned", "file")
+    if pollenisator_files is None or not isinstance(pollenisator_files, list):
+        pollenisator_files = []
     def _recursive_process(obj, depth: int):
         if depth > 10:
             return obj
@@ -141,12 +146,20 @@ def replaceUnassignedFileImages(context: dict, pentest: str) -> None:
                 alt_text = match.group(1)
                 url = match.group(2)
                 if url in files:
-                    base_dir = os.path.normpath(os.path.join(getMainDir(), "files", pentest, "file", "unassigned"))
-                    local_path = os.path.normpath(os.path.join(base_dir, os.path.basename(url)))
-                    if local_path.startswith(base_dir):
-                        return f"![{local_path}](file://{local_path})"
-                    else:
-                        return alt_text
+                    pentest_base_dir = os.path.normpath(os.path.join(getMainDir(), "files", pentest, "file", "unassigned"))
+                    pentest_path = os.path.normpath(os.path.join(pentest_base_dir, os.path.basename(url)))
+                    if pentest_path.startswith(pentest_base_dir):
+                        if os.path.isfile(pentest_path):
+                            return f"![{pentest_path}](file://{pentest_path})"
+                   
+                    return alt_text
+                elif url in pollenisator_files:
+                    pollenisator_base_dir = os.path.normpath(os.path.join(getMainDir(), "files", "pollenisator", "file", "unassigned"))
+                    pollenisator_path = os.path.normpath(os.path.join(pollenisator_base_dir, os.path.basename(url)))
+                    if pollenisator_path.startswith(pollenisator_base_dir):
+                        if os.path.isfile(pollenisator_path):
+                            return f"![{pollenisator_path}](file://{pollenisator_path})"
+                    return alt_text
                 else:
                     return match.group(0)
             obj = re.sub(pattern, repl, obj)

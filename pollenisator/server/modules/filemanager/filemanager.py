@@ -335,6 +335,13 @@ def download(pentest: str, attached_to: str, filetype: FileType, filename: Optio
         filepath = os.path.join(filepath, os.path.basename(filename))
         if os.path.exists(filepath):
             return send_file(filepath)
+        else:
+            filepath = os.path.join(local_path, "pollenisator", "file", "unassigned", os.path.basename( filename))
+            filepath = os.path.normpath(filepath)
+            if not filepath.startswith(local_path):
+                return "Invalid path", 400
+            if os.path.exists(filepath):
+                return send_file(filepath)
     else:
         files = os.listdir(filepath)
         if len(files) == 1:
@@ -358,6 +365,14 @@ def download(pentest: str, attached_to: str, filetype: FileType, filename: Optio
 
     if os.path.exists(filepath):
         return send_file(filepath)
+    elif filename is not None:
+        filename = os.path.basename(filename)
+        filepath = os.path.join(local_path, "pollenisator", "file", "unassigned", filename)
+        filepath = os.path.normpath(filepath)
+        if not filepath.startswith(local_path):
+            return "Invalid path", 400
+        if os.path.exists(filepath):
+            return send_file(filepath)
     return "File not found", 404
 
 @permission("pentester")

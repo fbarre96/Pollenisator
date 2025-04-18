@@ -468,6 +468,8 @@ class Defect(Element):
             for proof_group in proof_groups:
                 if proof_group.group(1) in existing_proofs_to_remove:
                     existing_proofs_to_remove.remove(proof_group.group(1))
+                if proof_group.group(1) not in new_data["proofs"]:
+                    continue
                 new_data["proofs"].add(proof_group.group(1))
             for proof_to_remove in existing_proofs_to_remove:
                 self.rmProof(proof_to_remove)
