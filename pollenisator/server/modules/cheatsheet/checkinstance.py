@@ -695,3 +695,24 @@ def queueCheckInstances(pentest: str, body: BodyQueueCheckInstances) -> ErrorSta
         check_iids.add(ObjectId(check_iid))
     CheckInstance.bulk_queue(pentest, list(check_iids), body.get("priority", 0), force=force_queue)
     return "Success", 200
+
+@permission("pentester")
+def getChecksData(pentest: str, checkinstance_iid: str) -> Union[ErrorStatus,Dict[str, Any]]:
+    """
+    Get the getChecksData for the checkinstance.
+
+    Args:
+        pentest (str): The name of the pentest.
+        checkinstance_iid (str): The id of the CheckInstance.
+
+    Returns:
+        Dict[str, Any]: A dictionary containing the checkinstance useful data.
+    """
+    check = CheckInstance.fetchObject(pentest, {"_id": ObjectId(checkinstance_iid)})
+    if check is None:
+        return "Not found", 404
+    ret = {}
+    result = check.getCheckInstanceInformation()
+    if result is not None:
+        ret[str(check.getId())] = result
+    return ret

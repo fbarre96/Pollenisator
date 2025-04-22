@@ -91,6 +91,30 @@ paths:
         description: ''
       tags:
         - Cheatsheet
+
+  "/checkinstances/{pentest}/{checkinstance_iid}/getChecksData":
+    get:
+      operationId: pollenisator.server.modules.cheatsheet.checkinstance.getChecksData
+      tags:
+        - Scopes
+      summary: Get check instances data for a check instance
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: checkinstance_iid
+          in: path
+          description: checkinstance iid to get
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get data on a checkisntance
+
   '/cheatsheet/{pentest}/getTargetRepr':
     parameters:
       - schema:
