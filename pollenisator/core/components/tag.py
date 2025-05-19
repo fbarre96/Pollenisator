@@ -1,5 +1,6 @@
 """
 This module contains the Tag class, which is used to represent a tag in the Pollenisator system.
+TODO : Move to models ?
 """
 
 from typing import Dict, List, Optional, Tuple, Union, overload
