@@ -472,7 +472,7 @@ class Defect(Element):
                     try:
                         pollenisator_images = os.listdir(os.path.join(utils.getMainDir(), "files", "pollenisator", "file","unassigned"))
                     except FileNotFoundError:
-                        pass
+                        pollenisator_images = []
                     if (proof_group.group(1) in pollenisator_images):
                         continue
                 new_data["proofs"].add(os.path.normpath(proof_group.group(1)))

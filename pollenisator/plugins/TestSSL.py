@@ -89,7 +89,6 @@ def parseWarnings(pentest, file_opened):
                 missconfiguredHosts[ip] = missconfiguredHosts.get(ip, {})
                 missconfiguredHosts[ip][port] = missconfiguredHosts[ip].get(port, [])
                 missconfiguredHosts[ip][port].append(information)
-
     bulk_insertions(pentest, list(ips_to_add.values()), list(ports_to_add.values()))
     cache = {}
     for ip, _ in missconfiguredHosts.items():
