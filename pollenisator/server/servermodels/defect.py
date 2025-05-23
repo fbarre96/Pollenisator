@@ -173,8 +173,9 @@ def update(pentest: str, defect_iid: str, force: bool, body: Dict[str, Any]) -> 
                     return "You are trying to skip a redaction step, this could leave some review unaccepted.", 400
             except ValueError:
                 return "Unknown redacted state", 400
+        old.save_history()
         # Delete review if needed
-        if new_redacted_state == "New" or new_redacted_state == "To review" and old.redacted_state == "Completed":
+        if (new_redacted_state == "New" or new_redacted_state == "To review") and old.redacted_state == "Completed":
             old.delete_review()
             
         if new_redacted_state == "To review":
@@ -184,11 +185,29 @@ def update(pentest: str, defect_iid: str, force: bool, body: Dict[str, Any]) -> 
         old.updateInDb(body)
     else:
         # Defect change
-        if old.redacted_state == "To review":
+        if old.redacted_state == "To review" or old.redacted_state == "Reviewed":
             old.save_review(body)
         else:
             old.updateInDb(body)
     return True
+
+@permission("pentester")
+def getDefectHistory(pentest: str, defect_iid: str) -> Union[ErrorStatus,List[Dict[str, Any]]]:
+    """
+    Get the history of a defect. The history includes all changes made to the defect.
+
+    Args:
+        pentest (str): The name of the pentest.
+        defect_iid (str): The id of the defect.
+
+    Returns:
+        List[Dict[str, Any]]: A list of dictionaries, each representing a version of the defect. The versions are ordered by their index.
+    """
+    defect = Defect.fetchObject(pentest, {"_id":ObjectId(defect_iid)})
+    if defect is None:
+        return "Not found", 404
+    defect = cast(Defect, defect)
+    return defect.get_history()
 
 @permission("user")
 def update_template_suggestion(defect_iid: str, body: Dict[str, Any], username: str) -> Union[bool, Tuple[str, int]]:

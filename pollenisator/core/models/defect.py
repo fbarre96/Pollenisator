@@ -350,6 +350,40 @@ class Defect(Element):
         else:
             return res
         
+    def save_history(self) -> None:
+        """
+            Save the current version in the database under the version collection.
+        """
+        dbclient = DBClient.getInstance()
+        if self.redacted_state == "To review" or self.redacted_state == "Reviewed":
+            data = self.get_review(force=False)
+            if "_id" in data:
+                data["history_defect_iid"] = ObjectId(data["defect_iid"])
+                data["history_review_id"] = ObjectId(data["_id"])
+                del data["_id"]
+        else:
+            data = self.getData()
+            if "_id" in data:
+                data["history_defect_iid"] = ObjectId(data["_id"])
+                del data["_id"]
+        data["date"] = datetime.now()
+        dbclient.insertInDb(self.pentest, "defects_history", data)
+
+    def get_history(self) -> List[Dict[str, Any]]:
+        """
+        Get the history of this defect.
+
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries representing the history of this defect.
+        """
+        dbclient = DBClient.getInstance()
+        history = dbclient.findInDb(self.pentest, "defects_history", {"history_defect_iid": ObjectId(self.getId())}, multi=True)
+        if history is None:
+            return []
+        
+        return [x for x in history]
+    
+        
     def save_review(self, data) -> None:
         """
         Save current version in the database under the version collection.

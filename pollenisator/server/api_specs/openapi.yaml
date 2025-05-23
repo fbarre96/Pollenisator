@@ -2357,6 +2357,28 @@ paths:
             application/json:
               schema:
                 type: integer
+  "/defects/{pentest}/{defect_iid}/history":
+    get:
+      operationId: pollenisator.server.servermodels.defect.getDefectHistory
+      tags:
+        - Defects
+      summary: Get defect history
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: defect_iid
+          in: path
+          description: defect iid to get
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get defect history as list of defects data
   "/intervals/{pentest}":
     post:
       operationId: pollenisator.server.servermodels.interval.insert
