@@ -25,6 +25,8 @@ def upsert(pentest: str, body: Dict[str, Any]) -> ErrorStatus:
     dbclient = DBClient.getInstance()
     body = json.loads(json.dumps(body), cls=JSONDecoder)
     key = body.get("key", "")
+    if key.lower() == "pentesters":
+        return "Key argument was not valid", 400
     value = json.loads(body.get("value", ""))
     if key == "" or not isinstance(key, str):
         return "Key argument was not valid", 400

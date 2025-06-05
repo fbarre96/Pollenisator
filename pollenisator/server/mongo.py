@@ -107,7 +107,8 @@ def update(pentest: str, collection: str, body: Dict[str, Union[str, bool]]) -> 
             return "Collection argument is not a valid pollenisator collection", 403
     elif pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 403
-
+    if collection == "settings":
+        return "Settings collection cannot be updated directly", 403
     dbclient.updateInDb(pentest, collection, pipeline, updatePipeline, body.get("many", False), body["notify"], body.get("upsert", False))
     return "Success", 200
 
@@ -638,7 +639,7 @@ def addPentestUser(pentest: str, body: Dict[str, str], **kwargs: Dict[str, Any])
         return {"message": "Pentest not found"}, 404
     if owner != dbclient.getPentestOwner(pentest) and "admin" not in kwargs["token_info"]["scope"]:
         return {"message": "Forbidden"}, 403
-    if username == owner:
+    if username == owner and "admin" not in kwargs["token_info"]["scope"]:
         return {"message": "You cannot add owner as a user"}, 400
     if username in dbclient.getPentestUsers(pentest):
         return {"message": f"User {username} is already in pentest"}, 400
