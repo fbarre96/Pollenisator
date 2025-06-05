@@ -494,6 +494,8 @@ paths:
       responses:
         '200':
           description: Successful read user
+
+  
     
   /getTriggerLevels:
     get:
@@ -1820,7 +1822,117 @@ paths:
       responses:
         "200":
           description: Successful edition
-       
+  
+  "/pentest/{pentest}/users":
+    get:
+      operationId: pollenisator.server.mongo.getPentestUsers
+      tags:
+        - pentest
+      summary: Get a list of users in a pentest
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful get
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '["user1", "user2"]'
+    post:
+      description: Add a user to a pentest
+      operationId: pollenisator.server.mongo.addPentestUser
+      tags:
+        - pentest
+      summary: Add a user to a pentest
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+              properties:
+                username:
+                  type: string
+      responses:
+        "200":
+          description: Successful addition of user to pentest
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
+
+  
+  "/pentest/{pentest}/users/{username}":
+    delete:
+      operationId: pollenisator.server.mongo.removePentestUser
+      tags:
+        - pentest
+      summary: Remove a user from a pentest
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful removal of user from pentest
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
+   
+
+  "/pentest/{pentest}/users/transferOwnership":
+    post:
+      operationId: pollenisator.server.mongo.transferPentestOwnership
+      tags:
+        - pentest
+      summary: Transfer ownership of a pentest to another user
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - new_owner
+              properties:
+                new_owner:
+                  type: string
+      responses:
+        "200":
+          description: Successful transfer of ownership
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'true'
+
   "/notification/{pentest}":
     get:
       operationId: pollenisator.server.mongo.fetchNotifications

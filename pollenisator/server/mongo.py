@@ -2,6 +2,7 @@
 Handles all generic interactions with the database
 """
 import json
+from uuid import UUID
 import zipfile
 from typing import Any, Dict, List, Set, Tuple, Union
 import tempfile
@@ -455,6 +456,8 @@ def bulk_delete_commands(body: Union[str, Dict[str, List[str]]], **kwargs: Dict[
             if not isinstance(obj_id_str, ObjectId):
                 if obj_id_str.startswith("ObjectId|"):
                     obj_id = ObjectId(obj_id_str.split("ObjectId|")[1])
+                else:
+                    obj_id = ObjectId(obj_id_str)
             else:
                 obj_id = ObjectId(obj_id_str)
             res = dbclient.deleteFromDb("pollenisator", obj_type, {"_id": ObjectId(obj_id)}, False, True)
@@ -559,7 +562,7 @@ def registerPentest(pentest: str, body: Dict[str, Any], **kwargs: Dict[str, Any]
     else:
         return msg, 403
 
-@permission("owner")
+@permission("user") # user but owner is verified
 def editPentest(pentest: str, body: Dict[str, str], **kwargs: Dict[str, Any]) -> Union[Dict[str, str], Tuple[Dict[str, str], int]]:
     """
     Edit the name of a pentest.
@@ -574,10 +577,130 @@ def editPentest(pentest: str, body: Dict[str, str], **kwargs: Dict[str, Any]) ->
         Union[Dict[str, str], Tuple[Dict[str, str], int]]: A success message if the name change was successful, otherwise an error message and status code.
     """
     pentest_name = body.get("pentest_name", "")
+    if not pentest_name:
+        return {"message": "Pentest name is required"}, 400
+    username = kwargs["token_info"]["sub"]
+    if pentest not in dbclient.listPentestUuids():
+        return {"message": "Pentest not found"}, 404
+    if username != dbclient.getPentestOwner(pentest) and "admin" not in kwargs["token_info"]["scope"]:
+        return {"message": "Forbidden"}, 403
     res, msg = dbclient.editPentest(pentest, pentest_name)
     if not res:
         return {"message": msg, "error": "Invalid name"}, 403
     return {"message": "Pentest name changed"}, 200
+
+@permission("user")
+def getPentestUsers(pentest: str, **kwargs: Dict[str, Any]) -> List[Dict[str, str]]:
+    """
+    Get the list of users associated with a pentest.
+
+    Args:
+        pentest (str): The UUID of the pentest.
+        **kwargs (Dict[str, Any]): Additional keyword arguments. Not used in this function.
+
+    Returns:
+        List[str]: A list of usernames associated with the pentest.
+    """
+    username = kwargs["token_info"]["sub"]
+    if pentest not in dbclient.listPentestUuids():
+        return []
+    owner = dbclient.getPentestOwner(pentest)
+    pentest_users = dbclient.getPentestUsers(pentest)
+    if username != owner and "admin" not in kwargs["token_info"]["scope"] and username not in pentest_users:
+        return []
+    users = []
+    for user in pentest_users:
+        if user == owner:
+            continue
+        users.append({"username": user, "role": "pentester"})
+    users.append({"username": owner, "role": "owner"})
+    return users
+
+@permission("user")  # user but owner is verified
+def addPentestUser(pentest: str, body: Dict[str, str], **kwargs: Dict[str, Any]) -> Union[Dict[str, str], Tuple[Dict[str, str], int]]:
+    """
+    Add a user to a pentest.
+
+    Args:
+        pentest (str): The UUID of the pentest.
+        body (Dict[str, str]): A dictionary containing the username of the user to add.
+            "username" (str): The username of the user to add.
+        **kwargs (Dict[str, Any]): Additional keyword arguments. The "token_info" key should contain a dictionary with a "sub" key representing the user.
+
+    Returns:
+        Union[Dict[str, str], Tuple[Dict[str, str], int]]: A success message if the user was added successfully, otherwise an error message and status code.
+    """
+    username = body.get("username", "")
+    if not username:
+        return {"message": "Username is required"}, 400
+    owner = kwargs["token_info"]["sub"]
+    if pentest not in dbclient.listPentestUuids():
+        return {"message": "Pentest not found"}, 404
+    if owner != dbclient.getPentestOwner(pentest) and "admin" not in kwargs["token_info"]["scope"]:
+        return {"message": "Forbidden"}, 403
+    if username == owner:
+        return {"message": "You cannot add owner as a user"}, 400
+    if username in dbclient.getPentestUsers(pentest):
+        return {"message": f"User {username} is already in pentest"}, 400
+    if not dbclient.isUserInDb(username):
+        return {"message": f"User {username} does not exist"}, 404
+    res = dbclient.addPentestUser(pentest, username)
+    if res:
+        return {"message": f"User {username} added to pentest"}, 200
+    else:
+        return {"message": f"User {username} could not be added to pentest"}, 400
+    
+@permission("user")  # user but owner is verified
+def removePentestUser(pentest: str, username: str, **kwargs: Dict[str, Any]) -> Union[Dict[str, str], Tuple[Dict[str, str], int]]:
+    """
+    Remove a user from a pentest.
+
+    Args:
+        pentest (str): The UUID of the pentest.
+        username (str): The username of the user to remove.
+        **kwargs (Dict[str, Any]): Additional keyword arguments. The "token_info" key should contain a dictionary with a "sub" key representing the user.
+
+    Returns:
+        Union[Dict[str, str], Tuple[Dict[str, str], int]]: A success message if the user was removed successfully, otherwise an error message and status code.
+    """
+    current_username = kwargs["token_info"]["sub"]
+    if pentest not in dbclient.listPentestUuids():
+        return {"message": "Pentest not found"}, 404
+    if current_username != dbclient.getPentestOwner(pentest) and "admin" not in kwargs["token_info"]["scope"]:
+        return {"message": "Forbidden"}, 403
+    res = dbclient.removePentestUser(pentest, username)
+    if res:
+        return {"message": f"User {username} removed from pentest {pentest}"}, 200
+    else:
+        return {"message": f"User {username} could not be removed from pentest {pentest}"}, 400
+    
+@permission("user")  # user but owner is verified
+def transferPentestOwnership(pentest: str, body: Dict[str, str], **kwargs: Dict[str, Any]) -> Union[Dict[str, str], Tuple[Dict[str, str], int]]:
+    """
+    Transfer ownership of a pentest to another user.
+
+    Args:
+        pentest (str): The UUID of the pentest.
+        body (Dict[str, str]): A dictionary containing the username of the new owner.
+            "new_owner" (str): The username of the new owner.
+        **kwargs (Dict[str, Any]): Additional keyword arguments. The "token_info" key should contain a dictionary with a "sub" key representing the user.
+
+    Returns:
+        Union[Dict[str, str], Tuple[Dict[str, str], int]]: A success message if the ownership was transferred successfully, otherwise an error message and status code.
+    """
+    new_owner = body.get("new_owner", "")
+    if not new_owner:
+        return {"message": "New owner's username is required"}, 400
+    owner = kwargs["token_info"]["sub"]
+    if pentest not in dbclient.listPentestUuids():
+        return {"message": "Pentest not found"}, 404
+    if owner != dbclient.getPentestOwner(pentest) and "admin" not in kwargs["token_info"]["scope"]:
+        return {"message": "Forbidden"}, 403
+    res = dbclient.transferPentestOwnership(pentest, new_owner)
+    if res:
+        return {"message": f"Ownership of pentest {pentest} transferred to {new_owner}"}, 200
+    else:
+        return {"message": f"Could not transfer ownership of pentest {pentest} to {new_owner}"}, 400
 
 @permission("pentester")
 def getPentestInfo(pentest: str, **kwargs: Dict[str, Any]) -> Dict[str, Any]:
@@ -869,37 +992,18 @@ def updateTag(body: Dict[str, Any]) -> Union[ErrorStatus, bool]:
     dbclient.updateInDb("pollenisator", "settings", {"key":"tags"}, {"$set": {"value":json.dumps(tags,  cls=JSONEncoder)}}, many=False, notify=True)
     return True
 
-@permission("pentester", "dbName")
-def dumpDb(dbName: str, collection: str = "") -> Union[ErrorStatus, Response]:
+def do_dump_db_to_file(dbName: str, collection: str, pentest_record: Dict[str, Any], dirpath: str) -> Union[ErrorStatus, str]:
     """
-    Export a database dump into the exports/ folder as a gzip archive.
-    It uses the mongodump utility installed with mongodb-org-tools.
+    Perform a pentest dump (export) to a file.
+    This function uses the DBClient to dump the database and create an archive with the pentest record and files.
 
     Args:
-        dbName (str): The database name to dump.
-        collection (str, optional): The collection to dump. Defaults to "".
-
-    Returns:
-        Union[ErrorStatus, Response]: If the database or collection was not found, or if the export failed, returns an error message and status code. Otherwise, returns the file to be downloaded.
+        dbName (str): The name of the database to dump.
+        collection (str): The collection to dump.
+        pentest_record (Dict[str, Any]): The pentest record containing details about the pentest.
+        dirpath (str): The directory path where the dump will be stored.
     """
     dbclient_fresh = DBClient.getInstance()
-    if dbName != "pollenisator" and dbName not in dbclient_fresh.listPentestUuids():
-        return "Database not found", 404
-    dbclient_fresh.connectToDb(dbName)
-    if dbclient_fresh.db is None:
-        dbclient_fresh.connect()
-    if dbclient_fresh.db is None:
-        return "Connection to database failed", 503
-    collections = dbclient_fresh.db.list_collection_names()
-    if collection != "" and collection not in collections:
-        return "Collection not found in database provided", 404
-    if collection != "" and not re.match(r"^[a-zA-Z0-9_\-]+$", collection):
-        return "Invalid collection name", 400
-    pentest_record = dbclient_fresh.findInDb("pollenisator", "pentests", {"uuid":dbName}, False)
-    if pentest_record is None:
-        return "Pentest not found", 404
-    dirpath = tempfile.mkdtemp()
-    
     dump_path, status_code = dbclient_fresh.dumpDb(dbName, collection, directory=dirpath)
     if status_code != 200:
         return dump_path, status_code # error message and status code
@@ -922,6 +1026,59 @@ def dumpDb(dbName: str, collection: str = "") -> Union[ErrorStatus, Response]:
         zipf.write(os.path.join(dirpath, "pentest.json"), "pentest.json")
         if os.path.isfile(export_files):
             zipf.write(export_files, os.path.basename(export_files))
+    return export_path
+
+def check_pentest_collection_exists(dbName: str, collection:str) -> Union[ErrorStatus, Dict[str, Any]]:
+    """
+    Check if the database and collection exist in the DBClient.
+    Args:
+        dbName (str): The name of the database to check.
+        collection (str): The name of the collection to check.
+
+    Returns:
+        Union[ErrorStatus, Dict[str, Any]]: If the database or collection does not exist, returns an error message and status code. Otherwise, returns the pentest record.
+    """
+    dbclient_fresh = DBClient.getInstance()
+    if dbName != "pollenisator" and dbName not in dbclient_fresh.listPentestUuids():
+        return "Database not found", 404
+    dbclient_fresh.connectToDb(dbName)
+    if dbclient_fresh.db is None:
+        dbclient_fresh.connect()
+    if dbclient_fresh.db is None:
+        return "Connection to database failed", 503
+    collections = dbclient_fresh.db.list_collection_names()
+    if collection != "" and collection not in collections:
+        return "Collection not found in database provided", 404
+    if collection != "" and not re.match(r"^[a-zA-Z0-9_\-]+$", collection):
+        return "Invalid collection name", 400
+    pentest_record = dbclient_fresh.findInDb("pollenisator", "pentests", {"uuid":dbName}, False)
+    if pentest_record is None:
+        return "Pentest not found", 404
+    return pentest_record
+
+
+@permission("pentester", "dbName")
+def dumpDb(dbName: str, collection: str = "") -> Union[ErrorStatus, Response]:
+    """
+    Export a database dump into the exports/ folder as a gzip archive.
+    It uses the mongodump utility installed with mongodb-org-tools.
+
+    Args:
+        dbName (str): The database name to dump.
+        collection (str, optional): The collection to dump. Defaults to "".
+
+    Returns:
+        Union[ErrorStatus, Response]: If the database or collection was not found, or if the export failed, returns an error message and status code. Otherwise, returns the file to be downloaded.
+    """
+    
+    pentest_record = check_pentest_collection_exists(dbName, collection)
+    if isinstance(pentest_record, tuple):
+        return pentest_record
+    dirpath = tempfile.mkdtemp()
+    export_path = do_dump_db_to_file(dbName, collection, pentest_record, dirpath)
+    if isinstance(export_path, tuple):
+        return export_path
+    # send_file differs between python versions, so we need to handle it carefully
     try:
         response = send_file(export_path, mimetype="application/zip", attachment_filename=os.path.basename(export_path))
     except TypeError as _e: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
@@ -930,25 +1087,33 @@ def dumpDb(dbName: str, collection: str = "") -> Union[ErrorStatus, Response]:
     return response
 
 @permission("user")
-def importDb(upfile: werkzeug.datastructures.FileStorage, **kwargs: Dict[str,Any]) -> ErrorStatus:
+def importDb(upfile: Union[str,werkzeug.datastructures.FileStorage], **kwargs: Dict[str,Any]) -> ErrorStatus:
     """
     Import a database dump from a file.
 
     Args:
-        upfile (Any): The file containing the database dump.
+        upfile Union[str,werkzeug.datastructures.FileStorage]: The file containing the database dump. Either path if direct call of uploaded file from api call
         **kwargs (Dict[str, Dict[str, str]]): Additional keyword arguments. The "token_info" key should contain a dictionary with a "sub" key representing the user.
 
     Returns:
         ErrorStatus: A message and status code indicating success or error.
     """
-    username = kwargs["token_info"]["sub"]
-    if upfile.filename is None:
-        return "Invalid filename", 400
+    username = kwargs.get("token_info", {}).get("sub", None)
+    if username is None:
+        username = kwargs.get("username", None)
+    if username is None:
+        return "No username found", 400
     dirpath = tempfile.mkdtemp()
-    temp_name = tempfile.mktemp()
-    tmpfile = os.path.join(dirpath, os.path.basename(temp_name))
-    with open(tmpfile, "wb") as f:
-        f.write(upfile.stream.read())
+    
+    if not isinstance(upfile, str):
+        if upfile.filename is None:
+            return "Invalid filename", 400
+        temp_name = tempfile.mktemp()
+        tmpfile = os.path.join(dirpath, os.path.basename(temp_name))
+        with open(tmpfile, "wb") as f:
+            f.write(upfile.stream.read())
+    else:
+        tmpfile = upfile
     pentest_archive = ""
     with zipfile.ZipFile(tmpfile, 'r') as zip_ref:
         for member in zip_ref.namelist():
@@ -970,17 +1135,47 @@ def importDb(upfile: werkzeug.datastructures.FileStorage, **kwargs: Dict[str,Any
     orig_uuid = pentest["uuid"]
     if orig_uuid == "pollenisator":
         return "Cannot import into main database", 403
-    if orig_uuid in dbclient.listPentestUuids():
+    if orig_uuid in dbclient.listPentestUuids() and not kwargs.get("isCopy", False):
         return "Pentest already exists", 400
-    to_name = pentest["nom"]
-    success = dbclient.importDatabase(username, pentest_archive, to_name, orig_uuid)
+    to_name = kwargs.get("toDb", pentest["nom"])
+    msg, success_status = dbclient.importDatabase(username, pentest_archive, to_name, orig_uuid)
+    if success_status != 200:
+        shutil.rmtree(dirpath)
+        return msg, success_status
+    new_uuid = msg
     if "files.zip" in os.listdir(dirpath):
-        output_file_path = os.path.abspath(os.path.join(getMainDir(), "files", orig_uuid))
+        output_file_path = os.path.abspath(os.path.join(getMainDir(), "files", new_uuid))
         with zipfile.ZipFile(os.path.join(dirpath, "files.zip"), 'r') as zip_ref:
             zip_ref.extractall(output_file_path)
 
     shutil.rmtree(dirpath)
-    return success
+    return new_uuid, 200
+
+
+@permission("pentester", "body.fromDb")
+def copyDb(body: Dict[str, str], **kwargs: Dict[str,Any]) -> Any:
+    """
+    Copy a database to another database.
+
+    Args:
+        body (Dict[str, str]): A dictionary containing the names of the source and destination databases.
+            "toDb" (str): The name of the destination database.
+            "fromDb" (str): The name of the source database.
+
+    Returns:
+        Any: The result of the database operation.
+    """
+    toCopyName = body["toDb"]
+    fromCopyName = body["fromDb"]
+    pentest_record = check_pentest_collection_exists(fromCopyName, "")
+    if isinstance(pentest_record, tuple):
+        return pentest_record
+    dirpath = tempfile.mkdtemp()
+    export_path = do_dump_db_to_file(fromCopyName, "", pentest_record, dirpath)
+    if isinstance(export_path, tuple):
+        return export_path
+    return importDb(export_path, toDb=toCopyName, username=kwargs["token_info"]["sub"], isCopy=True)
+
 
 def doImportCommands(data: str, user: str) -> Union[ErrorStatus, List[Dict[str, Any]]]:
     """
@@ -1195,20 +1390,3 @@ def exportCheatsheet(**kwargs) -> Dict[str, List[Dict[str, Any]]]:
         Dict[str, List[Dict[str, Any]]]: A dictionary with "checkitems", "defects", and "commands" keys each containing a list of all items in the respective collections in the database.
     """
     return doExportCheatsheet()
-
-@permission("pentester", "body.fromDb")
-def copyDb(body: Dict[str, str]) -> Any:
-    """
-    Copy a database to another database.
-
-    Args:
-        body (Dict[str, str]): A dictionary containing the names of the source and destination databases.
-            "toDb" (str): The name of the destination database.
-            "fromDb" (str): The name of the source database.
-
-    Returns:
-        Any: The result of the database operation.
-    """
-    toCopyName = body["toDb"]
-    fromCopyName = body["fromDb"]
-    return dbclient.copyDb(fromCopyName, toCopyName)

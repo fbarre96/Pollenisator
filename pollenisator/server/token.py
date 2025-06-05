@@ -14,7 +14,7 @@ import os
 
 
 JWT_SECRET = os.environ.get("JWT_SECRET", secrets.token_urlsafe(32))
-JWT_LIFETIME_SECONDS = 3600*8
+JWT_LIFETIME_SECONDS = 3600*12  # 12 hours
 JWT_ALGORITHM = 'HS256'
 
 def getTokenFor(username: str, pentest: str = "", owner: bool = False) -> str:

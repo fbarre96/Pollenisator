@@ -1104,7 +1104,7 @@ class DBClient:
         pentesters = self.findInDb(pentest, "settings", {"key":"pentesters"}, False)
         if pentesters is None:
             return []
-        value: List[str] = pentesters["value"]
+        value: List[str] = [x for x in pentesters["value"] if x.strip() != ""]
         return value
 
     def getPentestOwner(self, pentest: str) -> str:
@@ -1180,7 +1180,7 @@ class DBClient:
                                         todb=toCopyUUID)
             return "Database copied", 200
         else:
-            outpath,status_code = self.dumpDb(fromCopyUUID)
+            outpath, status_code = self.dumpDb(fromCopyUUID)
             if status_code != 200:
                 return outpath, status_code
             return self.importDatabase(self.getPentestOwner(fromCopyUUID), outpath, toCopyName, fromCopyUUID)
@@ -1322,6 +1322,8 @@ class DBClient:
         tags = tags.get("value", {})
         if isinstance(tags, str):
             tags = json.loads(tags)
+        pentest_tags: Union[List[str], List[Dict[str, Any]]]
+        global_tags: Union[List[str], List[Dict[str, Any]]]
         if only_name:
             pentest_tags = list(tags.keys())
             global_tags = list(self.getGlobalTags().keys())
@@ -1491,3 +1493,69 @@ class DBClient:
             if attached_to != "unassigned":
                 dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(attached_to)}, {"$addToSet":{"proofs":name}})
         return {"msg":name + " was successfully uploaded", "attachment_id":attachment_id}, 200, full_filepath
+
+    def transferPentestOwnership(self, pentest: str, new_owner: str) -> bool:
+        """
+        Transfer the ownership of a pentest to a new user.
+
+        Args:
+            pentest (str): The name of the pentest.
+            new_owner (str): The username of the new owner.
+
+        Returns:
+            bool: True if the ownership was successfully transferred, False otherwise.
+        """
+        if self.client is None:
+            raise ValueError("No pentest connected")
+        old_owner = self.getPentestOwner(pentest)
+        self.updateInDb(pentest, "settings", {"key": "pentesters"}, {"$addToSet": {"value": old_owner}}, notify=True)
+        res = self.updateInDb("pollenisator", "pentests", {"uuid": pentest}, {"$set": {"owner": new_owner}})
+
+        return res.acknowledged
+    
+    def removePentestUser(self, pentest: str, user: str) -> bool:
+        """
+        Remove a user from a pentest.
+
+        Args:
+            pentest (str): The name of the pentest.
+            user (str): The username of the user to remove.
+
+        Returns:
+            bool: True if the user was successfully removed, False otherwise.
+        """
+        if self.client is None:
+            raise ValueError("No pentest connected")
+        res = self.updateInDb(pentest, "settings", {"key": "pentesters"}, {"$pull": {"value": user}}, notify=True)
+        return res.acknowledged
+    
+    def addPentestUser(self, pentest: str, user: str) -> bool:
+        """
+        Add a user to a pentest.
+
+        Args:
+            pentest (str): The name of the pentest.
+            user (str): The username of the user to add.
+
+        Returns:
+            bool: True if the user was successfully added, False otherwise.
+        """
+        if self.client is None:
+            raise ValueError("No pentest connected")
+        res = self.updateInDb(pentest, "settings", {"key": "pentesters"}, {"$addToSet": {"value": user}}, notify=True)
+        return res.acknowledged
+    
+    def isUserInDb(self, username: str) -> bool:
+        """
+        Check if a user exists in the database.
+
+        Args:
+            username (str): The username to check.
+
+        Returns:
+            bool: True if the user exists, False otherwise.
+        """
+        if self.client is None:
+            raise ValueError("No pentest connected")
+        user_record = self.getUserRecordFromUsername(username)
+        return user_record is not None and "_id" in user_record

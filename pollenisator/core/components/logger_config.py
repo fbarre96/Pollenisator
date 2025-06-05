@@ -26,7 +26,7 @@ logger.addHandler(error_handler)
 
 # still log INFO+ to stdout
 stream_handler = logging.StreamHandler(sys.stdout)
-stream_handler.setLevel(logging.INFO)
+stream_handler.setLevel(logging.DEBUG)
 stream_handler.setFormatter(debug_formatter)
 logger.addHandler(stream_handler)
 
