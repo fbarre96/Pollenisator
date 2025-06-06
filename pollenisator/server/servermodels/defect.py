@@ -39,7 +39,7 @@ def delete(pentest: str, defect_iid: str) -> int:
 
 
 @permission("pentester")
-def insert(pentest: str, body: Dict[str, Any]) -> Union[DefectInsertResult, Tuple[str, int]]:
+def insert(pentest: str, body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[DefectInsertResult, Tuple[str, int]]:
     """
     Insert a new defect into the database.
 
@@ -51,11 +51,14 @@ def insert(pentest: str, body: Dict[str, Any]) -> Union[DefectInsertResult, Tupl
         Union[Dict[str, Union[bool, Any]], str]: A dictionary with keys "res" and "iid" if the operation was successful, 
         or a string error message otherwise.
     """
+    username = kwargs["token_info"]["sub"]
     if "_id" in body:
         del body["_id"]
     if "index" in body:
         del body["index"]
+    
     body = json.loads(json.dumps(body), cls=JSONDecoder)
+    body["editor"] = username
     defect = Defect(pentest, body)
     return defect.addInDb()
 
@@ -141,7 +144,7 @@ def findInsertPosition(pentest: str, risk: str) -> int:
 
 
 @permission("pentester")
-def update(pentest: str, defect_iid: str, force: bool, body: Dict[str, Any]) -> Union[bool, Tuple[str, int]]:
+def update(pentest: str, defect_iid: str, force: bool, body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[bool, Tuple[str, int]]:
     """
     Update a defect in the database.
 
@@ -155,7 +158,7 @@ def update(pentest: str, defect_iid: str, force: bool, body: Dict[str, Any]) -> 
         Union[bool, Tuple[str, int]]: True if the operation was successful, or a tuple containing an error message and 
         an error code otherwise.
     """
-    
+    username = kwargs["token_info"]["sub"]
     old = Defect.fetchObject(pentest, {"_id":ObjectId(defect_iid)})
     if old is None:
         return "Not found", 404
@@ -173,7 +176,8 @@ def update(pentest: str, defect_iid: str, force: bool, body: Dict[str, Any]) -> 
                     return "You are trying to skip a redaction step, this could leave some review unaccepted.", 400
             except ValueError:
                 return "Unknown redacted state", 400
-        old.save_history()
+        old.save_history(username)
+        body["editor"] = username
         # Delete review if needed
         if (new_redacted_state == "New" or new_redacted_state == "To review") and old.redacted_state == "Completed":
             old.delete_review()

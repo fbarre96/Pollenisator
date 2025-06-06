@@ -40,7 +40,7 @@ class Defect(Element):
                 A mongo fetched defect is optimal. Possible keys with default values are : _id (None), parent (None), 
                 infos({}), target_id, target_type, title(""), synthesis(""), impacts(""), description(""), ease(""), impact(""), 
                 risk(""), redactor("N/A"), type([]),  language(""),, notes(""), proofs([]), fixes([]), creation_time, 
-                redact_state("New"),infos, index(None),  perimeter([]). Defaults to None.
+                redacted_state("New"), editor="", infos, index(None),  perimeter([]). Defaults to None.
         """
         if valuesFromDb is None:
             valuesFromDb = {}
@@ -59,6 +59,7 @@ class Defect(Element):
                             valuesFromDb.get("notes", ""), valuesFromDb.get(
                                 "proofs", []),
                             valuesFromDb.get("fixes", []), valuesFromDb.get("creation_time", None), valuesFromDb.get("redacted_state", "New"),
+                            valuesFromDb.get("editor", ""),
                             valuesFromDb.get("infos", {}),
                             valuesFromDb.get("index", 0), valuesFromDb.get("perimeter", []))
 
@@ -66,7 +67,7 @@ class Defect(Element):
                    impacts: str= "", description: str = "", ease: str = "", impact: str = "", risk: str = "", redactor: str = "N/A",
                    mtype: Optional[Union[str, List[str]]] = None, language: str = "", notes: str = "",
                    proofs: Optional[List[str]] = None, fixes: Optional[List[Dict[str, Any]]] = None,
-                   creation_time: Optional[datetime] = None, redacted_state: str = "New", infos: Optional[Dict[str, Any]] = None,
+                   creation_time: Optional[datetime] = None, redacted_state: str = "New", editor="", infos: Optional[Dict[str, Any]] = None,
                    index: int = 0, perimeter: Optional[List[str]] = None) -> 'Defect':
         """
         Set values of defect.
@@ -89,6 +90,7 @@ class Defect(Element):
             fixes (Optional[List[Dict[str, Any]]], optional): A list of fixes for this defect, default to empty list. Defaults to None.
             creation_time (Optional[datetime], optional): The time this defect was created. Default to None, will be auto filled if None.
             redacted_state (str, optional): The redacted state of this defect. Defaults to "New".
+            editor(str, optional): The editor of this defect, usually the redactor. Defaults to "".
             infos (Optional[Dict[str, Any]], optional): A dictionary with key values as additional information. Default to None.
             index (int, optional): The index of this defect in global defect table (only for unassigned defect). Defaults to 0.
             perimeter (Optional[List[str]], optional): A list of perimeters for this defect. Defaults to None.
@@ -122,6 +124,7 @@ class Defect(Element):
             self.index = 0
         self.creation_time = datetime.now() if creation_time is None else creation_time
         self.redacted_state = "New" if redacted_state is None or redacted_state == "" else redacted_state
+        self.editor = "" if editor is None else editor
         self.repr_string = self.getDetailedString()
 
         return self
@@ -133,13 +136,13 @@ class Defect(Element):
         Returns:
             Dict[str,Any]: A dictionary with keys title, 
             synthesis, impacts, description, ease, impact, risk, redactor, type, language, notes, target_id, target_type, index, 
-            proofs, creation_time, redacted_state, fixes, _id, infos.
+            proofs, creation_time, redacted_state, editor, fixes, _id, infos.
         """
 
         return {"title": self.title, "synthesis":self.synthesis, "impacts":self.impacts, "description":self.description, "ease": self.ease, "impact": self.impact,
                 "risk": self.risk, "redactor": self.redactor, "type": self.mtype, "language":self.language, "notes": self.notes,
                 "target_id": self.target_id, "target_type": self.target_type, "index":int(self.index),
-                "proofs": self.proofs, "creation_time": self.creation_time, "redacted_state":self.redacted_state, "fixes":self.fixes, "perimeter":self.perimeter, "_id": self.getId(), "infos": self.infos}
+                "proofs": self.proofs, "creation_time": self.creation_time, "redacted_state":self.redacted_state, "editor":self.editor, "fixes":self.fixes, "perimeter":self.perimeter, "_id": self.getId(), "infos": self.infos}
 
     @classmethod
     def getSearchableTextAttribute(cls) -> List[str]:
@@ -350,9 +353,12 @@ class Defect(Element):
         else:
             return res
         
-    def save_history(self) -> None:
+    def save_history(self, username: str) -> None:
         """
             Save the current version in the database under the version collection.
+
+            Args:
+                username (str): The username of the user saving the history.
         """
         dbclient = DBClient.getInstance()
         if self.redacted_state == "To review" or self.redacted_state == "Reviewed":
@@ -367,6 +373,7 @@ class Defect(Element):
                 data["history_defect_iid"] = ObjectId(data["_id"])
                 del data["_id"]
         data["date"] = datetime.now()
+        data["editor"] = username
         dbclient.insertInDb(self.pentest, "defects_history", data)
 
     def get_history(self) -> List[Dict[str, Any]]:

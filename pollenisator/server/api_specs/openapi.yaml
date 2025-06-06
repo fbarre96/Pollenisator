@@ -244,6 +244,9 @@ components:
             - To review
             - Reviewed
             - Completed
+        editor:
+          type: string
+          
         type:
           type: array
           items:
