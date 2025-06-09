@@ -8,7 +8,7 @@ from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.defect import Defect
 from pollenisator.server.permission import permission
-from pollenisator.core.components.utils import  JSONDecoder
+from pollenisator.core.components.utils import  JSONDecoder, JSONEncoder
 import json
 import datetime
 DefectInsertResult = TypedDict('DefectInsertResult', {'res': bool, 'iid': ObjectId})
@@ -56,8 +56,19 @@ def insert(pentest: str, body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Unio
         del body["_id"]
     if "index" in body:
         del body["index"]
+    return doInsert(pentest, body, username)
     
-    body = json.loads(json.dumps(body), cls=JSONDecoder)
+def doInsert(pentest: str, body: Dict[str, Any], username: str) -> DefectInsertResult:
+    """
+    Helper function to insert a defect into the database.
+    Args:
+        pentest (str): The name of the pentest.
+        body (Dict[str, Any]): A dictionary containing the details of the defect to be inserted.
+        username (str): The id of the user who is inserting the defect.
+    Returns:
+        DefectInsertResult: A dictionary with keys "res" and "iid" indicating the success of the operation and the id of the inserted defect.
+    """
+    body = json.loads(json.dumps(body, cls=JSONEncoder), cls=JSONDecoder)
     body["editor"] = username
     defect = Defect(pentest, body)
     return defect.addInDb()
@@ -296,7 +307,7 @@ def moveDefect(pentest: str, defect_id_to_move: str, target_id: str) -> Union[Tu
     return Defect.moveDefect(pentest, ObjectId(defect_id_to_move), ObjectId(target_id))
 
 @permission("report_template_writer")
-def importDefectTemplates(upfile: Any) -> Union[Tuple[str, int], bool]:
+def importDefectTemplates(upfile: Any, **kwargs: Dict[str,Any ]) -> Union[Tuple[str, int], bool]:
     """
     Import defect templates from a JSON file. The file should contain a list of defects and a list of remarks. 
     Each defect and remark is inserted into the "pollenisator" database. If a defect or remark with the same id already exists, 
@@ -309,6 +320,7 @@ def importDefectTemplates(upfile: Any) -> Union[Tuple[str, int], bool]:
         Union[Tuple[str, int], bool]: A tuple containing an error message and status code if the file is not valid JSON, 
         otherwise True indicating the operation was successful.
     """
+    username = kwargs["token_info"]["sub"]
     try:
         file_content = json.loads(upfile.stream.read())
         defects = file_content.get("defects", [])
@@ -317,7 +329,7 @@ def importDefectTemplates(upfile: Any) -> Union[Tuple[str, int], bool]:
             for invalid in invalids:
                 if invalid in defect:
                     del defect[invalid]
-            res = insert("pollenisator", defect)
+            res = doInsert("pollenisator", defect, username)
             if not res["res"]:
                 update("pollenisator", res["iid"], True, defect)
         remarks = file_content.get("remarks", [])
@@ -446,16 +458,17 @@ def insertDefectTemplate(body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Unio
         Union[DefectInsertResult, Tuple[str, int]]: The id of the inserted template, or a tuple containing an error message and status 
         code if the insertion was unsuccessful.
     """
+    username = kwargs["token_info"]["sub"]
     is_suggestion = ("admin" not in kwargs["token_info"]["scope"] and "template_writer" not in kwargs["token_info"]["scope"]) or body.get("is_suggestion", False)
     res: Union[DefectInsertResult, Tuple[str, int]]
     if is_suggestion:
         res = insert_template_suggestion("pollenisator", body, kwargs["token_info"]["sub"])
     else:
-        res = insert("pollenisator", body)
+        res = doInsert("pollenisator", body, username)
     return res
 
 @permission("template_writer")
-def validateDefectTemplate(iid: str) -> Union[bool, Tuple[str, int]]:
+def validateDefectTemplate(iid: str, **kwargs) -> Union[bool, Tuple[str, int]]:
     """
     Validate a defect template suggestion in the "pollenisator" database using its id. The suggestion is inserted as a defect
     The suggestion is removed
@@ -466,6 +479,7 @@ def validateDefectTemplate(iid: str) -> Union[bool, Tuple[str, int]]:
     Returns:
         Union[bool, Tuple[str, int]]: True if the operation was successful, otherwise a tuple containing an error message and status code.
     """
+    username = kwargs["token_info"]["sub"]
     dbclient = DBClient.getInstance()
     suggestion = dbclient.findInDb("pollenisator", "defectssuggestions", {"_id":ObjectId(iid)}, False)
     if suggestion is None:
@@ -476,7 +490,7 @@ def validateDefectTemplate(iid: str) -> Union[bool, Tuple[str, int]]:
         res = update("pollenisator", iid, True, suggestion)
     else:
         suggestion["suggestion_type"] = "insert"
-        res = insert("pollenisator", suggestion)
+        res = doInsert("pollenisator", suggestion, username)
         if not res["res"]:
             return res
     dbclient.deleteFromDb("pollenisator", "defectssuggestions", {"_id":ObjectId(iid)})
