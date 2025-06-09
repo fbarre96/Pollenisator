@@ -186,13 +186,13 @@ def update(pentest: str, defect_iid: str, force: bool, body: Dict[str, Any], **k
             old.get_review(force=True)
         old.redacted_state = new_redacted_state
         
-        old.updateInDb(body)
+        old.updateInDb(body, clean_proofs=True)
     else:
         # Defect change
         if old.redacted_state == "To review" or old.redacted_state == "Reviewed":
             old.save_review(body)
         else:
-            old.updateInDb(body)
+            old.updateInDb(body, clean_proofs=False)
     return True
 
 @permission("pentester")

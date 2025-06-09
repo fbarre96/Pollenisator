@@ -467,7 +467,7 @@ class Defect(Element):
             
         return True, ""
 
-    def updateInDb(self, data: Optional[Dict[str, Any]] = None) -> list[str]:
+    def updateInDb(self, data: Optional[Dict[str, Any]] = None, clean_proofs=False) -> list[str]:
         """
         Update the current Defect object in the database.
 
@@ -517,8 +517,9 @@ class Defect(Element):
                     if (proof_group.group(1) in pollenisator_images):
                         continue
                 new_data["proofs"].add(os.path.normpath(proof_group.group(1)))
-            for proof_to_remove in existing_proofs_to_remove:
-                self.rmProof(proof_to_remove)
+            if clean_proofs:
+                for proof_to_remove in existing_proofs_to_remove:
+                    self.rmProof(proof_to_remove)
             new_data["proofs"] = list(new_data["proofs"])
         
         dbclient.updateInDb(self.pentest, "defects", {"_id":ObjectId(self.getId())}, {"$set":new_data}, False, True)
