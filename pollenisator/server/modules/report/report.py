@@ -482,7 +482,8 @@ def craftContext(pentest: str, **kwargs: Any) -> Dict[str, Any]:
         if pentest_sections is None:
             pentest_sections = []
         for pentest_section in pentest_sections:
-            del additional_section["_id"]
+            if "_id" in pentest_section:
+                del pentest_section["_id"]
             title = lookup.get(str(pentest_section.get("section_id", "")), "")
             if title != "":
                 context[title] = context.get(title, {}) | pentest_section
