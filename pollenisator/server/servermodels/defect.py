@@ -170,6 +170,21 @@ def update(pentest: str, defect_iid: str, force: bool, body: Dict[str, Any], **k
         an error code otherwise.
     """
     username = kwargs["token_info"]["sub"]
+    return doUpdate(pentest, defect_iid, body, username, force)
+
+def doUpdate(pentest: str, defect_iid: str, body: Dict[str, Any], username: str, force: bool) -> Union[bool, Tuple[str, int]]:
+    """
+    Helper function to update a defect in the database.
+    Args:
+        pentest (str): The name of the pentest.
+        defect_iid (str): The id of the defect to be updated.
+        body (Dict[str, Any]): A dictionary containing the new defect details.
+        username (str): The id of the user who is updating the defect.
+        force (bool): Force the redacted state to be updated. If False, any issue will send back an error / warning as status 400.
+    Returns:
+        Union[bool, Tuple[str, int]]: True if the operation was successful, or a tuple containing an error message and 
+        an error code otherwise.
+    """
     old = Defect.fetchObject(pentest, {"_id":ObjectId(defect_iid)})
     if old is None:
         return "Not found", 404
@@ -331,7 +346,7 @@ def importDefectTemplates(upfile: Any, **kwargs: Dict[str,Any ]) -> Union[Tuple[
                     del defect[invalid]
             res = doInsert("pollenisator", defect, username)
             if not res["res"]:
-                update("pollenisator", res["iid"], True, defect)
+                doUpdate("pollenisator", res["iid"], defect, username, True)
         remarks = file_content.get("remarks", [])
         for remark in remarks:
             res = insert_remark("pollenisator", remark)
@@ -487,7 +502,7 @@ def validateDefectTemplate(iid: str, **kwargs) -> Union[bool, Tuple[str, int]]:
     existing = dbclient.findInDb("pollenisator", "defects", {"$or":[{"_id":ObjectId(iid)}, {"title": suggestion.get("title")}]}, False)
     if existing is not None:
         suggestion["suggestion_type"] = "update"
-        res = update("pollenisator", iid, True, suggestion)
+        res = doUpdate("pollenisator", iid, suggestion, username, True)
     else:
         suggestion["suggestion_type"] = "insert"
         res = doInsert("pollenisator", suggestion, username)
@@ -514,7 +529,7 @@ def updateDefectTemplate(iid: str, body: Dict[str, Any], **kwargs: Dict[str, Any
     if is_suggestion:
         res = update_template_suggestion(iid, body, kwargs["token_info"]["sub"])
     else:
-        res = update("pollenisator", iid, True, body)
+        res = doUpdate("pollenisator", iid, body, kwargs["token_info"]["sub"], True)
     return res
 
 @permission("user")
