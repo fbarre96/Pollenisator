@@ -40,7 +40,7 @@ def parse(opened_file):
         return None
     severities = ["none","info","low", "medium", "high", "critical"]
     for host, data in ret.items():
-        data.sort(key=lambda elem: severities.index(elem["info"].get("level","none")), reverse=True)
+        data.sort(key=lambda elem: severities.index(elem["info"].get("level",elem["info"].get("severity", "none"))), reverse=True)
     return ret
 
 
@@ -106,11 +106,11 @@ class Nuclei(Plugin):
             targets["ip"] = {"ip":host}
             notes = "host:"+str(host)+"\n"
             for finding in findings:
-                notes += finding["info"]["name"]+" ("+finding["info"].get("level", "none")+") "+finding["info"].get("description", "")+"\n"
+                notes += finding["info"]["name"]+" ("+finding["info"].get("level", finding["info"].get("severity", "none"))+") "+finding["info"].get("description", "")+"\n"
             for finding in findings:
-                if finding["info"].get("level","none") in ["medium"]:
+                if finding["info"].get("level", finding["info"].get("severity", "none")) in ["medium"]:
                     tags = [self.getTags()["todo-nuclei-level"]]
-                if finding["info"].get("level", "none") in ["critical","high"]:
+                if finding["info"].get("level", finding["info"].get("severity", "none")) in ["critical","high"]:
                     tags = [self.getTags()["todo-high-nuclei-level"]]
             ip_o = Ip(pentest).initialize(host, notes, infos={"plugin":Nuclei.get_name(), "findings":findings})
             # Add a tags to the ip object
