@@ -107,6 +107,16 @@ class Interval(Element):
             or None if the date is not set.
         """
         return Interval._translateDateString(self.datef)
+    
+    def getStartDate(self) -> Optional[datetime]:
+        """
+        Returns the starting date and time of this interval.
+
+        Returns:
+            Optional[datetime]: A datetime object representing the starting date and time of this interval, 
+            or None if the date is not set.
+        """
+        return Interval._translateDateString(self.dated)
 
     def getDbKey(self) -> Dict[str, str]:
         """

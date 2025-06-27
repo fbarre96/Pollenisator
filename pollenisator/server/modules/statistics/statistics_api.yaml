@@ -1,0 +1,55 @@
+
+paths:
+  "/statistics":
+    get:
+      operationId: pollenisator.server.modules.statistics.statistics.getStatistics
+      tags:
+        - Statistics
+      summary: Retrieve statistics
+      parameters:
+        - name: start_date
+          in: query
+          description: filters
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: filters
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: start_duration
+          in: query
+          description: filters
+          required: false
+          schema:
+            type: integer
+            format: int32
+        - name: end_duration
+          in: query
+          description: filters
+          required: false
+          schema:
+            type: integer
+            format: int32
+        - name: context
+          in: query
+          description: filters
+          required: false
+          schema:
+            type: string
+            
+          
+      responses:
+        "200":
+          description: Successfully return statistics
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"top_defects": [{"name": "SQL Injection", "count": 10}, {"name": "XSS", "count": 5}], "top_tools": [{"name": "Nmap", "count": 10}, {"name": "Nikto", "count": 5}], "top_hosts": [{"name": "'
+       
+ 
