@@ -208,7 +208,12 @@ def updateData(pentest: str, iid: str, body: Dict[str, Any]) -> Union[ErrorStatu
         del body["_id"]
     if "section_id" in body:
         del body["section_id"]
-    dbclient.updateInDb(pentest, "additionalreportsections", {"section_id": ObjectId(iid)}, {"$set": body}, many=False, upsert=True)
+    section_old = dbclient.findInDb("pollenisator", "additionalreportsections", {"_id": ObjectId(iid)}, multi=False)
+    if section_old is None:
+        return "Not found", 404
+    pipeline =  {"section_id": ObjectId(iid)}
+    updatePipeline = {"$set": body}
+    dbclient.updateInDb(pentest, "additionalreportsections", pipeline, updatePipeline, many=False, upsert=True)
     return True
 
 @permission("pentester")
@@ -226,7 +231,8 @@ def getData(pentest: str, iid: str) -> Union[ErrorStatus, Dict[str, Any]]:
     if pentest == "pollenisator":
         return "Forbidden", 403
     dbclient = DBClient.getInstance()
-    section = dbclient.findInDb(pentest, "additionalreportsections", {"section_id": ObjectId(iid)}, multi=False)
+    pipeline = {"section_id": ObjectId(iid)}
+    section = dbclient.findInDb(pentest, "additionalreportsections", pipeline, multi=False)
     if section is None:
         return "Not found", 404
     return section
@@ -250,16 +256,25 @@ def getById(iid: str) -> Union[ErrorStatus, Dict[str, Any]]:
     return section
 
 @permission("user")
-def listAll() -> List[Dict[str, Any]]:
+def listSections(filter_str: Union[Literal["fix"],Literal["global"],Literal["defect"],Literal["all"]]) -> Union[ErrorStatus,List[Dict[str, Any]]]:
     """
-    Get all report section.
+    Get report section. Filter is optional.
+
+    Params:
+        filter (str): The filter to apply on the sections. If empty, all sections are returned. (it should be all, defect, fix, global)
 
     Returns:
         List[AdditionalReportSection]: The section object.
     """
     dbclient = DBClient.getInstance()
+    if filter_str == "all":
+        pipeline = {}
+    elif filter_str not in ["fix", "global", "defect"]:
+        return "Invalid filter", 400
+    else:
+        pipeline = {"section_type": filter_str}
     sections = dbclient.findInDb("pollenisator",
-        AdditionalReportSection.coll_name, {}, multi=True)
+        AdditionalReportSection.coll_name, pipeline, multi=True)
     if sections is None:
         return []
     return [x for x in sections]

@@ -8,7 +8,18 @@ paths:
   '/additionalreportsections':
     get:
       summary: get a list of all additional report sections
-      operationId: pollenisator.server.modules.additionalreportsections.additionalreportsections.listAll
+      operationId: pollenisator.server.modules.additionalreportsections.additionalreportsections.listSections
+      parameters:
+        - name: filter_str
+          in: query
+          description: Filter for the list of additional report sections
+          schema:
+            type: string
+            enum:
+              - global
+              - defect
+              - fix
+              - all
       responses:
         '200':
           description: OK
@@ -76,17 +87,17 @@ paths:
 
   '/additionalreportsections/{pentest}/{iid}':
     parameters:
-      - schema:
-          type: string
-        name: pentest
+      - name: pentest
         in: path
         required: true
-      - schema:
+        schema:
           type: string
-        name: iid
+      - name: iid
         in: path
         required: true
         description: Section iid
+        schema:
+          type: string
     post:
       tags:
         - Additional Report Sections
@@ -108,7 +119,6 @@ paths:
       responses:
         '200':
           description: Data as json
-          
 
 
 components:
