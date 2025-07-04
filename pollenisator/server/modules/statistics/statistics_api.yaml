@@ -1,48 +1,41 @@
-
 paths:
   "/statistics":
-    get:
+    post:
       operationId: pollenisator.server.modules.statistics.statistics.getStatistics
       tags:
         - Statistics
       summary: Retrieve statistics
-      parameters:
-        - name: start_date
-          in: query
-          description: filters
-          required: false
-          schema:
-            type: string
-            format: date
-        - name: end_date
-          in: query
-          description: filters
-          required: false
-          schema:
-            type: string
-            format: date
-        - name: start_duration
-          in: query
-          description: filters
-          required: false
-          schema:
-            type: integer
-            format: int32
-        - name: end_duration
-          in: query
-          description: filters
-          required: false
-          schema:
-            type: integer
-            format: int32
-        - name: context
-          in: query
-          description: filters
-          required: false
-          schema:
-            type: string
-            
-          
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                start_date:
+                  type: string
+                  format: date
+                  description: filters
+                end_date:
+                  type: string
+                  format: date
+                  description: filters
+                start_duration:
+                  type: integer
+                  format: int32
+                  description: filters
+                end_duration:
+                  type: integer
+                  format: int32
+                  description: filters
+                pentest_types:
+                  type: array
+                  items:
+                    type: string
+                  description: filters
+                context:
+                  type: string
+                  description: filters
       responses:
         "200":
           description: Successfully return statistics
@@ -50,6 +43,11 @@ paths:
             application/json:
               examples:
                 Success:
-                  value: '{"top_defects": [{"name": "SQL Injection", "count": 10}, {"name": "XSS", "count": 5}], "top_tools": [{"name": "Nmap", "count": 10}, {"name": "Nikto", "count": 5}], "top_hosts": [{"name": "'
-       
- 
+                  value: >
+                    {
+                      "top_defects": [
+                        { "name": "SQL Injection", "count": 10 },
+                        { "name": "XSS", "count": 5 }
+                      ]
+                    
+                    }

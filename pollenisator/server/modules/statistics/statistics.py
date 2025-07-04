@@ -1,5 +1,6 @@
 
 from datetime import datetime
+from typing import Any, Dict
 import pollenisator.core.components.utils as utils
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.interval import Interval
@@ -94,10 +95,16 @@ def getAvgDefectRisk(pentests):
 
 
 @permission("user")
-def getStatistics(start_date=None, end_date=None, start_duration=None, end_duration=None, context_lvl=None, **kwargs):
+def getStatistics(body: Dict[str, Any], **kwargs):
     """
     Get statistics
     """
+    start_date = body.get("start_date", None)
+    end_date = body.get("end_date", None)
+    start_duration = body.get("start_duration", None)
+    end_duration = body.get("end_duration", None)
+    pentest_types = body.get("pentest_types", None)
+    context_lvl = body.get("context", None)
     try:
        start_date = datetime(1970,1,1) if (start_date == "" or start_date is None) else datetime.strptime(start_date, "%d/%m/%Y")
     except ValueError:
@@ -108,6 +115,11 @@ def getStatistics(start_date=None, end_date=None, start_duration=None, end_durat
         return "Invalid end_date", 400
     if start_date > end_date:
         return "start_date must be before end_date", 400
+    if pentest_types is not None:
+        if not isinstance(pentest_types, list):
+            return "pentest_types must be a list", 400
+    pentest_types = [ptype.lower() for ptype in pentest_types] if pentest_types is not None else []
+        
     start_duration = 0 if start_duration is None else int(start_duration)
     end_duration = 99999999 if end_duration is None else int(end_duration)
     context_lvl = -1 if context_lvl is None else int(context_lvl)
@@ -117,6 +129,12 @@ def getStatistics(start_date=None, end_date=None, start_duration=None, end_durat
         return "No pentests found", 404 
     filtered_pentests = []
     for pentest in pentests:
+        if pentest_types is not None:
+            pentest_type_setting = dbclient.findInDb(pentest["uuid"], "settings", {"key": "pentest_type"}, False)
+            if pentest_type_setting is not None:
+                if pentest_type_setting.get("value", "").lower() not in pentest_types:
+                    continue
+        
         intervals = Interval.fetchObjects(pentest["uuid"], {})
         duration = 0
         for interval in intervals:
