@@ -1105,7 +1105,19 @@ def importDb(upfile: Union[str,werkzeug.datastructures.FileStorage], **kwargs: D
     if username is None:
         return "No username found", 400
     dirpath = tempfile.mkdtemp()
-    
+    # validate that the uploaded file is a zip archive
+    if not isinstance(upfile, str):
+        filename = getattr(upfile, "filename", "")
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in (".zip", ".gz"):
+            return "Invalid file extension", 400
+        mimetype = getattr(upfile, "mimetype", "")
+        if mimetype not in ("application/zip", "application/x-zip-compressed"):
+            return "Invalid mime type", 400
+    else:
+        ext = os.path.splitext(upfile)[1].lower()
+        if ext not in (".zip", ".gz"):
+            return "Invalid file extension", 400
     if not isinstance(upfile, str):
         if upfile.filename is None:
             return "Invalid filename", 400
@@ -1115,6 +1127,7 @@ def importDb(upfile: Union[str,werkzeug.datastructures.FileStorage], **kwargs: D
             f.write(upfile.stream.read())
     else:
         tmpfile = upfile
+    
     pentest_archive = ""
     with zipfile.ZipFile(tmpfile, 'r') as zip_ref:
         for member in zip_ref.namelist():

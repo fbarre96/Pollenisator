@@ -87,7 +87,7 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
             for i,proof in enumerate(instance.get("proofs", [])):
                 instance["proofs"][i] = InlineImage(doc, proof)
     # TODO : END
-    replaceUnassignedFileImages(context, context["pentest"])
+    recursiveEdits(context, context["pentest"])
     
     try:
         doc.render(context, jinja_env)
@@ -112,10 +112,15 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
     return True, out_path
 
 
-def replaceUnassignedFileImages(context: dict, pentest: str) -> None:
+regex_replace_lonely_lf = re.compile(r"(?<!\n)\n(?!\n)")
+regex_replace_images = re.compile(r"(?<!\n\n)(!\[.*\]\((.*?)\))")
+regex_replace_images_no_newline = re.compile(r"(!\[.*\]\((.*?)\))(?!\n\n)")
+
+def recursiveEdits(context: dict, pentest: str) -> None:
     """
     Recursively iterate over the context dictionary (up to 10 levels deep)
     and download markdown images, replacing remote URLs with the local file path.
+    also replaces lonely newlines with double newlines.
 
     Args:
         context (dict): The context dictionary to process.
@@ -139,9 +144,12 @@ def replaceUnassignedFileImages(context: dict, pentest: str) -> None:
             for i, item in enumerate(obj):
                 obj[i] = _recursive_process(item, depth + 1)
         elif isinstance(obj, str):
+            # replace lonely \n with \n\n
+            obj = regex_replace_lonely_lf.sub("\n\n", obj)
+          
             # Regex to find markdown images with http/https URLs
-            obj = re.sub(r"(?<!\n\n)(!\[.*\]\((.*?)\))", r"\n\1", obj)
-            obj = re.sub(r"(!\[.*\]\((.*?)\))(?!\n\n)", r"\1\n", obj)
+            obj = regex_replace_images.sub(r"\n\1", obj)
+            obj = regex_replace_images_no_newline.sub(r"\1\n", obj)
             def repl(match):
                 alt_text = match.group(1)
                 url = match.group(2)

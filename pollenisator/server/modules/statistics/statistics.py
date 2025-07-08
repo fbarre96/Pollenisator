@@ -1,6 +1,6 @@
 
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, cast
 import pollenisator.core.components.utils as utils
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.interval import Interval
@@ -139,6 +139,7 @@ def getStatistics(body: Dict[str, Any], **kwargs):
         duration = 0
         for interval in intervals:
             if interval is not None:
+                interval = cast(Interval, interval)
                 dated = interval.getStartDate()
                 datef = interval.getEndingDate()
                 if dated is None or datef is None:
