@@ -1,0 +1,211 @@
+openapi: 3.0.0
+info:
+  description: Pollenisator universal search api file
+  version: 1.2.0
+  title: Universal Search API
+
+paths:
+
+  '/search/{pentest}/all':
+    post:
+      summary: Universal search across all data types
+      operationId: pollenisator.server.modules.searchmodule.searchmodule.search_all
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchAllResponse'
+        '400':
+          description: Bad request
+        '500':
+          description: Internal server error
+      description: Search across hosts, ports, check instances, and terminal sessions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchAllRequest'
+        description: Search parameters
+      tags:
+        - Universal Search
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+        description: Pentest name
+
+  '/search/{pentest}/notes':
+    post:
+      summary: Search specifically in notes fields
+      operationId: pollenisator.server.modules.searchmodule.searchmodule.search_notes
+      responses:
+        '200':
+          description: Notes search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchNotesResponse'
+        '400':
+          description: Bad request
+        '500':
+          description: Internal server error
+      description: Search in notes fields across hosts, ports, and check instances
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchNotesRequest'
+        description: Notes search parameters
+      tags:
+        - Universal Search
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+        description: Pentest name
+
+components:
+  schemas:
+    SearchAllRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: Search term
+          example: "apache"
+        categories:
+          type: array
+          items:
+            type: string
+            enum: [hosts, ports, checkinstances, terminals]
+          description: Optional filter for specific data types
+          example: ["hosts", "ports"]
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+          description: Maximum number of results
+        offset:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Offset for pagination
+
+    SearchAllResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResult'
+        total:
+          type: integer
+          description: Total number of results found
+        hasMore:
+          type: boolean
+          description: Whether there are more results available
+
+    SearchResult:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the result
+        category:
+          type: string
+          enum: [hosts, ports, checkinstances, terminals]
+          description: Type of data
+        label:
+          type: string
+          description: Display name/title
+        description:
+          type: string
+          description: Optional description
+        matches:
+          type: array
+          items:
+            type: string
+          description: Array of matching text snippets
+        data:
+          type: object
+          description: Raw object data for navigation/action
+          properties:
+            _id:
+              type: string
+              description: Object ID
+          additionalProperties: true
+
+    SearchNotesRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: Search term for notes
+          example: "vulnerability"
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+          description: Maximum number of results
+        offset:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Offset for pagination
+
+    SearchNotesResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotesSearchResult'
+        total:
+          type: integer
+          description: Total number of results found
+        hasMore:
+          type: boolean
+          description: Whether there are more results available
+
+    NotesSearchResult:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the note result
+        category:
+          type: string
+          enum: [notes]
+          description: Always "notes" for this endpoint
+        source_type:
+          type: string
+          enum: [host, port, checkinstance]
+          description: Type of object containing the note
+        source_id:
+          type: string
+          description: ID of the source object
+        label:
+          type: string
+          description: Display label for the note
+        content:
+          type: string
+          description: Note content snippet
+        matches:
+          type: array
+          items:
+            type: string
+          description: Array of matching text snippets

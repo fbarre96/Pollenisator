@@ -39,9 +39,9 @@ class CheckInstance(Element):
         super().__init__(pentest, valuesFromDb)
         self.status = ""
         self.initialize(valuesFromDb.get("check_iid", None), valuesFromDb.get("target_iid", None), valuesFromDb.get(
-            "target_type", ""), valuesFromDb.get("status", ""), valuesFromDb.get("notes", ""))
+            "target_type", ""), valuesFromDb.get("status", ""), valuesFromDb.get("notes", ""), valuesFromDb.get("target_rep", None))
 
-    def initialize(self, check_iid: Optional[ObjectId], target_iid: Optional[ObjectId], target_type: str, status: str, notes: str) -> 'CheckInstance':
+    def initialize(self, check_iid: Optional[ObjectId], target_iid: Optional[ObjectId], target_type: str, status: str, notes: str, target_rep: Optional[str]) -> 'CheckInstance':
         """
         Initialize a CheckInstance object.
 
@@ -51,6 +51,7 @@ class CheckInstance(Element):
             target_type (str): The type of the target.
             status (str): The status of the check instance.
             notes (str): The notes for the check instance.
+            target_rep (Optional[str]): The representation of the target.
 
         Returns:
             CheckInstance: The initialized CheckInstance object.
@@ -61,6 +62,7 @@ class CheckInstance(Element):
         self.target_type = target_type
         self.status = status
         self.notes = notes
+        self.target_rep = target_rep
         return self
 
     @classmethod
@@ -650,6 +652,14 @@ def getTargetRepr(pentest: str, body: List[str]) -> Dict[str, str]:
                 for elem in elems:
                     ret_str = elem.getDetailedString()
                     ret[str(elem.getId())] = ret_str
+    # Update the checkinstances with the representation string
+    for data in checkinstances:
+        if str(data["_id"]) in ret:
+            data["target_repr"] = ret[str(data["_id"])]
+        else:
+            data["target_repr"] = "Target not found"
+        dbclient.updateInDb(pentest, "checkinstances", {"_id": data["_id"]}, {"$set": {"target_repr": data["target_repr"]}}, many=False, notify=True)
+
     return ret
 
 @permission("pentester")

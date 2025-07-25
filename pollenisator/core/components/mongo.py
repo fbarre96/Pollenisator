@@ -385,7 +385,7 @@ class DBClient:
         collections: List[str] = self.db.list_collection_names()
         return collections
 
-    def create_index(self, pentest: str, collection: str, index: List[Tuple[str, int]]) -> None:
+    def create_index(self, pentest: str, collection: str, index: List[Tuple[str, Union[str,int]]]) -> None:
         """
         Create an index in the specified collection of the pentest database.
 
