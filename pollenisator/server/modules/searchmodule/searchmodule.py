@@ -362,7 +362,7 @@ def search_terminalsessions(pentest: str, query: str, limit: int, offset: int) -
                 log_matches += 1
                 if len(matches) < 3:  # Limit to 3 matches to avoid too much data
                     snippet = log_entry[:100] + "..." if len(log_entry) > 100 else log_entry
-                    matches.append(f"command: {snippet}")
+                    matches.append(f"{snippet}")
         
         if log_matches > 3:
             matches.append(f"... and {log_matches - 3} more command matches")
@@ -385,7 +385,8 @@ def search_terminalsessions(pentest: str, query: str, limit: int, offset: int) -
                 "target": visible_target,
                 "last_command": logs[-1] if logs else "",
                 "status": session_data.get("status", ""),
-                "user": session_data.get("user", "")
+                "user": session_data.get("user", ""),
+                "visible_target": visible_target if visible_target else "",
             }
         }
         results.append(result)
