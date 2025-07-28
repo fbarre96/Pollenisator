@@ -253,9 +253,9 @@ class DBClient:
                 connectionString = self.user+':'+self.password+'@'
             self.current_pentest = None
             try:
-                if cfg["ssl"].strip() != "":
+                if str(cfg["ssl"]).strip() != "":
 
-                    self.ssldir = cfg["ssl"].strip()
+                    self.ssldir = str(cfg["ssl"]).strip()
                     self.client = MongoClient('mongodb://'+connectionString+self.host+":"+self.port, ssl=True, ssl_certfile=os.path.join(
                         self.ssldir, "client.pem"), ssl_cert_reqs=ssl.CERT_REQUIRED, ssl_ca_certs=os.path.join(self.ssldir, "ca.pem"), serverSelectionTimeoutMS=timeoutInMS, socketTimeoutMS=2000, connectTimeoutMS=2000)
                 else:
@@ -1327,10 +1327,11 @@ class DBClient:
         if only_name:
             pentest_tags = list(tags.keys())
             global_tags = list(self.getGlobalTags().keys())
+            return global_tags+pentest_tags
         else:
             pentest_tags = [tags]
             global_tags = [self.getGlobalTags()]
-        return global_tags+pentest_tags
+            return global_tags+pentest_tags
 
     def getGlobalTags(self) -> Dict[str, Any]:
         """

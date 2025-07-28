@@ -129,7 +129,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         """
         from pollenisator.server.token import verifyToken, decode_token
         dbclient = mongo.DBClient.getInstance()
-        token = data.get("token", "")
+        token = str(request.cookies.get("session_token", ""))
         pentest = data.get("pentest", "")
         supported_plugins = data.get("supported_plugins", [])
         sid = request.sid
@@ -165,7 +165,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         from pollenisator.server.token import verifyToken, decode_token
         logger.info("received registerAsTerminalConsumer")
         dbclient = mongo.DBClient.getInstance()
-        token = data.get("token", "")
+        token = str(request.cookies.get("session_token", ""))
         pentest = data.get("pentest", "")
         sid = request.sid
         res = verifyToken(token)
@@ -200,7 +200,6 @@ def create_app(debug: bool, async_mode: str) -> Flask:
 
             Args:
                 data (dict): A dictionary containing the following keys:
-                    - "token" (str): The auth token.
                     - "pentest" (str): The ID of the pentest for which the socket wants to receive notifications.
 
             Returns:
@@ -209,7 +208,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         from pollenisator.server.token import verifyToken, decode_token
         logger.info("Registering socket for notifications %s", str(data))
         sid = request.sid
-        token = str(data.get("token", ""))
+        token = str(request.cookies.get("session_token", ""))
         pentest = str(data.get("pentest", ""))
         res = verifyToken(token)
         if res:

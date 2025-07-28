@@ -364,10 +364,10 @@ class Port(Element):
         values = list(upserted_ids.values())
         current_slice = 0
         nb_values = len(values)
-        ports_inserted = []
+        ports_inserted: List[Port] = []
         while current_slice < nb_values:
             top_of_slice = min(current_slice + 100000, nb_values)
-            ports_inserted += Port.fetchObjects(pentest, {"_id":{"$in":values[current_slice:top_of_slice]}})
+            ports_inserted += [cast(Port, port) for port in Port.fetchObjects(pentest, {"_id":{"$in":values[current_slice:top_of_slice]}})]
             current_slice += 100000
         CheckInstance.bulk_insert_for(pentest, cast(Iterable, ports_inserted), "port", ["port:onServiceUpdate"], f_get_impacted_targets=cls.get_allowed_ports)
 

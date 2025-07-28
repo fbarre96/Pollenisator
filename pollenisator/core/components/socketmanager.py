@@ -37,5 +37,5 @@ class SocketManager:
         if SocketManager.__instances.get(pid, None) is not None:
             raise TypeError("This class is a singleton!")
         else:
-            self.socketio = SocketIO(logger=logger, engineio_logger=logger, cors_allowed_origins="*")
+            self.socketio = SocketIO(logger=logger, engineio_logger=logger, cors_allowed_origins="*", cors_credentials=True)
             SocketManager.__instances[pid] = self

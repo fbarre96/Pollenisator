@@ -1,7 +1,7 @@
 """
 Instanciation of a checkItem, with a target and a status
 """
-from typing import Callable, Iterable, Iterator, List, Optional, Dict, Any, Set, Union, Tuple, cast
+from typing import Callable, Generator, Iterable, Iterator, List, Optional, Dict, Any, Set, Union, Tuple, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
@@ -76,7 +76,7 @@ class CheckInstance(Element):
         return ["title", "category", "lvl"] # will load on checktitems attribute
 
     @classmethod
-    def fetchObjects(cls, pentest: str, pipeline: Dict[str, Any]) -> Iterator['CheckInstance']:
+    def fetchObjects(cls, pentest: str, pipeline: Dict[str, Any]) -> Generator['CheckInstance', None, None]:
         """
         Fetch many commands from database and return a Cursor to iterate over model objects.
 
@@ -85,7 +85,7 @@ class CheckInstance(Element):
             pipeline (Dict[str, Any]): A Mongo search pipeline.
 
         Returns:
-            Iterator[CheckInstance]: A cursor to iterate on model objects.
+            Generator[CheckInstance]: A cursor to iterate on model objects.
         """
         dbclient = DBClient.getInstance()
         pipeline["type"] = "checkinstance"
@@ -269,7 +269,7 @@ class CheckInstance(Element):
             else:
                 subset = targets
             for target in subset:
-                checkinstance = CheckInstance(pentest).initialize(ObjectId(checkItem.getId()), ObjectId(target.getId()), targets_type, "", "")
+                checkinstance = CheckInstance(pentest).initialize(ObjectId(checkItem.getId()), ObjectId(target.getId()), targets_type, "", "", None)
                 checks_to_add.append(checkinstance)
             for command in checkItem.commands:
                 if commands_lkp.get(str(command), None) is not None:
@@ -301,10 +301,10 @@ class CheckInstance(Element):
         values = res.inserted_ids
         current_slice = 0
         nb_values = len(values)
-        checks_inserted = []
+        checks_inserted: List[CheckInstance] = []
         while current_slice < nb_values:
             top_of_slice = min(current_slice + 1000000, nb_values)
-            checks_inserted += CheckInstance.fetchObjects(pentest, {"_id":{"$in":values[current_slice:top_of_slice]}})
+            checks_inserted += [cast(CheckInstance, check) for check in CheckInstance.fetchObjects(pentest, {"_id":{"$in":values[current_slice:top_of_slice]}})]
             current_slice += 1000000
 
         if not checks_inserted:
@@ -379,7 +379,7 @@ class CheckInstance(Element):
         """
         infos = {} if infos is None else infos
         checkinstance = CheckInstance(pentest).initialize(ObjectId(
-            checkItem.getId()), ObjectId(target_iid), target_type, "", "")
+            checkItem.getId()), ObjectId(target_iid), target_type, "", "", None)
         return checkinstance.addInDb(checkItem=checkItem, toolInfos=infos)
 
     def update(self) -> Union[ErrorStatus, bool]:
@@ -617,7 +617,10 @@ def getInformations(pentest: str, iid: str) -> Union[Dict[str, Any], ErrorStatus
     if inst is None:
         return "Not found", 404
     inst = cast(CheckInstance, inst)
-    return inst.getCheckInstanceInformation()
+    checkinfos = inst.getCheckInstanceInformation()
+    if checkinfos is None:
+        return "Check instance information not found", 404
+    return checkinfos
     
 
 

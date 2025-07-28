@@ -5,7 +5,7 @@ import os
 import re
 import shutil
 import threading
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple, Union, cast
 from typing_extensions import TypedDict
 from bson.objectid import ObjectId
 import pollenisator.core.components.utils as utils
@@ -545,7 +545,7 @@ class Defect(Element):
             if risklevel_i > riskLevelPos:
                 break
             globalDefects = Defect.fetchObjects(pentest, {"target_id":None, "risk":riskLevel})
-            globalDefects = cast(Iterator[Defect], globalDefects)
+            globalDefects = cast(Generator[Defect, None, None], globalDefects)
             for globalDefect in globalDefects:
                 highestInd = max(int(globalDefect.index)+1, highestInd)
         return highestInd

@@ -4,6 +4,7 @@
 Module for the authentication and user management.
 """
 
+import os
 from typing import Any, Dict, List, Tuple, Union
 from pollenisator.core.components.mongo import DBClient
 import bcrypt
@@ -11,8 +12,11 @@ from pollenisator.server.permission import permission
 from pollenisator.server.token import getTokenFor
 from pollenisator.server.mongo import doImportCheatsheet
 from pollenisator.core.components.utils import getDefaultCheatsheetFile
+from flask import make_response, jsonify
 import re
 ErrorStatus = Tuple[str, int]
+
+isdebug = bool(os.environ.get("FLASK_DEBUG", False))
 
 def password_check(password):
     """
@@ -272,7 +276,7 @@ def searchUsers(searchreq: str) -> List[str]:
     user_records = dbclient.findInDb("pollenisator", "users", {"username":{"$regex":f".*{searchreq}.*"}})
     return [user_record["username"] for user_record in user_records]
 
-def login(body: Dict[str, str]) -> Union[Dict[str, Any], ErrorStatus]:
+def login(body: Dict[str, str]) -> Union[Any, ErrorStatus]:
     """
     Authenticate a user with the given username and password.
 
@@ -282,7 +286,7 @@ def login(body: Dict[str, str]) -> Union[Dict[str, Any], ErrorStatus]:
             "pwd" (str): The password of the user.
 
     Returns:
-        ErrorStatus: The user's token if the authentication was successful, otherwise an error message and status code.
+        ErrorStatus: The user's mustChangePassword flag if the authentication was successful, otherwise an error message and status code.
     """
     username = body.get("username", "")
     pwd = body.get("pwd", "")
@@ -296,10 +300,20 @@ def login(body: Dict[str, str]) -> Union[Dict[str, Any], ErrorStatus]:
         return "Authentication failure", 401
     if user_record["username"] == username:
         if bcrypt.checkpw(pwd.encode(), user_record["hash"]):
-            return {"token":getTokenFor(username), "mustChangePassword":user_record.get("mustChangePassword", True)}
+            # Set token in httpOnly cookie and return mustChangePassword flag
+            token = getTokenFor(username)
+            response = make_response(jsonify({"token":token, "mustChangePassword": user_record.get("mustChangePassword", True)}))
+            response.set_cookie(
+                'session_token', 
+                token,
+                httponly=True,
+                secure=not isdebug,
+                samesite='Strict'
+            )
+            return response
     return "Authentication failure", 401
 
-def connectToPentest(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union[Dict[str, Any], ErrorStatus]:
+def connectToPentest(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union[Any, ErrorStatus]:
     """
     Connect to a pentest with the given details.
 
@@ -310,7 +324,7 @@ def connectToPentest(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union
         **kwargs (Any): Additional parameters, including the user token.
 
     Returns:
-        Union[Dict[str, Any], ErrorStatus]: A dictionary containing the user's token and the pentest name if the connection was successful, otherwise an error message and status code.
+        Union[Any, ErrorStatus]: A dictionary containing the pentest name if the connection was successful, otherwise an error message and status code.
     """
     username = kwargs["token_info"]["sub"]
     dbclient = DBClient.getInstance()
@@ -330,7 +344,17 @@ def connectToPentest(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union
         pass
 
     if "admin" in token.get("scope", []):
-        return {"token":getTokenFor(username, pentest, True), "pentest_name":pentest_name}
+        # Set token in httpOnly cookie and return pentest name
+        pentest_token = getTokenFor(username, pentest, True)
+        response = make_response(jsonify({"pentest_name": pentest_name, "token":pentest_token}))
+        response.set_cookie(
+            'session_token', 
+            pentest_token,
+            httponly=True,
+            secure=not isdebug,
+            samesite='Strict'
+        )
+        return response
     else:
         owner = dbclient.getPentestOwner(pentest)
         testers.append(owner)
@@ -341,4 +365,14 @@ def connectToPentest(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union
             return "User not found", 404
         if user.get("mustChangePassword", True):
             return "Forbidden : you must change your password", 403
-        return {"token":getTokenFor(username, pentest, owner == username), "pentest_name":pentest_name}
+        # Set token in httpOnly cookie and return pentest name
+        pentest_token = getTokenFor(username, pentest, owner == username)
+        response = make_response(jsonify({"pentest_name": pentest_name, "token":pentest_token}))
+        response.set_cookie(
+            'session_token', 
+            pentest_token,
+            httponly=True,
+            secure=not isdebug,
+            samesite='Strict'
+        )
+        return response
