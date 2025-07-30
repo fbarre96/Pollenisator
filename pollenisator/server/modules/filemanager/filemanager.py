@@ -253,6 +253,29 @@ def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage
     return results_count
 
 @permission("pentester")
+def listFilesAll(pentest: str, filetype: FileType) -> Union[ErrorStatus, List[str]]:
+    """
+    List all files of a specific type in a pentest.
+
+    Args:
+        pentest (str): The name of the pentest.
+        filetype (FileType): The type of the files to list. (proof, file or result)
+
+    Returns:
+       Union[ErrorStatus, List[str]]: A list of filenames if successful, otherwise an error message and status code.
+    """
+    if filetype not in POSSIBLE_TYPES:
+        return "Invalid filetype", 400
+    dbclient = DBClient.getInstance()
+    files = dbclient.findInDb(pentest, "attachments", {"type": filetype}, multi=True)
+    if files is None:
+        return "No files found", 404
+    files = [file for file in files]
+    if not files:
+        return "No files found", 404
+    return files
+
+@permission("pentester")
 def listFiles(pentest: str, attached_to: str, filetype: FileType) -> Union[ErrorStatus, List[str]]:
     """
     List all files of a specific type attached to a specific item in a pentest.
@@ -305,6 +328,23 @@ def listFiles(pentest: str, attached_to: str, filetype: FileType) -> Union[Error
     except FileNotFoundError:
         return "File not found", 404
     return files
+
+@permission("pentester")
+def downloadById(pentest: str, attachment_id: str) -> Union[ErrorStatus, Response]:
+    """
+    Download a file by its attachment id.
+
+    Args:
+        pentest (str): The name of the pentest.
+        attachment_id (str): The id of the attachment to download.
+
+    Returns:
+       Union[ErrorStatus, Response]: The file to download if successful, otherwise an error message and status code.
+    """
+    attachment = dbclient.findInDb(pentest, "attachments", {"attachment_id": attachment_id}, False)
+    if attachment is None:
+        return "Attachment not found", 404
+    return download(pentest, attachment.get("attached_to", "unassigned"), attachment.get("type", "file"), attachment.get("name", None))
 
 @permission("pentester")
 def download(pentest: str, attached_to: str, filetype: FileType, filename: Optional[str]=None) -> Union[ErrorStatus, Response]:
@@ -376,19 +416,24 @@ def download(pentest: str, attached_to: str, filetype: FileType, filename: Optio
     return "File not found", 404
 
 @permission("pentester")
-def rmFile(pentest: str, attached_to: str, filetype: FileType, filename: str) -> ErrorStatus:
+def rmFile(pentest: str,  attachment_id: str) -> ErrorStatus:
     """
     Remove a proof file from a defect in a pentest.
 
     Args:
         pentest (str): The name of the pentest.
-        defect_iid (str): The id of the defect the proof is attached to.
-        filename (str): The name of the proof file to remove.
+        attachment_id (str): id to delete
 
     Returns:
         ErrorStatus: A success message if the file was successfully deleted, otherwise an error message and status code.
     """
     pentest = os.path.basename(pentest)
+    attachment = dbclient.findInDb(pentest, "attachments", {"attachment_id": attachment_id}, False)
+    if attachment is None:
+        return "Attachment not found", 404
+    filetype = attachment.get("type", None)
+    attached_to = attachment.get("attached_to", "unassigned")
+    filename = attachment.get("name", None)
     if filetype == "proof":
         if not is_valid_object_id(attached_to):
             return "Invalid attached_iid", 400
@@ -404,10 +449,15 @@ def rmFile(pentest: str, attached_to: str, filetype: FileType, filename: str) ->
         return "Results cannot be deleted", 403
     elif filetype == "file":
         file_local_path = os.path.normpath(os.path.join(getMainDir(), "files"))
-        filepath = os.path.join(file_local_path, pentest, "files", "unassigned", filename)
+        filepath = os.path.join(file_local_path, pentest, "file", "unassigned", filename)
         filepath = os.path.normpath(filepath)
         if not filepath.startswith(file_local_path):
             return "Invalid path", 400
+        try:
+            dbclient.deleteFromDb(pentest, "attachments", {"attachment_id": attachment_id}, many=False, notify=True)
+        except Exception as e:
+            logger.error("Error deleting attachment: %s", str(e))
+            return "Error deleting attachment", 500 
         if os.path.exists(filepath):
             os.remove(filepath)
         else:

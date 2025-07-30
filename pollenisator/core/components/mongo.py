@@ -1462,7 +1462,8 @@ class DBClient:
             os.makedirs(filepath)
         except FileExistsError:
             pass
-
+        
+        uploadName = upfile.filename.replace("/", "_").replace("\\", "_")
         name, ext = os.path.splitext(upfile.filename.replace("/", "_"))
         ext = ext.replace("/","_")
         basename = os.path.basename(name)
@@ -1487,6 +1488,7 @@ class DBClient:
             full_filepath = os.path.join(filepath, attachment_id+name)
         with open(full_filepath, "wb") as f:
             f.write(upfile.stream.read())
+        dbclient.updateInDb(pentest, "attachments", {"attachment_id": attachment_id}, {"$set": {"name": name, "uploadName":uploadName, "type": filetype, "attached_to": attached_to}}, many=False, notify=True, upsert=True)
         if filetype == "proof":
             im1 = Image.open(full_filepath)
             im1.save(full_filepath, format="png")

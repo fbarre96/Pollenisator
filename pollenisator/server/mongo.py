@@ -504,6 +504,7 @@ def deletePentestFiles(pentest: str) -> None:
         shutil.rmtree(proofspath)
     resultspath = os.path.join(local_path, pentest, "result")
     if os.path.isdir(resultspath):
+        dbclient.deleteFromDb(pentest, "attachments", {}, many=True)
         shutil.rmtree(resultspath)
 
 @permission("user")

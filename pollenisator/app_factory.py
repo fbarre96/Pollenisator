@@ -19,7 +19,7 @@ import bcrypt
 from flask_socketio import SocketIO, join_room, leave_room
 from pollenisator.server.modules.worker.worker import removeWorkers, unregister
 from pollenisator.core.components.logger_config import logger
-from pollenisator.core.components.utils import JSONEncoder, loadServerConfig
+from pollenisator.core.components.utils import JSONEncoder, getMainDir, loadServerConfig
 from pollenisator.core.components.socketmanager import SocketManager
 import pollenisator.core.components.mongo as mongo
 
@@ -130,6 +130,13 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         from pollenisator.server.token import verifyToken, decode_token
         dbclient = mongo.DBClient.getInstance()
         token = str(request.cookies.get("session_token", ""))
+        if token == "":
+            logger.info("No session token found in cookies")
+        token = data.get("token", token)
+        if token == "":
+            logger.error("No session token found in data neither")
+            return
+        logger.info("Registering terminal worker with token %s", token)
         pentest = data.get("pentest", "")
         supported_plugins = data.get("supported_plugins", [])
         sid = request.sid
@@ -516,6 +523,8 @@ def migrate():
         version = migrate_2_11()
     if version == "2.11":
         version = migrate_2_12()
+    if version == "2.12":
+        version = migrate_2_13()
     logger.info("DB version is %s", version)
 
 def migrate_0():
@@ -744,6 +753,84 @@ def migrate_2_12():
     dbclient.updateInDb("pollenisator","defects", {}, {"$set":{"impacts":""}}, many=True)
     dbclient.updateInDb("pollenisator","infos",{"key":"version"},{"$set":{"key":"version","value":"2.12"}})
     return "2.12"
+
+def migrate_2_13():
+    dbclient = mongo.DBClient.getInstance()
+    # list pentests files and create their database version
+    logger.info("Start iterating pentests.")
+    file_local_path = os.path.normpath(os.path.join(getMainDir(), "files"))
+    pentests = os.listdir(file_local_path)
+    for pentest in pentests:
+        if not os.path.exists(os.path.join(file_local_path, pentest)) or not os.path.isdir(os.path.join(file_local_path, pentest)):
+            continue
+        print("Migrating pentest %s" % pentest)
+        #files
+        if not os.path.exists(os.path.join(file_local_path, pentest, "file")):
+            continue
+        attached_to_ids = os.listdir(os.path.join(file_local_path, pentest, "file"))
+        if len(attached_to_ids) > 0:
+            for attached_to_id in attached_to_ids:
+                attached_file = os.path.join(file_local_path, pentest, "file", attached_to_id)
+                if not os.path.exists(attached_file) or not os.path.isdir(attached_file):
+                    continue
+
+                files = os.listdir(attached_file)
+                if len(files) > 0:
+                    for attached in files:
+                        attached_path = os.path.join(attached_file, attached)
+                        if not os.path.exists(attached_path) or not os.path.isfile(attached_path):
+                            continue
+                        attached_id = str(uuid.uuid4())
+                        dbclient.insertInDb(pentest, "attachments", {"attachment_id":attached_id, "name":attached, "attached_to":attached_to_id, "type":"file"})
+                        logger.info("Inserted attachment %s for pentest %s", attached_id, pentest)
+        #proofs
+    for pentest in pentests:
+        if not os.path.exists(os.path.join(file_local_path, pentest, "proof")):
+            continue
+        attached_to_ids = os.listdir(os.path.join(file_local_path, pentest, "proof"))
+        if len(attached_to_ids) > 0:
+            for attached_to_id in attached_to_ids:
+                attached_file = os.path.join(file_local_path, pentest, "proof", attached_to_id)
+                if not os.path.exists(attached_file) or not os.path.isdir(attached_file):
+                    continue
+
+                files = os.listdir(attached_file)
+                if len(files) > 0:
+                    for attached in files:
+                        attached_path = os.path.join(attached_file, attached)
+                        if not os.path.isfile(attached_path):
+                            continue
+                        attached_id = str(uuid.uuid4())
+                        dbclient.insertInDb(pentest, "attachments", {"attachment_id":attached_id, "name":attached, "attached_to":attached_to_id, "type":"proof"})
+                        logger.info("Inserted proof %s for pentest %s", attached_id, pentest)
+    for pentest in pentests: 
+        # results
+        if not os.path.exists(os.path.join(file_local_path, pentest, "result")):
+            continue
+        attached_to_ids = os.listdir(os.path.join(file_local_path, pentest, "result"))
+        if len(attached_to_ids) > 0:
+            for attached_to_id in attached_to_ids:
+                attached_file = os.path.join(file_local_path, pentest, "result", attached_to_id)
+                if not os.path.exists(attached_file) or not os.path.isdir(attached_file):
+                    continue
+
+                files = os.listdir(attached_file)
+                if len(files) > 0:
+                    for attached in files:
+                        attached_path = os.path.join(attached_file, attached)
+                        if not os.path.exists(attached_path) or not os.path.isfile(attached_path):
+                            continue
+                        attached_id = str(uuid.uuid4())
+                        dbclient.insertInDb(pentest, "attachments", {"attachment_id":attached_id, "name":attached,  "attached_to":attached_to_id, "type":"result"})
+                        logger.info("Inserted result %s for pentest %s", attached_id, pentest)
+   
+    dbclient.updateInDb(
+        "pollenisator",
+        "infos",
+        {"key": "version"},
+        {"$set": {"key": "version", "value": "2.13"}}
+    )
+    return "2.13"
 
 def init_db() -> None:
     """

@@ -208,6 +208,11 @@ def search_ports(pentest: str, query: str, limit: int, offset: int) -> List[Dict
         if service:
             label += f" ({service})"
         
+        ip = dbclient.find("ips", {"ip": ip}, multi=False)
+        if not ip:
+            continue
+        host_id = ip.get("_id", "")
+        
         result = {
             "id": f"port_{port_data['_id']}",
             "category": "ports",
@@ -216,9 +221,9 @@ def search_ports(pentest: str, query: str, limit: int, offset: int) -> List[Dict
             "matches": matches,
             "data": {
                 "_id": str(port_data["_id"]),
-                "host_id": str(port_data.get("parent", "")),
+                "host_id": str(host_id),
                 "ip": ip,
-                "port": int(port) if port.isdigit() else port,
+                "port": int(port) if str(port).isdigit() else port,
                 "protocol": port_data.get("proto", ""),
                 "service": service
             }

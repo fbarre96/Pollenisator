@@ -749,6 +749,7 @@ class Defect(Element):
             raise FileNotFoundError("File not found")
         dbclient = DBClient.getInstance()
         dbclient.updateInDb(self.pentest, "defects", {"_id": ObjectId(self.getId())}, {"$pull":{"proofs":filename}})
+        dbclient.deleteFromDb(self.pentest, "attachments", {"attachment_id": filename, "attached_to": self.getId()}, many=True)
         os.remove(proof_path)
 
     def listProofFiles(self, getUnassigned=False) -> List[str]:

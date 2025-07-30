@@ -531,7 +531,7 @@ def checkCommandService(allowed_ports_services: List[str], port: str, proto: str
                 endAllowedRange = int(maybeRange[1])
             except ValueError:
                 startAllowedRange = endAllowedRange = -1
-        if proto + "/" + port == allowed or proto + "/" + service == allowed \
+        if proto + "/" + str(port) == allowed or proto + "/" + service == allowed \
             or (
                 proto == proto_range \
                 and startAllowedRange <= int(port) <= endAllowedRange

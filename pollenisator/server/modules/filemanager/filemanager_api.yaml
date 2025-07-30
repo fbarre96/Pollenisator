@@ -115,6 +115,37 @@ paths:
               examples:
                 Unknown defect:
                   value: '"The given iid does not match an existing defect"'
+  "/files/{pentest}/list/{filetype}":
+    get:
+      operationId: pollenisator.server.modules.filemanager.filemanager.listFilesAll
+      tags:
+        - FileManager
+      summary: Lists all files of given type
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: filetype
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - result
+              - proof
+              - file
+      responses:
+        "200":
+          description: Successfully listed files
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
   "/files/{pentest}/list/{filetype}/{attached_to}":
     get:
       operationId: pollenisator.server.modules.filemanager.filemanager.listFiles
@@ -203,7 +234,44 @@ paths:
               examples:
                 file not found:
                   value: '"File not found"'
-  "/files/{pentest}/{filetype}/{attached_to}/{filename}":
+  "/files/{pentest}/download/file/{attachment_id}":
+    get:
+      operationId: pollenisator.server.modules.filemanager.filemanager.downloadById
+      tags:
+        - FileManager
+      summary: Download a file
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: attachment_id
+          in: path
+          description: file uuid to download
+          required: true
+          schema:
+            type: string
+       
+
+      responses:
+        "200":
+          description: Successfully downloaded file
+          content:
+            application/octet-steam:
+              schema:
+                type: string
+                format: binary
+                
+        "404":
+          description: File not found
+          content:
+            application/json:
+              examples:
+                file not found:
+                  value: '"File not found"'
+  "/files/{pentest}/{attachment_id}":
     delete:
       operationId: pollenisator.server.modules.filemanager.filemanager.rmFile
       tags:
@@ -216,26 +284,13 @@ paths:
           required: true
           schema:
             type: string
-        - name: attached_to
+        - name: attachment_id
           in: path
-          description: defect iid which have the file to delete
+          description: file uuid to delete
           required: true
           schema:
             type: string
-        - name: filetype
-          in: path
-          required: true
-          schema:
-            type: string
-            enum:
-              - result
-              - proof
-              - file
-        - name: filename
-          in: path
-          required: true
-          schema:
-            type: string
+        
       responses:
         "200":
           description: Successfully deleted the file
