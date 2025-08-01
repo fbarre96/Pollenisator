@@ -1495,7 +1495,7 @@ class DBClient:
             upfile.stream.seek(0)
             if attached_to != "unassigned":
                 dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(attached_to)}, {"$addToSet":{"proofs":name}})
-        return {"msg":name + " was successfully uploaded", "attachment_id":attachment_id}, 200, full_filepath
+        return {"msg":uploadName + " was successfully uploaded", "attachment_id":attachment_id}, 200, full_filepath
 
     def transferPentestOwnership(self, pentest: str, new_owner: str) -> bool:
         """
