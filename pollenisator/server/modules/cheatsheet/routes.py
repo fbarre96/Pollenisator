@@ -146,8 +146,8 @@ def getChecksData(pentest: str) -> Union[ErrorStatus, List[Dict[str, Any]]]:
         return_values[check._id]["checkinstances"] = []
     for checkinstance in checkinstances_list:
         inst_data = checkinstance.getData()
-        inst_data["representation"] = repres.get(str(checkinstance.target_iid), return_values[checkinstance.check_iid]["title"])
-        return_values[checkinstance.check_iid]["checkinstances"].append(inst_data)
+        inst_data["representation"] = repres.get(str(checkinstance.target_iid), return_values.get(str(checkinstance.check_iid), {}).get("title"))
+        return_values[ObjectId(checkinstance.check_iid)]["checkinstances"].append(inst_data)
     return sorted([x for x in return_values.values()], key=lambda x: x["priority"])
 
 
