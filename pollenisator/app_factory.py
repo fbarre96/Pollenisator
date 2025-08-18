@@ -22,6 +22,7 @@ from pollenisator.core.components.utils import JSONEncoder, getMainDir, loadServ
 from pollenisator.core.components.socketmanager import SocketManager
 import pollenisator.core.components.mongo as mongo
 from pollenisator.migrate import *
+from pollenisator.server.permission import checkPentestPermission
 
 server_folder = os.path.join(os.path.dirname(
 os.path.realpath(__file__)), "./server/api_specs/")
@@ -149,7 +150,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
             if username is None:
                 return
             logger.info("Registering terminal worker for user %s", str(username))
-            if pentest in token_info["scope"]:
+            if checkPentestPermission(token_info, pentest, False):
                 dbclient = mongo.DBClient.getInstance()
                 socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid, "user":username, "type":"terminal"}, False)
                 if socket is None:
@@ -185,7 +186,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
             if username is None:
                 return
             logger.info("Registering terminal consumer for user %s", str(username))
-            if pentest in token_info["scope"]:
+            if checkPentestPermission(token_info, pentest, False):
                 dbclient = mongo.DBClient.getInstance()
                 socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid, "user":username, "type":"terminalConsumer"}, False)
                 if socket is None:
@@ -219,8 +220,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
         res = verifyToken(token)
         if res:
             token_info = decode_token(token)
-            
-            if pentest in token_info["scope"]:
+            if checkPentestPermission(token_info, pentest, False):
                 dbclient = mongo.DBClient.getInstance()
                 socket = dbclient.findInDb("pollenisator", "sockets", {"sid":sid}, False)
                 if socket is None:

@@ -17,14 +17,12 @@ JWT_SECRET = os.environ.get("JWT_SECRET", secrets.token_urlsafe(32))
 JWT_LIFETIME_SECONDS = 3600*12  # 12 hours
 JWT_ALGORITHM = 'HS256'
 
-def getTokenFor(username: str, pentest: str = "", owner: bool = False) -> str:
+def getTokenFor(username: str) -> str:
     """
     Get the token for a specific user. If the user does not have a token or if the token is invalid, a new token is generated.
 
     Args:
         username (str): The username of the user.
-        pentest (str, optional): The pentest associated with the user. Defaults to "".
-        owner (bool, optional): Whether the user is an owner. Defaults to False.
 
     Returns:
         str: The token for the user.
@@ -38,14 +36,7 @@ def getTokenFor(username: str, pentest: str = "", owner: bool = False) -> str:
         scopes = set(decode_token(user_record.get("token","")).get("scope", []))
     except Unauthorized:
         scopes = set()
-    scopes = scopes.union(set(user_record.get("scope", [])))
-    if pentest != "" and pentest not in scopes:
-        scopes = set(user_record["scope"])
-        scopes.add(pentest)
-        if owner:
-            scopes.add("owner")
-        scopes.add("pentester")
-        mod = True
+    
     if "user" not in scopes:
         scopes.add("user")
         mod = True

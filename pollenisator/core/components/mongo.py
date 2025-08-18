@@ -72,7 +72,7 @@ class DBClient:
             self.current_pentest: Union[str, None] = None
             self.ssldir = ""
             self.db: Union[pymongo.database.Database[Any], None] = None
-            self.cache_collections = ["ports","ips","checkinstances","commands"]
+            self.cache_collections = ["ports","ips","checkinstances","commands","pentests"]
             self.forbiddenNames = ["admin", "config", "local",
                                    "broker_pollenisator", "pollenisator"]
             DBClient.__instances[pid] = self
@@ -686,8 +686,8 @@ class DBClient:
                         res: Union[Dict[str, Any], List[Dict[str, Any]]] = json.loads(res_redis, cls=utils.JSONDecoder)
                         return res
                 except redis.exceptions.ConnectionError:
-                    logger.warning("Failed to connect to redis")
-                    self.redis = None
+                    logger.warning("Failed to get from redis")
+                    #self.redis = None
         find_res: Union[pymongo.cursor.Cursor, None, List[Dict[str, Any]]] =  self._find(dbMongo, collection, pipeline, multi, skip, limit)
         if cache_key and find_res:
             if inspect.isgenerator(find_res) or isinstance(find_res, pymongo.cursor.Cursor):
@@ -698,8 +698,8 @@ class DBClient:
             try:
                 if self.redis:
                     self.redis.set(cache_key, store, ex=30) #set serialized object to redis server.
-            except redis.exceptions.ConnectionError as _e:
-                logger.warning("Failed to connect to redis")
+            except redis.exceptions.ConnectionError as e:
+                logger.warning("Failed to set to redis, connection error "+ str(e))
                 self.redis = None
             return return_value
         return find_res

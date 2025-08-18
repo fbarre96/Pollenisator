@@ -345,7 +345,7 @@ def connectToPentest(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union
 
     if "admin" in token.get("scope", []):
         # Set token in httpOnly cookie and return pentest name
-        pentest_token = getTokenFor(username, pentest, True)
+        pentest_token = getTokenFor(username)
         response = make_response(jsonify({"pentest_name": pentest_name, "token":pentest_token}))
         response.set_cookie(
             'session_token', 
@@ -366,7 +366,7 @@ def connectToPentest(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union
         if user.get("mustChangePassword", True):
             return "Forbidden : you must change your password", 403
         # Set token in httpOnly cookie and return pentest name
-        pentest_token = getTokenFor(username, pentest, owner == username)
+        pentest_token = getTokenFor(username)
         response = make_response(jsonify({"pentest_name": pentest_name, "token":pentest_token}))
         response.set_cookie(
             'session_token', 

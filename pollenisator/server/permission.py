@@ -1,3 +1,5 @@
+from typing import Any
+from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.logger_config import logger
 import inspect
 
@@ -5,6 +7,41 @@ from pollenisator.server.token import checkTokenValidity
 # permission decorator
 
 all_permissions = ["admin", "user", "owner", "pentester", "template_writer", "worker", "report_template_writer"]
+
+def checkPentestPermission(token_info: dict[str, Any], pentest: str, check_owner: bool) -> bool:
+    """
+    Check if the user has permission to access the specified pentest.
+
+    Args:
+        token_info (Dict[str, Any]): The token information containing user details and scopes.
+        pentest (str): The name of the pentest to check permissions for.
+        check_owner (bool): If True, check if the user is the owner of the pentest.
+
+    Returns:
+        bool: True if the user has permission, False otherwise.
+    """
+    if "admin" in token_info.get("scope", []):
+        return True
+    if "user" not in token_info.get("scope", []):
+        return False
+    user = token_info.get("sub", "")
+    if user == "":
+        logger.debug("Forbidden : user is not defined in token_info")
+        return False
+    dbclient = DBClient.getInstance()
+    result = dbclient.findInDb("pollenisator", "pentests", {"uuid": pentest}, False)
+    if result is None:
+        return False
+    if result.get("owner", "") == user:
+        return True
+    if check_owner:
+        logger.debug(f"Forbidden : {user} is not the owner of {pentest}")
+        return False
+    if user in result.get("pentesters", []):
+        return True
+    return False
+
+
 def permission(*dec_args, **deckwargs):
     def _permission(function):
         def wrapper(*args, **kwargs):
@@ -28,7 +65,7 @@ def permission(*dec_args, **deckwargs):
                         token_scope.append(perm)
                 token_info["scope"] = token_scope
             # Check scope inside token
-            if scope not in token_scope:
+            if scope not in token_scope and scope != "pentester" and scope != "owner":
                 logger.debug(f"FORBIDDEN : {scope} not in {token_info}")
                 return f"Forbidden : {scope} is required", 403
             if (scope == "pentester" or scope == "owner") and "worker" not in token_scope:
@@ -41,10 +78,9 @@ def permission(*dec_args, **deckwargs):
                     if arg_value is None and arg_name in args_spec.args:
                         arg_value_i = args_spec.args.index(arg_name)
                         arg_value = args[arg_value_i]
-                if arg_value not in token_scope:
-                    if "admin" not in token_scope:
-                        logger.debug(f"{arg_value} is not in the token scope {token_info}")
-                        return f"Forbidden : you do not have access to {arg_value}", 403
+                if not checkPentestPermission(token_info, arg_value, scope == "owner"):
+                    return f"Forbidden : you are not allowed to access {arg_value}", 403
+                
             if scope == "worker":
                 if arg_name == "pentest":
                     arg_name = "name"
