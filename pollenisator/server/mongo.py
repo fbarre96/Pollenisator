@@ -793,7 +793,7 @@ def preparePentest(pentest_uuid: str, pentest_type: str, start_date: str, end_da
     dbclient.insertInDb(pentest_uuid, "settings", {"key":"autoscan_threads", "value":4}, notify=False)
     pentester_list = [x.strip() for x in pentesters.replace("\n",",").split(",")]
     pentester_list.insert(0, owner)
-    dbclient.insertInDb(pentest_uuid, "settings", {"key":"pentesters", "value": pentester_list}, notify=False)
+    dbclient.updateInDb("pollenisator", "pentests", {"uuid":pentest_uuid}, {"$set":{"owner":owner, "pentesters":pentester_list}})
     Command.addUserCommandsToPentest(pentest_uuid, user)
     #addCheckInstancesToPentest(pentest, pentest_type)
     commands = Command.getList({}, pentest_uuid)

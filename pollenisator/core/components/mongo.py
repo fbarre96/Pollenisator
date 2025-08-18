@@ -909,8 +909,8 @@ class DBClient:
                     return None
                 for pentest in pentests: # pylint: disable=not-an-iterable
                     if username is not None:
-                        res = self.findInDb(pentest["uuid"], "settings", {"key":"pentesters", "value":username}, False)
-                        if res is not None or username == pentest.get("owner"):
+                        pentesters = pentest.get("pentesters", [])
+                        if username in pentesters or pentest.get("owner") == username:
                             ret.append(pentest)
                     else:
                         ret.append(pentest)
@@ -1101,11 +1101,11 @@ class DBClient:
         Returns:
             List[str]: A list of usernames who are users of the specified pentest. If no users are found, an empty list is returned.
         """
-        pentesters = self.findInDb(pentest, "settings", {"key":"pentesters"}, False)
-        if pentesters is None:
+        dbclient = DBClient.getInstance()
+        pentest_record = dbclient.findInDb("pollenisator", "pentests", {"uuid": pentest}, False)
+        if pentest_record is None:
             return []
-        value: List[str] = [x for x in pentesters["value"] if x.strip() != ""]
-        return value
+        return [x.strip() for x in set(pentest_record.get("pentesters", []) + [pentest_record.get("owner", None)]) if x != "" ]
 
     def getPentestOwner(self, pentest: str) -> str:
         """
@@ -1511,9 +1511,7 @@ class DBClient:
         if self.client is None:
             raise ValueError("No pentest connected")
         old_owner = self.getPentestOwner(pentest)
-        self.updateInDb(pentest, "settings", {"key": "pentesters"}, {"$addToSet": {"value": old_owner}}, notify=True)
-        res = self.updateInDb("pollenisator", "pentests", {"uuid": pentest}, {"$set": {"owner": new_owner}})
-
+        res = self.updateInDb("pollenisator", "pentests", {"uuid": pentest}, {"$set": {"owner": new_owner}, "$addToSet": {"pentesters": old_owner}})
         return res.acknowledged
     
     def removePentestUser(self, pentest: str, user: str) -> bool:
@@ -1529,7 +1527,7 @@ class DBClient:
         """
         if self.client is None:
             raise ValueError("No pentest connected")
-        res = self.updateInDb(pentest, "settings", {"key": "pentesters"}, {"$pull": {"value": user}}, notify=True)
+        res = self.updateInDb("pollenisator", "pentests", {"uuid": pentest}, {"$pull": {"pentesters": user}}, notify=True)
         return res.acknowledged
     
     def addPentestUser(self, pentest: str, user: str) -> bool:
@@ -1545,7 +1543,7 @@ class DBClient:
         """
         if self.client is None:
             raise ValueError("No pentest connected")
-        res = self.updateInDb(pentest, "settings", {"key": "pentesters"}, {"$addToSet": {"value": user}}, notify=True)
+        res = self.updateInDb("pollenisator", "pentests", {"uuid": pentest}, {"$addToSet": {"pentesters": user}}, notify=True)
         return res.acknowledged
     
     def isUserInDb(self, username: str) -> bool:
