@@ -31,3 +31,4 @@ def getTriggerLevels() -> List[str]:
     for _, class_type in REGISTRY.items():
         ret = ret.union(set(class_type.getTriggers()))
     return sorted(list(ret))
+

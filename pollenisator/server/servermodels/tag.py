@@ -1,11 +1,12 @@
 """
 Handle  request common to Tags
 """
-from typing import Dict, Any, List, Tuple, Union
+from typing import Dict, Any, List, Optional, Tuple, Union
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.element import Element
 from pollenisator.server.permission import permission
+from pollenisator.core.components.logger_config import logger
 
 @permission("pentester")
 def addTag(pentest: str, item_id: str, body: Dict[str, Any]) -> Union[Tuple[str, int], bool]:
@@ -126,4 +127,48 @@ def getRegisteredTags(pentest: str) -> List[Dict[str, Any]]:
     """
     dbclient = DBClient.getInstance()
     tags = dbclient.getRegisteredTags(pentest, only_name=False)
+    return tags
+
+@permission("pentester")
+def getAllTagsWithTargetInfo(pentest: str, limit: Optional[int] = None , skip: Optional[int] = None) -> List[Dict[str, Any]]:
+    """
+    Get all tags in the database along with their target information.
+
+    Args:
+        pentest (str): The name of the pentest.
+        limit (int, optional): The maximum number of tags to return. Defaults to None (no limit).
+        skip (int, optional): The number of tags to skip. Defaults to 0.
+
+    Returns:
+        List[Dict[str, Any]]: A list of dictionaries where each dictionary contains the tag name and its target information.
+    """
+    dbclient = DBClient.getInstance()
+    tags = dbclient.findInDb(
+        pentest,
+        "tags",
+        {"tags": {"$ne": []}},  # only fetch documents where tags array is not empty
+        multi=True,
+        limit=limit,
+        skip=skip
+    )
+    if tags is None:
+        return []
+    tags = sorted(tags, key=lambda x: x["date"], reverse=True)
+    tags_iids_per_types: Dict[str, List[str]] = {}
+    for tag in tags:
+        if tag["item_type"] not in tags_iids_per_types:
+            tags_iids_per_types[tag["item_type"]] = []
+        tags_iids_per_types[tag["item_type"]].append(tag["item_id"])
+    items_per_type: Dict[str, Dict[str, Any]] = {}
+    for item_type, item_ids in tags_iids_per_types.items():
+        target_class = Element.classFactory(item_type)
+        if target_class is None:
+            logger.error("Invalid target type used : %s", item_type)
+            continue
+        items_objs = target_class.fetchObjects(pentest, {"_id": {"$in": [ObjectId(item_id) for item_id in item_ids]}})
+        items_objs = [item for item in items_objs if item is not None]
+        items_per_type[item_type] = {str(item.getId()): item.getDetailedString() for item in items_objs}
+    for tag in tags:
+        tag["item"] = items_per_type.get(tag["item_type"], {}).get(str(tag["item_id"]), "Unknown item")
+
     return tags

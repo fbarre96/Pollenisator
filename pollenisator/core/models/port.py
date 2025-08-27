@@ -175,6 +175,8 @@ class Port(Element):
         base = self.getDbKey()
         existing = Port.fetchObject(self.pentest, base)
         if existing is not None:
+            if self._id is None:
+                self._id = existing.getId()
             return {"res":False, "iid":existing.getId()}
         data = self.getData()
         if "_id" in data:

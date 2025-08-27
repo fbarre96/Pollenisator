@@ -34,10 +34,10 @@ paths:
         - Cheatsheet
       summary: get checks data
       operationId: pollenisator.server.modules.cheatsheet.routes.getChecksData
-      description: 'get checks data'
+      description: 'get checks data with optional pipeline filter'
       responses:
         '200':
-          description: a list of checks data in same order as iids list
+          description: a list of checks data filtered by the pipeline
   '/cheatsheet/{iid}':
     parameters:
       - schema:
@@ -114,6 +114,69 @@ paths:
       responses:
         "200":
           description: Get data on a checkisntance
+  "/checkinstances/{pentest}/getManyChecksData":
+    post:
+      operationId: pollenisator.server.modules.cheatsheet.checkinstance.getManyChecksData
+      tags:
+        - CheckInstance
+      summary: Get many check instances data for a pentest
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                iids:
+                  type: array
+                  items:
+                    type: string
+      description: "Get many check instances data for a pentest"
+
+        
+      responses:
+        "200":
+          description: Get data on a checkisntance
+
+  '/cheatsheet/{pentest}/startMultiCommand':
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+    post:
+      tags:
+        - Cheatsheet
+      summary: start multiple commandline tools
+      operationId: pollenisator.server.modules.cheatsheet.routes.startMultiCommand
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                session_id:
+                  type: string
+                command:
+                  type: string
+                plugin:
+                  type: string
+                toolsData:
+                  type: array
+                  items:
+                    type: object
+      description: 'start multiple commandline tools'
+      responses:
+        '200':
+          description: OK
 
   '/cheatsheet/{pentest}/getTargetRepr':
     parameters:

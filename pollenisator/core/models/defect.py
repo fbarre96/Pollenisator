@@ -26,7 +26,7 @@ class Defect(Element):
     """
     coll_name = "defects"
     reviewable_keys = {
-        "defect": ["synthesis", "title", "impacts", "description", "ease", "impact", "risk"],
+        "defect": ["synthesis", "title", "impacts", "description", "ease", "impact", "risk", "cvss_score", "cvss_string"],
         "fixe" : ["synthesis", "description", "ease", "gain"]
     }
 
@@ -39,7 +39,7 @@ class Defect(Element):
             valuesFromDb (Optional[Dict[str, Any]], optional): A dict holding values to load into the object. 
                 A mongo fetched defect is optimal. Possible keys with default values are : _id (None), parent (None), 
                 infos({}), target_id, target_type, title(""), synthesis(""), impacts(""), description(""), ease(""), impact(""), 
-                risk(""), redactor("N/A"), type([]),  language(""),, notes(""), proofs([]), fixes([]), creation_time, 
+                risk(""), cvss_score(-1), cvss_string(""), redactor("N/A"), type([]),  language(""), notes(""), proofs([]), fixes([]), creation_time, 
                 redacted_state("New"), editor="", infos, index(None),  perimeter([]). Defaults to None.
         """
         if valuesFromDb is None:
@@ -54,7 +54,7 @@ class Defect(Element):
                             valuesFromDb.get("ease", ""), valuesFromDb.get(
                                 "impact", ""),
                             valuesFromDb.get(
-                                "risk", ""), valuesFromDb.get("redactor", "N/A"), valuesFromDb.get("type", []),
+                                "risk", ""), valuesFromDb.get("cvss_score", -1), valuesFromDb.get("cvss_string",""), valuesFromDb.get("redactor", "N/A"), valuesFromDb.get("type", []),
                             valuesFromDb.get("language", ""),
                             valuesFromDb.get("notes", ""), valuesFromDb.get(
                                 "proofs", []),
@@ -64,7 +64,7 @@ class Defect(Element):
                             valuesFromDb.get("index", 0), valuesFromDb.get("perimeter", []))
 
     def initialize(self, target_id: Optional[ObjectId] = None, target_type: str = "", title: str = "", synthesis: str = "",
-                   impacts: str= "", description: str = "", ease: str = "", impact: str = "", risk: str = "", redactor: str = "N/A",
+                   impacts: str= "", description: str = "", ease: str = "", impact: str = "", risk: str = "", cvss_score: float = -1, cvss_string: str = "", redactor: str = "N/A",
                    mtype: Optional[Union[str, List[str]]] = None, language: str = "", notes: str = "",
                    proofs: Optional[List[str]] = None, fixes: Optional[List[Dict[str, Any]]] = None,
                    creation_time: Optional[datetime] = None, redacted_state: str = "New", editor="", infos: Optional[Dict[str, Any]] = None,
@@ -82,6 +82,8 @@ class Defect(Element):
             ease (str, optional): Ease of exploitation for this defect described as a string. Defaults to "".
             impact (str, optional): Impact the defect has on system. Described as a string. Defaults to "".
             risk (str, optional): The combination of impact/ease gives a resulting risk value. Described as a string. Defaults to "".
+            cvss_score (float, optional): The CVSS score of this defect. Defaults to -1.
+            cvss_string (str, optional): The CVSS string of this defect. Defaults to "".
             redactor (str, optional): A pentester that will be the redactor for this defect. Defaults to "N/A".
             mtype (Optional[Union[str, List[str]]], optional): Types of this security defects (Application, data, etc...). Default is None.
             language (str, optional): The language in which this defect is redacted. Defaults to "".
@@ -104,6 +106,8 @@ class Defect(Element):
         self.ease = ease
         self.impact = impact
         self.risk = risk
+        self.cvss_score = cvss_score
+        self.cvss_string = cvss_string
         self.redactor = redactor
         self.mtype = mtype if mtype is not None else []
         if isinstance(self.mtype, str):
@@ -135,12 +139,12 @@ class Defect(Element):
 
         Returns:
             Dict[str,Any]: A dictionary with keys title, 
-            synthesis, impacts, description, ease, impact, risk, redactor, type, language, notes, target_id, target_type, index, 
+            synthesis, impacts, description, ease, impact, risk, cvss_score, cvss_string, redactor, type, language, notes, target_id, target_type, index, 
             proofs, creation_time, redacted_state, editor, fixes, _id, infos.
         """
 
         return {"title": self.title, "synthesis":self.synthesis, "impacts":self.impacts, "description":self.description, "ease": self.ease, "impact": self.impact,
-                "risk": self.risk, "redactor": self.redactor, "type": self.mtype, "language":self.language, "notes": self.notes,
+                "risk": self.risk, "cvss_score":self.cvss_score, "cvss_string":self.cvss_string, "redactor": self.redactor, "type": self.mtype, "language":self.language, "notes": self.notes,
                 "target_id": self.target_id, "target_type": self.target_type, "index":int(self.index),
                 "proofs": self.proofs, "creation_time": self.creation_time, "redacted_state":self.redacted_state, "editor":self.editor, "fixes":self.fixes, "perimeter":self.perimeter, "_id": self.getId(), "infos": self.infos}
 
@@ -638,6 +642,7 @@ class Defect(Element):
             ObjectId: The parent id of this defect.
         """
         return ObjectId(self.target_id)
+
 
     def getTargetRepr(self) -> str:
         """

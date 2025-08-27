@@ -6,6 +6,8 @@ import pollenisator.core.components.utils as utils
 from pollenisator.server.permission import permission
 from pollenisator.core.components.logger_config import logger
 import requests
+from bson import ObjectId
+from pollenisator.core.models.element import Element
 
 ErrorStatus = Tuple[str, int]
 
@@ -75,3 +77,34 @@ def textcompletion(body, **kwargs):
     if model not in ["pollenisator-description", "pollenisator-remediation"]:
         return "Invalid model", 400
     return do_completion(model, text, config)
+
+@permission("pentester")
+def get_visible_target(pentest: str, body: Dict[str, Any], **kwargs) -> Union[ErrorStatus, Dict[str, Any]]:
+    """
+    Get a visible target by its type and id.
+
+    Args:
+        pentest (str): The name of the pentest.
+        body (Dict[str, Any]): A dictionary containing the target type and id.
+
+    Returns:
+        Union[ErrorStatus, Dict[str, Any]]: The target details if found, otherwise an error message and status code.
+    """
+    target_type = body.get("item_type", "")
+    target_id = body.get("item_id", "")
+    if target_id.startswith("ObjectId|"):
+        target_id = target_id.split("|",1)[1]
+    if not target_type:
+        return "No target type provided", 400
+    if not target_id:
+        return "No target id provided", 400
+    target_class = Element.classFactory(target_type)
+    if target_class is None:
+        return "Invalid target type", 400
+    target = target_class.fetchObject(pentest, {"_id": ObjectId(target_id)})
+    if target is None:
+        return "Target not found", 404
+    if target_type in ["ips","scopes","waves"]:
+        return target_id
+    return target.getParentId()
+        

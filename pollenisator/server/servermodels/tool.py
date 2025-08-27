@@ -1,6 +1,7 @@
 """
 Handle request common to Tools
 """
+import io
 import os
 import sys
 import time
@@ -244,10 +245,11 @@ def importResult(pentest: str, tool_iid: str, upfile: Any, body: Dict[str, Any])
     toolModel = cast(Tool, toolModel)
     mod = toolModel.getPlugin()
     ext = os.path.splitext(upfile.filename)[-1]
+    f = io.open(filepath, "rb")
     if mod is not None:
         try:
             # Check return code by plugin (can be always true if the return code is inconsistent)
-            notes, tags, _, _ = mod.Parse(pentest, upfile, tool=toolModel, ext=ext, filename=upfile.filename)
+            notes, tags, _, _ = mod.Parse(pentest, f, tool=toolModel, ext=ext, filename=upfile.filename)
             if notes is None:
                 notes = "No results found by plugin."
             if tags is None:
@@ -347,7 +349,7 @@ def clearTasks(pentest: str, **kwargs: Any):
 
 
 @permission("pentester")
-def getQueue(pentest: str) -> List[Dict[str, Any]]:
+def getQueue(pentest: str) -> Dict[str, List[Dict[str, Any]]]:
     """
     Get the queue for a pentest. The queue is fetched from the database and the tools in the queue are fetched. The 
     commands for the tools are also fetched. For each tool in the queue, the tool data is fetched and if the tool text is 
@@ -360,8 +362,9 @@ def getQueue(pentest: str) -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: A list of dictionaries where each dictionary contains the data for a tool in the queue.
     """
     dbclient = DBClient.getInstance()
-    res: List[Dict[str, Any]] = []
+    res: Dict[str, List[Dict[str, Any]]] = {"queued": [], "running": []}
     queue = dbclient.findInDb(pentest, "autoscan", {"type":"queue"}, False)
+    running_tools = dbclient.findInDb("pollenisator", "workers", {"pentest":pentest}, multi=True)
     if queue is not None:
         tools = queue["tools"]
         tools_objects = Tool.fetchObjects(pentest, {"_id": {"$in": [ObjectId(tool_info.get("iid")) for tool_info in tools]}})
@@ -380,7 +383,27 @@ def getQueue(pentest: str) -> List[Dict[str, Any]]:
                         tool_data["text"] = command.text
                     except AttributeError:
                         tool_data["text"] = ""
-            res.append(tool_data)
+            res["queued"].append(tool_data)
+    if running_tools is not None:
+        for worker in running_tools:
+            running = worker.get("running_tools", [])
+            tools_objects = Tool.fetchObjects(pentest, {"_id": {"$in": [ObjectId(tool_info.get("iid")) for tool_info in running]}})
+            if tools_objects is None:
+                continue
+            commands = Command.fetchObjects(pentest, {})
+            commands_dict = {str(command.getId()):command for command in commands}
+            for tool in tools_objects:
+                tool = cast(Tool, tool)
+                tool_data = {}
+                tool_data = tool.getData()
+                if tool.text == "":
+                    command = commands_dict.get(str(tool.command_iid))
+                    if command is not None:
+                        try:
+                            tool_data["text"] = command.text
+                        except AttributeError:
+                            tool_data["text"] = ""
+                res["running"].append(tool_data)
     return res
 
 def isLaunchable(pentest: str, tool_iid: ObjectId, authorized_commands: Optional[List[str]], force: bool = False) -> Tuple[str, int]:

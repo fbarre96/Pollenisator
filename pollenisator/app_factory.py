@@ -23,6 +23,7 @@ from pollenisator.core.components.socketmanager import SocketManager
 import pollenisator.core.components.mongo as mongo
 from pollenisator.migrate import *
 from pollenisator.server.permission import checkPentestPermission
+from pollenisator.server.modules.worker.worker import doSetInclusion
 
 server_folder = os.path.join(os.path.dirname(
 os.path.realpath(__file__)), "./server/api_specs/")
@@ -55,13 +56,12 @@ def handle_start_terminal_session(sm: SocketManager, data: Dict[str, Any], socke
         for output_log in existing_session.get("logs", []):
             sm.socketio.emit("proxy-term", {"action":"pty-output", "id":data.get("id"), "output":output_log}, room=request_sid)
     else:
-        dbclient.insertInDb(socket["pentest"], "terminalsessions", {"user":socket["user"], "id":data.get("id"), "name":data.get("name"), "target_check_iid":data.get("target_check_iid",None), "visible_target":data.get("visible_target",None), "logs":[], "status":"open", "displayMode": data.get("displayMode", "panel")})
+        dbclient.insertInDb(socket["pentest"], "terminalsessions", {"user":socket["user"], "id":data.get("id"), "name":data.get("name"), "target_check_iid":data.get("target_check_iid",None), "visible_target":data.get("visible_target",None), "target_tools_iids": data.get("target_tools_iids", []),"logs":[], "status":"open", "displayMode": data.get("displayMode", "panel")})
 def handle_stop_terminal_session(sm: SocketManager, data: Dict[str, Any], socket: Dict[str, Any], dbclient: mongo.DBClient, request_sid: str) -> None:
     existing_session = dbclient.findInDb(socket["pentest"], "terminalsessions", {"user":socket["user"], "id":data.get("id")}, False)
     if existing_session is not None:
         dbclient.updateInDb(socket["pentest"], "terminalsessions", { "id":data.get("id")}, {"$set":{"status":"closed"}}, False)
     
-
 def handle_pty_output(sm: SocketManager, data: Dict[str, Any], socket: Dict[str, Any], dbclient: mongo.DBClient) -> None:
     existing_session = dbclient.findInDb(socket["pentest"], "terminalsessions", {"user":socket["user"], "id":data.get("id")}, False)
     if existing_session is not None:
@@ -159,6 +159,8 @@ def create_app(debug: bool, async_mode: str) -> Flask:
                     dbclient.updateInDb("pollenisator", "sockets", {"sid":sid, "user":username}, {"$set":{"pentest":pentest, "user":username, "supported_plugins":supported_plugins}}, notify=False)
                 #sm.socketio.emit("testTerminal", {"pentest":pentest}, room=request.sid)
                 register(data)
+                workerName = data.get("name")
+                doSetInclusion(workerName, pentest, True)
                 
                 socket_terminal_consumer = dbclient.findInDb("pollenisator", "sockets", {"user":username, "type":"terminalConsumer"}, False)
                 if socket_terminal_consumer is not None:
@@ -509,6 +511,7 @@ def init_db() -> None:
     if len(settings) < 2 or settings[0].get("key") != "pentest_types" or settings[1].get("key") != "tags":
         dbclient.insertInDb("pollenisator", "settings", {"key":"pentest_types", "value":'{"Web": ["Base", "Application", "Data", "Policy"], "LAN": ["Base", "Application", "Infrastructure", "Active Directory", "Data", "Policy"]}'})
         dbclient.insertInDb("pollenisator", "settings", {"key":"tags", "value":'{"todo": {"color": "orange", "level": "todo"}, "pwned": {"color": "red", "level": "high"}, "Interesting": {"color": "dark green", "level": "medium"}, "Uninteresting": {"color": "sky blue", "level": "low"}, "neutral": {"color": "transparent", "level": ""}}'})
+        dbclient.insertInDb("pollenisator", "settings", {"key":"defect_notation_types", "value":'["CVSS"]'})
     any_user = dbclient.findInDb("pollenisator", "users", {}, False)
     noninteractive = False
     if any_user is None:

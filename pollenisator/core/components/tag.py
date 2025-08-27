@@ -41,32 +41,46 @@ class Tag:
             ValueError: If the first argument is not a tuple, list, Tag object, string, or dictionary.
         """
 
-        if isinstance(args[0], tuple) or isinstance(args[0], list):
-            name = args[0][0]
-            color = args[0][1]
-            level = args[0][2]
-            try:
-                notes = str(args[0][3])
-            except IndexError:
-                notes = ""
-        elif isinstance(args[0], Tag):
-            tag: Tag = args[0]
-            name = str(tag.name)
-            color = str(tag.color)
-            level = str(tag.level)
-            notes = str(tag.notes)
-        elif isinstance(args[0], str):
+        if len(args) > 1:
             name = args[0]
-            color = kwargs.get("color", None)
-            level = kwargs.get("level", None)
-            notes = kwargs.get("notes", None)
-        elif isinstance(args[0], dict):
-            name = args[0].get("name", "")
-            color = args[0].get("color", None)
-            level = args[0].get("level", None)
-            notes = args[0].get("notes", None)
+            color = args[1]
+            try:
+                level = args[2]
+            except IndexError:
+                level = kwargs.get("level", None)
+            try:
+                notes = str(args[3])
+            except IndexError:
+                notes = kwargs.get("notes", None)
+        elif len(args) == 1:
+            if isinstance(args[0], Tag):
+                tag: Tag = args[0]
+                name = str(tag.name)
+                color = str(tag.color)
+                level = str(tag.level)
+                notes = str(tag.notes)
+            elif isinstance(args[0], (list, tuple)):
+                name = str(args[0][0])
+                color = str(args[0][1])
+                level = str(args[0][2])
+                try:
+                    notes = str(args[0][3])
+                except IndexError:
+                    notes = ""
+            elif isinstance(args[0], str):
+                name = args[0]
+                color = kwargs.get("color", None)
+                level = kwargs.get("level", None)
+                notes = kwargs.get("notes", None)
+            elif isinstance(args[0], dict):
+                name = args[0].get("name", "")
+                color = args[0].get("color", None)
+                level = args[0].get("level", None)
+                notes = args[0].get("notes", None)
+            else:
+                raise ValueError("Tag constructor can't handle this type of argument: "+str(type(args[0]))+ ";"+str(args[0]))
         else:
-            raise ValueError("Tag constructor can't handle this type of argument: "+str(type(args[0]))+ ";"+str(args[0]))
+            raise ValueError("Tag incorrectly constructed Got: "+str(args))
         if kwargs.get("color", None) is not None:
             color = kwargs.get("color", None)
         if kwargs.get("level", None) is not None:

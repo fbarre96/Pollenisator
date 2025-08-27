@@ -1397,7 +1397,7 @@ class DBClient:
         return True    
 
 
-    def send_notify(self, db: str, collection: str, iid: Union[str, List[str]], action: str, parentId: str = "") -> None:
+    def send_notify(self, db: str, collection: str, iid: Union[str, List[str]], action: str, parentId: str = "", data: Optional[dict[str, Any]] = None) -> None:
         """
         Notify all observers of the modified record from database.
         Uses the observer's notify implementation. This implementation must take the same args as this.
@@ -1408,9 +1408,12 @@ class DBClient:
             iid Union(str, List[str]): The mongo ObjectId(s) of the document(s) that has been modified.
             action (str): The type of modification performed on this document ("insert", "update" or "delete").
             parentId (str, optional): A node parent id as str. Defaults to "".
+            data (Optional[dict[str, Any]]): Additional data to send with the notification.
         """
         from pollenisator.app_factory import notify_clients
-        notify_clients({"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now()})
+        if data is None:
+            data = {}
+        notify_clients({"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now(), "data":data})
 
     def do_upload(self, pentest: str, attachement_iid:  Union[Literal["unassigned"], str], filetype: str, upfile: Any, attached_to: Union[Literal["unassigned"], str]) -> Tuple[Dict[str, Any], int, str]:
         """
@@ -1422,7 +1425,23 @@ class DBClient:
             filetype (str): The type of the file, either 'result' or 'proof'.
             upfile (Any): The file to be uploaded.
             attached_to ( Union[Literal["unassigned"], str]): The id of the tool or defect to which the file is attached.
+            filename (str): The name of the file to be uploaded.
+        Returns:
+            Tuple[str, int, str]: A tuple containing a message indicating the result of the operation, a HTTP-like status code, and the path of the uploaded file if succeedeed only.
+        """
+        return self.do_upload_with_filename(pentest, attachement_iid, filetype, attached_to, upfile.filename, upfile.stream)
 
+    def do_upload_with_filename(self, pentest: str, attachement_iid:  Union[Literal["unassigned"], str], filetype: str, attached_to: Union[Literal["unassigned"], str], filename: str, file_stream: Any) -> Tuple[Dict[str, Any], int, str]:
+        """
+        Upload a file and attach it to a specific tool or defect in a pentest.
+
+        Args:
+            pentest (str): The name of the pentest.
+            attachement_iid ( Union[Literal["unassigned"], str]): The id of attachment if replacing, else "unassigned".
+            filetype (str): The type of the file, either 'result' or 'proof'.
+            attached_to ( Union[Literal["unassigned"], str]): The id of the tool or defect to which the file is attached.
+            filename (str): The name of the file to be uploaded.
+            file_stream (Any): The file stream to be uploaded.
         Returns:
             Tuple[str, int, str]: A tuple containing a message indicating the result of the operation, a HTTP-like status code, and the path of the uploaded file if succeedeed only.
         """
@@ -1463,8 +1482,8 @@ class DBClient:
         except FileExistsError:
             pass
         
-        uploadName = upfile.filename.replace("/", "_").replace("\\", "_")
-        name, ext = os.path.splitext(upfile.filename.replace("/", "_"))
+        uploadName = filename.replace("/", "_").replace("\\", "_")
+        name, ext = os.path.splitext(filename.replace("/", "_"))
         ext = ext.replace("/","_")
         basename = os.path.basename(name)
         if filetype == "proof":
@@ -1487,12 +1506,12 @@ class DBClient:
                 name = attachment_id+name
             full_filepath = os.path.join(filepath, attachment_id+name)
         with open(full_filepath, "wb") as f:
-            f.write(upfile.stream.read())
+            f.write(file_stream.read())
         dbclient.updateInDb(pentest, "attachments", {"attachment_id": attachment_id}, {"$set": {"name": name, "uploadName":uploadName, "type": filetype, "attached_to": attached_to}}, many=False, notify=True, upsert=True)
         if filetype == "proof":
             im1 = Image.open(full_filepath)
             im1.save(full_filepath, format="png")
-            upfile.stream.seek(0)
+            file_stream.seek(0)
             if attached_to != "unassigned":
                 dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(attached_to)}, {"$addToSet":{"proofs":name}})
         return {"msg":uploadName + " was successfully uploaded", "attachment_id":attachment_id}, 200, full_filepath

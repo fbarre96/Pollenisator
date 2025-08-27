@@ -454,6 +454,14 @@ class CheckInstance(Element):
                     else:
                         data["tools_not_done"][str(
                             tool_model.getId())]["commandline"] = tool_model.getCommandLine()
+                    command_line_multi = tool_model.getCommandLineMulti()
+                    if isinstance(command_line_multi, tuple):
+                        data["tools_not_done"][str(
+                            tool_model.getId())]["commandline_multi"] = None
+                    else:
+                        data["tools_not_done"][str(
+                            tool_model.getId())]["commandline_multi"] = tool_model.getCommandLineMulti()
+
                 total += 1
 
         if done != total:
@@ -728,4 +736,37 @@ def getChecksData(pentest: str, checkinstance_iid: str) -> Union[ErrorStatus,Dic
     result = check.getCheckInstanceInformation()
     if result is not None:
         ret[str(check.getId())] = result
+    return ret
+
+@permission("pentester")
+def getManyChecksData(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus,Dict[str, Any]]:
+    """
+    Get the getChecksData for the checkinstance.
+
+    Args:
+        pentest (str): The name of the pentest.
+        Body:
+        checkinstances_iids (List[str]): The ids of the CheckInstances.
+
+    Returns:
+        Dict[str, Any]: A dictionary containing the checkinstance useful data.
+    """
+    if "checkinstances_iids" not in body:
+        return "Missing checkinstances_iids", 400
+    checkinstances_iids = body["checkinstances_iids"]
+    checks = CheckInstance.fetchObjects(pentest, {"_id": {"$in": [ObjectId(x) for x in checkinstances_iids]}})
+    if checks is None:
+        return "Not found", 404
+    ret = {}
+    multi_command_line_tools = {}
+    for check in checks:
+        result = check.getCheckInstanceInformation()
+        if result is not None:
+            ret[str(check.getId())] = result
+            for toolId, result_tool in result["tools_not_done"].items():
+                if "commandline_multi" in result_tool and result_tool["commandline_multi"] is not None:
+                    if result_tool["commandline_multi"]["comm"] not in multi_command_line_tools:
+                        multi_command_line_tools[result_tool["commandline_multi"]["comm"]] = []
+                    multi_command_line_tools[result_tool["commandline_multi"]["comm"]].append({"tool_id": toolId, "checkinstance_id": str(check.getId()), "result_tool": result_tool})
+    ret["multi_command_line_tools"] = multi_command_line_tools
     return ret

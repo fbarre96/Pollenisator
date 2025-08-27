@@ -24,6 +24,7 @@ from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.utils import getMainDir
 from pollenisator.core.models.defect import Defect
 from pollenisator.core.models.tool import Tool
+from pollenisator.server.modules.cheatsheet.checkinstance import getTargetRepr
 from pollenisator.server.permission import permission
 from enum import Enum
 
@@ -123,6 +124,245 @@ def upload(pentest: str, attached_to: Union[Literal["unassigned"], str], filetyp
         return {"remote_path": f"files/{pentest}/download/{filetype}/{attached_to}/{name}", "attachment_id": str(result.get("attachment_id","")), "msg":str(result.get("msg","")), "status":status}
     return str(result.get("msg","")), status
 
+def _parse_import_parameters(body: Dict[str, Any]) -> Union[Tuple[str, Dict[str, Any], str], ErrorStatus]:
+    """
+    Parse and validate import parameters from the request body.
+    
+    Args:
+        body (Dict[str, Any]): The request body containing import parameters.
+        
+    Returns:
+        Union[Tuple[str, Dict[str, Any], str], ErrorStatus]: Either a tuple of (plugin, default_target, cmdline) 
+        or an error message and status code.
+    """
+    plugin = body.get("plugin", "auto-detect")
+    try:
+        default_target = json.loads(body.get("default_target", {}))
+    except json.JSONDecodeError:
+        return "Invalid default_target", 400
+    cmdline = body.get("cmdline", "")
+    return plugin, default_target, cmdline
+
+def _process_plugin_results(pentest: str, upfile: werkzeug.datastructures.FileStorage, plugin: str, 
+                          cmdline: str, ext: str) -> Tuple[List[Dict[str, Any]], Dict[str, int], Optional[str]]:
+    """
+    Process plugin detection and parsing to get results.
+    
+    Args:
+        pentest (str): The pentest name.
+        upfile (werkzeug.datastructures.FileStorage): The uploaded file.
+        plugin (str): The plugin to use or "auto-detect".
+        cmdline (str): The command line.
+        ext (str): The file extension.
+        
+    Returns:
+        Tuple[List[Dict[str, Any]], Dict[str, int], Optional[str]]: Plugin results, results count, and any error message.
+    """
+    results_count: Dict[str, int] = {}
+    plugin_results = []
+    error_msg: Optional[str] = None
+    
+    if plugin == "auto-detect":
+        # AUTO DETECT
+        plugin_results = detectPlugins(pentest, upfile, cmdline, ext)
+        for result in plugin_results:
+            foundPlugin = result.get("plugin", None)
+            if foundPlugin is not None:
+                results_count[foundPlugin] = results_count.get(foundPlugin, 0) + 1
+    else:
+        # SET PLUGIN
+        mod = loadPlugin(plugin)
+        try:
+            logger.info("PLUGIN for cmdline %s", str(cmdline))
+            notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline, ext=ext, filename=upfile.filename)
+            results_count[plugin] = results_count.get(plugin, 0) + 1
+            plugin_results.append({"plugin": plugin, "notes": notes, "tags": tags, "lvl": lvl, "targets": targets})
+        except (ImportError, AttributeError, ValueError) as e:
+            error_msg = str(e)
+            logger.error("Plugin exception : %s", str(e))
+            logger.error("Plugin exception : %s", traceback.format_exc())
+            traceback.print_exc()
+            
+    return plugin_results, results_count, error_msg
+
+def _prepare_notification_data(pentest: str, notes: str, tags: List[str], plugin: str, 
+                             default_target: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Prepare notification data for default targets.
+    
+    Args:
+        pentest (str): The pentest name.
+        notes (str): The notes from plugin parsing.
+        tags (List[str]): The tags from plugin parsing.
+        plugin (str): The plugin name.
+        default_target (Dict[str, Any]): The default target configuration.
+        
+    Returns:
+        Dict[str, Any]: The notification data.
+    """
+    notif_data = {"notes": notes, "tags": tags, "plugin": plugin.replace(".py", "")}
+    
+    if default_target.get("check_iid", None) is not None:
+        list_targets = default_target.get("check_iid", None)
+        if not isinstance(list_targets, list):
+            list_targets = [list_targets]
+        result = getTargetRepr(pentest, list_targets)
+        if result is None or not isinstance(result, dict) or len(result) == 0:
+            notif_data["target_repr"] = "Unknown target"
+        else:
+            if len(list(result.values())) > 1:
+                representations = ", ".join(list(result.values()))
+                if len(representations) > 100:
+                    representations = representations[:100] + "..."
+                notif_data["target_repr"] = representations
+                notif_data["target_iid"] = ", ".join([str(x) for x in list(result.keys())])
+            else:
+                notif_data["target_repr"] = list(result.values())[0]
+                notif_data["target_iid"] = list(result.keys())[0]
+                
+    return notif_data
+
+def _get_or_create_tools(pentest: str, target: Optional[Dict[str, Any]], tools_iids: List[ObjectId], 
+                        toolName: str, check_iid: Optional[ObjectId], lvl: str, 
+                        user: str, notes: str, date: str) -> List[Tool]:
+    """
+    Get existing tools or create new ones based on target configuration.
+    
+    Args:
+        pentest (str): The pentest name.
+        target (Optional[Dict[str, Any]]): The target configuration.
+        tools_iids (List[ObjectId]): List of existing tool IDs.
+        toolName (str): The tool name to create.
+        check_iid (Optional[ObjectId]): The check instance ID.
+        lvl (str): The level.
+        user (str): The user.
+        notes (str): The notes.
+        date (str): The date.
+        
+    Returns:
+        List[Tool]: List of tools and the tool ID.
+    """
+    tools_m: List[Tool] = []
+    
+    if tools_iids is not None and len(tools_iids) > 0:
+        tools_results_m = Tool.fetchObjects(pentest, {"_id": {"$in": tools_iids}})
+        if tools_results_m is not None:
+            tools_m = [cast(Tool, tool_m) for tool_m in tools_results_m if tool_m is not None]
+            for tool_m in tools_m:
+                tool_m = cast(Tool, tool_m)
+                tool_m.notes = notes
+                tool_m.scanner_ip = user
+                tool_iid = tool_m.getId()
+
+    if tools_m is None or len(tools_m) == 0:  # tool not found, create it
+        if target is None:
+            wave = scope = ip = port = proto = None
+        else:
+            wave = none_or_str(target.get("wave", None))
+            scope = none_or_str(target.get("scope", None))
+            ip = none_or_str(target.get("ip", None))
+            port = none_or_str(target.get("port", None))
+            proto = none_or_str(target.get("proto", None))
+            
+        tool_m = Tool(pentest).initialize(None, check_iid, wave, name=toolName,
+                                        scope=scope, ip=ip, port=port, proto=proto,
+                                        lvl=str(lvl), text="", text_multi="",
+                                        dated=date, datef=date, scanner_ip=user,
+                                        status=["done"], notes=notes)
+        ret = tool_m.addInDb()
+        tool_iid = ObjectId(ret["iid"])
+        tool_m._id = tool_iid
+        tools_m = [tool_m]
+        
+    return tools_m
+
+def _finalize_tool_processing(pentest: str, tools_m: List[Tool], tags: List[str], 
+                            upfile: werkzeug.datastructures.FileStorage, 
+                            plugin: str) -> None:
+    """
+    Finalize tool processing by setting tags and uploading the file.
+    
+    Args:
+        pentest (str): The pentest name.
+        tools_m (List[Tool]): List of tools to process.
+        tags (List[str]): Tags to set on tools.
+        upfile (werkzeug.datastructures.FileStorage): The uploaded file.
+        plugin (str): The plugin name.
+    """
+    db_client = DBClient.getInstance()
+    if len(tools_m) > 0:
+        for tool_m in tools_m:
+            tag_objects = [Tag(tag) for tag in tags]
+            tool_m.setTags(tag_objects)
+            upfile.stream.seek(0)
+            _res, status, filepath = db_client.do_upload(pentest, "unassigned", "result", upfile, str(tool_m.getId()))
+            if status == 200:
+                tool_m.plugin_used = plugin
+                # Use the protected method as intended by the original code
+                tool_m._setStatus(["done"], filepath)  # type: ignore
+
+def _process_plugin_result(pentest: str, result: Dict[str, Any], default_target: Dict[str, Any], 
+                         toolName: str, user: str, upfile: werkzeug.datastructures.FileStorage, 
+                         plugin: str) -> None:
+    """
+    Process a single plugin result by creating tools and handling notifications.
+    
+    Args:
+        pentest (str): The pentest name.
+        result (Dict[str, Any]): The plugin result.
+        default_target (Dict[str, Any]): The default target configuration.
+        toolName (str): The tool name.
+        user (str): The user.
+        upfile (werkzeug.datastructures.FileStorage): The uploaded file.
+        plugin (str): The plugin name.
+    """
+    notes = result.get('notes')
+    notes = "" if notes is None else notes
+    tags = result.get('tags', [])
+    tags = [] if tags is None else tags
+    lvl = result.get('lvl', "imported")
+    if lvl is None:  # because result["lvl"] = None is defined
+        lvl = "imported"
+    targets = result.get('targets', {})
+    targets = {} if targets is None else targets
+    
+    notif_data = _prepare_notification_data(pentest, notes, tags, result.get("plugin", ""), default_target)
+    
+    if default_target:
+        targets["default"] = default_target
+        dbclient.send_notify(pentest, "checkinstances", str(default_target), "notif_terminal", data=notif_data)
+        
+    for tag in tags:
+        tag = Tag(tag)
+        dbclient.doRegisterTag(pentest, tag)
+
+    # ADD THE RESULTING TOOL TO AFFECTED
+    for target in targets.values():
+        date = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        check_iid: Optional[ObjectId] = None
+        
+        if target is None:
+            tools_iids: List[ObjectId] = []
+        else:
+            lvl = str(target.get("lvl", lvl))
+            check_iid = target.get("check_iid", None)
+            check_iids = []
+            if not isinstance(check_iid, list):
+                try:
+                    check_iid = None if target.get("check_iid", None) is None else ObjectId(target["check_iid"])
+                    check_iids.append(check_iid)
+                except bson.errors.InvalidId:
+                    check_iid = None
+            check_iids = [ObjectId(x) for x in check_iids if x is not None]
+            tools_iids = target.get("tool_iid", [])
+            if not isinstance(tools_iids, list):
+                tools_iids = [tools_iids]
+            tools_iids = [ObjectId(x) for x in tools_iids if is_valid_object_id(x)]
+            
+        tools_m = _get_or_create_tools(pentest, target, tools_iids, toolName, check_iid, 
+                                               lvl, user, notes, date)
+        _finalize_tool_processing(pentest, tools_m, tags, upfile, plugin)
+
 @permission("pentester")
 def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage, body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[str, Dict[str, int]]:
     """
@@ -138,122 +378,35 @@ def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage
         Union[str, Dict[str, int]]: An error message if an error occurred, otherwise a dictionary mapping plugin names to the number of times they were used.
     """
     user = kwargs["token_info"]["sub"]
-    plugin = body.get("plugin", "auto-detect")
-    try:
-        default_target = json.loads(body.get("default_target", {}))
-    except json.JSONDecodeError:
-        return "Invalid default_target", 400
-    cmdline = body.get("cmdline", "")
+    
+    # Parse and validate parameters
+    parse_result = _parse_import_parameters(body)
+    if isinstance(parse_result, tuple) and len(parse_result) == 2:
+        error_msg, statuscode = parse_result
+        return error_msg,statuscode  # Return just the error message
+    plugin, default_target, cmdline = cast(Tuple[str, Dict[str, Any], str], parse_result)
 
+    # Prepare file information
     md5File = md5(upfile.stream)
     upfile.stream.seek(0)
     name = upfile.filename.replace("/", "_") if upfile.filename is not None else "file_"+str(time.time()).replace(".", "_")
-    toolName = os.path.splitext(os.path.basename(name))[
-        0] + md5File[:6]
-    results_count: Dict[str, int] = {}
-    plugin_results = []
-    error_msg = None
+    toolName = os.path.splitext(os.path.basename(name))[0] + md5File[:6]
     ext = os.path.splitext(name)[-1]
-    if plugin == "auto-detect":
-        # AUTO DETECT
-        plugin_results = detectPlugins(pentest, upfile, cmdline, ext)
-        for result in plugin_results:
-            foundPlugin = result.get("plugin", None)
-            if foundPlugin is not None:
-                results_count[foundPlugin] = results_count.get(foundPlugin, 0) + 1
-    else:
-        # SET PLUGIN
-        mod = loadPlugin(plugin)
-        try:
-            logger.info("PLUGIN for cmdline %s", str(cmdline))
-            notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline, ext=ext,filename=upfile.filename)
-            results_count[plugin] = results_count.get(plugin, 0) + 1
-            plugin_results.append({"plugin":plugin, "notes":notes, "tags":tags, "lvl":lvl, "targets":targets})
-        except Exception as e:
-            error_msg = e
-            logger.error("Plugin exception : %s", str(e))
-            logger.error("Plugin exception : %s", traceback.format_exc())
-            traceback.print_exc()
-            notes = tags = lvl = targets = None
-    if error_msg:
-        return str(error_msg)
-    # IF PLUGIN FOUND NOTHING, notes and tags are None
+    
+    # Process plugins
+    plugin_results, results_count, error_msg_optional = _process_plugin_results(pentest, upfile, plugin, cmdline, ext)
+    
+    if error_msg_optional:
+        return error_msg_optional
+    
+    # Process each plugin result
     for result in plugin_results:
-        notes = result.get('notes')
-        notes = "" if notes is None else notes
-        tags = result.get('tags', [])
-        tags = [] if tags is None else tags
-        lvl = result.get('lvl', "imported") 
-        if lvl is None: # because result["lvl"] = None is defined
-            lvl = "imported"
-        targets = result.get('targets', {})
-        targets = {} if targets is None else targets
-        if default_target:
-            targets["default"] = default_target
-            dbclient.send_notify(pentest, "checkinstances", default_target, "notif_terminal")
-        for tag in tags:
-            tag = Tag(tag)
-            dbclient.doRegisterTag(pentest, tag)
-
-        # ADD THE RESULTING TOOL TO AFFECTED
-        for target in targets.values():
-            date = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-            check_iid: Optional[ObjectId] = None
-            tool_iid: Optional[ObjectId] = None
-            if target is None:
-                wave = None
-                scope = None
-                ip = None
-                port = None
-                proto = None
-            else:
-                lvl = str(target.get("lvl", lvl))
-                wave = none_or_str(target.get("wave", None))
-                scope = none_or_str(target.get("scope", None))
-                ip = none_or_str(target.get("ip", None))
-                port = none_or_str(target.get("port", None))
-                proto = none_or_str(target.get("proto", None))
-                try:
-                    check_iid = None if target.get("check_iid", None) is None else ObjectId(target["check_iid"])
-                except bson.errors.InvalidId:
-                    check_iid = None
-                try:
-                    tool_iid = None if target.get("tool_iid", None) is None else ObjectId(target["tool_iid"])
-                except bson.errors.InvalidId:
-                    tool_iid = None
-            # if wave is None:
-            #     wave = result.get("plugin", "")+"-Imported"
-            # if dbclient.findInDb(pentest, "waves", {"wave":wave}, False) is None:
-            #     dbclient.insertInDb(pentest, "waves", {"wave":wave, "wave_commands":[]})
-            tool_m = None
-            if tool_iid is not None:
-                tool_m = Tool.fetchObject(pentest, {"_id":ObjectId(tool_iid)})
-                if tool_m is not None:
-                    tool_m = cast(Tool, tool_m)
-                    tool_m.notes = notes
-                    tool_m.scanner_ip = user
-                    tool_iid = tool_m.getId()
-
-            if tool_m is None: # tool not found, create it
-                tool_m = Tool(pentest).initialize(None, check_iid, wave, name=toolName,
-                                                  scope=scope, ip=ip, port=port, proto=proto,
-                                                  lvl=str(lvl), text="",
-                                                  dated=date, datef=date, scanner_ip=user,
-                                                  status=["done"], notes=notes)
-                ret = tool_m.addInDb()
-                tool_iid = ObjectId(ret["iid"])
-            if tool_m is not None:
-                tool_m = cast(Tool, tool_m)
-                tool_m.setTags(tags)
-                upfile.stream.seek(0)
-                _res, status, filepath = dbclient.do_upload(pentest, "unassigned", "result", upfile, str(tool_iid))
-                if status == 200:
-                    tool_m.plugin_used = plugin
-                    tool_m._setStatus(["done"], filepath)
+        _process_plugin_result(pentest, result, default_target, toolName, user, upfile, plugin)
+    
     return results_count
 
 @permission("pentester")
-def listFilesAll(pentest: str, filetype: FileType) -> Union[ErrorStatus, List[str]]:
+def listFilesAll(pentest: str, filetype: FileType) -> Union[ErrorStatus, List[Dict[str, Any]]]:
     """
     List all files of a specific type in a pentest.
 
@@ -262,12 +415,12 @@ def listFilesAll(pentest: str, filetype: FileType) -> Union[ErrorStatus, List[st
         filetype (FileType): The type of the files to list. (proof, file or result)
 
     Returns:
-       Union[ErrorStatus, List[str]]: A list of filenames if successful, otherwise an error message and status code.
+       Union[ErrorStatus, List[Dict[str, Any]]]: A list of file documents if successful, otherwise an error message and status code.
     """
     if filetype not in POSSIBLE_TYPES:
         return "Invalid filetype", 400
-    dbclient = DBClient.getInstance()
-    files = dbclient.findInDb(pentest, "attachments", {"type": filetype}, multi=True)
+    db_client = DBClient.getInstance()
+    files = db_client.findInDb(pentest, "attachments", {"type": filetype}, multi=True)
     if files is None:
         return "No files found", 404
     files = [file for file in files]
@@ -318,7 +471,7 @@ def listFiles(pentest: str, attached_to: str, filetype: FileType) -> Union[Error
                 raise ValueError("Invalid path")
             try:
                 files = os.listdir(filepath)
-            except FileNotFoundError as e:
+            except FileNotFoundError:
                 ##logger.error("Error listing files: %s", str(e))
                 return "File not found", 404
         else:
@@ -395,7 +548,7 @@ def download(pentest: str, attached_to: str, filetype: FileType, filename: Optio
             def remove_file(response):
                 try:
                     os.remove(temp_zipfile_path)
-                except Exception as error:
+                except (OSError, FileNotFoundError):
                     pass
                 return response
             with zipfile.ZipFile(temp_zipfile_path, mode="w") as archive:
@@ -455,7 +608,7 @@ def rmFile(pentest: str,  attachment_id: str) -> ErrorStatus:
             return "Invalid path", 400
         try:
             dbclient.deleteFromDb(pentest, "attachments", {"attachment_id": attachment_id}, many=False, notify=True)
-        except Exception as e:
+        except (ValueError, KeyError) as e:
             logger.error("Error deleting attachment: %s", str(e))
             return "Error deleting attachment", 500 
         if os.path.exists(filepath):

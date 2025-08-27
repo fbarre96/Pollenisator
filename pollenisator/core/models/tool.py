@@ -42,7 +42,7 @@ class Tool(Element):
             pentest (str): The name of the pentest.
             valuesFromDb (Optional[Dict[str, Any]], optional): A dictionary holding values to load into the object. 
             A mongo fetched interval is optimal. Possible keys with default values are : _id(None), parent(None),  
-            infos({}), name(""), wave(""), scope(""), ip(""), port(""), proto("tcp"), lvl(""), text(""), dated("None"),
+            infos({}), name(""), wave(""), scope(""), ip(""), port(""), proto("tcp"), lvl(""), text(""), text_multi(""), dated("None"),
             datef("None"), scanner_ip("None"), status([]), notes(""), resultfile(""), plugin_used(""). Defaults to None.
         """
         if valuesFromDb is None:
@@ -54,6 +54,7 @@ class Tool(Element):
         self.resultfile = ""
         self.plugin_used = ""
         self.text = ""
+        self.text_multi = ""
         self.notes = ""
         self.status: List[str] = []
         command_iid_or_none: Optional[ObjectId] = ObjectId(valuesFromDb.get("command_iid", None)) if "command_iid" in valuesFromDb else None
@@ -65,13 +66,13 @@ class Tool(Element):
                         str(valuesFromDb.get("port", "")), valuesFromDb.get(
                             "proto", "tcp"),
                         valuesFromDb.get(
-                            "lvl", ""), valuesFromDb.get("text", ""),
+                            "lvl", ""), valuesFromDb.get("text", ""), valuesFromDb.get("text_multi", ""),
                         valuesFromDb.get("dated", "None"), valuesFromDb.get(
                             "datef", "None"),
                         valuesFromDb.get(
                             "scanner_ip", "None"), valuesFromDb.get("status", []), valuesFromDb.get("notes", ""), valuesFromDb.get("resultfile", ""), valuesFromDb.get("plugin_used", ""), valuesFromDb.get("infos", {}))
 
-    def initialize(self, command_iid: Optional[ObjectId], check_iid: Optional[ObjectId] = None, wave: Optional[str] = "", name: Optional[str] = None, scope: Optional[str] = "", ip: Optional[str] = "", port: Optional[str] = "", proto: Optional[str] = "tcp", lvl: str = "", text: str = "",
+    def initialize(self, command_iid: Optional[ObjectId], check_iid: Optional[ObjectId] = None, wave: Optional[str] = "", name: Optional[str] = None, scope: Optional[str] = "", ip: Optional[str] = "", port: Optional[str] = "", proto: Optional[str] = "tcp", lvl: str = "", text: str = "", text_multi: str = "",
                    dated: str = "None", datef: str = "None", scanner_ip: str = "None", status: Optional[Union[str, List[str]]] = None, notes: str = "", resultfile: str = "", plugin_used: str = "", infos: Optional[Dict[str, Any]] = None) -> 'Tool':
         """
         Initializes the tool with the provided values.
@@ -87,6 +88,7 @@ class Tool(Element):
             proto (Optional, optional): The target port "proto" of this tool (only if lvl is "port"). Defaults to "tcp".
             lvl (str, optional): The tool level of exploitation (wave, network, ip or port/). Defaults to "".
             text (str, optional): The command to be launched. Can be empty if name is matching a command. Defaults to "".
+            text_multi (str, optional): The multi command to be launched. Can be empty if name is matching a command. Defaults to "".
             dated (str, optional): A starting date and time for this interval in format : '%d/%m/%Y %H:%M:%S'. or the string "None". Defaults to "None".
             datef (str, optional): An ending date and time for this interval in format : '%d/%m/%Y %H:%M:%S'. or the string "None". Defaults to "None".
             scanner_ip (str, optional): The worker name that performed this tool. "None" if not performed yet. Default is "None".
@@ -122,6 +124,7 @@ class Tool(Element):
         self.proto = proto
         self.lvl = lvl
         self.text = text
+        self.text_multi = text_multi
         self.dated = dated
         self.datef = datef
         self.scanner_ip = scanner_ip
@@ -147,7 +150,7 @@ class Tool(Element):
         return {"command_iid": self.command_iid, "check_iid": self.check_iid, 
                 "name": self.name, "wave": self.wave, "scope": self.scope,
                 "ip": self.ip, "port": self.port, "proto": self.proto,
-                "lvl": self.lvl, "text": self.text, "dated": self.dated,
+                "lvl": self.lvl, "text": self.text, "text_multi": self.text_multi, "dated": self.dated,
                 "datef": self.datef, "scanner_ip": self.scanner_ip,
                 "notes": self.notes, "_id": self.getId(),  "infos": self.infos, "status":self.getStatus()}
 
@@ -157,9 +160,9 @@ class Tool(Element):
         Returns all the searchable attributes for a tool
 
         Returns:
-            List[str]: A list containing the attribute names that can be used for searching. In this case, it's ["name", "text"].
+            List[str]: A list containing the attribute names that can be used for searching. In this case, it's ["name", "text", "text_multi"].
         """
-        return ["name", "text"]
+        return ["name", "text", "text_multi"]
 
     def getStatus(self) -> List[str]:
         """
@@ -269,6 +272,7 @@ class Tool(Element):
                     db_base[str(k)] = v
         existing = dbclient.findInDb(self.pentest, "tools", db_base, False)
         if existing is not None:
+            self._id = existing["_id"]
             return {"res":False, "iid":existing["_id"]}
         if "_id" in body:
             del body["_id"]
@@ -286,6 +290,7 @@ class Tool(Element):
         db_base["dated"] = body.get("dated", "None")
         db_base["datef"] = body.get("datef", "None")
         db_base["text"] = body.get("text", "")
+        db_base["text_multi"] = body.get("text_multi", "")
         db_base["status"] = body.get("status", [])
         db_base["notes"] = body.get("notes", "")
         db_base["infos"] = body.get("infos", {})
@@ -414,6 +419,7 @@ class Tool(Element):
         except TypeError:
             # None type returned:
             return None
+        
 
     def findQueueIndexFromPrio(self, queue: List[Dict[str, Any]]) -> int:
         """
@@ -451,7 +457,7 @@ class Tool(Element):
         queue_db = dbclient.findInDb(self.pentest, "autoscan", {"type":"queue"}, False) 
         if queue_db is None:
             queue = list()
-            dbclient.insertInDb(self.pentest, "autoscan", {"type":"queue", "tools":[]}) 
+            dbclient.insertInDb(self.pentest, "autoscan", {"type":"queue", "tools":[]}, notify=False) 
         else:
             queue = list(queue_db["tools"])
         if self.getId() in queue:
@@ -469,7 +475,9 @@ class Tool(Element):
                 queue.insert(index, {"iid":self.getId(), "priority":priority})
             except IndexError:
                 return False, "Index error"
-        dbclient.updateInDb(self.pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":queue}})
+        dbclient.updateInDb(self.pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":queue}}, notify=False)
+        # Notify the socket manager
+        dbclient.send_notify(self.pentest, "queue", queue, "insert")
         return True, "Added to queue"
 
     def removeFromQueue(self) -> Tuple[bool, str]:
@@ -480,7 +488,8 @@ class Tool(Element):
             Tuple[bool, str]: A tuple containing a boolean indicating the success of the operation and a message.
         """
         dbclient = DBClient.getInstance()
-        dbclient.updateInDb(self.pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":{"iid":self.getId()}}})
+        dbclient.updateInDb(self.pentest, "autoscan", {"type":"queue"}, {"$pull":{"tools":{"iid":self.getId()}}}, notify=False)
+        dbclient.send_notify(self.pentest, "queue", self.getId(), "delete")
         return True, "remove from to queue"
 
     @staticmethod
@@ -529,26 +538,44 @@ class Tool(Element):
         ext = mod.getFileOutputExt()
         return {"comm":comm, "ext":ext, "comm_with_output":comm_complete}
 
-    def getCommandToExecute(self, command_o: Union[str, Command]) -> str:
+    def getCommandLineMulti(self, commandline_options: str = "") -> Union[ErrorStatus, Tuple[str, str, str]]:
+        if commandline_options != "":
+            self.text_multi = commandline_options
+            self.updateInDb({"text_multi":commandline_options})
+        # GET COMMAND OBJECT FOR THE TOOL
+        command_o: Union[str, Command]
+        if self.text_multi == "":
+            try:
+                command_result = self.getCommand()
+                if command_result is None:
+                    return "Associated command was not found", 404
+                command_o = Command(self.pentest, command_result)
+            except:
+                return "No command was not found", 404
+        else:
+            command_o = str(self.text_multi)
+        # Replace vars in command text (command line)
+        comm = self.getCommandToExecute(command_o, is_multi=True)
+        # Read file to execute for given tool and prepend to final command
+        if comm == "":
+            return "An empty command line was crafted", 400
+        # Load the plugin
+        ext = ""
+        mod = self.getPlugin()
+        if mod is None:
+            return "Plugin not found for this tool", 400
+        # craft outputfile name
+        comm_complete = mod.changeCommand(comm, "|outputDir|", mod.getFileOutputExt())
+        ext = mod.getFileOutputExt()
+        return {"comm":comm, "ext":ext, "comm_with_output":comm_complete}
+    
+    def getCommandData(self) -> Dict[str, Any]:
         """
-        Get the tool bash command to execute.
-        Replace the command's text's variables with tool's informations.
-
-        Args:
-            command_o (Union[str, Command]): The command or command string to execute.
+        Get the command data associated with this tool.
 
         Returns:
-            str: The bash command of this tool instance, a marker |outputDir| is still to be replaced.
+            Dict[str, Any]: The command data associated with this tool.
         """
-        toolHasCommand = self.text
-        if isinstance(command_o, str):
-            command = command_o
-            self.text = command
-        else:
-            if toolHasCommand is not None and toolHasCommand.strip() != "":
-                command = self.text
-            else:
-                command = command_o.text
         data = self.getData()
         if self.check_iid is not None:
             check = checkinstance.CheckInstance.fetchObject(self.pentest, {"_id":ObjectId(self.check_iid)})
@@ -558,6 +585,37 @@ class Tool(Element):
                     infos = {**data.get("infos", {}), **target.get("infos", {})}
                     data |= target
                     data["infos"] = infos
+        return data
+
+
+    def getCommandToExecute(self, command_o: Union[str, Command], is_multi: bool = False) -> str:
+        """
+        Get the tool bash command to execute.
+        Replace the command's text's variables with tool's informations.
+
+        Args:
+            command_o (Union[str, Command]): The command or command string to execute.
+            is_multi (bool): Whether to get multi commands or not.
+
+        Returns:
+            str: The bash command of this tool instance, a marker |outputDir| is still to be replaced.
+        """
+        toolHasCommand = self.text if is_multi is False else self.text_multi
+        if isinstance(command_o, str):
+            command = command_o
+            if is_multi is False:
+                self.text = command
+            else:
+                self.text_multi = command
+        else:
+            if toolHasCommand is not None and toolHasCommand.strip() != "":
+                if is_multi is False:
+                    command = self.text
+                else:
+                    command = self.text_multi
+            else:
+                command = command_o.text if is_multi is False else command_o.text_multi
+        data = self.getCommandData()
         command = Element.replaceAllCommandVariables(self.pentest, command, data)
         if isinstance(command_o, str):
             return command
@@ -646,7 +704,8 @@ class Tool(Element):
         self.status = newStatus
         self.resultfile = file_name if file_name is not None else ""
         dbclient = DBClient.getInstance()
-        dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
+        dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=False)
+        dbclient.send_notify(self.pentest, "running_tools", self.getId(), "insert")
 
     def markAsError(self, msg: str = "") -> None:
         """
@@ -659,7 +718,8 @@ class Tool(Element):
         self.dated = "None"
         self.datef = "None"
         dbclient = DBClient.getInstance()
-        dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
+        dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=False)
+        dbclient.send_notify(self.pentest, "running_tools", self.getId(), "delete")
         self.scanner_ip = "None"
         if "done" in self.status:
             self.status.remove("done")
@@ -676,7 +736,8 @@ class Tool(Element):
         self.dated = "None"
         self.datef = "None"
         dbclient = DBClient.getInstance()
-        dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
+        dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=False)
+        dbclient.send_notify(self.pentest, "running_tools", self.getId(), "delete")
         self.scanner_ip = "None"
         if "done" in self.status:
             self.status.remove("done")
@@ -693,7 +754,8 @@ class Tool(Element):
         self.datef = "None"
         dbclient = DBClient.getInstance()
         if self.scanner_ip != "None":
-            dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}})
+            dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=False)
+            dbclient.send_notify(self.pentest, "running_tools", self.getId(), "delete")
         self.scanner_ip = "None"
         if "done" in self.status:
             self.status.remove("done")
@@ -721,8 +783,8 @@ class Tool(Element):
         self.status = newStatus
         self.scanner_ip = workerName
         dbclient = DBClient.getInstance()
-        dbclient.updateInDb("pollenisator", "workers", {"name":workerName}, {"$addToSet":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=True)
-
+        dbclient.updateInDb("pollenisator", "workers", {"name":workerName}, {"$addToSet":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=False)
+        dbclient.send_notify(self.pentest, "running_tools", self.getId(), "insert")
 
 
     def getDbKey(self) -> Dict[str, Any]:

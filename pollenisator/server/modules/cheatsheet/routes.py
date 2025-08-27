@@ -6,15 +6,20 @@ from typing import Any, Dict, List, Tuple, Union, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 import json
+import re
 
 import pymongo
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.command import Command
+from pollenisator.core.models.element import Element
+from pollenisator.core.models.tool import Tool
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance, getTargetRepr
 from pollenisator.server.permission import permission
 from pollenisator.core.components.utils import JSONDecoder
+from pollenisator.core.components.socketmanager import SocketManager
 import bson
+import tempfile
 
 CheckItemInsertResult = TypedDict('CheckItemInsertResult', {'res': bool, 'iid': ObjectId})
 ErrorStatus = Tuple[str, int]
@@ -150,6 +155,66 @@ def getChecksData(pentest: str) -> Union[ErrorStatus, List[Dict[str, Any]]]:
         return_values[ObjectId(checkinstance.check_iid)]["checkinstances"].append(inst_data)
     return sorted([x for x in return_values.values()], key=lambda x: x["priority"])
 
+@permission("pentester")
+def startMultiCommand(pentest:str, body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[ErrorStatus, str]:
+    """
+    Start a multi command for a pentest.
+
+    Args:
+        pentest (str): The name of the pentest.
+        body (Dict[str, Any]): The body of the request.
+        **kwargs (Dict[str, Any]): Additional keyword arguments.
+
+    Returns:
+        Union[ErrorStatus, Dict[str, bool]]: Returns "Not found" and 404 if the command is not found, or a dictionary with the result of the operation.
+    """
+    user = kwargs["token_info"]["sub"]
+    session_id = body.get("session_id", "")
+    command_text = body.get("command", "")
+    plugin = body.get("plugin", "")
+    toolsData = body.get("toolsData", [])
+    tools = Tool.fetchObjects(pentest, {"_id": {"$in":[ObjectId(tool.get("tool_id")) for tool in toolsData]}})
+    replaced_command = command_text
+    if tools is None:
+        return "Not found", 404
+    # treat files to be created
+    param_files_search = re.findall(r"\|[^\|]+\_as\_file\|", command_text)
+    params_to_get = set()
+    for param_file in param_files_search:
+        param_file_clean = param_file.replace("_as_file","")
+        params_to_get.add(param_file_clean)
+    if len(params_to_get) == 0:
+        return replaced_command
+    # we have some files to create
+    tools_data = []
+    for tool in tools:
+        tool = cast(Tool, tool)
+        data = tool.getCommandData()
+        tools_data.append(data)
+    dbclient = DBClient.getInstance()
+    for param in params_to_get:
+        with tempfile.NamedTemporaryFile(delete_on_close=False, suffix=".txt") as tmpfile:
+            for tool_data in tools_data:
+                replaced_param = Element.replaceAllCommandVariables(pentest, param, tool_data)
+                tmpfile.write(replaced_param.encode()+"\n".encode())
+            tmpfile.flush()
+            tmpfile.seek(0)
+            result, status, filepath = dbclient.do_upload_with_filename(pentest, "unassigned", "file", "unassigned", tmpfile.name, tmpfile)
+            if status == 200:
+               attachment_id = result.get("attachment_id", "")
+               replaced_command = replaced_command.replace("|"+param.replace("|","")+"_as_file|", f"'|file_{attachment_id}|'")
+    socket = dbclient.findInDb("pollenisator", "sockets", {"pentest":pentest, "type":"terminal", "user":user}, False)
+    if socket is None:
+        return "No terminal socket found", 404
+    sm = SocketManager.getInstance()
+    data = {
+        "action": "pty-input",
+        "input": "pollex " + plugin + " " + replaced_command + "\r",
+        "id": session_id
+    }
+    sm.socketio.emit("proxy-term", data, room=socket["sid"])
+    return replaced_command
+    
 
 @permission("pentester")
 def applyToPentest(pentest: str, iid: str, body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[ErrorStatus, Dict[str, bool]]:

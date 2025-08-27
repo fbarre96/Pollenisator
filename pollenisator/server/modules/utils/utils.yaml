@@ -46,4 +46,48 @@ paths:
               examples:
                 Success:
                   value: '{"completed_text": "Response to the request"}'
-       
+  "/utils/{pentest}/getVisibleTarget":
+    post:
+      operationId: pollenisator.server.modules.utils.utils.get_visible_target
+      tags:
+        - Utils
+      summary: Get visible target for a pentest
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Name of the pentest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                item_id:
+                  type: string
+                  description: ID of the item to get visible target for
+                item_type:
+                  type: string
+                  description: Type of the item to get visible target for
+              required:
+                - item_id
+                - item_type
+      responses:
+        "200":
+          description: Successfully return visible target information
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"target": "target_data"}'
+        "404":
+          description: Target not found
+          content:
+            application/json:
+              examples:
+                NotFound:
+                  value: '{"error": "Target not found"}'
+

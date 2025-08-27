@@ -37,13 +37,14 @@ def startAutoScan(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Tuple[st
         Tuple[str, int]: The result of the start operation.
     """
     dbclient = DBClient.getInstance()
-    authorized_commands = body.get("command_iids", [])
+    authorized_commands = body.get("command_iids", None)
     autoqueue = body.get("autoqueue", False)
-    for authorized_command in authorized_commands:
-        try:
-            _ = ObjectId(authorized_command) # test Object id valid
-        except InvalidId:
-            return "Invalid command id", 400
+    if authorized_commands is not None:
+        for authorized_command in authorized_commands:
+            try:
+                _ = ObjectId(authorized_command) # test Object id valid
+            except InvalidId:
+                return "Invalid command id", 400
     autoscanRunning = dbclient.findInDb(
         pentest, "autoscan", {"special": True}, False) is not None
     if autoscanRunning:
@@ -53,6 +54,7 @@ def startAutoScan(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Tuple[st
         return "No worker registered for this pentest", 404
     dbclient.insertInDb(pentest, "autoscan", {"start": datetime.now(
     ), "special": True, "authorized_commands": authorized_commands})
+    dbclient.send_notify(pentest, "autoscan", "", "start")
     encoded = encode_token(kwargs["token_info"])
     # queue auto commands
     tools_lauchable = findLaunchableTools(pentest)
@@ -131,22 +133,32 @@ def autoScan(pentest: str, endoded_token: str, autoqueue: bool) -> None:
                 tool_o = cast(Tool, tool_o)
                 msg, statuscode = tool_o.isLaunchable(authorized_commands, force)
                 if statuscode == 404:
+                    logger.debug("Autoscan : tool %s not found in db", str(launchableToolIid))
+                    # tool not found in db, remove it from queue
                     dbclient.updateInDb(pentest, "autoscan", {"type": "queue"}, {
-                                        "$pull": {"tools": {"iid": launchableToolIid}}})
+                                        "$pull": {"tools": {"iid": launchableToolIid}}}, notify=False)
+                    dbclient.send_notify(pentest, "queue", launchableToolIid, "delete")
+                elif statuscode == 400:
                     tool_o = Tool.fetchObject(
                         pentest, {"_id": ObjectId(launchableToolIid)})
                     if tool_o is not None:
                         tool_o = cast(Tool, tool_o)
                         tool_o.markAsError(msg)
                 elif statuscode == 403:
+                    logger.debug("Autoscan : tool %s not launchable: %s", str(launchableToolIid), msg)
+                    # tool not launchable, remove it from queue
                     dbclient.updateInDb(pentest, "autoscan", {"type": "queue"}, {
-                                        "$pull": {"tools": {"iid": launchableToolIid}}})
+                                        "$pull": {"tools": {"iid": launchableToolIid}}}, notify=False)
+                    dbclient.send_notify(pentest, "queue", launchableToolIid, "delete")
                 elif statuscode == 200:
+                    logger.debug("Autoscan : tool %s launchable: %s", str(launchableToolIid), msg)
                     dbclient.updateInDb(pentest, "autoscan", {"type": "queue"}, {
-                                        "$pull": {"tools": {"iid": launchableToolIid}}})
+                                        "$pull": {"tools": {"iid": launchableToolIid}}}, notify=False)
+                    dbclient.send_notify(pentest, "queue", launchableToolIid, "delete")
                     toLaunch.append((launchableToolIid, msg))
                     # the tool will be launched, we can remove it from the queue, let the worker set it as running
             for tool in toLaunch:
+                dbclient.send_notify(pentest, "running_tools", tool[0], "insert")
                 Tool.launchTask(pentest, tool[0], tool[1], endoded_token)
             check = getAutoScanStatus(pentest)
             time.sleep(6)
@@ -185,6 +197,7 @@ def stopAutoScan(pentest: str) -> Literal["Success"]:
                 for tool in tools:
                     toolsRunning.append(cast(Tool, tool))
     dbclient.deleteFromDb(pentest, "autoscan", {}, True)
+    dbclient.send_notify(pentest, "autoscan", "", "stop")
     for tool_o in toolsRunning:
         tool_o = cast(Tool, tool_o)
         _res, _msg = tool_o.stopTask(forceReset=True)
@@ -204,6 +217,7 @@ def getAutoScanStatus(pentest: str) -> bool:
     """
     dbclient = DBClient.getInstance()
     return dbclient.findInDb(pentest, "autoscan", {"special": True}, False) is not None
+    
 
 
 def findLaunchableTools(pentest: str) -> List[LaunchableToolType]:
@@ -226,6 +240,9 @@ def findLaunchableTools(pentest: str) -> List[LaunchableToolType]:
         pentest, "autoscan", {"special": True}, False)
     if autoscan_enr is None:
         logger.debug("No autoscan is running")
+        return toolsLaunchable
+    if autoscan_enr["authorized_commands"] is None:
+        logger.debug("No authorized commands found in autoscan")
         return toolsLaunchable
     authorized_commands = [ObjectId(x)
                            for x in autoscan_enr["authorized_commands"]]

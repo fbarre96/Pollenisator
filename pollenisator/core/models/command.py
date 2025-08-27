@@ -25,7 +25,7 @@ class Command(Element):
             pentest (str): An object representing a penetration test.
             valuesFromDb (Optional[Dict[str, Any]], optional): A dict holding values to load into the object. 
                 A mongo fetched command is optimal. Possible keys with default values are : _id (None), parent (None), 
-                infos({}), name(""), text(""), lvl("network"), ports(""), safe(True), types([]), indb("pollenisator"), 
+                infos({}), name(""), text(""), text_multi(""), lvl("network"), ports(""), safe(True), types([]), indb("pollenisator"), 
                 owners(""), timeout("300"). Defaults to None.
         """
         if valuesFromDb is None:
@@ -33,10 +33,10 @@ class Command(Element):
         super().__init__(pentest, valuesFromDb)
         if valuesFromDb:
             self.initialize(valuesFromDb.get("name", ""), valuesFromDb.get("bin_path", ""), valuesFromDb.get("plugin", ""),
-                            valuesFromDb.get("text", ""), valuesFromDb.get("indb", "pollenisator"),
+                            valuesFromDb.get("text", ""), valuesFromDb.get("text_multi", ""), valuesFromDb.get("indb", "pollenisator"),
                             valuesFromDb.get("original_iid"), valuesFromDb.get("owners", []), valuesFromDb.get("timeout", 300), valuesFromDb.get("infos", {}))
 
-    def initialize(self, name: str, bin_path: str, plugin: str = "Default", text: str = "", indb: str = "pollenisator", 
+    def initialize(self, name: str, bin_path: str, plugin: str = "Default", text: str = "", text_multi: str = "", indb: str = "pollenisator", 
                    original_iid: Optional[ObjectId] = None, owners: Optional[List[str]] = None, timeout: int = 300, 
                    infos: Optional[Dict[str, Any]] = None) -> 'Command':
         """
@@ -47,6 +47,7 @@ class Command(Element):
             bin_path (str): Local command, binary path or command line.
             plugin (str, optional): Plugin that goes with this command. Defaults to "Default".
             text (str, optional): The command line options. Defaults to "".
+            text_multi (str, optional): The multi command line options. Defaults to "".
             indb (str, optional): DB name : global (pollenisator database) or local pentest database..
             original_iid (Optional[ObjectId], optional): Original iid as string. Defaults to None.
             owners (Optional[List[str]], optional): The user owning this command. Defaults to None.
@@ -60,6 +61,7 @@ class Command(Element):
         self.bin_path = bin_path
         self.plugin = plugin
         self.text = text
+        self.text_multi = text_multi
         self.original_iid = ObjectId(original_iid) if original_iid is not None else None
         self.infos = infos if infos is not None else {}
         self.indb: str = indb
@@ -76,7 +78,7 @@ class Command(Element):
         Returns:
             Dict[str, Any]: A dictionary containing the data of the command.
         """
-        return {"name": self.name, "bin_path":self.bin_path, "plugin":self.plugin,  "text": self.text,
+        return {"name": self.name, "bin_path":self.bin_path, "plugin":self.plugin,  "text": self.text, "text_multi": self.text_multi,
                 "timeout": self.timeout, "owners": self.owners, "original_iid": self.original_iid,
                 "indb":self.indb, "_id": self.getId(),  "infos": self.infos}
 

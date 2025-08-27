@@ -791,6 +791,12 @@ def preparePentest(pentest_uuid: str, pentest_type: str, start_date: str, end_da
     dbclient.insertInDb(pentest_uuid, "settings", {"key":"mission_name", "value":settings["mission_name"]}, notify=False)
     dbclient.insertInDb(pentest_uuid, "settings", {"key":"lang", "value":settings["lang"]}, notify=False)
     dbclient.insertInDb(pentest_uuid, "settings", {"key":"autoscan_threads", "value":4}, notify=False)
+    notation_types = dbclient.findInDb("pollenisator", "settings", {"key":"defect_notation_types"}, False)
+    if notation_types is not None:
+        notation_types = json.loads(notation_types.get("value", "[]"))
+    else:
+        notation_types = []
+    dbclient.insertInDb(pentest_uuid, "settings", {"key":"defect_notation_types", "value":json.dumps(list(set(notation_types)))}, notify=False)
     pentester_list = [x.strip() for x in pentesters.replace("\n",",").split(",")]
     pentester_list.insert(0, owner)
     dbclient.updateInDb("pollenisator", "pentests", {"uuid":pentest_uuid}, {"$set":{"owner":owner, "pentesters":pentester_list}})

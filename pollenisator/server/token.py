@@ -12,7 +12,6 @@ from pollenisator.core.components.logger_config import logger
 import secrets
 import os
 
-
 JWT_SECRET = os.environ.get("JWT_SECRET", secrets.token_urlsafe(32))
 JWT_LIFETIME_SECONDS = 3600*12  # 12 hours
 JWT_ALGORITHM = 'HS256'
@@ -33,7 +32,7 @@ def getTokenFor(username: str) -> str:
         return ""
     mod = False
     try:
-        scopes = set(decode_token(user_record.get("token","")).get("scope", []))
+        scopes = set(user_record.get("scope",[]))
     except Unauthorized:
         scopes = set()
     

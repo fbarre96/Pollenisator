@@ -68,36 +68,38 @@ class EternalBlue(Plugin):
         targets = {}
         tags = []
         try:
-            notes = file_opened.read().decode("utf-8", errors="ignore")
+            allnotes = file_opened.read().decode("utf-8", errors="ignore")
         except UnicodeDecodeError:
             return None, None, None, None
         regex_ip = r"Nmap scan report for (\S+)"
-        ip_group = re.search(regex_ip, notes)
+        ip_group = re.search(regex_ip, allnotes) # no IP is was found
         if ip_group is None:
             return None, None, None, None
         # Auto Detect:
-        if "smb-vuln-ms17-010:" not in notes:
+        if "smb-vuln-ms17-010:" not in allnotes: # no vuln detected
             return None, None, None, None
         # Parsing
-        ip = ip_group.group(1).strip()
-        Ip(pentest).initialize(ip, infos={"plugin":EternalBlue.get_name()}).addInDb()
-        port_re = r"(\d+)\/(\S+)\s+open\s+microsoft-ds"
-        res_search = re.search(port_re, notes)
-        res_insert = None
-        if res_search is None:
-            port = None
-            proto = None
-        else:
-            port = res_search.group(1)
-            proto = res_search.group(2)
-            p_o = Port(pentest)
-            p_o.initialize(ip, port, proto, "microsoft-ds", infos={"plugin":EternalBlue.get_name()})
-            insert_res = p_o.addInDb()
-            res_insert = insert_res["res"]
-            targets[str(p_o.getId())] = {
-                "ip": ip, "port": port, "proto": proto}
-        if "VULNERABLE" in notes:
-            tags= [self.getTags()["pwned-eternalblue"]]
-            if res_insert is not None:
-                p_o.addTag(Tag(self.getTags()["pwned-eternalblue"], notes=notes))
-        return notes, tags, "port", targets
+        sub_notes = allnotes.split("Nmap scan report for")[1:]
+        for notes in sub_notes:
+            ip = ip_group.group(1).strip()
+            Ip(pentest).initialize(ip, infos={"plugin":EternalBlue.get_name()}).addInDb()
+            port_re = r"(\d+)\/(\S+)\s+open\s+microsoft-ds"
+            res_search = re.search(port_re, notes)
+            res_insert = None
+            if res_search is None:
+                port = None
+                proto = None
+            else:
+                port = res_search.group(1)
+                proto = res_search.group(2)
+                p_o = Port(pentest)
+                p_o.initialize(ip, port, proto, "microsoft-ds", infos={"plugin":EternalBlue.get_name()})
+                insert_res = p_o.addInDb()
+                res_insert = insert_res["res"]
+                targets[str(p_o.getId())] = {
+                    "ip": ip, "port": port, "proto": proto}
+            if "VULNERABLE" in notes:
+                tags= [self.getTags()["pwned-eternalblue"]]
+                if res_insert is not None:
+                    p_o.addTag(Tag(self.getTags()["pwned-eternalblue"], notes=notes))
+        return allnotes, tags, "port", targets

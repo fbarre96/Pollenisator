@@ -179,6 +179,8 @@ components:
           type: string
         text:
           type: string
+        text_multi:
+          type: string
         owners:
           type: array
           items:
@@ -235,6 +237,13 @@ components:
             - Major
             - Critical
             - N/A
+        cvss_string:
+          type: string
+          nullable: true
+        cvss_score:
+          type: number
+          format: float
+          nullable: true
         redactor:
           type: string
         redacted_state:
@@ -415,6 +424,13 @@ components:
             - Major
             - Critical
             - N/A
+        cvss_string:
+          type: string
+          nullable: true
+        cvss_score:
+          type: number
+          format: float
+          nullable: true
         type:
           type: array
           items:
@@ -521,7 +537,7 @@ paths:
       responses:
         '200':
           description: list of variables for commands that can be replaced.
-          
+
   /issue:
     post:
       operationId: pollenisator.server.logger.report
@@ -3141,7 +3157,40 @@ paths:
               examples:
                 'defects where tagged':
                   value: '{  "defects": [    {      "_id": "ObjectId|60f190815955e6cf385a405d",      "ease": "Moderate",      "impact": "Major",      "index": "1",      "ip": "",      "notes": "",      "parent": "",      "port": "",      "proofs": [],      "proto": "",      "redactor": "N/A",      "risk": "Major",      "title": "sql",      "type": [        "Application"      ]    },    {      "_id": "ObjectId|60f194db1255fd087c769756",      "ease": "Moderate",      "impact": "Critical",      "index": "0",      "ip": "",      "notes": "",      "parent": "",      "port": "",      "proofs": [],      "proto": "",      "redactor": "N/A",      "risk": "Critical",      "title": "XSS",      "type": [        "Application"      ]    }  ]}'
-  
+  "/tags/{pentest}/getAllTagsWithTargetInfo":
+    get:
+      operationId: pollenisator.server.servermodels.tag.getAllTagsWithTargetInfo
+      tags:
+        - Tags
+      summary: "Get all tags with target info (how many items are tagged with this tag)"
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Maximum number of tags to return
+          required: false
+          schema:
+            type: integer
+            nullable: true
+        - name: skip
+          in: query
+          description: Number of tags to skip
+          required: false
+          schema:
+            type: integer
+            nullable: true
+      responses:
+        "200":
+          description: list of tag dict with target info
+          content:
+            application/json:
+              examples:
+                'tags':
+                  value: '[{"info-nmap":{"color":"transparent","level":"info"}, "target_info":{"defects":3, "ips":0, "ports":5, "scopes":1}}, ...]'
   "/tags/{pentest}/getRegisteredTags":
     get:
       operationId: pollenisator.server.servermodels.tag.getRegisteredTags
