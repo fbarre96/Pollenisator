@@ -2268,6 +2268,26 @@ paths:
               examples:
                 success:
                   value: 'True'
+  "/commands/{pentest}/reloadAllCommands":
+    post:
+      operationId: pollenisator.server.servermodels.command.reloadAllCommands
+      tags:
+        - Commands
+      summary: Reload all commands from the default cheatsheet into the pentest commands collection
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: command insertion success or already existing object
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : 'true'
   
   "/commands/{pentest}":
     post:

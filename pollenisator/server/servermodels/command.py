@@ -141,3 +141,14 @@ def addToMyCommands(command_iid: str, **kwargs: Any) -> Tuple[str, int]:
     dbclient.updateInDb("pollenisator", "commands", {
                                  "_id": ObjectId(command_iid)}, {"$addToSet":{"owners":user}})
     return "OK", 200
+
+@permission("pentester")
+def reloadAllCommands(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union[Tuple[str, int], bool]:
+    dbclient = DBClient.getInstance()
+    user = kwargs["token_info"]["sub"]
+    Command.addUserCommandsToPentest(pentest, user)
+    #addCheckInstancesToPentest(pentest, pentest_type)
+    commands = Command.getList({}, pentest)
+    if not commands:
+        commands = []
+    

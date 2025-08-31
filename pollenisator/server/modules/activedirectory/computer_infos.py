@@ -20,6 +20,7 @@ class ComputerInfos():
             os (str): The os of this ComputerInfos.
             signing (bool): The signing of this ComputerInfos.
             smbv1 (bool): The smbv1 of this ComputerInfos.
+            null_auth (bool): If null_auth is enabled on this Computer.
             is_dc (bool): The is_dc of this ComputerInfos.
             is_sqlserver (bool): The is_sqlserver of this ComputerInfos.
             secrets (List[str]): The secrets of this ComputerInfos.
@@ -28,11 +29,11 @@ class ComputerInfos():
             valuesFromDb = {}
         elif isinstance(valuesFromDb, ComputerInfos):
             valuesFromDb = valuesFromDb.getData()
-        self.initialize(valuesFromDb.get("os"), valuesFromDb.get("signing"),valuesFromDb.get("smbv1"), \
+        self.initialize(valuesFromDb.get("os"), valuesFromDb.get("signing"),valuesFromDb.get("smbv1"), valuesFromDb.get("null_auth"), \
                 valuesFromDb.get("is_dc"), valuesFromDb.get("secrets", []), valuesFromDb.get("is_sqlserver"))
 
 
-    def initialize(self, os: Optional[str] = None, signing: Optional[bool] = None, smbv1: Optional[bool] = None, 
+    def initialize(self, os: Optional[str] = None, signing: Optional[bool] = None, smbv1: Optional[bool] = None, null_auth: Optional[bool] = None,
                    is_dc: Optional[bool] = None, secrets: Optional[List[str]] = None, 
                    is_sqlserver: Optional[bool] = None) -> 'ComputerInfos': 
         """
@@ -43,6 +44,7 @@ class ComputerInfos():
             os (Optional[str], optional): The os of the ComputerInfos object. Defaults to None.
             signing (Optional[bool], optional): The signing of the ComputerInfos object. Defaults to None.
             smbv1 (Optional[bool], optional): The smbv1 of the ComputerInfos object. Defaults to None.
+            null_auth (Optional[bool], optional): The null_auth of the ComputerInfos object. Defaults to None.
             is_dc (Optional[bool], optional): The is_dc of the ComputerInfos object. Defaults to None.
             secrets (Optional[List[str]], optional): The secrets of the ComputerInfos object. Defaults to None.
             is_sqlserver (Optional[bool], optional): The is_sqlserver of the ComputerInfos object. Defaults to None.
@@ -53,6 +55,7 @@ class ComputerInfos():
         self.os: Optional[str] = os
         self.signing: Optional[bool] = signing
         self.smbv1: Optional[bool] = smbv1
+        self.null_auth: Optional[bool] = null_auth
         self.is_dc: Optional[bool] = is_dc
         self.secrets: List[str] = secrets if secrets is not None else []
         self.is_sqlserver: Optional[bool] = is_sqlserver
@@ -66,7 +69,7 @@ class ComputerInfos():
         Returns:
             Dict[str, Union[str, bool, List[str]]]: A dictionary containing the data of the ComputerInfos object.
         """
-        return {"os":self.os, "signing": self.signing, "smbv1":self.smbv1, "is_dc":self.is_dc,  "is_sqlserver":self.is_sqlserver, "secrets":self.secrets}
+        return {"os":self.os, "signing": self.signing, "smbv1":self.smbv1,  "null_auth": self.null_auth, "is_dc":self.is_dc,  "is_sqlserver":self.is_sqlserver, "secrets":self.secrets}
     
     def update(self, values: Dict[str, Any]) -> None:
         """
@@ -79,6 +82,7 @@ class ComputerInfos():
         self.os = values.get("os", self.os)
         self.signing = values.get("signing", self.signing)
         self.smbv1 = values.get("smbv1", self.smbv1)
+        self.null_auth = values.get("null_auth", self.null_auth)
         self.is_dc = values.get("is_dc", self.is_dc)
         self.is_sqlserver = values.get("is_sqlserver", self.is_sqlserver)
         self.secrets = values.get("secrets", self.secrets)
@@ -144,6 +148,28 @@ class ComputerInfos():
         """
 
         self._smbv1 = smbv1
+
+    @property
+    def null_auth(self) -> Optional[bool]:
+        """
+        Gets the null_auth of this ComputerInfos.
+
+        Returns:
+            Optional[bool]: The null_auth of this ComputerInfos.
+        """
+        if self._null_auth is None:
+            return False
+        return self._null_auth
+    @null_auth.setter
+    def null_auth(self, null_auth: Optional[bool]) -> None:
+        """
+        Sets the null_auth of this ComputerInfos.
+
+        Args:
+            null_auth (Optional[bool]): The null_auth of this ComputerInfos.
+        """
+
+        self._null_auth = null_auth
 
     @property
     def is_dc(self) -> Optional[bool]:

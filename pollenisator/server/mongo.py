@@ -26,6 +26,7 @@ from pollenisator.core.models.scope import Scope
 from pollenisator.core.models.wave import Wave
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.permission import permission
+from pollenisator.server.servermodels.command import update as update_command
 from pollenisator.core.components.logger_config import logger
 
 dbclient = DBClient.getInstance()
@@ -1256,6 +1257,7 @@ def doImportCheatsheet(data: str, user: str) -> Union[ErrorStatus, List[Dict[str
         return "Invalid file format, checkitems  properties must be lists", 400
     matching_commands = {}
     matching_defects = {}
+    dbclient = DBClient.getInstance()
     failed = []
     if "commands" not in checks.keys():
         return "Invalid file format, object expected property: commands", 400
@@ -1270,6 +1272,15 @@ def doImportCheatsheet(data: str, user: str) -> Union[ErrorStatus, List[Dict[str
         del command["_id"]
         command_o = Command("pollenisator", command)
         obj_ins = command_o.addInDb()
+        if not obj_ins["res"]:
+            existing_command = Command.fetchObject("pollenisator", {"_id":ObjectId(obj_ins["iid"])})
+            if existing_command is not None:
+                existing_data = existing_command.getData()
+                existing_data |= command_o.getData()
+                if "_id" in existing_data:
+                    del existing_data["_id"]
+                dbclient.updateInDb("pollenisator",  "commands", {"_id":ObjectId(obj_ins["iid"])}, {"$set":existing_data})
+        command_o._id = ObjectId(obj_ins["iid"])
         command_o.addOwner(user)
         matching_commands[save_id] = str(obj_ins["iid"])
         if not obj_ins["res"]:

@@ -150,12 +150,17 @@ class Port(Element):
     def replaceCommandVariables(cls, pentest, command, data):
         command = command.replace("|port|", data.get("port", ""))
         command = command.replace("|port.proto|", data.get("proto", ""))
+        if data.get("ip") is not None:
+            command = command.replace("|ip_port|", data.get("ip", "")+":"+data.get("port", ""))
         if data.get("port")  is not None and data.get("ip")  is not None:
             dbclient = DBClient.getInstance()
             port_db = dbclient.findInDb(pentest, "ports", {"port":data.get("port") , "proto":data.get("proto", "tcp") , "ip":data.get("ip") }, False)
             if port_db is not None:
                 command = command.replace("|port.service|", port_db.get("service", ""))
                 command = command.replace("|port.product|", port_db.get("product",""))
+                port = data.get("port")
+                is_ssl = "ssl" in port_db.get("service", "") or "https" in port_db.get("service", "")
+                command = command.replace("|url|", "https" if is_ssl else "http"+"://"+data.get("ip", "")+ (":"+str(port) if str(port) != "" else ""))
                 port_infos = port_db.get("infos", {})
                 for info in port_infos:
                     command = command.replace("|port.infos."+str(info)+"|", str(port_infos[info]))

@@ -645,7 +645,7 @@ def getTargetRepr(pentest: str, body: List[str]) -> Dict[str, str]:
         Dict[str, str]: A dictionary mapping CheckInstance ids to their target's representation.
     """
     dbclient = DBClient.getInstance()
-    iids_list = [ ObjectId(x) for x in body ]
+    iids_list = [ ObjectId(x) for x in body if ObjectId.is_valid(x) ]
     checkinstances = dbclient.findInDb(pentest, "checkinstances", {"_id": {"$in": iids_list}}, True)
     ret = {}
     elements: Dict[str, Set[ObjectId]] = {}

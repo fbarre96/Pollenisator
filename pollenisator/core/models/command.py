@@ -243,13 +243,16 @@ class Command(Element):
             bool: True if the operation was successful, False otherwise.
         """
         commands = Command.fetchObjects("pollenisator", {})
+        dbclient = DBClient.getInstance()
         for command in commands:
             mycommand = command
             mycommand.original_iid = ObjectId(command.getId())
             mycommand.indb = pentest
             mycommand.owners = [user]
+            original_id = command.getId()
             res = mycommand.addInDb()
             if not res["res"]:
                 comm_o = Command(pentest, {"_id": ObjectId(res["iid"])})
                 comm_o.addOwner(user)
+                dbclient.updateInDb(pentest, "commands", {"_id": ObjectId(res["iid"])}, {"$set": {"owners":[user], "text":command.text, "text_multi":command.text_multi, "original_iid": ObjectId(original_id)}})
         return True

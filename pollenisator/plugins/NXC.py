@@ -55,7 +55,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
 """
     result = {}
     retour = []
-    regex_info = re.compile(r"(?:LDAP|SMB)\s+(\S+)\s+(\d+)\s+\S+\s+\[\*\]\s*([^\(]+)\(name:(.*)\) \(domain:(.*)\) \(signing:(True|False)\) \(SMBv1:(False|True)\)$", re.MULTILINE)
+    regex_info = re.compile(r"(?:LDAP|SMB)\s+(\S+)\s+(\d+)\s+\S+\s+\[\*\]\s*([^\(]+)\(name:(.*)\) \(domain:(.*)\) \(signing:(True|False)\) \(SMBv1:(False|True)\)\s+(?:\(Null Auth:(False|True)\)|)$", re.MULTILINE)
     regex_logon_failed = re.compile(
         r"(?:LDAP|SMB)\s+(\S+)\s+(\d+)\s+(\S+)\s+\[\-\]\s*([^\\]+)\\([^:\n]+):(.*?) ([A-Z_]+)$", re.MULTILINE)
     regex_success = re.compile(
@@ -152,6 +152,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                     lastValidDomain = toAdd["domain"]
                     toAdd["signing"] = res_infos.group(6)
                     toAdd["smbv1"] = res_infos.group(7)
+                    toAdd["null_auth"] = res_infos.group(8)
                     countFound += 1
                 else:
                     success_infos = re.search(regex_success, line)
@@ -264,6 +265,9 @@ def editScopeIPs(pentest, hostsInfos):
                 SMBv1 = infos.get("smbv1", "")
                 if SMBv1 != "":
                     infosToAdd["smbv1"] = SMBv1
+                nullAuth = infos.get("null_auth", "")
+                if nullAuth != "":
+                    infosToAdd["null_auth"] = nullAuth
                 signing = infos.get("signing", "")
                 if signing != "":
                     infosToAdd["signing"] = signing
@@ -315,7 +319,7 @@ def editScopeIPs(pentest, hostsInfos):
                     infosToAdd["admins"] = infosToAdd.get("admins", []) + [user_model]
                 
 
-            ip_m = Ip(pentest).initialize(str(infos["ip"]), infos={"plugin":NXC.get_name(),"hostname":infos.get("machine_name", "")})
+            ip_m = Ip(pentest).initialize(str(infos["ip"]), infos={"plugin":NXC.get_name(),"hostname":infos.get("machine_name", ""), "domain": infos.get("domain", "")})
             insert_ret = ip_m.addInDb()
             if not insert_ret["res"]:
                 ip_m = Ip.fetchObject(pentest, {"_id": insert_ret["iid"]})
@@ -366,10 +370,12 @@ def editScopeIPs(pentest, hostsInfos):
                 d["infos"]["plugins"]  = NXC.get_name()
                 computer_m = Computer(pentest, d)
                 computer_m.update()
-                if d["infos"].get("signing", True) == False:
+                if str(d["infos"].get("signing", True)).lower() == "false":
                     computer_m.addTag(Tag("signing-disabled", "orange", "medium", f"Signing is disabled on {computer_m.name}"), True)
-                if d["infos"].get("smbv1", True) == False:
+                if str(d["infos"].get("smbv1", True)).lower() == "false":
                     computer_m.addTag(Tag("smbv1-enabled", "orange", "medium", f"SMBv1 is enabled on {computer_m.name}"), True)
+                if str(d["infos"].get("null_auth", "")).lower() == "true":
+                    computer_m.addTag(Tag("null-auth-allowed", "red", "high", f"Null authentication is allowed on {computer_m.name}"), True)
             if "users" in infosToAdd:
                 del infosToAdd["users"]
             if "admins" in infosToAdd:
@@ -420,6 +426,7 @@ class NXC(Plugin):
                 "pwned": Tag("pwned", "red", "high"),
                 "signing-disabled": Tag("signing-disabled", "orange", "medium"),
                 "smbv1-enabled" : Tag("smbv1-enabled", "orange", "medium"),
+                "null-auth-allowed": Tag("null-auth-allowed", "red", "high"),
                 "pwned-ntds": Tag("pwned-ntds", "black", "critical"),
                 "hashLM-found": Tag("hashLM-found", "red", "high")}
 

@@ -705,7 +705,7 @@ class Tool(Element):
         self.resultfile = file_name if file_name is not None else ""
         dbclient = DBClient.getInstance()
         dbclient.updateInDb("pollenisator", "workers", {"name":self.scanner_ip}, {"$pull":{"running_tools": {"pentest":self.pentest, "iid":self.getId()}}}, notify=False)
-        dbclient.send_notify(self.pentest, "running_tools", self.getId(), "insert")
+        dbclient.send_notify(self.pentest, "running_tools", self.getId(), "delete")
 
     def markAsError(self, msg: str = "") -> None:
         """
