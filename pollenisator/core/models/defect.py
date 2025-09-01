@@ -48,6 +48,8 @@ class Defect(Element):
         self.proofs: List[str] = []
         self.creation_time: Optional[datetime] = None
         self.index = 0
+        self.redacted_state = "New"
+        self.mtype: Optional[Union[str, List[str]]] = []
         if valuesFromDb is not None:
             self.initialize(valuesFromDb.get("target_id", None), valuesFromDb.get("target_type", ""),
                             valuesFromDb.get("title", ""), valuesFromDb.get("synthesis", ""), valuesFromDb.get("impacts", ""), valuesFromDb.get("description", ""),
@@ -204,7 +206,7 @@ class Defect(Element):
             Dict[str, Any]: A dict with keys "target_id", "target_type", "title" if pentest is not "pollenisator". 
             If pentest is "pollenisator", returns a dict with only "title" key.
         """
-        if self.pentest == "pollenisator":
+        if self.isTemplate():
             return {"title": self.title}
         return {"target_id": self.target_id, "target_type": self.target_type, "title": self.title}
 
@@ -216,6 +218,15 @@ class Defect(Element):
             bool: True if the defect is assigned to an IP, False otherwise.
         """
         return self.target_id is not None
+    
+    def isTemplate(self) -> bool:
+        """
+        Returns a boolean indicating if this defect is a template defect in pollenisator database.
+
+        Returns:
+            bool: True if the defect is in pollenisator database, False otherwise.
+        """
+        return self.pentest == "pollenisator"
 
     def addInDb(self) -> DefectInsertResult:
         """
@@ -227,11 +238,13 @@ class Defect(Element):
         Returns:
             DefectInsertResult: The ObjectId of the inserted document in the database, or None if the operation was not successful.
         """
+        dbclient = DBClient.getInstance()
         try:
-            self.creation_time = datetime.now()
             self.redacted_state = "New" if self.redacted_state == "" or self.redacted_state is None else self.redacted_state
             if not self.isAssigned():
+                # mostly prevent wrong index in global defect table
                 sem.acquire()
+            # Check existing
             base = self.getDbKey()
             existing = Defect.fetchObject(self.pentest, base)
             if existing is not None:
@@ -241,65 +254,86 @@ class Defect(Element):
                 sem.release()
                 raise ValueError("If a target_id is specified, a target_type should be specified to")
             parent = self.getParentId()
-            if self.pentest != "pollenisator" and not self.isAssigned():
-                insert_pos = Defect.findInsertPosition(self.pentest, self.risk)
-                save_insert_pos = insert_pos
-                defects_to_edit = []
-
-                defect_to_edit_o = Defect.fetchObject(self.pentest, {"target_id":None, "index":int(insert_pos)})
-                if defect_to_edit_o is not None:
-                    defects_to_edit.append(defect_to_edit_o)
-                while defect_to_edit_o is not None:
-                    insert_pos+=1
-                    defect_to_edit_o = Defect.fetchObject(self.pentest, {"target_id":None,  "index":int(insert_pos)})
-                    if defect_to_edit_o is not None:
-                        defects_to_edit.append(defect_to_edit_o)
-                    
-                for defect_to_edit in defects_to_edit:
-                    defect_to_edit = cast(Defect, defect_to_edit)
-                    defect_to_edit.update_index(int(defect_to_edit.index)+1)
-                self.index = int(save_insert_pos)
-
+            if not self.isTemplate() and not self.isAssigned():
+                # find insert position in global defect table
+                self.set_defect_table_index()
             self.creation_time = datetime.now()
             if isinstance(self.mtype, str):
                 self.mtype = self.mtype.split(",")
-            dbclient = DBClient.getInstance()
             data = self.getData()
             if "_id" in data:
                 del data["_id"]
             ins_result = dbclient.insertInDb(self.pentest, "defects", data, ObjectId(parent))
             iid = ins_result.inserted_id
             self._id = iid
-            if self.pentest != "pollenisator":
-                local_proofs = set()
-                proof_groups = Defect._findProofsInDescription(self.description)
-                try:
-                    unassigned_proofs = self.listProofFiles(getUnassigned=True)
-                except FileNotFoundError:
-                    unassigned_proofs = []
-                for proof_group in proof_groups:
-                    if proof_group.group(1) in unassigned_proofs:
-                        self.assignProof(proof_group.group(1))
-                        local_proofs.add(proof_group.group(1))
-                self.proofs = list(local_proofs)
+            if not self.isTemplate():
+                self.set_proofs_from_description()
             if self.isAssigned():
                 # Edit to global defect and insert it
-                global_defect = Defect(self.pentest, self.getData())
-                global_defect.target_id = None
-                global_defect.target_type = ""
-                global_defect.parent = None
-                global_defect.notes = ""
-                result = global_defect.addInDb()
-                if isinstance(result, tuple):
-                    pass
-                else:
-                    insert_res = cast(DefectInsertResult, result)
-                    dbclient.updateInDb(self.pentest, "defects", {"_id":ObjectId(iid)}, {"$set":{"global_defect": insert_res["iid"]}})
+                self.add_as_global_defect(iid)
         except Exception as e:
-            sem.release()
             raise(e)
-        sem.release()
+        finally:
+            if not self.isAssigned():
+                sem.release()
+
         return {"res":True, "iid":iid}
+
+    def add_as_global_defect(self, iid: str) -> None:
+        """
+        Add this defect as a global defect in the pentest database.
+        """
+        dbclient = DBClient.getInstance()
+        global_defect = Defect(self.pentest, self.getData())
+        global_defect.target_id = None
+        global_defect.target_type = ""
+        global_defect.parent = None
+        global_defect.notes = ""
+        result = global_defect.addInDb()
+        if isinstance(result, tuple):
+            pass
+        else:
+            insert_res = cast(DefectInsertResult, result)
+            dbclient.updateInDb(self.pentest, "defects", {"_id":ObjectId(iid)}, {"$set":{"global_defect": insert_res["iid"]}})
+
+    def set_proofs_from_description(self) -> None:
+        """
+        Set the proofs of this defect from its description.
+        It searches for proof files mentioned in the description and assigns them to the defect.
+        
+        Returns:
+            None
+        """
+        local_proofs = set()
+        proof_groups = Defect._findProofsInDescription(self.description)
+        try:
+            unassigned_proofs = self.listProofFiles(getUnassigned=True)
+        except FileNotFoundError:
+            unassigned_proofs = []
+        for proof_group in proof_groups:
+            if proof_group.group(1) in unassigned_proofs:
+                self.assignProof(proof_group.group(1))
+                local_proofs.add(proof_group.group(1))
+        self.proofs = list(local_proofs)
+
+    def set_defect_table_index(self):
+        insert_pos = Defect.findInsertPosition(self.pentest, self.risk)
+        save_insert_pos = insert_pos
+        defects_to_edit = []
+
+        defect_to_edit_o = Defect.fetchObject(self.pentest, {"target_id":None, "index":int(insert_pos)})
+        if defect_to_edit_o is not None:
+            defects_to_edit.append(defect_to_edit_o)
+        while defect_to_edit_o is not None:
+            insert_pos+=1
+            defect_to_edit_o = Defect.fetchObject(self.pentest, {"target_id":None,  "index":int(insert_pos)})
+            if defect_to_edit_o is not None:
+                defects_to_edit.append(defect_to_edit_o)
+                    
+        for defect_to_edit in defects_to_edit:
+            defect_to_edit = cast(Defect, defect_to_edit)
+            defect_to_edit.update_index(int(defect_to_edit.index)+1)
+        self.index = int(save_insert_pos)
 
     def update_index(self, index: int) -> None:
         """
@@ -322,40 +356,57 @@ class Defect(Element):
             int: the number of deleted documents
         """
         dbclient = DBClient.getInstance()
-        if not self.isAssigned() and self.pentest != "pollenisator":
+        if not self.isAssigned() and not self.isTemplate():
             # if not assigned to a pentest object it's a report defect (except in pollenisator db where it's a defect template)
-            globalDefects_iterator = Defect.fetchObjects(self.pentest, {"target_id":None})
-            if globalDefects_iterator is None:
-                globalDefects: List[Defect] = []
-            else:
-                globalDefects = cast(List[Defect], globalDefects_iterator)
-            for globalDefect in globalDefects:
-                globalDefect = cast(Defect, globalDefect)
-                if int(globalDefect.index) > int(self.index):
-                    globalDefect.update_index(int(globalDefect.index)-1)
-            thisAssignedDefects = Defect.fetchObjects(self.pentest, {"global_defect": ObjectId(self.getId())})
-            if thisAssignedDefects is not None:
-                for thisAssignedDefect in thisAssignedDefects:
-                    thisAssignedDefect = cast(Defect, thisAssignedDefect)
-                    thisAssignedDefect.deleteFromDb()
-        if self.pentest != "pollenisator":
-            proofs_path = self.getProofPath()
-            try:
-                files = self.listProofFiles()
-            except FileNotFoundError:
-                files = []
-            for filetodelete in files:
-                filetodelete = os.path.basename(filetodelete)
-                os.remove(os.path.join(proofs_path, filetodelete))
-            try:
-                os.rmdir(proofs_path)
-            except FileNotFoundError:
-                pass
+            self.shift_all_index_left()
+            self.delete_affiliates_defects()
+        if not self.isTemplate():
+            self.remove_proofs()
         res = dbclient.deleteFromDb(self.pentest, "defects", {"_id": ObjectId(self.getId())}, False)
         if res is None:
             return 0
+        return res
+
+    def remove_proofs(self) -> None:
+        """
+        Remove all proof files associated with this defect from the filesystem.
+        """
+        proofs_path = self.getProofPath()
+        try:
+            files = self.listProofFiles()
+        except FileNotFoundError:
+            files = []
+        for filetodelete in files:
+            filetodelete = os.path.basename(filetodelete)
+            os.remove(os.path.join(proofs_path, filetodelete))
+        try:
+            os.rmdir(proofs_path)
+        except FileNotFoundError:
+            pass
+
+    def delete_affiliates_defects(self) -> None:
+        """
+        Delete all defects assigned to a target that are linked to this global defect.
+        """
+        thisAssignedDefects = Defect.fetchObjects(self.pentest, {"global_defect": ObjectId(self.getId())})
+        if thisAssignedDefects is not None:
+            for thisAssignedDefect in thisAssignedDefects:
+                thisAssignedDefect = cast(Defect, thisAssignedDefect)
+                thisAssignedDefect.deleteFromDb()
+
+    def shift_all_index_left(self) -> None:
+        """
+        Shift left the index of all global defects with index greater than this defect index.
+        """
+        globalDefects_iterator = Defect.fetchObjects(self.pentest, {"target_id":None})
+        if globalDefects_iterator is None:
+            globalDefects: List[Defect] = []
         else:
-            return res
+            globalDefects = cast(List[Defect], globalDefects_iterator)
+        for globalDefect in globalDefects:
+            globalDefect = cast(Defect, globalDefect)
+            if int(globalDefect.index) > int(self.index):
+                globalDefect.update_index(int(globalDefect.index)-1)
         
     def save_history(self, username: str) -> None:
         """
@@ -488,46 +539,67 @@ class Defect(Element):
             del data["_id"]
         new_data |= data
         new_self = Defect(self.pentest, new_data)
-
         if "_id" in new_data:
             del new_data["_id"]
         oldRisk = self.risk
-        if not new_self.isAssigned() and self.pentest != "pollenisator":
-            if data.get("risk", None) is not None and self.pentest != "pollenisator":
+        if not new_self.isAssigned() and not self.isTemplate():
+            if data.get("risk", None) is not None and not self.isTemplate():
                 if new_data["risk"] != oldRisk:
-                    insert_pos = Defect.findInsertPosition(self.pentest, new_data["risk"])
-                    if int(insert_pos) > int(self.index):
-                        insert_pos = int(insert_pos)-1
-                    defectTarget = Defect.fetchObject(self.pentest, {"target_id":None, "index":insert_pos})
-                    if defectTarget is not None:
-                        Defect.moveDefect(self.pentest, self.getId(), defectTarget.getId())
-                if "index" in new_data:
-                    del new_data["index"]
-        if self.pentest != "pollenisator" and "description" in data:
-            new_data["proofs"] = set()
-            proof_groups = Defect._findProofsInDescription(new_data.get("description", ""))
-            try:
-                existing_proofs_to_remove = self.listProofFiles()
-            except FileNotFoundError:
-                existing_proofs_to_remove = []
-            for proof_group in proof_groups:
-                if proof_group.group(1) in existing_proofs_to_remove:
-                    existing_proofs_to_remove.remove(proof_group.group(1))
-                if (proof_group.group(1) not in new_data["proofs"]):
-                    try:
-                        pollenisator_images = os.listdir(os.path.join(utils.getMainDir(), "files", "pollenisator", "file","unassigned"))
-                    except FileNotFoundError:
-                        pollenisator_images = []
-                    if (proof_group.group(1) in pollenisator_images):
-                        continue
-                new_data["proofs"].add(os.path.normpath(proof_group.group(1)))
-            if clean_proofs:
-                for proof_to_remove in existing_proofs_to_remove:
-                    self.rmProof(proof_to_remove)
-            new_data["proofs"] = list(new_data["proofs"])
-        
+                    new_data = self.update_defect_index(new_data)
+        if not self.isTemplate() and "description" in data:
+            new_data = self.handle_proofs_update(clean_proofs, new_data)
         dbclient.updateInDb(self.pentest, "defects", {"_id":ObjectId(self.getId())}, {"$set":new_data}, False, True)
         return list(new_data.keys())
+
+    def handle_proofs_update(self, clean_proofs:bool, new_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle the update of proofs when the description is changed.
+        Args:
+            clean_proofs (bool): Whether to clean proofs that are no longer referenced in the description.
+            new_data (Dict[str, Any]): The new data to set in the database.
+        Returns:
+            Dict[str, Any]: The updated data with the new proofs.
+        """
+        new_data["proofs"] = set()
+        proof_groups = Defect._findProofsInDescription(new_data.get("description", ""))
+        try:
+            existing_proofs_to_remove = self.listProofFiles()
+        except FileNotFoundError:
+            existing_proofs_to_remove = []
+        for proof_group in proof_groups:
+            if proof_group.group(1) in existing_proofs_to_remove:
+                existing_proofs_to_remove.remove(proof_group.group(1))
+            if (proof_group.group(1) not in new_data["proofs"]):
+                try:
+                    pollenisator_images = os.listdir(os.path.join(utils.getMainDir(), "files", "pollenisator", "file","unassigned"))
+                except FileNotFoundError:
+                    pollenisator_images = []
+                if (proof_group.group(1) in pollenisator_images):
+                    continue
+            new_data["proofs"].add(os.path.normpath(proof_group.group(1)))
+        if clean_proofs:
+            for proof_to_remove in existing_proofs_to_remove:
+                self.rmProof(proof_to_remove)
+        new_data["proofs"] = list(new_data["proofs"])
+        return new_data
+
+    def update_defect_index(self, new_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update the defect index in the global defect table if the risk level has changed.
+        Args:
+            new_data (Dict[str, Any]): The new data to set in the database.
+        Returns:
+            Dict[str, Any]: The updated data with the new index.
+        """
+        insert_pos = Defect.findInsertPosition(self.pentest, new_data["risk"])
+        if int(insert_pos) > int(self.index):
+            insert_pos = int(insert_pos)-1
+        defectTarget = Defect.fetchObject(self.pentest, {"target_id":None, "index":insert_pos})
+        if defectTarget is not None:
+            Defect.moveDefect(self.pentest, self.getId(), defectTarget.getId())
+        if "index" in new_data: 
+            del new_data["index"]
+        return new_data
 
     @classmethod
     def findInsertPosition(cls, pentest: str, risk: str) -> int:
@@ -599,40 +671,42 @@ class Defect(Element):
             an error code otherwise.
         """
         if "_id" in data:
-            del data["_id"]
+            del data["_id"] # Prevent changing the _id
         data = Defect(self.pentest, data).getData()
         if "_id" in data:
-            del data["_id"]
-
+            del data["_id"] # remove _id cause it's not updatable
         dbclient = DBClient.getInstance()
-        oldRisk = self.risk
-        if not self.isAssigned() and self.pentest != "pollenisator":
-            if data.get("risk", None) is not None and self.pentest != "pollenisator":
-                if data["risk"] != oldRisk:
-                    insert_pos = Defect.findInsertPosition(self.pentest, data["risk"])
-                    if int(insert_pos) > int(self.index):
-                        insert_pos = int(insert_pos)-1
-                    defectTarget = Defect.fetchObject(self.pentest, {"target_id":None, "index":insert_pos})
-                    if defectTarget is not None:
-                        Defect.moveDefect(self.pentest, self.getId(), defectTarget.getId())
-                if "index" in data:
-                    del data["index"]
-        if self.pentest != "pollenisator":
-            data["proofs"] = set()
-            proof_groups = Defect._findProofsInDescription(data.get("description", ""))
-            try:
-                existing_proofs_to_remove = self.listProofFiles()
-            except FileNotFoundError:
-                existing_proofs_to_remove = []
-            for proof_group in proof_groups:
-                if proof_group.group(1) in existing_proofs_to_remove:
-                    existing_proofs_to_remove.remove(proof_group.group(1))
-                data["proofs"].add(proof_group.group(1))
-            for proof_to_remove in existing_proofs_to_remove:
-                self.rmProof(proof_to_remove)
-            data["proofs"] = list(data["proofs"])
+        if not self.isAssigned() and not self.isTemplate() and data.get("risk", None) is not None:
+            if data["risk"] != self.risk:
+                data = self.update_defect_index(data)
+        if not self.isTemplate():
+            data = self.remove_proofs_from_description(data)
         dbclient.updateInDb(self.pentest, "defects", {"_id":ObjectId(self.getId())}, {"$set":data})
         return True
+
+    def remove_proofs_from_description(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update the proofs of this defect from its description.
+        It searches for proof files assigned to the defect and not mentioned in the description and removes them.
+        Args:
+            data (Dict[str, Any]): The new data to set in the database.
+        Returns:
+            None
+        """
+        data["proofs"] = set()
+        proof_groups = Defect._findProofsInDescription(data.get("description", ""))
+        try:
+            existing_proofs_to_remove = self.listProofFiles()
+        except FileNotFoundError:
+            existing_proofs_to_remove = []
+        for proof_group in proof_groups:
+            if proof_group.group(1) in existing_proofs_to_remove:
+                existing_proofs_to_remove.remove(proof_group.group(1))
+            data["proofs"].add(proof_group.group(1))
+        for proof_to_remove in existing_proofs_to_remove:
+            self.rmProof(proof_to_remove)
+        data["proofs"] = list(data["proofs"])
+        return data
 
     def getParentId(self) -> ObjectId:
         """

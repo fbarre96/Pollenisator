@@ -13,7 +13,7 @@ from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.tag import Tag
 from pollenisator.core.components.socketmanager import SocketManager
 from pollenisator.core.models.command import Command
-from pollenisator.core.components.utils import loadPlugin, detectPluginsWithCmd
+from pollenisator.core.components.utils import detect_objectid, loadPlugin, detectPluginsWithCmd
 from pollenisator.core.models.tool import Tool
 from pollenisator.server.permission import permission
 from pollenisator.server.token import encode_token
@@ -299,8 +299,7 @@ def queueTasks(pentest: str, body: List[str], **kwargs: Any) -> QueueTasksResult
         return {"successes":[], "failures":[{"tool_iid":"", "error":"Body is not a list"}]}
     tools_iids = set()
     for tool_iid in body:
-        if isinstance(tool_iid, str) and tool_iid.startswith("ObjectId|"):
-            tool_iid = tool_iid[9:]
+        tool_iid = detect_objectid(tool_iid)
         try:
             tools_iids.add(ObjectId(tool_iid))
         except InvalidId:
@@ -328,8 +327,7 @@ def unqueueTasks(pentest: str, body: List[str], **kwargs: Any) -> QueueTasksResu
         return {"successes":[], "failures":[{"tool_iid":"", "error":"Body is not a list"}]}
     tools_iids = set()
     for tool_iid in body:
-        if isinstance(tool_iid, str) and tool_iid.startswith("ObjectId|"):
-            tool_iid = tool_iid[9:]
+        tool_iid = detect_objectid(tool_iid)
         try:
             tools_iids.add(ObjectId(tool_iid))
         except InvalidId:

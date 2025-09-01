@@ -5,6 +5,7 @@ from typing import Callable, Generator, Iterable, Iterator, List, Optional, Dict
 from typing_extensions import TypedDict
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
+from pollenisator.core.components.utils import detect_objectid
 from pollenisator.core.models.command import Command
 from pollenisator.core.models.element import Element
 import pollenisator.core.models.tool as tool
@@ -711,8 +712,7 @@ def queueCheckInstances(pentest: str, body: BodyQueueCheckInstances) -> ErrorSta
     check_iids = set()
     force_queue = body.get("force", False)
     for check_iid in body.get("iids", []):
-        if isinstance(check_iid, str) and check_iid.startswith("ObjectId|"):
-            check_iid = check_iid.replace("ObjectId|", "")
+        check_iid = detect_objectid(check_iid)
         check_iids.add(ObjectId(check_iid))
     CheckInstance.bulk_queue(pentest, list(check_iids), body.get("priority", 0), force=force_queue)
     return "Success", 200

@@ -91,9 +91,7 @@ def get_visible_target(pentest: str, body: Dict[str, Any], **kwargs) -> Union[Er
         Union[ErrorStatus, Dict[str, Any]]: The target details if found, otherwise an error message and status code.
     """
     target_type = body.get("item_type", "")
-    target_id = body.get("item_id", "")
-    if target_id.startswith("ObjectId|"):
-        target_id = target_id.split("|",1)[1]
+    target_id = utils.detect_objectid(body.get("item_id", ""))
     if not target_type:
         return "No target type provided", 400
     if not target_id:

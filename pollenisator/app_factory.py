@@ -4,7 +4,6 @@ This module contains the main application factory for the Pollenisator server.
 import os
 import sys
 from typing import Dict, Any
-import uuid
 from getpass import getpass
 from pathlib import Path
 import json
@@ -18,10 +17,10 @@ import bcrypt
 from flask_socketio import SocketIO, join_room, leave_room
 from pollenisator.server.modules.worker.worker import removeWorkers, unregister
 from pollenisator.core.components.logger_config import logger
-from pollenisator.core.components.utils import JSONEncoder, getMainDir, loadServerConfig
+from pollenisator.core.components.utils import JSONEncoder, loadServerConfig
 from pollenisator.core.components.socketmanager import SocketManager
 import pollenisator.core.components.mongo as mongo
-from pollenisator.migrate import *
+from pollenisator.migrate import migrate
 from pollenisator.server.permission import checkPentestPermission
 from pollenisator.server.modules.worker.worker import doSetInclusion
 
@@ -57,6 +56,7 @@ def handle_start_terminal_session(sm: SocketManager, data: Dict[str, Any], socke
             sm.socketio.emit("proxy-term", {"action":"pty-output", "id":data.get("id"), "output":output_log}, room=request_sid)
     else:
         dbclient.insertInDb(socket["pentest"], "terminalsessions", {"user":socket["user"], "id":data.get("id"), "name":data.get("name"), "target_check_iid":data.get("target_check_iid",None), "visible_target":data.get("visible_target",None), "target_tools_iids": data.get("target_tools_iids", []),"logs":[], "status":"open", "displayMode": data.get("displayMode", "panel")})
+
 def handle_stop_terminal_session(sm: SocketManager, data: Dict[str, Any], socket: Dict[str, Any], dbclient: mongo.DBClient, request_sid: str) -> None:
     existing_session = dbclient.findInDb(socket["pentest"], "terminalsessions", {"user":socket["user"], "id":data.get("id")}, False)
     if existing_session is not None:
@@ -494,29 +494,13 @@ def notify_clients(notif: Dict[str, Any]) -> None:
     else:
         sm.socketio.emit("notif", json.dumps(notif, cls=JSONEncoder), to=notif["db"])
 
-
-def init_db() -> None:
-    """
-    Initialize empty databases or remaining tmp data from the last run.
-
-    This function connects to the database, deletes any remaining socket data, checks for existing users, and creates an admin user if none exist. It also handles command-line arguments for non-interactive mode and help. Finally, it performs database migration and removes any remaining workers.
-    """
-    dbclient = mongo.DBClient.getInstance()
-    dbclient.deleteFromDb("pollenisator", "sockets", {}, many=True, notify=False)
-    res = dbclient.findInDb("pollenisator", "settings", {}, True)
-    if res is None:
-        settings = []
-    else:
-        settings = [s for s in res]
-    if len(settings) < 2 or settings[0].get("key") != "pentest_types" or settings[1].get("key") != "tags":
-        dbclient.insertInDb("pollenisator", "settings", {"key":"pentest_types", "value":'{"Web": ["Base", "Application", "Data", "Policy"], "LAN": ["Base", "Application", "Infrastructure", "Active Directory", "Data", "Policy"]}'})
-        dbclient.insertInDb("pollenisator", "settings", {"key":"tags", "value":'{"todo": {"color": "orange", "level": "todo"}, "pwned": {"color": "red", "level": "high"}, "Interesting": {"color": "dark green", "level": "medium"}, "Uninteresting": {"color": "sky blue", "level": "low"}, "neutral": {"color": "transparent", "level": ""}}'})
-        dbclient.insertInDb("pollenisator", "settings", {"key":"defect_notation_types", "value":'["CVSS"]'})
+def add_default_admin_if_needed(dbclient: mongo.DBClient) -> None:
+    """Check if there is at least one user in the database, if not create an admin user."""
     any_user = dbclient.findInDb("pollenisator", "users", {}, False)
     noninteractive = False
     if any_user is None:
         for arg in sys.argv:
-            if arg == "-h" or "--help":
+            if arg == "-h" or arg == "--help":
                 print("""Usage : pollenisator [-h|--help] [--non-interactive]
                 Python3.7+ is required
                 Options:
@@ -529,10 +513,24 @@ def init_db() -> None:
             create_admin("admin", "admin")
         else:
             create_admin()
-        #createWorker()
+
+def init_db() -> None:
+    """
+    Initialize empty databases or remaining tmp data from the last run.
+
+    This function connects to the database, deletes any remaining socket data, checks for existing users, and creates an admin user if none exist. It also handles command-line arguments for non-interactive mode and help. Finally, it performs database migration and removes any remaining workers.
+    """
+    dbclient = mongo.DBClient.getInstance()
+    dbclient.deleteFromDb("pollenisator", "sockets", {}, many=True, notify=False)
+    res = dbclient.findInDb("pollenisator", "settings", {}, True)
+    settings = [] if res is None else [s for s in res]
+    if len(settings) < 2 or settings[0].get("key") != "pentest_types" or settings[1].get("key") != "tags":
+        dbclient.insertInDb("pollenisator", "settings", {"key":"pentest_types", "value":'{"Web": ["Base", "Application", "Data", "Policy"], "LAN": ["Base", "Application", "Infrastructure", "Active Directory", "Data", "Policy"]}'})
+        dbclient.insertInDb("pollenisator", "settings", {"key":"tags", "value":'{"todo": {"color": "orange", "level": "todo"}, "pwned": {"color": "red", "level": "high"}, "Interesting": {"color": "dark green", "level": "medium"}, "Uninteresting": {"color": "sky blue", "level": "low"}, "neutral": {"color": "transparent", "level": ""}}'})
+        dbclient.insertInDb("pollenisator", "settings", {"key":"defect_notation_types", "value":'["CVSS"]'})
+    add_default_admin_if_needed(dbclient)
     migrate()
     removeWorkers()
-    #TODO FIX TAKES TOO MUCH TIME OR ADD OPTION TO DO SO dbclient.resetRunningTools()
 
 def init_config() -> int:
     """

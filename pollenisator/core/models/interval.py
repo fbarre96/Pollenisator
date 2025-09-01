@@ -193,23 +193,32 @@ class Interval(Element):
             return 0
         parent_wave = wave_class.fetchObject(self.pentest, {"wave": self.wave})
         if parent_wave is not None:
+            self.checkToolsOutOfTime(wave_class)
             dbclient.send_notify(self.pentest,
                                     "waves", str(parent_wave.getId()), "update", "")
-            other_intervals = wave_class.fetchObjects(self.pentest, {"wave": self.wave})
-            if other_intervals is not None:
-                no_interval_in_time = True
-                for other_interval_o in other_intervals:
-                    other_interval_o = cast(Interval, other_interval_o)
-                    if utils.fitNowTime(other_interval_o.dated, other_interval_o.datef):
-                        no_interval_in_time = False
-                        break
-                if no_interval_in_time:
-                    tools = Tool.fetchObjects(self.pentest, {"wave": self.wave})
-                    if tools is not None:
-                        for tool_o in tools:
-                            tool_o = cast(Tool, tool_o)
-                            tool_o.setOutOfTime()
         if res is None:
             return 0
         else:
             return res
+
+    def checkToolsOutOfTime(self, wave_class: Element) -> None:
+        """
+        Check if there is no interval in time for the parent wave of this interval.
+        If it is the case, set all tools in this wave as Out of Time (OOT).
+        Args:
+            wave_class: The wave class to use for fetching intervals and tools.
+        """
+        other_intervals = wave_class.fetchObjects(self.pentest, {"wave": self.wave})
+        if other_intervals is not None:
+            no_interval_in_time = True
+            for other_interval_o in other_intervals:
+                other_interval_o = cast(Interval, other_interval_o)
+                if utils.fitNowTime(other_interval_o.dated, other_interval_o.datef):
+                    no_interval_in_time = False
+                    break
+            if no_interval_in_time:
+                tools = Tool.fetchObjects(self.pentest, {"wave": self.wave})
+                if tools is not None:
+                    for tool_o in tools:
+                        tool_o = cast(Tool, tool_o)
+                        tool_o.setOutOfTime()

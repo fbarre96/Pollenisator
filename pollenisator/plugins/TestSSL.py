@@ -61,7 +61,6 @@ def parseWarnings(pentest, file_opened):
                 ip = "/".join(ip.split("/")[1:])
                 if (ip.strip() != "") and ip not in ips_to_add:
                     ips_to_add[ip] = Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name(), "FQDN": domain})
-                    ips_to_add[ip] = Ip(pentest).initialize(ip, infos={"plugin":TestSSL.get_name(), "FQDN": domain})
                 if (domain.strip() != "") and domain not in ips_to_add:
                     ips_to_add[domain] = Ip(pentest).initialize(domain, infos={"plugin":TestSSL.get_name(), "ip": ip})
                 if ip+str(port) not in ports_to_add:

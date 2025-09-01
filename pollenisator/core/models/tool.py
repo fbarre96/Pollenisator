@@ -617,8 +617,6 @@ class Tool(Element):
                 command = command_o.text if is_multi is False else command_o.text_multi
         data = self.getCommandData()
         command = Element.replaceAllCommandVariables(self.pentest, command, data)
-        if isinstance(command_o, str):
-            return command
         return command
 
     @classmethod

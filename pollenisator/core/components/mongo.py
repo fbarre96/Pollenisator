@@ -1,7 +1,5 @@
 """Handle mongo database connection and add shortcut functions to common stuff."""
 import datetime
-import hashlib
-import inspect
 import json
 import os
 import ssl
@@ -13,15 +11,17 @@ from uuid import UUID, uuid4
 import bson
 from PIL import Image
 import pymongo
-import redis
 from bson import ObjectId
 from pymongo import InsertOne, MongoClient, UpdateOne
 from pymongo.errors import OperationFailure, ServerSelectionTimeoutError
+from pollenisator.core.components.cacher import Cacher
 
 import pollenisator.core.components.utils as utils
 from pollenisator.core.components.logger_config import logger
 from pollenisator.core.components.tag import Tag
 
+error_no_pentest = "No pentest connected"
+error_api_connection = "API has trouble connecting to db. Check api server config."
 
 class DBClient:
     # pylint: disable=unsubscriptable-object
@@ -41,6 +41,7 @@ class DBClient:
 
     __instances: Dict[int, 'DBClient'] = {}
 
+
     @staticmethod
     def getInstance() -> 'DBClient':
         """ Singleton Static access method.
@@ -59,7 +60,7 @@ class DBClient:
 
         """
         pid = os.getpid()  # HACK : One mongo per process.
-        self.redis: Union[None, redis.Redis] = None
+        self.cacher = Cacher()
         if DBClient.__instances.get(pid, None) is not None:
             raise ValueError("This class is a singleton!")
         else:
@@ -72,7 +73,6 @@ class DBClient:
             self.current_pentest: Union[str, None] = None
             self.ssldir = ""
             self.db: Union[pymongo.database.Database[Any], None] = None
-            self.cache_collections = ["ports","ips","checkinstances","commands","pentests"]
             self.forbiddenNames = ["admin", "config", "local",
                                    "broker_pollenisator", "pollenisator"]
             DBClient.__instances[pid] = self
@@ -104,7 +104,7 @@ class DBClient:
         """
         self.connect()
         if self.client is None:
-            raise IOError("Failed to connect.")
+            raise IOError("Failed to connect to database.")
         if pentest is None:
             raise ValueError("Pentest cannot be None")
         db = self.client[pentest]
@@ -201,21 +201,7 @@ class DBClient:
         return self.updateInDb("pollenisator", "workers", {"name": worker_hostname}, {
                         "$set": {"last_heartbeat": datetime.datetime.now()}})
 
-    def connect_cache(self) -> None:
-        """
-        Connect to the Redis cache.
-
-        This function attempts to connect to a Redis server using the host and port specified in the environment variables. Usable environment variables are REDIS_HOST and REDIS_PORT. If the connection fails, it logs an error and continues without the cache, which may slow down the application.
-        If the connection fails, it logs an error and continues without the cache, which may slow down the application.
-        """
-        try:
-            if self.redis is None:
-                redis_port = int(os.environ.get("REDIS_PORT", 6379))
-                redis_host = os.environ.get("REDIS_HOST", "127.0.0.1")
-                self.redis = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
-        except redis.exceptions.ConnectionError as _e:
-            logger.error("No redis server found, continuing without will slow down the app.")
-            self.redis = None
+   
 
 
     def connect(self, config: Optional[Dict[str, Union[str, int, bool]]] = None, timeoutInMS: int = 500) -> Optional[bool]:
@@ -262,8 +248,8 @@ class DBClient:
                     self.client = MongoClient(
                         'mongodb://'+connectionString+self.host+":"+self.port, serverSelectionTimeoutMS=timeoutInMS)
                 server_info = self.client.server_info()
-                self.connect_cache()
-                return True and self.client is not None and server_info is not None
+                self.cacher.connect_cache()
+                return self.client is not None and server_info is not None
             except ServerSelectionTimeoutError as e:  # Unable to connect
                 print(f"Unable to connect to the database:\nPlease check the mongo db is up and reachable and your configuration file is correct: \n{os.path.normpath(utils.getServerConfigFolder())}/server.cfg")
                 print(e)
@@ -286,6 +272,18 @@ class DBClient:
         """
         return self.listPentests() is not None
 
+    def printDbConnectionError(self) -> None:
+        """
+        Print a database connection error message.
+
+        This function prints an error message indicating that the application is unable to connect to the database.
+        It suggests verifying that the mongod service is running on the specified host and that a mongo user with the correct password exists.
+        """
+        print("Failed to connect to database.")
+        print("Please verify that the mongod service is running on host " +
+              self.host + " and has a mongo user with the correct password.")
+        self.client = None
+
     def connectToDb(self, pentest_uuid: str) -> None:
         """
         Connect to the pentest database given by pentest_uuid.
@@ -305,10 +303,7 @@ class DBClient:
             if pentest_uuid is not None:
                 self.db = self.client[pentest_uuid]
         except IOError as e:
-            print("Failed to connect." + str(e))
-            print("Please verify that the mongod service is running on host " +
-                  self.host + " and has a user mongAdmin with the correct password.")
-            self.client = None
+            self.printDbConnectionError()
 
     def removeWorker(self, worker_name: str) -> None:
         """
@@ -363,10 +358,7 @@ class DBClient:
             logger.info("Registered worker %s", worker_name)
             return True
         except IOError as e:
-            print("Failed to connect." + str(e))
-            print("Please verify that the mongod service is running on host " +
-                  self.host + " and has a user mongAdmin with the correct password.")
-            self.client = None
+            self.printDbConnectionError()
             return False
 
     def listCollections(self, pentest: str) -> List[str]:
@@ -417,7 +409,7 @@ class DBClient:
         
         """
         if self.current_pentest is None:
-            raise ValueError("No pentest connected")
+            raise ValueError(error_no_pentest)
         return self._update(self.current_pentest, collection, pipeline, updatePipeline, many=many, notify=notify, upsert=upsert)
 
     def updateInDb(self, db: str, collection: str, pipeline: Dict[str, Any], updatePipeline: Dict[str, Any], many: bool = False, notify: bool = True, upsert: bool = False) -> pymongo.results.UpdateResult:
@@ -439,7 +431,62 @@ class DBClient:
         """
         self.connect()
         return self._update(db, collection, pipeline, updatePipeline, many=many, notify=notify, upsert=upsert)
+    
+    def _updateMany(self, dbName: str, collection: str, pipeline: Dict[str, Any], updatePipeline: Dict[str, Any], notify: bool = True) -> pymongo.results.UpdateResult:
+        """
+        Perform an updateMany operation in the database.
 
+        Args:
+            dbName (str): The database name to use.
+            collection (str): The collection that holds the document to update.
+            pipeline (Dict[str, Any]): A first "match" pipeline mongo to select which document to update.
+            updatePipeline (Dict[str, Any]): A second "action" pipeline mongo to apply changes to the selected document(s).
+            notify (bool, optional): A boolean asking for all client to be notified of this update. Defaults to True.
+
+        Returns:
+            pymongo.results.UpdateResult: Return the pymongo result of the update_many function.
+        """
+        self.connect()
+        if self.client is None:
+            raise ValueError(error_no_pentest)
+        db = self.client[dbName]
+        res = db[collection].update_many(pipeline, updatePipeline)
+        elems = db[collection].find(pipeline)
+        if notify:
+            for elem in elems:
+                self.send_notify(dbName, collection, elem["_id"], "update")
+        return res
+
+    def _updateOne(self, dbName: str, collection: str, pipeline: Dict[str, Any], updatePipeline: Dict[str, Any], notify: bool = True, upsert: bool = False) -> pymongo.results.UpdateResult:
+        """
+        Perform an updateOne operation in the database.
+
+        Args:
+            dbName (str): The database name to use.
+            collection (str): The collection that holds the document to update.
+            pipeline (Dict[str, Any]): A first "match" pipeline mongo to select which document to update.
+            updatePipeline (Dict[str, Any]): A second "action" pipeline mongo to apply changes to the selected document(s).
+            notify (bool, optional): A boolean asking for all client to be notified of this update. Defaults to True.
+            upsert (bool, optional): A boolean defining if a new document should be created if no document matches the query. Defaults to False.
+
+        Returns:
+            pymongo.results.UpdateResult: Return the pymongo result of the update_one function.
+        """
+        self.connect()
+        if self.client is None:
+            raise ValueError(error_no_pentest)
+        db = self.client[dbName]
+        self.cacher.deleteKeyWithPipeline(dbName, collection, pipeline)
+        res = db[collection].update_one(pipeline, updatePipeline, upsert=upsert)
+        if upsert and res.upserted_id is not None:
+            self.send_notify(dbName, collection, res.upserted_id, "insert")
+        else:
+            elem = db[collection].find_one(pipeline)
+            if elem is not None:
+                if notify:
+                    self.send_notify(dbName, collection, elem["_id"], "update")
+        return res
+    
     def _update(self, dbName: str, collection: str, pipeline: Dict[str, Any], updatePipeline: Dict[str, Any], many: bool = False, notify: bool = True, upsert: bool = False) -> pymongo.results.UpdateResult:
         """
         Wrapper for the pymongo update and update_many functions. Then notify observers if notify is true.
@@ -457,39 +504,10 @@ class DBClient:
         Returns:
             pymongo.results.UpdateResult: Return the pymongo result of the update or update_many function.
         """
-
-        self.connect()
-        if self.client is None:
-            raise ValueError("No pentest connected")
-        db = self.client[dbName]
         if many:
-            res = db[collection].update_many(
-                pipeline, updatePipeline)
-            elems = db[collection].find(pipeline)
-            if notify:
-                for elem in elems:
-                    self.send_notify(dbName, collection, elem["_id"], "update")
-        else:
-            if collection in self.cache_collections:
-                if len(pipeline) == 1 and isinstance(pipeline[list(pipeline.keys())[0]], ObjectId):
-                    cache_key = dbName+"."+collection+"."+str(pipeline[list(pipeline.keys())[0]])
-                else:
-                    cache_key = dbName+"."+collection+"."+hashlib.md5(json.dumps(pipeline, cls=utils.JSONEncoder).encode()).hexdigest()
-                if self.redis:
-                    try:
-                        self.redis.delete(cache_key)
-                    except redis.exceptions.ConnectionError as _e:
-                        logger.warning("Failed to connect to redis")
-                        self.redis = None
-            res = db[collection].update_one(pipeline, updatePipeline, upsert=upsert)
-            if upsert and res.upserted_id is not None:
-                self.send_notify(dbName, collection, res.upserted_id, "insert")
-            else:
-                elem = db[collection].find_one(pipeline)
-                if elem is not None:
-                    if notify:
-                        self.send_notify(dbName, collection, elem["_id"], "update")
-        return res
+            return self._updateMany(dbName, collection, pipeline, updatePipeline, notify)
+        return self._updateOne(dbName, collection, pipeline, updatePipeline, notify, upsert)
+        
 
     def insert(self, collection: str, values: Dict[str, Any], parent: Optional[ObjectId] = None, notify: bool = True) -> Union[pymongo.results.InsertManyResult, pymongo.results.InsertOneResult]:
         """
@@ -508,7 +526,7 @@ class DBClient:
         if values.get("parent", None) is None:
             values["parent"] = parent
         if self.current_pentest is None:
-            raise ValueError("No pentest connected")
+            raise ValueError(error_no_pentest)
         ret = self._insert(self.current_pentest, collection, values, notify, parent)
         return ret
 
@@ -568,35 +586,53 @@ class DBClient:
         Returns:
             Union[pymongo.results.InsertOneResult, pymongo.results.InsertManyResult]: Return the pymongo result of the insert command for the command collection.
         """
+      
+        if multi:
+            return self.insertMany(dbName, collection, cast(List[Dict[str, Any]], values), parentId=parentId, notify=notify)
+        return self.insertOne(dbName, collection, cast(Dict[str, Any], values), parentId=parentId, notify=notify)
+    
+    def insertMany(self, pentest: str, collection: str, values: List[Dict[str, Any]], parentId: Optional[ObjectId] = None, notify: bool = True) -> pymongo.results.InsertManyResult:
+        """
+        Wrapper for the pymongo insert_many. Then notify observers.
+
+        Args:
+            pentest (str): The pentest database name to use.
+            collection (str): The collection that will hold the document to insert.
+            values (List[Dict[str, Any]]): The list of documents to insert into the given collection.
+            parentId (ObjectId, optional): Not used, default to None. Was used to give info about parent node.
+            notify (bool, optional): A boolean asking for all client to be notified of this insert. Defaults to True.
+        Raises:
+            ValueError: If no pentest is connected.
+        Returns:
+            pymongo.results.InsertManyResult: Return the pymongo result of the insert_many function.
+        """
         self.connect()
         if self.client is None:
-            raise ValueError("No pentest connected")
-        if multi:
-            db = self.client[dbName]
-            res_many: pymongo.results.InsertManyResult = db[collection].insert_many(values, ordered=False)
-            if notify:
-                self.send_notify(dbName, collection,
-                        list(map(str, res_many.inserted_ids)), "insert_many", str(parentId))
-        else:
-            db = self.client[dbName]
-            try:
-                res_solo: pymongo.results.InsertOneResult = db[collection].insert_one(values)
-            except bson.errors.InvalidDocument as e:
-                new_values_str = json.dumps(values, cls=utils.JSONEncoder)
-                values = json.loads(new_values_str, cls=utils.JSONDecoder)
-                res_solo = db[collection].insert_one(values)
-            if res_solo.inserted_id is not None and collection in self.cache_collections:
-                cache_key = dbName+"."+collection+"."+str(res_solo.inserted_id)
-                try:
-                    if self.redis:
-                        self.redis.set(cache_key, json.dumps(values, cls=utils.JSONEncoder), ex=20)
-                except redis.exceptions.ConnectionError as _e:
-                    logger.warning("Failed to connect to redis")
-                    self.redis = None
-            if res_solo.inserted_id is not None and notify:
-                self.send_notify(dbName, collection,
-                            str(res_solo.inserted_id), "insert", str(parentId))
-        return res_many if multi else res_solo
+            raise ValueError(error_no_pentest)
+        db = self.client[pentest]
+        res_many: pymongo.results.InsertManyResult = db[collection].insert_many(values, ordered=False)
+        if notify:
+            self.send_notify(pentest, collection,
+                    list(map(str, res_many.inserted_ids)), "insert_many", str(parentId))
+        return res_many
+            
+    def insertOne(self, pentest: str, collection: str, values: Dict[str, Any], notify: bool = True, parentId: Optional[ObjectId] = None) -> pymongo.results.InsertOneResult:
+        self.connect()
+        if self.client is None:
+            raise ValueError(error_no_pentest)
+        db = self.client[pentest]
+        try:
+            res_solo: pymongo.results.InsertOneResult = db[collection].insert_one(values)
+        except bson.errors.InvalidDocument:
+            new_values_str = json.dumps(values, cls=utils.JSONEncoder)
+            values = json.loads(new_values_str, cls=utils.JSONDecoder)
+            res_solo = db[collection].insert_one(values)
+        if res_solo.inserted_id is not None:
+            self.cacher.cacheSet(pentest, collection, res_solo.inserted_id, values)
+        if res_solo.inserted_id is not None and notify:
+            self.send_notify(pentest, collection,
+                        str(res_solo.inserted_id), "insert", str(parentId))
+        return res_solo
 
     def find(self, collection: str, pipeline: Optional[Dict[str, Any]] = None, multi: bool = True) -> Union[pymongo.cursor.Cursor, None, List[Dict[str, Any]]]:
         """
@@ -613,7 +649,7 @@ class DBClient:
         if pipeline is None:
             pipeline = {}
         if self.db is None:
-            raise ValueError("No pentest connected")
+            raise ValueError(error_no_pentest)
         return self._find(self.db, collection, pipeline, multi)
 
     def countInDb(self, db: str, collection: str, pipeline: Optional[Dict[str, Any]] = None) -> int:
@@ -632,9 +668,9 @@ class DBClient:
             pipeline = {}
         self.connect()
         if self.client is None:
-            raise ValueError("No pentest connected")
+            raise ValueError(error_no_pentest)
         if self.client[db] is None:
-            raise ValueError("No pentest connected")
+            raise ValueError(error_no_pentest)
         try:
             return self.client[db][collection].count_documents(pipeline)
         except pymongo.errors.OperationFailure as e:
@@ -670,38 +706,16 @@ class DBClient:
             pipeline = {}
         self.connect()
         if self.client is None:
-            raise ValueError("No pentest connected")
+            raise ValueError(error_no_pentest)
         cache_key = None
-        if use_cache and collection in self.cache_collections:
-            if not multi and len(pipeline) == 1 and isinstance(pipeline[list(pipeline.keys())[0]], ObjectId):
-                cache_key = db+"."+collection+"."+str(pipeline[list(pipeline.keys())[0]])
-            elif not multi:
-                cache_key = db+"."+collection+"."+hashlib.md5(json.dumps(pipeline, cls=utils.JSONEncoder).encode()).hexdigest()
+        if use_cache:
+            cache_res, cache_key = self.cacher.cacheGet(db, collection, pipeline, multi)
+            if cache_res is not None:
+                return cache_res
         dbMongo: pymongo.database.Database[Any] = self.client[db]
-        if cache_key:
-            if self.redis:
-                try:
-                    res_redis: Any = self.redis.get(cache_key)
-                    if res_redis:
-                        res: Union[Dict[str, Any], List[Dict[str, Any]]] = json.loads(res_redis, cls=utils.JSONDecoder)
-                        return res
-                except redis.exceptions.ConnectionError:
-                    logger.warning("Failed to get from redis")
-                    #self.redis = None
         find_res: Union[pymongo.cursor.Cursor, None, List[Dict[str, Any]]] =  self._find(dbMongo, collection, pipeline, multi, skip, limit)
-        if cache_key and find_res:
-            if inspect.isgenerator(find_res) or isinstance(find_res, pymongo.cursor.Cursor):
-                return_value: List[Dict[str, Any]] = [r for r in find_res]
-            else:
-                return_value = find_res
-            store = json.dumps(return_value, cls=utils.JSONEncoder)
-            try:
-                if self.redis:
-                    self.redis.set(cache_key, store, ex=30) #set serialized object to redis server.
-            except redis.exceptions.ConnectionError as e:
-                logger.warning("Failed to set to redis, connection error "+ str(e))
-                self.redis = None
-            return return_value
+        if cache_key is not None and find_res:
+            return self.cacher.setCacheFromFindResult(cache_key, find_res)
         return find_res
 
     def fetchNotifications(self, pentest: str, fromTime: str) -> List[Dict[str, Any]]:
@@ -769,7 +783,7 @@ class DBClient:
         if pipelines is None:
             pipelines = []
         if self.db is None:
-            raise ValueError("No pentest connected")
+            raise ValueError(error_no_pentest)
         return self._aggregate(self.db, collection, pipelines)
 
     def aggregateFromDb(self, db: str, collection: str, pipelines: Optional[List[Dict[str, Any]]] = None) -> pymongo.command_cursor.CommandCursor:
@@ -788,7 +802,7 @@ class DBClient:
             pipelines = []
         self.connect()
         if self.client is None:
-            raise ValueError("No pentest connected")
+            raise ValueError(error_no_pentest)
         dbMongo = self.client[db]
         return self._aggregate(dbMongo, collection, pipelines)
 
@@ -822,7 +836,7 @@ class DBClient:
            List[ObjectId]: Return the deleted object ids.
         """
         if self.current_pentest is None:
-            raise ValueError("No pentest connected")
+            raise ValueError(error_no_pentest)
         return self._delete(self.current_pentest, collection, pipeline, many, True)
 
     def deleteFromDb(self, db: str, collection: str, pipeline: Dict[str, Any], many: bool = False, notify: bool = True) -> int:
@@ -862,7 +876,7 @@ class DBClient:
         """
         self.connect()
         if self.client is None:
-            raise ValueError("No pentest connected")
+            raise ValueError(error_no_pentest)
         db = self.client[dbName]
         iids_deleted = []
         if many:
@@ -901,7 +915,7 @@ class DBClient:
             if self.client is None:
                 self.connect()
                 if self.client is None:
-                    raise ValueError("No pentest connected")
+                    raise ValueError(error_no_pentest)
             pentests = self.findInDb("pollenisator", "pentests", {}, True)
             
             try:
@@ -918,9 +932,8 @@ class DBClient:
                 print("The connected user has no rights")
                 return None
         except ServerSelectionTimeoutError as e:
-            print("Failed to connect." + str(e))
             print("Please verify that the mongod service is running on host " +
-                  self.host + " and has a user mongAdmin with the correct password.")
+                  self.host + " and has a mongo user with the correct password.")
             self.client = None
             return None
         return ret
@@ -987,7 +1000,7 @@ class DBClient:
             bool: True if the pentest was successfully deleted, False otherwise.
         """
         if self.client is None:
-            raise ValueError("No pentest connected")
+            raise ValueError(error_no_pentest)
         result = self.deleteFromDb(
             "pollenisator", "pentests", {"uuid": pentest_uuid})
         if result is not None:
@@ -1017,7 +1030,7 @@ class DBClient:
             return False, msg
         pentests = self.listPentestNames()
         if pentests is None:
-            return False, "API has trouble connecting to db. Check api server config."
+            return False, error_no_pentest
         pentests = [x.lower() for x in pentests]
         if pentestName.strip().lower() in pentests:
             msg = "A database with the same name already exists."
@@ -1161,13 +1174,12 @@ class DBClient:
             return "No database connected", 400
         pentest_uuids = self.listPentestUuids()
         if pentest_uuids is None:
-            return "API has trouble connecting to db. Check api server config.", 500
+            return error_no_pentest, 500
         if fromCopyUUID not in pentest_uuids and checkPentestName:
             return "database to copy : not found", 404
         pentest_data = self.findInDb("pollenisator", "pentests", {"uuid": fromCopyUUID }, False)
         if pentest_data is None:
-            return "API has trouble connecting to db. Check api server config.", 500
-        old_pentest_nom =  pentest_data.get("nom", "")
+            return error_no_pentest, 500
         major_version = ".".join(self.client.server_info()["version"].split(".")[:2])
         if float(major_version) < 4.2:
             succeed, msg = self.registerPentest(self.getPentestOwner(fromCopyUUID),
@@ -1203,7 +1215,7 @@ class DBClient:
         from pollenisator.core.components.utils import execute
         pentest_uuids = self.listPentestUuids()
         if pentest_uuids is None:
-            raise ValueError("API has trouble connecting to db. Check api server config.")
+            raise ValueError(error_no_pentest)
         if dbName is None or dbName not in pentest_uuids:
             raise ValueError("Database not found")
         if directory == "":
@@ -1282,7 +1294,7 @@ class DBClient:
             return msg, 403
         pentest_uuids = self.listPentestUuids()
         if pentest_uuids is None:
-            return "API has trouble connecting to db. Check api server config.", 500
+            return error_no_pentest, 500
         if new_pentest_uuid not in pentest_uuids:
             return "Database not found", 404
         if success:
@@ -1431,6 +1443,37 @@ class DBClient:
         """
         return self.do_upload_with_filename(pentest, attachement_iid, filetype, attached_to, upfile.filename, upfile.stream)
 
+    def _check_file_upload(self, pentest:str, filetype: str, attached_to: Union[Literal["unassigned"], str]) -> Tuple[Dict[str, Any], int]:
+        """
+        Check if the file upload parameters are valid.
+
+        Args:
+            pentest (str): The name of the pentest.
+            filetype (str): The type of the file, either 'result' or 'proof'.
+            attached_to ( Union[Literal["unassigned"], str]): The id of the tool or defect to which the file is attached.
+
+        Returns:
+            Tuple[str, int]: A tuple containing a message indicating the result of the operation, a HTTP-like status code, and an empty string.
+        """
+        dbclient = DBClient.getInstance()
+        if filetype == "result":
+            if attached_to == "unassigned":
+                return {"msg":"The given iid is unassigned", "attachment_id":None}, 400
+            res = dbclient.findInDb(pentest, "tools", {"_id": ObjectId(attached_to)}, False)
+            if res is None:
+                return {"msg":"The given iid does not match an existing tool", "attachment_id":None}, 404
+        elif filetype == "proof" and attached_to != "unassigned":
+            res = dbclient.findInDb(pentest, "defects", {"_id": ObjectId(attached_to)}, False)
+            if res is None:
+                return {"msg":"The given iid does not match an existing defect", "attachment_id":None}, 404
+        elif filetype == "proof" and attached_to == "unassigned":
+            return {}, 200
+        elif filetype == "file" and attached_to != "unassigned":
+            return {"msg":"Files cannot be assigned", "attachment_id":None}, 400
+        elif filetype == "file" and attached_to == "unassigned":
+            return {}, 200
+        return {"msg":"Filetype is not in allowed file types", "attachment_id":None}, 400
+
     def do_upload_with_filename(self, pentest: str, attachement_iid:  Union[Literal["unassigned"], str], filetype: str, attached_to: Union[Literal["unassigned"], str], filename: str, file_stream: Any) -> Tuple[Dict[str, Any], int, str]:
         """
         Upload a file and attach it to a specific tool or defect in a pentest.
@@ -1446,46 +1489,61 @@ class DBClient:
             Tuple[str, int, str]: A tuple containing a message indicating the result of the operation, a HTTP-like status code, and the path of the uploaded file if succeedeed only.
         """
         dbclient = DBClient.getInstance()
+        check_res, statuscode = self._check_file_upload(pentest, filetype, attached_to)
+        if statuscode != 200:
+            return check_res, statuscode, ""
+        attachment_id, uploadName, name, full_filepath = self._get_upload_path(pentest, filetype, attached_to, filename, attachement_iid)
+        with open(full_filepath, "wb") as f:
+            f.write(file_stream.read())
+        dbclient.updateInDb(pentest, "attachments", {"attachment_id": attachment_id}, {"$set": {"name": name, "uploadName":uploadName, "type": filetype, "attached_to": attached_to}}, many=False, notify=True, upsert=True)
+        if filetype == "proof":
+            self.assignFileToDefect(pentest, attached_to, file_stream, dbclient, name, full_filepath)
+        return {"msg":uploadName + " was successfully uploaded", "attachment_id":attachment_id}, 200, full_filepath
+
+    def assignFileToDefect(self, pentest, attached_to, file_stream, dbclient, name, full_filepath):
+        im1 = Image.open(full_filepath)
+        im1.save(full_filepath, format="png")
+        file_stream.seek(0)
+        if attached_to != "unassigned":
+            dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(attached_to)}, {"$addToSet":{"proofs":name}})
+
+    def _get_upload_path(self, pentest: str, filetype: str, attached_to: Union[Literal["unassigned"], str] , filename: str\
+                         , attachment_id: Union[Literal["unassigned"], str]) -> Tuple[str, str, str, str]:
+        """
+        Get the upload path for a file.
+        Args:
+            pentest (str): The name of the pentest.
+            filetype (str): The type of the file, either 'result' or 'proof' or 'file'.
+            attached_to ( Union[Literal["unassigned"], str]): The id of the tool or defect or "unassigned" to which the file is attached.
+            filename (str): The name of the file to be uploaded.
+            attachment_id ( Union[Literal["unassigned"], str]): The id of attachment if replacing or "unassigned" to get one automatically.
+        Returns:
+            Tuple[str, str, str, str]: A tuple containing
+            - the attachment_id (uuidv4 as str),
+            - the uploadName (the original filename with / and \ replaced by _),
+            - the name (the name of the file on disk),
+            - the full_filepath (the full path to the file on disk).
+        """
         local_path = os.path.normpath(os.path.join(utils.getMainDir(), "files"))
         try:
             os.makedirs(local_path)
         except FileExistsError:
             pass
         filepath = os.path.join(local_path, pentest, filetype, attached_to)
-        if filetype == "result":
-            if attached_to == "unassigned":
-                return {"msg":"The given iid is unassigned", "attachment_id":None}, 400, ""
-            res = dbclient.findInDb(pentest, "tools", {"_id": ObjectId(attached_to)}, False)
-            if res is None:
-                return {"msg":"The given iid does not match an existing tool", "attachment_id":None}, 404, ""
-
-        elif filetype == "proof" and attached_to != "unassigned":
-            res = dbclient.findInDb(pentest, "defects", {"_id": ObjectId(attached_to)}, False)
-            if res is None:
-                return {"msg":"The given iid does not match an existing defect", "attachment_id":None}, 404, ""
-        elif filetype == "proof" and attached_to == "unassigned":
-            pass
-        elif filetype == "file" and attached_to != "unassigned":
-            return {"msg":"Files cannot be assigned", "attachment_id":None}, 400, ""
-        elif filetype == "file" and attached_to == "unassigned":
-            pass
-        else:
-            return {"msg":"Filetype is not proof nor result", "attachment_id":None}, 400, ""
-        if attachement_iid != "unassigned":
-            replace = True
-            attachment_id = str(attachement_iid)
-        else:
-            replace = False
-            attachment_id = str(uuid4())
         try:
             os.makedirs(filepath)
         except FileExistsError:
             pass
-        
         uploadName = filename.replace("/", "_").replace("\\", "_")
         name, ext = os.path.splitext(filename.replace("/", "_"))
         ext = ext.replace("/","_")
         basename = os.path.basename(name)
+        if attachment_id != "unassigned":
+            replace = True
+            attachment_id = str(attachment_id)
+        else:
+            replace = False
+            attachment_id = str(uuid4())
         if filetype == "proof":
             if replace:
                 name = basename+".png"
@@ -1505,16 +1563,7 @@ class DBClient:
             else:
                 name = attachment_id+name
             full_filepath = os.path.join(filepath, attachment_id+name)
-        with open(full_filepath, "wb") as f:
-            f.write(file_stream.read())
-        dbclient.updateInDb(pentest, "attachments", {"attachment_id": attachment_id}, {"$set": {"name": name, "uploadName":uploadName, "type": filetype, "attached_to": attached_to}}, many=False, notify=True, upsert=True)
-        if filetype == "proof":
-            im1 = Image.open(full_filepath)
-            im1.save(full_filepath, format="png")
-            file_stream.seek(0)
-            if attached_to != "unassigned":
-                dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(attached_to)}, {"$addToSet":{"proofs":name}})
-        return {"msg":uploadName + " was successfully uploaded", "attachment_id":attachment_id}, 200, full_filepath
+        return attachment_id, uploadName, name, full_filepath
 
     def transferPentestOwnership(self, pentest: str, new_owner: str) -> bool:
         """
@@ -1528,7 +1577,7 @@ class DBClient:
             bool: True if the ownership was successfully transferred, False otherwise.
         """
         if self.client is None:
-            raise ValueError("No pentest connected")
+            raise ValueError(error_no_pentest)
         old_owner = self.getPentestOwner(pentest)
         res = self.updateInDb("pollenisator", "pentests", {"uuid": pentest}, {"$set": {"owner": new_owner}, "$addToSet": {"pentesters": old_owner}})
         return res.acknowledged
@@ -1545,7 +1594,7 @@ class DBClient:
             bool: True if the user was successfully removed, False otherwise.
         """
         if self.client is None:
-            raise ValueError("No pentest connected")
+            raise ValueError(error_no_pentest)
         res = self.updateInDb("pollenisator", "pentests", {"uuid": pentest}, {"$pull": {"pentesters": user}}, notify=True)
         return res.acknowledged
     
@@ -1561,7 +1610,7 @@ class DBClient:
             bool: True if the user was successfully added, False otherwise.
         """
         if self.client is None:
-            raise ValueError("No pentest connected")
+            raise ValueError(error_no_pentest)
         res = self.updateInDb("pollenisator", "pentests", {"uuid": pentest}, {"$addToSet": {"pentesters": user}}, notify=True)
         return res.acknowledged
     
@@ -1576,6 +1625,6 @@ class DBClient:
             bool: True if the user exists, False otherwise.
         """
         if self.client is None:
-            raise ValueError("No pentest connected")
+            raise ValueError(error_no_pentest)
         user_record = self.getUserRecordFromUsername(username)
         return user_record is not None and "_id" in user_record

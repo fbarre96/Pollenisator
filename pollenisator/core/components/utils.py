@@ -39,6 +39,21 @@ class JSONEncoder(json.JSONEncoder):
             return str(o, 'utf-8')
         return json.JSONEncoder.default(self, o)
 
+
+def detect_objectid(obj: Any) -> Any:
+    """
+    Detect if the given object is a string representation of a bson ObjectId and convert it to an ObjectId if so.
+
+    Args:
+        obj (Any): The object to check.
+
+    Returns:
+        Any: The original object if it is not a string representation of a bson ObjectId, or the corresponding bson ObjectId if it is.
+    """
+    if isinstance(obj, str) and obj.startswith('ObjectId|'):
+        return ObjectId(obj.split('ObjectId|')[1])
+    return obj
+
 class JSONDecoder(json.JSONDecoder):
     """
     JSON decoder for custom types:
@@ -73,14 +88,10 @@ class JSONDecoder(json.JSONDecoder):
         for k,v in dct.items():
             if isinstance(v, list):
                 for i, item in enumerate(v):
-                    if str(item).startswith('ObjectId|'):
-                        v[i] = ObjectId(str(item).split('ObjectId|')[1])
+                    v[i] = detect_objectid(item)
                 dct[k] = v
-            elif str(v).startswith('ObjectId|'):
-                dct[k] = ObjectId(v.split('ObjectId|')[1])
+            dct[k] = detect_objectid(v)
         return dct
-
-
 
 def loadPlugin(pluginName: str) -> Plugin:
     """
@@ -335,6 +346,56 @@ def fitNowTime(dated: Optional[str], datef: Optional[str]) -> bool:
         return False
     return today > date_start and date_end > today
 
+def setupKillTimer(timeout: Optional[Union[float, datetime]], proc: subprocess.Popen) -> Optional[float]:
+    """
+    Calculate the timeout to use for a command based on the given timeout and end date.
+
+    Args:
+        timeout (Optional[float]): The timeout in seconds.
+        proc (subprocess.Popen): The subprocess.Popen object for the command.
+
+    Returns:
+        Optional[float]: The timeout in seconds to use for the command. If datef is given and is before the current time + timeout, returns the difference between datef and current time. If datef is None or is after the current time + timeout, returns the given timeout. If both are None, returns None.
+    """
+    float_timeout = None
+    if timeout is None:
+        return float_timeout
+    if isinstance(timeout, float):
+        timer = Timer(timeout, proc.kill)
+        timer.start()
+        float_timeout = timeout
+    elif isinstance(timeout, datetime):
+        if timeout.year < datetime.now().year+1:
+            float_timeout = (timeout-datetime.now()).total_seconds()
+            timer = Timer(float_timeout, proc.kill)
+            timer.start()
+    else:
+        logger.error(
+            "ERROR in command execution: timeout must be a float or a datetime object")
+    return float_timeout
+
+def handle_print(printStdout: bool, raw_stdout: bytes, raw_stderr: bytes) -> None:
+    """
+    Handle the printing of the stdout and stderr of a command.
+
+    Args:
+        printStdout (bool): A boolean indicating if the stdout should be printed.
+        raw_stdout (bytes): The raw stdout of the command.
+        raw_stderr (bytes): The raw stderr of the command.
+    """
+    if not printStdout:
+        return
+    try:
+        stdout = raw_stdout.decode('utf-8')
+        stderr = raw_stderr.decode('utf-8')
+        if str(stdout) != "":
+            print(str(stdout))
+        if str(stderr) != "":
+            print(str(stderr))
+    except UnicodeDecodeError:
+        print("Error decoding command output")
+        print(raw_stdout)
+        print(raw_stderr)
 
 def execute(command: str, timeout: Optional[Union[float, datetime]] = None, printStdout: bool = True) -> int:
     """
@@ -358,28 +419,9 @@ def execute(command: str, timeout: Optional[Union[float, datetime]] = None, prin
         float_timeout = None
         timer = None
         try:
-            if timeout is not None:
-                if isinstance(timeout, float):
-                    timer = Timer(timeout, proc.kill)
-                    timer.start()
-                    float_timeout = timeout
-                elif isinstance(timeout, datetime):
-                    if timeout.year < datetime.now().year+1:
-                        float_timeout = (timeout-datetime.now()).total_seconds()
-                        timer = Timer(float_timeout, proc.kill)
-                        timer.start()
-                else:
-                    logger.error(
-                        "ERROR in command execution: timeout must be a float or a datetime object")
-                    return -1
+            float_timeout = setupKillTimer(timeout, proc)
             raw_stdout, raw_stderr = proc.communicate(None, float_timeout)
-            if printStdout:
-                stdout = raw_stdout.decode('utf-8')
-                stderr = raw_stderr.decode('utf-8')
-                if str(stdout) != "":
-                    print(str(stdout))
-                if str(stderr) != "":
-                    print(str(stderr))
+            handle_print(printStdout, raw_stdout, raw_stderr)
         except Exception as e:
             logger.error("ERROR in command execution of command %s: %s", command, e)
             proc.kill()

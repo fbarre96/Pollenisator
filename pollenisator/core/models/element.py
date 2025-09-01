@@ -2,7 +2,7 @@
 from bson.objectid import ObjectId
 from abc import ABCMeta, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, Generator, Iterator, List, Optional, Union, cast
+from typing import Any, Dict, Generator, List, Optional, Union, cast
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.tag import Tag
 from pollenisator.server.modules.activedirectory.computer_infos import ComputerInfos
@@ -274,24 +274,31 @@ class Element(metaclass=AbstractMetaElement):
         """
         tags = self.getTags()
         newTag = Tag(newTag)
-        if newTag.name not in [tag.name for tag in tags]:
-            dbclient = DBClient.getInstance()
-            for group in dbclient.getTagsGroups():
-                if newTag in group:
-                    i = 0
-                    len_tags = len(tags)
-                    while i < len_tags:
-                        if tags[i] in group:
-                            if override:
-                                tags.remove(tags[i])
-                                i -= 1
-                            else:
-                                continue
-                        len_tags = len(tags)
-                        i += 1
-            tags.append(newTag)
-            self.setTags(tags)
-            dbclient.doRegisterTag(self.pentest, newTag)
+        if newTag.name in [tag.name for tag in tags]:
+            return
+        dbclient = DBClient.getInstance()
+        for group in dbclient.getTagsGroups():
+            self.handle_tag_group(tags, newTag, group, override)
+        tags.append(newTag)
+        self.setTags(tags)
+        dbclient.doRegisterTag(self.pentest, newTag)
+
+    def handle_tag_group(self, tags: List[Tag], newTag: Tag, group: List[str], override: bool) -> None:
+        """
+        Handle the addition of a new tag by checking for conflicts within a group of tags.
+        """
+        if newTag in group:
+            i = 0
+            len_tags = len(tags)
+            while i < len_tags:
+                if tags[i] in group:
+                    if override:
+                        tags.remove(tags[i])
+                        i -= 1
+                    else:
+                        continue
+                len_tags = len(tags)
+                i += 1
 
     def delTag(self, tag: str) -> None:
         """Delete the given tag name in model if it has it
@@ -391,9 +398,9 @@ class Element(metaclass=AbstractMetaElement):
             target_data (Dict[str, Any]): The target data to which the defects will be added.
         """
         from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
-        from pollenisator.core.models.defect import Defect
 
-        checkitems = CheckItem.fetchObjects("pollenisator", {
+        # Build MongoDB query for defects with matching tag name
+        query = {
             "defect_tags": {
                 "$elemMatch": {
                     "$elemMatch": {
@@ -401,32 +408,125 @@ class Element(metaclass=AbstractMetaElement):
                     }
                 }
             }
-        })
+        }
+        
+        checkitems = CheckItem.fetchObjects("pollenisator", query)
         if checkitems is None:
             return
+
+        # Get pentest language setting once
+        pentest_language = cls._get_pentest_language(pentest)
+        
+        # Process each check item and its associated defects
+        for check_item in checkitems:
+            cls._process_check_item_defects(pentest, tag, target_data, check_item, pentest_language)
+
+    @classmethod
+    def _get_pentest_language(cls, pentest: str) -> Optional[str]:
+        """
+        Retrieves the language setting for the given pentest.
+        
+        Args:
+            pentest (str): The name of the pentest.
+            
+        Returns:
+            Optional[str]: The language setting or None if not found.
+        """
         dbclient = DBClient.getInstance()
-        pentest_lang: Optional[str] = None
-        pentest_lang_setting = dbclient.findInDb(pentest, "settings", {"key":"lang"}, False)
-        if pentest_lang_setting is not None:
-            pentest_lang = pentest_lang_setting.get("value")
-        for check in checkitems:
-            for defect_tag in check.defect_tags:
-                if defect_tag[0] == tag.name:
-                    defect_to_add = defect_tag[1]
-                    defect = Defect.fetchObject("pollenisator", {"_id":ObjectId(defect_to_add)})
-                    if defect is not None:
-                        defect = cast(Defect, defect)
-                        if pentest_lang is not None and pentest_lang != "" and pentest_lang != defect.language:
-                            continue
-                        new_defect_data = defect.getData()
-                        new_defect_data["ip"] = target_data.get("target_data", {}).get("ip", "")
-                        new_defect_data["port"] = target_data.get("target_data", {}).get("port", "")
-                        new_defect_data["proto"] = target_data.get("target_data", {}).get("proto", "")
-                        new_defect_data["target_id"] = target_data.get("target_id")
-                        new_defect_data["target_type"] = target_data.get("target_type")
-                        new_defect_data["notes"] = tag.notes
-                        newDefect = Defect(pentest, new_defect_data)
-                        newDefect.addInDb()
+        lang_setting = dbclient.findInDb(pentest, "settings", {"key": "lang"}, False)
+        return lang_setting.get("value") if lang_setting else None
+
+    @classmethod
+    def _process_check_item_defects(cls, pentest: str, tag: Tag, target_data: Dict[str, Any], 
+                                  check_item: Any, pentest_language: Optional[str]) -> None:
+        """
+        Processes defects for a specific check item.
+        
+        Args:
+            pentest (str): The name of the pentest.
+            tag (Tag): The tag associated with the defects.
+            target_data (Dict[str, Any]): The target data to which the defects will be added.
+            check_item: The check item containing defect tags.
+            pentest_language (Optional[str]): The pentest language setting.
+        """
+        from pollenisator.core.models.defect import Defect
+        
+        for defect_tag in check_item.defect_tags:
+            if not cls._is_matching_defect_tag(defect_tag, tag.name):
+                continue
+                
+            defect_id = defect_tag[1]
+            defect = Defect.fetchObject("pollenisator", {"_id": ObjectId(defect_id)})
+            
+            if defect is None:
+                continue
+                
+            defect = cast(Defect, defect)
+            
+            # Skip defect if language doesn't match pentest language
+            if not cls._should_include_defect(defect, pentest_language):
+                continue
+                
+            cls._create_new_defect(pentest, tag, target_data, defect)
+
+    @classmethod
+    def _is_matching_defect_tag(cls, defect_tag: List[str], tag_name: str) -> bool:
+        """
+        Checks if a defect tag matches the given tag name.
+        
+        Args:
+            defect_tag (List[str]): The defect tag tuple [tag_name, defect_id].
+            tag_name (str): The tag name to match.
+            
+        Returns:
+            bool: True if the defect tag matches, False otherwise.
+        """
+        return len(defect_tag) >= 2 and defect_tag[0] == tag_name
+
+    @classmethod
+    def _should_include_defect(cls, defect: Any, pentest_language: Optional[str]) -> bool:
+        """
+        Determines if a defect should be included based on language matching.
+        
+        Args:
+            defect: The defect object to check.
+            pentest_language (Optional[str]): The pentest language setting.
+            
+        Returns:
+            bool: True if the defect should be included, False otherwise.
+        """
+        if pentest_language is None or pentest_language == "":
+            return True
+        return defect.language == pentest_language
+
+    @classmethod
+    def _create_new_defect(cls, pentest: str, tag: Tag, target_data: Dict[str, Any], template_defect: Any) -> None:
+        """
+        Creates a new defect based on a template defect and target data.
+        
+        Args:
+            pentest (str): The name of the pentest.
+            tag (Tag): The tag associated with the defect.
+            target_data (Dict[str, Any]): The target data for the new defect.
+            template_defect: The template defect to base the new defect on.
+        """
+        from pollenisator.core.models.defect import Defect
+        
+        new_defect_data = template_defect.getData()
+        target_info = target_data.get("target_data", {})
+        
+        # Update defect data with target-specific information
+        new_defect_data.update({
+            "ip": target_info.get("ip", ""),
+            "port": target_info.get("port", ""),
+            "proto": target_info.get("proto", ""),
+            "target_id": target_data.get("target_id"),
+            "target_type": target_data.get("target_type"),
+            "notes": tag.notes
+        })
+        
+        new_defect = Defect(pentest, new_defect_data)
+        new_defect.addInDb()
 
     @classmethod
     def add_tag_check(cls, pentest: str, lvls: List[str], infos: Dict[str, Any]) -> None:
@@ -482,25 +582,149 @@ class Element(metaclass=AbstractMetaElement):
             check_item (CheckItem): The check item to be applied.
         """
         from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
+        
         check_item = cast(CheckItem, check_item_any)
+        
+        # Only process tag:onAdd triggers
+        if not check_item.lvl.startswith("tag:onAdd:"):
+            return
+            
+        # Extract tag name from level string (format: "tag:onAdd:tagname")
+        tag_target = cls._extract_tag_from_level(check_item.lvl)
+        if not tag_target:
+            return
+            
         dbclient = DBClient.getInstance()
-        if check_item.lvl.startswith("tag:onAdd:"):
-            tag_test = check_item.lvl.split(":")[2]
-            taggeds = dbclient.findInDb(pentest, "tags", {}, True)
-            for tagged in taggeds:
-                for tag_name in tagged.get("tags", []):
-                    if not isinstance(tag_name, str):
-                        tag_name = tag_name[0]
-                    if tag_name != tag_test:
-                        continue
-                    element_cls = cls.classFactory(tagged.get("item_type",""))
-                    if element_cls is None:
-                        raise ValueError("Element class not found for type "+str(tagged.get("item_type","")))
-                    item_tagged = element_cls.fetchObject(pentest, {"_id":ObjectId(tagged.get("item_id"))})
-                    if item_tagged is None:
-                        continue
-                    infos = {"target_iid":ObjectId(item_tagged.getId()), "target_type":tagged.get("item_type",""), "tags":tagged, "target_data":item_tagged.getData()}
-                    cls.add_tag_check(pentest, [check_item.lvl], infos)
+        tagged_items = dbclient.findInDb(pentest, "tags", {}, True)
+        
+        if not tagged_items:
+            return
+            
+        for tagged_item in tagged_items:
+            cls._process_tagged_item(pentest, tagged_item, tag_target, check_item.lvl)
+    
+    @classmethod
+    def _extract_tag_from_level(cls, level: str) -> Optional[str]:
+        """
+        Extracts the tag name from a level string in format "tag:onAdd:tagname".
+        
+        Args:
+            level (str): The level string to parse.
+            
+        Returns:
+            Optional[str]: The extracted tag name, or None if parsing fails.
+        """
+        parts = level.split(":")
+        return parts[2] if len(parts) >= 3 else None
+    
+    @classmethod
+    def _process_tagged_item(cls, pentest: str, tagged_item: Dict[str, Any], 
+                           target_tag: str, check_level: str) -> None:
+        """
+        Processes a single tagged item, applying checks if it matches the target tag.
+        
+        Args:
+            pentest (str): The name of the pentest.
+            tagged_item (Dict[str, Any]): The tagged item from database.
+            target_tag (str): The tag we're looking for.
+            check_level (str): The check level to apply.
+        """
+        tag_names = cls._extract_tag_names(tagged_item)
+        
+        if target_tag not in tag_names:
+            return
+            
+        # Get the element class and fetch the tagged object
+        element_cls = cls._get_element_class(tagged_item)
+        if element_cls is None:
+            return
+            
+        item_tagged = cls._fetch_tagged_object(pentest, element_cls, tagged_item)
+        if item_tagged is None:
+            return
+            
+        # Apply the check to the tagged item
+        cls._apply_check_to_item(pentest, tagged_item, item_tagged, check_level)
+    
+    @classmethod
+    def _extract_tag_names(cls, tagged_item: Dict[str, Any]) -> List[str]:
+        """
+        Extracts tag names from a tagged item, handling both string and tuple formats.
+        
+        Args:
+            tagged_item (Dict[str, Any]): The tagged item from database.
+            
+        Returns:
+            List[str]: List of tag names.
+        """
+        tag_names = []
+        for tag_data in tagged_item.get("tags", []):
+            if isinstance(tag_data, str):
+                tag_names.append(tag_data)
+            else:
+                # Handle tuple/list format where tag name is first element
+                tag_names.append(tag_data[0])
+        return tag_names
+    
+    @classmethod
+    def _get_element_class(cls, tagged_item: Dict[str, Any]) -> Optional['Element']:
+        """
+        Gets the element class for the tagged item.
+        
+        Args:
+            tagged_item (Dict[str, Any]): The tagged item from database.
+            
+        Returns:
+            Optional['Element']: The element class, or None if not found.
+        """
+        item_type = tagged_item.get("item_type", "")
+        element_cls = cls.classFactory(item_type)
+        
+        if element_cls is None:
+            raise ValueError(f"Element class not found for type '{item_type}'")
+            
+        return element_cls
+    
+    @classmethod
+    def _fetch_tagged_object(cls, pentest: str, element_cls: 'Element', 
+                           tagged_item: Dict[str, Any]) -> Optional['Element']:
+        """
+        Fetches the actual object that was tagged.
+        
+        Args:
+            pentest (str): The name of the pentest.
+            element_cls ('Element'): The class of the element to fetch.
+            tagged_item (Dict[str, Any]): The tagged item from database.
+            
+        Returns:
+            Optional['Element']: The fetched object, or None if not found.
+        """
+        item_id = tagged_item.get("item_id")
+        if not item_id:
+            return None
+            
+        return element_cls.fetchObject(pentest, {"_id": ObjectId(item_id)})
+    
+    @classmethod
+    def _apply_check_to_item(cls, pentest: str, tagged_item: Dict[str, Any], 
+                           item_tagged: 'Element', check_level: str) -> None:
+        """
+        Applies the check to a specific tagged item.
+        
+        Args:
+            pentest (str): The name of the pentest.
+            tagged_item (Dict[str, Any]): The tagged item from database.
+            item_tagged ('Element'): The actual tagged object.
+            check_level (str): The check level to apply.
+        """
+        target_info = {
+            "target_iid": ObjectId(item_tagged.getId()),
+            "target_type": tagged_item.get("item_type", ""),
+            "tags": tagged_item,
+            "target_data": item_tagged.getData()
+        }
+        
+        cls.add_tag_check(pentest, [check_level], target_info)
 
     @classmethod
     def getTriggers(cls) -> List[str]:

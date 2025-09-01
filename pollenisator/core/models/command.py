@@ -115,7 +115,7 @@ class Command(Element):
         if self.indb == "pollenisator":
             pentest_uuids = dbclient.listPentestUuids()
             if pentest_uuids is not None:
-                pentests.union(pentest_uuids)
+                pentests = pentests.union(pentest_uuids)
         else:
             pentests.add(self.indb)
 

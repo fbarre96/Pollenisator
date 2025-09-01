@@ -16,7 +16,7 @@ from pollenisator.core.models.tool import Tool
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.modules.cheatsheet.checkinstance import CheckInstance, getTargetRepr
 from pollenisator.server.permission import permission
-from pollenisator.core.components.utils import JSONDecoder
+from pollenisator.core.components.utils import JSONDecoder, detect_objectid
 from pollenisator.core.components.socketmanager import SocketManager
 import bson
 import tempfile
@@ -47,7 +47,8 @@ def insert(body: Dict[str, Any]) -> Union[ErrorStatus, CheckItemInsertResult]:
                 return "defect_tags must be a list of list of 2 values : string, ObjectId", 400
             if not isinstance(defect_tag[1], ObjectId):
                 if isinstance(defect_tag[1], str):
-                    defect_tag[1] = ObjectId(defect_tag[1].replace("ObjectId|",""))
+                    oid = detect_objectid(defect_tag[1])
+                    defect_tag[1] = ObjectId(oid)
                 else:
                     return "defect_tags must be a list of list of 2 values : string, ObjectId", 400
                 

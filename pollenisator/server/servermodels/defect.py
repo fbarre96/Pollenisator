@@ -8,7 +8,7 @@ from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.defect import Defect
 from pollenisator.server.permission import permission
-from pollenisator.core.components.utils import  JSONDecoder, JSONEncoder
+from pollenisator.core.components.utils import  JSONDecoder, JSONEncoder, detect_objectid
 import json
 import datetime
 DefectInsertResult = TypedDict('DefectInsertResult', {'res': bool, 'iid': ObjectId})
@@ -451,10 +451,7 @@ def findDefectTemplate(body: Dict[str, Any]) -> Union[Dict[str, Any], Tuple[str,
     """
     dbclient = DBClient.getInstance()
     if "_id" in body:
-        if str(body["_id"]).startswith("ObjectId|"):
-            body["_id"] = ObjectId(body["_id"].split("|")[1])
-        else:
-            body["_id"] = ObjectId(body["_id"])
+        body["_id"] = ObjectId(detect_objectid(body["_id"]))
     res = dbclient.findInDb("pollenisator", "defects", body, False)
     if res is not None:
         return res
@@ -585,10 +582,7 @@ def getTargetRepr(pentest: str, body: Union[str, List[str]]) -> Union[Tuple[str,
         return "Invalid input", 400
     iids_list = []
     for str_iid in body:
-        if "ObjectId|" in str_iid:
-            iid = ObjectId(str_iid.split("ObjectId|")[1])
-        else:
-            iid = ObjectId(str_iid)
+        iid = ObjectId(detect_objectid(str_iid))
         iids_list.append(iid)
     defects = Defect.fetchObjects(pentest, {"_id": {"$in": iids_list}})
     ret: Dict[str, str] = {}

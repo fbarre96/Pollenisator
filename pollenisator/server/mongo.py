@@ -17,7 +17,7 @@ import werkzeug
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.parser import Parser, ParseError, Term
 from pollenisator.core.components.tag import Tag
-from pollenisator.core.components.utils import JSONDecoder, getMainDir, isIp, JSONEncoder
+from pollenisator.core.components.utils import JSONDecoder, getMainDir, isIp, JSONEncoder, detect_objectid
 from pollenisator.core.models.command import Command
 from pollenisator.core.models.defect import Defect
 from pollenisator.core.models.element import Element
@@ -26,7 +26,6 @@ from pollenisator.core.models.scope import Scope
 from pollenisator.core.models.wave import Wave
 from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.permission import permission
-from pollenisator.server.servermodels.command import update as update_command
 from pollenisator.core.components.logger_config import logger
 
 dbclient = DBClient.getInstance()
@@ -422,10 +421,7 @@ def bulk_delete(pentest: str, body: Union[str, Dict[str, List[str]]]) -> Union[i
     deleted = 0
     for obj_type in data:
         for obj_id_str in data[obj_type]:
-            if not isinstance(obj_id_str, ObjectId) and str(obj_id_str).startswith("ObjectId|"):
-                obj_id = ObjectId(str(obj_id_str).split("ObjectId|")[1])
-            else:
-                obj_id = ObjectId(obj_id_str)
+            obj_id = detect_objectid(obj_id_str)
             res = dbclient.deleteFromDb(pentest, obj_type, {"_id": ObjectId(obj_id)}, False, True)
             if res is not None:
                 deleted += res
@@ -455,13 +451,7 @@ def bulk_delete_commands(body: Union[str, Dict[str, List[str]]], **kwargs: Dict[
         if obj_type != "commands":
             return "You can delete only commands", 403
         for obj_id_str in data[obj_type]:
-            if not isinstance(obj_id_str, ObjectId):
-                if obj_id_str.startswith("ObjectId|"):
-                    obj_id = ObjectId(obj_id_str.split("ObjectId|")[1])
-                else:
-                    obj_id = ObjectId(obj_id_str)
-            else:
-                obj_id = ObjectId(obj_id_str)
+            obj_id = detect_objectid(obj_id_str)
             res = dbclient.deleteFromDb("pollenisator", obj_type, {"_id": ObjectId(obj_id)}, False, True)
             if res is not None:
                 deleted += res
@@ -1088,10 +1078,10 @@ def dumpDb(dbName: str, collection: str = "") -> Union[ErrorStatus, Response]:
     if isinstance(export_path, tuple):
         return export_path
     # send_file differs between python versions, so we need to handle it carefully
-    try:
-        response = send_file(export_path, mimetype="application/zip", attachment_filename=os.path.basename(export_path))
-    except TypeError as _e: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
-        response = send_file(export_path, mimetype="application/zip", as_attachment=True, download_name=os.path.basename(export_path))
+    # try:
+    #     response = send_file(export_path, mimetype="application/zip", attachment_filename=os.path.basename(export_path))
+    # except TypeError as _e: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
+    response = send_file(export_path, mimetype="application/zip", as_attachment=True, download_name=os.path.basename(export_path))
     response.call_on_close(lambda: shutil.rmtree(dirpath))
     return response
 
@@ -1129,10 +1119,9 @@ def importDb(upfile: Union[str,werkzeug.datastructures.FileStorage], **kwargs: D
     if not isinstance(upfile, str):
         if upfile.filename is None:
             return "Invalid filename", 400
-        temp_name = tempfile.mktemp()
-        tmpfile = os.path.join(dirpath, os.path.basename(temp_name))
-        with open(tmpfile, "wb") as f:
-            f.write(upfile.stream.read())
+        with tempfile.NamedTemporaryFile(dir=dirpath, delete=False) as temp_file:
+            tmpfile = temp_file.name
+            temp_file.write(upfile.stream.read())
     else:
         tmpfile = upfile
     
