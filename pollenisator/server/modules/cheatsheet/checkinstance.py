@@ -1,7 +1,7 @@
 """
 Instanciation of a checkItem, with a target and a status
 """
-from typing import Callable, Generator, Iterable, Iterator, List, Optional, Dict, Any, Set, Union, Tuple, cast
+from typing import Callable, Generator, Iterable, List, Optional, Dict, Any, Set, Union, Tuple, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
@@ -252,88 +252,190 @@ class CheckInstance(Element):
         Returns:
             Optional[List[CheckInstance]]: A list of inserted CheckInstance objects, None if no checks were added.
         """
+        # Get pentest type setting
         dbclient = DBClient.getInstance()
-        pentest_type = dbclient.findInDb(pentest, "settings", {"key":"pentest_type"}, False)
-        pentest_type = None if pentest_type is None else pentest_type.get("value", None)
-        checks = CheckItem.fetchObjects("pollenisator", {"lvl":{"$in":lvls}, "pentest_types":pentest_type})
+        pentest_type_setting = dbclient.findInDb(pentest, "settings", {"key": "pentest_type"}, False)
+        pentest_type = None if pentest_type_setting is None else pentest_type_setting.get("value", None)
+        
+        # Fetch relevant check items
+        checks = CheckItem.fetchObjects("pollenisator", {"lvl": {"$in": lvls}, "pentest_types": pentest_type})
         if checks is None:
-            return
-        checks_to_add = []
-        targets = list(targets)
+            return None
+            
+        # Convert targets to list for multiple iterations
+        targets_list = list(targets)
+        
+        # Build lookup tables for checks and commands
+        checks_lkp = {str(check.getId()): check for check in checks}
         commands_pentest = Command.fetchObjects(pentest, {})
-        checks_lkp: Dict[str, CheckItem] = {str(check.getId()): check for check in checks}
-        commands_lkp: Dict[str, Command] = {str(command_pentest.original_iid): command_pentest for command_pentest in commands_pentest}
-        check_command_lkp: Dict[str, List[Command]] = {}
-        for checkItem in checks_lkp.values():
+        commands_lkp = {str(command.original_iid): command for command in commands_pentest}
+        
+        # Prepare data structures
+        checks_to_add = []
+        check_command_lkp: Dict[str, List[Command]]  = {}
+        
+        # Create check instances and build command lookup
+        for check_item in checks_lkp.values():
+            # Determine impacted targets
             if callable(f_get_impacted_targets):
-                subset = f_get_impacted_targets(checkItem, targets)
+                impacted_targets = f_get_impacted_targets(check_item, targets_list)
             else:
-                subset = targets
-            for target in subset:
-                checkinstance = CheckInstance(pentest).initialize(ObjectId(checkItem.getId()), ObjectId(target.getId()), targets_type, "", "", None)
-                checks_to_add.append(checkinstance)
-            for command in checkItem.commands:
-                if commands_lkp.get(str(command), None) is not None:
-                    check_command_lkp[str(checkItem.getId())] = check_command_lkp.get(str(checkItem.getId()), []) + [commands_lkp[str(command)]]
-                else:
-                    check_command_lkp[str(checkItem.getId())] = check_command_lkp.get(str(checkItem.getId()), [])
+                impacted_targets = targets_list
+                
+            # Create check instances for each target
+            for target in impacted_targets:
+                check_instance = CheckInstance(pentest).initialize(
+                    ObjectId(check_item.getId()), 
+                    ObjectId(target.getId()), 
+                    targets_type, 
+                    "", 
+                    "", 
+                    None
+                )
+                checks_to_add.append(check_instance)
+                
+            # Build command lookup for this check item
+            check_item_id = str(check_item.getId())
+            check_command_lkp[check_item_id] = []
+            
+            for command_id in check_item.commands:
+                command = commands_lkp.get(str(command_id))
+                if command is not None:
+                    check_command_lkp[check_item_id].append(command)
+        
         if not checks_to_add:
             return None
-        lkp = {}
+            
+        # Prepare data for bulk insertion
+        insertion_data = {}
         check_keys = set()
         or_conditions = []
-        for check in checks_to_add:
-            hashable_key = check.getHashableDbKey()
-            lkp[hashable_key] = check.getData()
-            del lkp[hashable_key]["_id"]
-            lkp[hashable_key]["type"] = "checkinstance"
+        
+        for check_instance in checks_to_add:
+            hashable_key = check_instance.getHashableDbKey()
+            data = check_instance.getData()
+            
+            # Prepare data for insertion
+            if "_id" in data:
+                del data["_id"]
+            data["type"] = "checkinstance"
+            
+            insertion_data[hashable_key] = data
             check_keys.add(hashable_key)
-            or_conditions.append(check.getDbKey())
+            or_conditions.append(check_instance.getDbKey())
+        
+        # Create index and filter existing checks
         dbclient.create_index(pentest, "checkinstances", [("check_iid", 1), ("target_iid", 1), ("target_type", 1)])
         existing_checks = CheckInstance.fetchObjects(pentest, {"$or": or_conditions})
-        existing_checks_as_keys = set([]) if existing_checks is None else set([ existing_check.getHashableDbKey() for existing_check in existing_checks])
-        to_add = check_keys - existing_checks_as_keys
-        things_to_insert = [lkp[check] for check in to_add]
-        #UPDATE EXISTING
-        # Insert new
-        if not things_to_insert:
+        existing_keys = set() if existing_checks is None else {check.getHashableDbKey() for check in existing_checks}
+        
+        # Determine new checks to insert
+        keys_to_add = check_keys - existing_keys
+        documents_to_insert = [insertion_data[key] for key in keys_to_add]
+        
+        if not documents_to_insert:
             return None
-        res = dbclient.insertManyInDb(pentest, CheckInstance.coll_name, things_to_insert)
-        values = res.inserted_ids
-        current_slice = 0
-        nb_values = len(values)
-        checks_inserted: List[CheckInstance] = []
-        while current_slice < nb_values:
-            top_of_slice = min(current_slice + 1000000, nb_values)
-            checks_inserted += [cast(CheckInstance, check) for check in CheckInstance.fetchObjects(pentest, {"_id":{"$in":values[current_slice:top_of_slice]}})]
-            current_slice += 1000000
-
+            
+        # Insert new check instances
+        insert_result = dbclient.insertManyInDb(pentest, CheckInstance.coll_name, documents_to_insert)
+        inserted_ids = insert_result.inserted_ids
+        
+        # Retrieve inserted check instances in batches
+        checks_inserted = cls._retrieve_inserted_checks_in_batches(pentest, inserted_ids)
+        
         if not checks_inserted:
             return None
-        # for each commands, add the tool
-        tools_to_add = []
-        #for checkitem_id, commands in check_command_lkp.items():
-        return_checkinstances = []
-        for check in checks_inserted:
-            return_checkinstances.append(check)
-            checkitem_id = check.check_iid
-            checkItem_o = checks_lkp.get(str(check.check_iid), None)
-            if checkItem_o is None:
-                lvl = "unknown"
-            else:
-                lvl = checkItem_o.lvl
-            commands = check_command_lkp.get(str(checkitem_id), [])
-            for command_o in commands:
-                tool_model = tool.Tool(pentest)
-                for target in targets:
-                    targetdata = target.getData()
-                    tool_model.initialize(ObjectId(command_o.getId()), ObjectId(check.getId()), targetdata.get("wave", ""), command_o.name, targetdata.get("scope", ""), targetdata.get("ip", ""), targetdata.get("port", ""),
-                                                targetdata.get("proto", ""), lvl, infos=toolInfos)
-                    tools_to_add.append(tool_model)
+            
+        # Create associated tools
+        tools_to_add = cls._create_tools_for_check_instances(
+            pentest, checks_inserted, targets_list, checks_lkp, check_command_lkp, toolInfos
+        )
+        
         if tools_to_add:
             tool.Tool.bulk_insert(pentest, tools_to_add)
 
-        return return_checkinstances
+        return checks_inserted
+    
+    @classmethod
+    def _retrieve_inserted_checks_in_batches(cls, pentest: str, inserted_ids: List[ObjectId], batch_size: int = 1000000) -> List['CheckInstance']:
+        """
+        Retrieve inserted check instances in batches to handle large datasets.
+        
+        Args:
+            pentest (str): The name of the pentest.
+            inserted_ids (List[ObjectId]): List of inserted check instance IDs.
+            batch_size (int): Size of each batch for retrieval.
+            
+        Returns:
+            List[CheckInstance]: List of retrieved check instances.
+        """
+        checks_inserted = []
+        total_ids = len(inserted_ids)
+        current_offset = 0
+        
+        while current_offset < total_ids:
+            batch_end = min(current_offset + batch_size, total_ids)
+            batch_ids = inserted_ids[current_offset:batch_end]
+            
+            batch_checks = CheckInstance.fetchObjects(pentest, {"_id": {"$in": batch_ids}})
+            if batch_checks is not None:
+                checks_inserted.extend([cast(CheckInstance, check) for check in batch_checks])
+                
+            current_offset += batch_size
+            
+        return checks_inserted
+    
+    @classmethod
+    def _create_tools_for_check_instances(cls, pentest: str, checks_inserted: List['CheckInstance'], targets_list: List, 
+                                        checks_lkp: Dict[str, CheckItem], check_command_lkp: Dict[str, List[Command]], 
+                                        toolInfos: Optional[Dict[str, Any]]) -> List:
+        """
+        Create tools for the inserted check instances.
+        
+        Args:
+            pentest (str): The name of the pentest.
+            checks_inserted (List[CheckInstance]): List of inserted check instances.
+            targets_list (List): List of targets.
+            checks_lkp (Dict[str, CheckItem]): Lookup table for check items.
+            check_command_lkp (Dict[str, List[Command]]): Lookup table for commands by check item.
+            toolInfos (Optional[Dict[str, Any]]): Additional tool information.
+            
+        Returns:
+            List: List of tools to be added.
+        """
+        tools_to_add = []
+        
+        for check_instance in checks_inserted:
+            check_item_id = str(check_instance.check_iid)
+            check_item = checks_lkp.get(check_item_id)
+            
+            # Determine level
+            level = check_item.lvl if check_item else "unknown"
+            
+            # Get commands for this check item
+            commands = check_command_lkp.get(check_item_id, [])
+            
+            # Create tools for each command and target combination
+            for command in commands:
+                for target in targets_list:
+                    target_data = target.getData()
+                    
+                    tool_model = tool.Tool(pentest)
+                    tool_model.initialize(
+                        ObjectId(command.getId()),
+                        ObjectId(check_instance.getId()),
+                        target_data.get("wave", ""),
+                        command.name,
+                        target_data.get("scope", ""),
+                        target_data.get("ip", ""),
+                        target_data.get("port", ""),
+                        target_data.get("proto", ""),
+                        level,
+                        infos=toolInfos
+                    )
+                    tools_to_add.append(tool_model)
+        
+        return tools_to_add
 
 
     @classmethod
@@ -431,38 +533,9 @@ class CheckInstance(Element):
         tools_to_add = tool.Tool.fetchObjects(self.pentest, {"check_iid": ObjectId(self.getId())})
         if tools_to_add is not None:
             for tool_model in tools_to_add:
-                tool_model = cast(tool.Tool, tool_model)
-                if "done" in tool_model.getStatus():
-                    done += 1
-                    at_least_one = True
-                    data["tools_done"][str(tool_model.getId())] = tool_model.getData()
-                    data["tools_done"][str(tool_model.getId())]["tags"] = tool_model.getTags()
-                elif "running" in tool_model.getStatus():
-                    at_least_one = True
-                    data["tools_running"][str(
-                        tool_model.getId())] = tool_model.getData()
-                    data["tools_running"][str(tool_model.getId())]["detailed_string"] = tool_model.getDetailedString()
-                elif "error" in tool_model.getStatus():
-                    data["tools_error"][str(
-                        tool_model.getId())] = tool_model.getData()
-                else:
-                    data["tools_not_done"][str(
-                        tool_model.getId())] = tool_model.getData()
-                    command_line = tool_model.getCommandLine()
-                    if isinstance(command_line, tuple):
-                        data["tools_not_done"][str(
-                            tool_model.getId())]["commandline"] = None
-                    else:
-                        data["tools_not_done"][str(
-                            tool_model.getId())]["commandline"] = tool_model.getCommandLine()
-                    command_line_multi = tool_model.getCommandLineMulti()
-                    if isinstance(command_line_multi, tuple):
-                        data["tools_not_done"][str(
-                            tool_model.getId())]["commandline_multi"] = None
-                    else:
-                        data["tools_not_done"][str(
-                            tool_model.getId())]["commandline_multi"] = tool_model.getCommandLineMulti()
-
+                running_or_done, is_done = self._add_tool_information(data, cast(tool.Tool, tool_model))
+                at_least_one = at_least_one or running_or_done
+                done += 1 if is_done else 0
                 total += 1
 
         if done != total:
@@ -481,6 +554,47 @@ class CheckInstance(Element):
         data["forced_status"] = self.status
         return data
 
+    def _add_tool_information(self, data: Dict[str, Any], tool_model: 'tool.Tool') -> Tuple[bool, bool]:
+        """
+        Add tool information to the provided data dictionary.
+        Args:
+            data (Dict[str, Any]): The data dictionary to update.
+            tool_model (tool.Tool): The tool model to extract information from.
+        Returns:
+            Tuple[bool, bool]: A tuple indicating if the tool is done or running and if it is done.
+        """
+        if "done" in tool_model.getStatus():
+            data["tools_done"][str(tool_model.getId())] = tool_model.getData()
+            data["tools_done"][str(tool_model.getId())]["tags"] = tool_model.getTags()
+            return True, True
+        elif "running" in tool_model.getStatus():
+            data["tools_running"][str(
+                        tool_model.getId())] = tool_model.getData()
+            data["tools_running"][str(tool_model.getId())]["detailed_string"] = tool_model.getDetailedString()
+            return True, False
+        if "error" in tool_model.getStatus():
+            data["tools_error"][str(
+                        tool_model.getId())] = tool_model.getData()
+        else:
+            data["tools_not_done"][str(
+                        tool_model.getId())] = tool_model.getData()
+            command_line = tool_model.getCommandLine()
+            if isinstance(command_line, tuple):
+                data["tools_not_done"][str(
+                            tool_model.getId())]["commandline"] = None
+            else:
+                data["tools_not_done"][str(
+                            tool_model.getId())]["commandline"] = tool_model.getCommandLine()
+            command_line_multi = tool_model.getCommandLineMulti()
+            if isinstance(command_line_multi, tuple):
+                data["tools_not_done"][str(
+                            tool_model.getId())]["commandline_multi"] = None
+            else:
+                data["tools_not_done"][str(
+                            tool_model.getId())]["commandline_multi"] = tool_model.getCommandLineMulti()
+        return False, False
+                    
+
     def updateInfosCheck(self, check_item: Optional['CheckItem'] = None) -> Optional[ErrorStatus]:
         """
         Update the information of the CheckInstance.
@@ -498,11 +612,27 @@ class CheckInstance(Element):
         data = self.getData()
         check_item_data = check_item.getData()
         data["check_item"] = check_item_data
+        at_least_one, all_complete = self.get_tools_data(data)
+        if len(check_item.commands) > 0:
+            if at_least_one and all_complete:
+                data["status"] = "done"
+            elif at_least_one and not all_complete:
+                data["status"] = "running"
+            else:
+                data["status"] = "todo"
+        else:
+            data["status"] = ""
+        if data["status"] != "":
+            self.status = data["status"]
+            self.update()
+        return None
+
+    def get_tools_data(self, data: Dict[str, Any]) -> Tuple[bool, bool]:
         data["tools_status"] = {}
         data["tools_not_done"] = {}
         data["tools_error"] = {}
-        all_complete = True
         at_least_one = False
+        all_complete = True
         total = 0
         done = 0
         tools_to_add = tool.Tool.fetchObjects(self.pentest, {"check_iid": ObjectId(self._id)})
@@ -521,22 +651,9 @@ class CheckInstance(Element):
                     data["tools_not_done"][str(
                         tool_model.getId())] = tool_model.getDetailedString()
                 total += 1
-
         if done != total:
             all_complete = False
-        if len(check_item.commands) > 0:
-            if at_least_one and all_complete:
-                data["status"] = "done"
-            elif at_least_one and not all_complete:
-                data["status"] = "running"
-            else:
-                data["status"] = "todo"
-        else:
-            data["status"] = ""
-        if data["status"] != "":
-            self.status = data["status"]
-            self.update()
-        return None
+        return at_least_one, all_complete
 
 
 @permission("pentester")
@@ -648,12 +765,28 @@ def getTargetRepr(pentest: str, body: List[str]) -> Dict[str, str]:
     dbclient = DBClient.getInstance()
     iids_list = [ ObjectId(x) for x in body if ObjectId.is_valid(x) ]
     checkinstances = dbclient.findInDb(pentest, "checkinstances", {"_id": {"$in": iids_list}}, True)
-    ret = {}
-    elements: Dict[str, Set[ObjectId]] = {}
+    elements = _getElementsPerType(checkinstances)
+    ret = generate_target_representations(pentest, elements)
+    # Update the checkinstances with the representation string
     for data in checkinstances:
-        if data["target_type"] not in elements:
-            elements[data["target_type"]] = set()
-        elements[data["target_type"]].add(ObjectId(data["target_iid"]))
+        if str(data["_id"]) in ret:
+            data["target_repr"] = ret[str(data["_id"])]
+        else:
+            data["target_repr"] = "Target not found"
+        dbclient.updateInDb(pentest, "checkinstances", {"_id": data["_id"]}, {"$set": {"target_repr": data["target_repr"]}}, many=False, notify=True)
+
+    return ret
+
+def generate_target_representations(pentest: str, elements: Dict[str, Set[ObjectId]]) -> Dict[str, str]:
+    """
+    Generate target representations for given elements.
+    Args:
+        pentest (str): The name of the pentest.
+        elements (Dict[str, Set[ObjectId]]): A dictionary mapping element types to sets of ObjectIds.
+    Returns:
+        Dict[str, str]: A dictionary mapping CheckInstance ids to their target's representation.
+    """
+    ret = {}
     for element_type, element_iids in elements.items():
         class_element = Element.classFactory(element_type)
         if class_element is not None:
@@ -664,15 +797,22 @@ def getTargetRepr(pentest: str, body: List[str]) -> Dict[str, str]:
                 for elem in elems:
                     ret_str = elem.getDetailedString()
                     ret[str(elem.getId())] = ret_str
-    # Update the checkinstances with the representation string
-    for data in checkinstances:
-        if str(data["_id"]) in ret:
-            data["target_repr"] = ret[str(data["_id"])]
-        else:
-            data["target_repr"] = "Target not found"
-        dbclient.updateInDb(pentest, "checkinstances", {"_id": data["_id"]}, {"$set": {"target_repr": data["target_repr"]}}, many=False, notify=True)
-
     return ret
+
+def _getElementsPerType(checkinstances: List[Dict[str, Any]]) -> Dict[str, Set[ObjectId]]:
+    """
+    Get the elements per type from a list of CheckInstances.
+    Args:
+        checkinstances (List[Dict[str, Any]]): A list of CheckInstances.
+    Returns:
+        Dict[str, Set[ObjectId]]: A dictionary mapping element types to sets of ObjectIds.
+    """
+    elements: Dict[str, Set[ObjectId]] = {}
+    for data in checkinstances:
+        if data["target_type"] not in elements:
+            elements[data["target_type"]] = set()
+        elements[data["target_type"]].add(ObjectId(data["target_iid"]))
+    return elements
 
 @permission("pentester")
 def multiChangeOfStatus(pentest: str, body: Dict[str, BodyMultiChangeOfStatus]) -> ErrorStatus:
@@ -758,15 +898,17 @@ def getManyChecksData(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus,D
     if checks is None:
         return "Not found", 404
     ret = {}
-    multi_command_line_tools = {}
+    multi_command_line_tools: Dict[str, List[Dict[str, Any]]] = {}
     for check in checks:
         result = check.getCheckInstanceInformation()
-        if result is not None:
-            ret[str(check.getId())] = result
-            for toolId, result_tool in result["tools_not_done"].items():
-                if "commandline_multi" in result_tool and result_tool["commandline_multi"] is not None:
-                    if result_tool["commandline_multi"]["comm"] not in multi_command_line_tools:
-                        multi_command_line_tools[result_tool["commandline_multi"]["comm"]] = []
-                    multi_command_line_tools[result_tool["commandline_multi"]["comm"]].append({"tool_id": toolId, "checkinstance_id": str(check.getId()), "result_tool": result_tool})
+        if result is None:
+            continue
+        ret[str(check.getId())] = result
+        for toolId, result_tool in result["tools_not_done"].items():
+            if "commandline_multi" in result_tool and result_tool["commandline_multi"] is None:
+                continue
+            if result_tool["commandline_multi"]["comm"] not in multi_command_line_tools:
+                multi_command_line_tools[result_tool["commandline_multi"]["comm"]] = []
+            multi_command_line_tools[result_tool["commandline_multi"]["comm"]].append({"tool_id": toolId, "checkinstance_id": str(check.getId()), "result_tool": result_tool})
     ret["multi_command_line_tools"] = multi_command_line_tools
     return ret

@@ -28,6 +28,7 @@ class Port(Element):
     """
     command_variables = ["port","port.proto","port.service","port.product","port.infos.*"]
     coll_name = "ports"
+    trigger_on_add_checks: List[str] = ["port:onServiceUpdate"]
 
     def __init__(self, pentest, valuesFromDb=None):
         """Constructor
@@ -119,7 +120,7 @@ class Port(Element):
 
     def add_port_checks(self) -> None:
         """Check service related triggers for this port object"""
-        self.addChecks(["port:onServiceUpdate"])
+        self.addChecks(Port.trigger_on_add_checks)
 
     def addChecks(self, lvls):
         """
@@ -144,26 +145,28 @@ class Port(Element):
         """
         Return the list of trigger declared here
         """
-        return ["port:onServiceUpdate"]
+        return Port.trigger_on_add_checks
 
     @classmethod
-    def replaceCommandVariables(cls, pentest, command, data):
+    def replaceCommandVariables(cls, pentest: str, command: str, data: Dict[str, Any]) -> str:
         command = command.replace("|port|", data.get("port", ""))
         command = command.replace("|port.proto|", data.get("proto", ""))
         if data.get("ip") is not None:
             command = command.replace("|ip_port|", data.get("ip", "")+":"+data.get("port", ""))
-        if data.get("port")  is not None and data.get("ip")  is not None:
-            dbclient = DBClient.getInstance()
-            port_db = dbclient.findInDb(pentest, "ports", {"port":data.get("port") , "proto":data.get("proto", "tcp") , "ip":data.get("ip") }, False)
-            if port_db is not None:
-                command = command.replace("|port.service|", port_db.get("service", ""))
-                command = command.replace("|port.product|", port_db.get("product",""))
-                port = data.get("port")
-                is_ssl = "ssl" in port_db.get("service", "") or "https" in port_db.get("service", "")
-                command = command.replace("|url|", "https" if is_ssl else "http"+"://"+data.get("ip", "")+ (":"+str(port) if str(port) != "" else ""))
-                port_infos = port_db.get("infos", {})
-                for info in port_infos:
-                    command = command.replace("|port.infos."+str(info)+"|", str(port_infos[info]))
+        if data.get("port") is None or data.get("ip") is None:
+            return command
+        dbclient = DBClient.getInstance()
+        port_db = dbclient.findInDb(pentest, "ports", {"port":data.get("port") , "proto":data.get("proto", "tcp") , "ip":data.get("ip") }, False)
+        if port_db is None:
+            return command
+        command = command.replace("|port.service|", port_db.get("service", ""))
+        command = command.replace("|port.product|", port_db.get("product",""))
+        port = data.get("port")
+        is_ssl = "ssl" in port_db.get("service", "") or "https" in port_db.get("service", "")
+        command = command.replace("|url|", "https" if is_ssl else "http"+"://"+data.get("ip", "")+ (":"+str(port) if str(port) != "" else ""))
+        port_infos = port_db.get("infos", {})
+        for info in port_infos:
+            command = command.replace("|port.infos."+str(info)+"|", str(port_infos[info]))
         return command
 
     @classmethod
@@ -190,25 +193,8 @@ class Port(Element):
         ins_result = dbclient.insertInDb(self.pentest, "ports", data, parent)
         iid = ins_result.inserted_id
         self._id = iid
-        if int(self.port) == 445:
-            computer_o = Computer(self.pentest, {"name":"", "ip":self.ip, "domain":"", "admins":[], "users":[], "infos":{"is_dc":False}})
-            computer_o.addInDb()
-        if int(self.port) == 88:
-            computer_o = Computer(self.pentest, {"name":"", "ip":self.ip, "domain":"", "admins":[], "users":[], "infos":{"is_dc":True}})
-            res = computer_o.addInDb()
-            if not res["res"]:
-                comp_existing_o = Computer.fetchObject(self.pentest, {"_id":ObjectId(res["iid"])})
-                if comp_existing_o is not None:
-                    comp_existing_o.infos.is_dc = True
-                    comp_existing_o.update()
-        if int(self.port) == 1433 or (self.service == "ms-sql"):
-            computer_o = Computer(self.pentest, {"name":"", "ip":self.ip, "domain":"", "admins":[], "users":[], "infos":{"is_sqlserver":True}})
-            res = computer_o.addInDb()
-            if not res["res"]:
-                comp_existing_o = Computer.fetchObject(self.pentest, {"_id":ObjectId(res["iid"])})
-                if comp_existing_o is not None:
-                    comp_existing_o.infos.is_sqlserver = True
-                    comp_existing_o.update()
+        Computer.create_computer_from_port(self)
+        
         self.add_port_checks()
         return {"res":True, "iid":iid}
 
@@ -232,9 +218,9 @@ class Port(Element):
         dbclient.updateInDb(self.pentest, "ports", {"_id":ObjectId(self.getId())}, {"$set":new_data}, False, True)
         if self.service != new_self.service:
             dbclient.deleteFromDb(self.pentest, "tools", {
-                                    "lvl": "port:onServiceUpdate", "ip": self.ip, "port": self.port, "proto": self.proto, "status":{"$ne":"done"}}, many=True)
+                                    "lvl": Port.trigger_on_add_checks[0], "ip": self.ip, "port": self.port, "proto": self.proto, "status":{"$ne":"done"}}, many=True)
             dbclient.deleteFromDb(self.pentest, "checkinstances", {
-                                    "lvl": "port:onServiceUpdate", "ip": self.ip, "port": self.port, "proto": self.proto, "status":{"$ne":"done"}}, many=True)     
+                                    "lvl": Port.trigger_on_add_checks[0], "ip": self.ip, "port": self.port, "proto": self.proto, "status":{"$ne":"done"}}, many=True)     
             new_self.add_port_checks()
         return True
 
@@ -338,22 +324,8 @@ class Port(Element):
             return
         dbclient = DBClient.getInstance()
         dbclient.create_index(pentest, "ports", [("port", 1), ("proto", 1), ("ip", 1)])
-        update_operations: List[UpdateOne] = []
-        computers = []
         start = time.time()
-        for port in ports_to_add:
-            data = port.getData()
-            if "service" in data:
-                del data["service"]
-            if "_id" in data:
-                del data["_id"]
-            if int(port.port) == 88:
-                computers.append({"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[], "infos.is_dc":True})
-            elif int(port.port) == 445:
-                computers.append({"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[]})
-            elif int(port.port) == 1433 or port.service == "ms-sql":
-                computers.append({"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[], "infos.is_sqlserver":True})
-            update_operations.append(UpdateOne({"port": port.port, "proto": port.proto, "ip": port.ip}, {"$setOnInsert": data, "$set":{"service":port.service}}, upsert=True))
+        update_operations, computers = cls._generate_update_operations(ports_to_add)
         logger.info("Crating port update operations took %s", str(time.time() - start))
         start = time.time()
         result = dbclient.bulk_write(pentest, "ports", cast(List[Union[InsertOne, UpdateOne]], update_operations))
@@ -376,7 +348,26 @@ class Port(Element):
             top_of_slice = min(current_slice + 100000, nb_values)
             ports_inserted += [cast(Port, port) for port in Port.fetchObjects(pentest, {"_id":{"$in":values[current_slice:top_of_slice]}})]
             current_slice += 100000
-        CheckInstance.bulk_insert_for(pentest, cast(Iterable, ports_inserted), "port", ["port:onServiceUpdate"], f_get_impacted_targets=cls.get_allowed_ports)
+        CheckInstance.bulk_insert_for(pentest, cast(Iterable, ports_inserted), "port", Port.trigger_on_add_checks, f_get_impacted_targets=cls.get_allowed_ports)
+
+    @classmethod
+    def _generate_update_operations(cls, ports_to_add):
+        update_operations: List[UpdateOne] = []
+        computers = []
+        for port in ports_to_add:
+            data = port.getData()
+            if "service" in data:
+                del data["service"]
+            if "_id" in data:
+                del data["_id"]
+            if int(port.port) == 88:
+                computers.append({"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[], "infos.is_dc":True})
+            elif int(port.port) == 445:
+                computers.append({"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[]})
+            elif int(port.port) == 1433 or port.service == "ms-sql":
+                computers.append({"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[], "infos.is_sqlserver":True})
+            update_operations.append(UpdateOne({"port": port.port, "proto": port.proto, "ip": port.ip}, {"$setOnInsert": data, "$set":{"service":port.service}}, upsert=True))
+        return update_operations,computers
 
     def getPortData(self) -> Dict[str, Any]:
         """

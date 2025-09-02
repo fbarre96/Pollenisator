@@ -1,6 +1,6 @@
 """Ip Model. Describes Hosts (not just IP now but domains too)"""
 
-from typing import Any, Dict, Iterator, List, Optional, Union, cast
+from typing import Any, Dict, Iterator, List, Optional, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 import re
@@ -30,6 +30,7 @@ class Ip(Element):
     """
     coll_name = "ips"
     command_variables: List[str] = ["ip","ip.infos.*"]
+    trigger_on_add_checks: List[str] = ["ip:onAdd"]
 
     def __init__(self, pentest: str, valuesFromDb: Optional[Dict[str, Any]] = None) -> None:
         """
@@ -91,35 +92,57 @@ class Ip(Element):
         Returns:
             bool: True if this ip/domain is in the given scope, False otherwise.
         """
-        dbclient = DBClient.getInstance()
-        if settings is None:
-            settings_scope_ip = dbclient.findInDb(self.pentest, "settings", {"key":"include_domains_with_ip_in_scope"}, False)
-            if isinstance(settings_scope_ip.get("value", None), str):
-                settings_scope_ip = settings_scope_ip.get("value", "").lower() == "true"
-            settings_all_domains = dbclient.findInDb(self.pentest,"settings", {"key":"include_all_domains"}, False)
-            if isinstance(settings_all_domains.get("value", None), str):
-                settings_all_domains = settings_all_domains.get("value", "").lower() == "true"
-            settings_top_domain = dbclient.findInDb(self.pentest, "settings", {"key":"include_domains_with_topdomain_in_scope"}, False)
-            if isinstance(settings_top_domain.get("value", None), str):
-                settings_top_domain = settings_top_domain.get("value", "").lower() == "true"
-        else:
-            settings_scope_ip = settings.get("include_domains_with_ip_in_scope", False)
-            settings_all_domains = settings.get("include_all_domains", False)
-            settings_top_domain = settings.get("include_domains_with_topdomain_in_scope", False)
+        scope_settings = Ip.getScopeSettings(self.pentest, settings)
         if isNetworkIp(scope):
             if Ip.checkIpScope(scope, self.ip):
                 return True
-        elif settings_all_domains:
+        elif scope_settings.get("include_all_domains", False):
             return True
-        elif Ip.isSubDomain(scope, self.ip) and settings_top_domain:
+        elif Ip.isSubDomain(scope, self.ip) and scope_settings.get("include_domains_with_topdomain_in_scope", False):
             return True
         elif self.ip == scope:
             return True
-        elif settings_scope_ip:
+        elif scope_settings.get("include_domains_with_ip_in_scope", False):
             ip = performLookUp(self.ip)
-            if ip is not None and Ip.checkIpScope(scope, ip):
-                return True
+            return ip is not None and Ip.checkIpScope(scope, ip)
         return False
+
+    @staticmethod
+    def get_setting_value(setting_result: Optional[Dict[str, Any]]) -> bool:
+        """Extract boolean value from setting result."""
+        if setting_result is None:
+            return False
+        value = setting_result.get("value", False)
+        if isinstance(value, str):
+            return value.lower() == "true"
+        return value
+    
+    @classmethod
+    def getScopeSettings(cls, pentest:str, settings: Optional[Dict[str, Any]] = None) -> Dict[str, bool]:
+        """
+        Fetch scope-related settings from the database or use provided settings.
+        Args:
+            pentest (str): The name of the pentest.
+            settings (Optional[Dict[str, Any]], optional): A dictionary of settings. 
+            If not provided, settings will be fetched from the database. Defaults to None.
+        Returns:
+            Dict[str, bool]: A dictionary with keys "include_domains_with_ip_in_scope", "include_all_domains", and "include_domains_with_topdomain_in_scope".
+        """
+        dbclient = DBClient.getInstance()
+        if settings is not None:
+            return  {
+                "include_domains_with_ip_in_scope": bool(settings.get("include_domains_with_ip_in_scope", False)),
+                "include_all_domains": bool(settings.get("include_all_domains", False)),
+                "include_domains_with_topdomain_in_scope": bool(settings.get("include_domains_with_topdomain_in_scope", False))
+            }
+        
+        settings_scope_ip_res = dbclient.findInDb(pentest, "settings", {"key":"include_domains_with_ip_in_scope"}, False)
+        settings_scope_ip = cls.get_setting_value(settings_scope_ip_res)
+        settings_all_domains_res = dbclient.findInDb(pentest,"settings", {"key":"include_all_domains"}, False)
+        settings_all_domains = cls.get_setting_value(settings_all_domains_res)
+        settings_top_domain_res = dbclient.findInDb(pentest, "settings", {"key":"include_domains_with_topdomain_in_scope"}, False)
+        settings_top_domain = cls.get_setting_value(settings_top_domain_res)
+        return {"include_domains_with_ip_in_scope":settings_scope_ip, "include_all_domains":settings_all_domains, "include_domains_with_topdomain_in_scope":settings_top_domain}
 
     def addPort(self, values: Dict[str, Any]) -> PortInsertResult:
         """
@@ -393,7 +416,7 @@ class Ip(Element):
     def add_ip_checks(self) -> None:
         """Check all ip type checks items triggers on this IP."""
         if self.in_scopes:
-            self.addChecks(["ip:onAdd"])
+            self.addChecks(Ip.trigger_on_add_checks)
 
     def addChecks(self, lvls: List[str]) -> None:
         """
@@ -422,7 +445,7 @@ class Ip(Element):
         Returns:
             List[str]: list of triggers
         """
-        return ["ip:onAdd"]
+        return cls.trigger_on_add_checks # add more later if needed
 
     def updateInDb(self, data: Optional[Dict[str, Any]] = None) -> bool:
         """
@@ -502,6 +525,22 @@ class Ip(Element):
 
 
     @classmethod
+    def _process_ip_scopes(cls, ip: 'Ip', scopes: List[Dict[str, Any]], settings: Dict[str, Any]) -> None:
+        """
+        Process and assign scopes for a given IP.
+        
+        Args:
+            ip (Ip): The IP object to process.
+            scopes (List[Dict[str, Any]]): List of available scopes.
+            settings (Dict[str, Any]): Scope settings.
+        """
+        fitted_scopes = []
+        for scope in scopes:
+            if ip.fitInScope(scope["scope"], settings):
+                fitted_scopes.append(ObjectId(scope["_id"]))
+        ip.in_scopes = fitted_scopes
+
+    @classmethod
     def bulk_insert(cls, pentest: str, ips_to_add: List['Ip'], look_scopes: bool = True) -> List['Ip']:
         """
         Bulk insert IP objects into the database.
@@ -512,110 +551,170 @@ class Ip(Element):
             look_scopes (bool, optional): Whether to look for scopes. Defaults to True.
 
         Returns:
-            Optional[List[Ip]]: A list of the inserted IP objects if any were inserted, None otherwise.
+            List[Ip]: A list of the inserted IP objects if any were inserted, empty list otherwise.
         """
         if not ips_to_add:
             return []
+            
         dbclient = DBClient.getInstance()
         scopes = []
         settings = {}
+        
+        # Retrieve scopes and settings if needed
         if look_scopes:
-            scopes = list(dbclient.findInDb(pentest, "scopes", {}, True))
+            scopes = dbclient.findInDb(pentest, "scopes", {}, True)
             if scopes is None:
                 scopes = []
-            settings_scope_ip = dbclient.findInDb(pentest, "settings", {"key":"include_domains_with_ip_in_scope"}, False)
-            if settings_scope_ip is None:
-                settings_scope_ip = False
-            elif isinstance(settings_scope_ip.get("value", None), str):
-                settings_scope_ip = settings_scope_ip.get("value", "").lower() == "true"
-            else:
-                settings_scope_ip = settings_scope_ip.get("value", False)
-            settings_all_domains = dbclient.findInDb(pentest,"settings", {"key":"include_all_domains"}, False)
-            if settings_all_domains is None:
-                settings_all_domains = False
-            elif isinstance(settings_all_domains.get("value", None), str):
-                settings_all_domains = settings_all_domains.get("value", "").lower() == "true"
-            else:
-                settings_all_domains = settings_all_domains.get("value", False)
-            settings_top_domain = dbclient.findInDb(pentest, "settings", {"key":"include_domains_with_topdomain_in_scope"}, False)
-            if settings_top_domain is None:
-                settings_top_domain = False
-            elif isinstance(settings_top_domain.get("value", None), str):
-                settings_top_domain = settings_top_domain.get("value", "").lower() == "true"
-            else:
-                settings_top_domain = settings_top_domain.get("value", False)
-            settings["include_domains_with_ip_in_scope"] = settings_scope_ip
-            settings["include_all_domains"] = settings_all_domains
-            settings["include_domains_with_topdomain_in_scope"] = settings_top_domain
-        lkp = {}
-        ip_keys = set()
+            settings = cls.getScopeSettings(pentest, None)
+        
+        # Prepare IP data for insertion
+        ip_data_lookup = {}
+        ip_addresses = set()
+        
         for ip in ips_to_add:
             if look_scopes:
-                fitted_scope = []
-                for scope in scopes:
-                    if ip.fitInScope(scope["scope"], settings):
-                        fitted_scope.append(ObjectId(scope["_id"]))
-                ip.in_scopes = fitted_scope
-            lkp[ip.ip] = ip.getData()
-            del lkp[ip.ip]["_id"]
-            ip_keys.add(ip.ip)
-        dbclient.create_index(pentest, "ips", [("ip",1)])
-        existing_ips = dbclient.findInDb(pentest, "ips", {"ip":{"$in":list(ip_keys)}}, multi=True)
-        existing_ips_as_key = set() if existing_ips is None else set([x.get("ip") for x in existing_ips])
-        to_add = ip_keys - existing_ips_as_key
-        things_to_insert = [lkp[ip] for ip in to_add]
-        # Insert new
-        res = None
-        if things_to_insert:
-            res = dbclient.insertManyInDb(pentest, "ips", things_to_insert)
-        if res is None:
+                cls._process_ip_scopes(ip, scopes, settings)
+            
+            # Get IP data and remove the _id field for insertion
+            ip_data = ip.getData()
+            if "_id" in ip_data:
+                del ip_data["_id"]
+            
+            ip_data_lookup[ip.ip] = ip_data
+            ip_addresses.add(ip.ip)
+        
+        # Create index and check for existing IPs
+        dbclient.create_index(pentest, "ips", [("ip", 1)])
+        existing_ips = dbclient.findInDb(pentest, "ips", {"ip": {"$in": list(ip_addresses)}}, multi=True)
+        existing_ip_addresses = set() if existing_ips is None else set(x.get("ip") for x in existing_ips)
+        
+        # Determine which IPs need to be inserted
+        new_ip_addresses = ip_addresses - existing_ip_addresses
+        documents_to_insert = [ip_data_lookup[ip_addr] for ip_addr in new_ip_addresses]
+        
+        # Perform bulk insertion
+        if not documents_to_insert:
             return []
-        ips_inserted = Ip.fetchObjects(pentest, {"_id":{"$in":res.inserted_ids}, "in_scopes":{"$exists": True, "$ne": []}})
-        if ips_inserted is None:
+            
+        insert_result = dbclient.insertManyInDb(pentest, "ips", documents_to_insert)
+        if insert_result is None:
             return []
-        list_ips_inserted = list(ips_inserted)
-        CheckInstance.bulk_insert_for(pentest, list_ips_inserted, "ip", ["ip:onAdd"])
-        return cast(List[Ip], list_ips_inserted)
+        
+        # Fetch inserted IPs that are in scope
+        inserted_ips = Ip.fetchObjects(pentest, {
+            "_id": {"$in": insert_result.inserted_ids}, 
+            "in_scopes": {"$exists": True, "$ne": []}
+        })
+        
+        if inserted_ips is None:
+            return []
+        
+        # Convert to list and add checks
+        inserted_ips_list = list(inserted_ips)
+        CheckInstance.bulk_insert_for(pentest, inserted_ips_list, "ip", cls.trigger_on_add_checks)
+        
+        return cast(List[Ip], inserted_ips_list)
 
-    def getHostData(self) -> Dict[str, Any]:
+    def _collect_checks_data(self) -> Dict[str, Any]:
         """
-        Get the getHostData for the ip.
-
+        Collect check instances data for this IP.
+        
         Returns:
-            Dict[str, Any]: A dictionary containing the host useful data.
+            Dict[str, Any]: Dictionary mapping check IDs to their information.
         """
-        ret: Dict[str, Union[List[Dict[str,Any]],Dict[str, Any]]] = {"checks":{}, "ports":{}, "defects": {}, "computers":{}, "tags":[]}
-
-        ### IP checks data
-        checks = CheckInstance.fetchObjects(self.pentest, {"target_iid": ObjectId(self.getId()), "target_type": "ip"})
+        checks_data = {}
+        checks = CheckInstance.fetchObjects(self.pentest, {
+            "target_iid": ObjectId(self.getId()), 
+            "target_type": "ip"
+        })
+        
         if checks is not None:
             for check in checks:
                 check = cast(CheckInstance, check)
                 result = check.getCheckInstanceInformation()
                 if result is not None:
-                    ret["checks"][str(check.getId())] = result
-        ### PORTS data
+                    checks_data[str(check.getId())] = result
+        
+        return checks_data
+
+    def _collect_ports_data(self) -> Dict[str, Any]:
+        """
+        Collect ports data for this IP.
+        
+        Returns:
+            Dict[str, Any]: Dictionary mapping port IDs to their data.
+        """
+        ports_data = {}
         ports = Port.fetchObjects(self.pentest, {"ip": self.ip})
+        
         if ports is not None:
             for port in ports:
                 port = cast(Port, port)
-                ret["ports"][str(port.getId())] = port.getPortData()
-        ### DEFECTS data
+                ports_data[str(port.getId())] = port.getPortData()
+        
+        return ports_data
+
+    def _collect_defects_data(self) -> Dict[str, Any]:
+        """
+        Collect defects data for this IP.
+        
+        Returns:
+            Dict[str, Any]: Dictionary mapping defect IDs to their data.
+        """
+        defects_data = {}
         defects = Defect.fetchObjects(self.pentest, {"target_id": self.getId()})
+        
         if defects is not None:
             for defect in defects:
                 defect = cast(Defect, defect)
-                ret["defects"][str(defect.getId())] = defect.getData()
+                defects_data[str(defect.getId())] = defect.getData()
+        
+        return defects_data
 
-        ### Tags
+    def _collect_tags_data(self) -> List[Dict[str, Any]]:
+        """
+        Collect tags data for this IP.
+        
+        Returns:
+            List[Dict[str, Any]]: List of tag data dictionaries.
+        """
+        tags_data = []
         tags = self.getTags()
+        
         if tags:
             for tag in tags:
-                ret["tags"].append(tag.getData())
+                tags_data.append(tag.getData())
+        
+        return tags_data
 
+    def _collect_computers_data(self) -> Dict[str, Any]:
+        """
+        Collect computers data for this IP.
+        
+        Returns:
+            Dict[str, Any]: Dictionary mapping computer IDs to their data.
+        """
+        computers_data = {}
         computers = Computer.fetchObjects(self.pentest, {"ip": self.ip})
+        
         if computers is not None:
             for computer in computers:
                 computer = cast(Computer, computer)
-                ret["computers"][str(computer.getId())] = computer.getComputerData()
-        return ret
+                computers_data[str(computer.getId())] = computer.getComputerData()
+        
+        return computers_data
+
+    def getHostData(self) -> Dict[str, Any]:
+        """
+        Get comprehensive host data for this IP including checks, ports, defects, tags, and computers.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing all host-related data organized by type.
+        """
+        return {
+            "checks": self._collect_checks_data(),
+            "ports": self._collect_ports_data(),
+            "defects": self._collect_defects_data(),
+            "tags": self._collect_tags_data(),
+            "computers": self._collect_computers_data()
+        }

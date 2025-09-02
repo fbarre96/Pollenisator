@@ -28,7 +28,6 @@ from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 from pollenisator.server.permission import permission
 from pollenisator.core.components.logger_config import logger
 
-dbclient = DBClient.getInstance()
 
 searchable_collections = set(["waves","scopes","ips","ports","tools","defects", "checkinstances", "commands", "computers","shares","users"])
 validPollenisatorDbCollections = [ "checkitems", "commands", "settings" , "defects"]
@@ -45,6 +44,7 @@ def status() -> bool:
     Returns:
         bool: True if the database is connected
     """
+    dbclient = DBClient.getInstance()
     dbclient.connect()
     return dbclient.client is not None
 
@@ -55,13 +55,14 @@ def getVersion() -> str:
     Returns:
         str: The current database version.
     """
+    dbclient = DBClient.getInstance()
     version_key = dbclient.findInDb("pollenisator","infos",{"key":"version"}, False)
     if version_key is None:
         return "Unknown"
     return str(version_key["value"])
 
 @permission("user")
-def getUser(_pentest: str, **kwargs: Any) -> str:
+def getUser(**kwargs: Any) -> str:
     """
     Return the user associated with the token.
 
@@ -92,6 +93,7 @@ def update(pentest: str, collection: str, body: Dict[str, Union[str, bool]]) -> 
     Returns:
         ErrorStatus: True if the update was successful, otherwise an error message and status code.
     """
+    dbclient = DBClient.getInstance()
     pipeline = body["pipeline"] if body["pipeline"] is not None else "{}"
     if isinstance(pipeline, str):
         pipeline = json.loads(pipeline, cls=JSONDecoder)
@@ -109,8 +111,7 @@ def update(pentest: str, collection: str, body: Dict[str, Union[str, bool]]) -> 
         return "Pentest argument is not a valid pollenisator pentest", 403
     if collection == "settings":
         return "Settings collection cannot be updated directly", 403
-    dbclient.updateInDb(pentest, collection, pipeline, updatePipeline, body.get("many", False), body["notify"], body.get("upsert", False))
-    return "Success", 200
+    return dbclient.updateInDb(pentest, collection, pipeline, updatePipeline, body.get("many", False), body.get("notify", True), body.get("upsert", False))
 
 @permission("pentester")
 def insert(pentest: str, collection: str, body: Dict[str,Any]) -> ErrorStatus:
@@ -128,6 +129,7 @@ def insert(pentest: str, collection: str, body: Dict[str,Any]) -> ErrorStatus:
     Returns:
         ErrorStatus: The ID of the inserted document if the insertion was successful, otherwise an error message and status code.
     """
+    dbclient = DBClient.getInstance()
     pipeline = body["pipeline"]
     if isinstance(pipeline, str):
         pipeline = json.loads(pipeline, cls=JSONDecoder)
@@ -138,7 +140,7 @@ def insert(pentest: str, collection: str, body: Dict[str,Any]) -> ErrorStatus:
             return "Collection argument is not a valid pollenisator collection", 403
     elif pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 403
-    res = dbclient.insertInDb(pentest, collection, pipeline, body["parent"], body["notify"])
+    res = dbclient.insertInDb(pentest, collection, pipeline, body.get("parent"), body.get("notify", True))
     return str(res.inserted_id), 200
 
 @permission("pentester")
@@ -160,8 +162,12 @@ def find(pentest: str, collection: str, body: Dict[str, Any]) -> Union[Dict[str,
         Union[Dict[str, Any], List[Dict[str, Any]], ErrorStatus]: The found documents if the find operation was successful, otherwise an error message and status code.
     """
     pipeline = body["pipeline"]
+    dbclient = DBClient.getInstance()
     if isinstance(pipeline, str):
-        pipeline = json.loads(pipeline, cls=JSONDecoder)
+        try:
+            pipeline = json.loads(pipeline, cls=JSONDecoder)
+        except json.JSONDecodeError:
+            return "Pipeline argument was not valid", 400
     if not isinstance(pipeline, dict):
         return "Pipeline argument was not valid", 400
     if pentest == "pollenisator":
@@ -194,6 +200,7 @@ def search(pentest: str, s: str, textonly: bool) -> Union[Dict[str, List[Dict[st
     Returns:
         Union[Dict[str, List[Dict[str, Any]]], ErrorStatus]: A dictionary where each key is a collection name and each value is a list of matching documents if the search was successful, otherwise an error message and status code.
     """
+    dbclient = DBClient.getInstance()
     searchQuery = s
     if pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 400
@@ -311,6 +318,7 @@ def count(pentest: str, collection: str, body: Dict[str, Any]) -> Union[int, Tup
         Union[int, Tuple[str, int]]: The count of matching documents if the count operation was successful, otherwise an error message and status code.
     """
     pipeline = body["pipeline"]
+    dbclient = DBClient.getInstance()
     if isinstance(pipeline, str):
         pipeline = json.loads(pipeline, cls=JSONDecoder)
     if pentest == "pollenisator":
@@ -335,6 +343,7 @@ def fetchNotifications(pentest: str, fromTime: str) -> List[Dict[str, Any]]:
     Returns:
         List[Dict[str, Any]]: A list of notifications. Each notification is a dictionary containing its details.
     """
+    dbclient = DBClient.getInstance()
     res = dbclient.fetchNotifications(pentest, fromTime)
     if res is None:
         return []
@@ -354,6 +363,7 @@ def aggregate(pentest: str, collection: str, body: List[Dict[str, Any]]) -> Unio
         Union[List[Dict[str, Any]], Tuple[str, int]]: A list of documents resulting from the aggregation if the operation was successful, otherwise an error message and status code.
     """
     ret = []
+    dbclient = DBClient.getInstance()
     if pentest == "pollenisator":
         if collection not in validPollenisatorDbCollections:
             return "Collection argument is not a valid pollenisator collection", 403
@@ -381,6 +391,7 @@ def delete(pentest: str, collection: str, body: Dict[str, Any]) -> Union[int, No
         Union[None, int, Tuple[str, int]]: None if the delete operation was unsuccessful, the deleted count if everything is fine, otherwise an error message and status code.
     """
     pipeline = body["pipeline"]
+    dbclient = DBClient.getInstance()
     if isinstance(pipeline, str):
         pipeline = json.loads(pipeline, cls=JSONDecoder)
     if not isinstance(pipeline, dict):
@@ -390,7 +401,7 @@ def delete(pentest: str, collection: str, body: Dict[str, Any]) -> Union[int, No
             return "Collection argument is not a valid pollenisator collection", 403
     elif pentest not in dbclient.listPentestUuids():
         return "Pentest argument is not a valid pollenisator pentest", 403
-    res = dbclient.deleteFromDb(pentest, collection, pipeline, body["many"], body["notify"])
+    res = dbclient.deleteFromDb(pentest, collection, pipeline, body.get("many", False), body.get("notify", True))
     if res is None:
         return None
     else:
@@ -410,6 +421,7 @@ def bulk_delete(pentest: str, body: Union[str, Dict[str, List[str]]]) -> Union[i
         Union[int, ErrorStatus]: The number of documents deleted if the operation was successful, otherwise an error message and status code.
     """
     data = body
+    dbclient = DBClient.getInstance()
     if isinstance(data, str):
         data = json.loads(data, cls=JSONDecoder)
     if not isinstance(data, dict):
@@ -442,6 +454,7 @@ def bulk_delete_commands(body: Union[str, Dict[str, List[str]]], **kwargs: Dict[
     """
     #user = kwargs["token_info"]["sub"]
     data = body
+    dbclient = DBClient.getInstance()
     if isinstance(data, str):
         data = json.loads(data, cls=JSONDecoder)
     if not isinstance(data, dict):
@@ -468,6 +481,7 @@ def listPentests(**kwargs: Dict[str, Any]) -> List[Dict[str, Any]]:
     Returns:
         List[Dict[str, Any]]: A list of pentests. Each pentest is a dictionary containing its details.
     """
+    dbclient = DBClient.getInstance()
     username = kwargs["token_info"]["sub"]
     if "admin" in kwargs["token_info"]["scope"]:
         user_filter = None
@@ -489,6 +503,7 @@ def deletePentestFiles(pentest: str) -> None:
     Returns:
         None
     """
+    dbclient = DBClient.getInstance()
     local_path = os.path.join(getMainDir(), "files")
     proofspath = os.path.join(local_path, pentest, "proof")
     if os.path.isdir(proofspath):
@@ -510,6 +525,7 @@ def deletePentest(pentest: str, **kwargs: Dict[str,Any]) -> ErrorStatus:
     Returns:
         ErrorStatus: A success message if the deletion was successful, otherwise an error message and status code.
     """
+    dbclient = DBClient.getInstance()
     username = kwargs["token_info"]["sub"]
     if username != dbclient.getPentestOwner(pentest) and "admin" not in kwargs["token_info"]["scope"]:
         return "Forbidden", 403
@@ -543,6 +559,7 @@ def registerPentest(pentest: str, body: Dict[str, Any], **kwargs: Dict[str, Any]
 
 
     pentest = urllib.parse.unquote(pentest)
+    dbclient = DBClient.getInstance()
     ret, msg = dbclient.registerPentest(username, pentest, None, False, False)
     if ret:
         #token = connectToPentest(pentest, **kwargs)
@@ -569,6 +586,7 @@ def editPentest(pentest: str, body: Dict[str, str], **kwargs: Dict[str, Any]) ->
     Returns:
         Union[Dict[str, str], Tuple[Dict[str, str], int]]: A success message if the name change was successful, otherwise an error message and status code.
     """
+    dbclient = DBClient.getInstance()
     pentest_name = body.get("pentest_name", "")
     if not pentest_name:
         return {"message": "Pentest name is required"}, 400
@@ -595,6 +613,7 @@ def getPentestUsers(pentest: str, **kwargs: Dict[str, Any]) -> List[Dict[str, st
         List[str]: A list of usernames associated with the pentest.
     """
     username = kwargs["token_info"]["sub"]
+    dbclient = DBClient.getInstance()
     if pentest not in dbclient.listPentestUuids():
         return []
     owner = dbclient.getPentestOwner(pentest)
@@ -623,6 +642,7 @@ def addPentestUser(pentest: str, body: Dict[str, str], **kwargs: Dict[str, Any])
     Returns:
         Union[Dict[str, str], Tuple[Dict[str, str], int]]: A success message if the user was added successfully, otherwise an error message and status code.
     """
+    dbclient = DBClient.getInstance()
     username = body.get("username", "")
     if not username:
         return {"message": "Username is required"}, 400
@@ -656,6 +676,7 @@ def removePentestUser(pentest: str, username: str, **kwargs: Dict[str, Any]) -> 
     Returns:
         Union[Dict[str, str], Tuple[Dict[str, str], int]]: A success message if the user was removed successfully, otherwise an error message and status code.
     """
+    dbclient = DBClient.getInstance()
     current_username = kwargs["token_info"]["sub"]
     if pentest not in dbclient.listPentestUuids():
         return {"message": "Pentest not found"}, 404
@@ -681,6 +702,7 @@ def transferPentestOwnership(pentest: str, body: Dict[str, str], **kwargs: Dict[
     Returns:
         Union[Dict[str, str], Tuple[Dict[str, str], int]]: A success message if the ownership was transferred successfully, otherwise an error message and status code.
     """
+    dbclient = DBClient.getInstance()
     new_owner = body.get("new_owner", "")
     if not new_owner:
         return {"message": "New owner's username is required"}, 400
@@ -719,6 +741,7 @@ def getPentestInfo(pentest: str, **kwargs: Dict[str, Any]) -> Dict[str, Any]:
             "checks_done" (int): The number of checks that are done.
             "checks_total" (int): The total number of checks.
     """
+    dbclient = DBClient.getInstance()
     ret: Dict[str, Any] = {}
     ret["defects_count"] = dbclient.countInDb(pentest, "defects", {})
     ret["defects_count_critical"] = dbclient.countInDb(pentest, "defects", {"risk":"Critical"})
@@ -773,6 +796,7 @@ def preparePentest(pentest_uuid: str, pentest_type: str, start_date: str, end_da
     Returns:
         ErrorStatus: A tuple containing a string message and a boolean indicating the success of the operation.
     """
+    dbclient = DBClient.getInstance()
     user = kwargs["token_info"]["sub"]
     dbclient.insertInDb(pentest_uuid, "settings", {"key":"pentest_type", "value":pentest_type}, notify=False)
     dbclient.insertInDb(pentest_uuid, "settings", {"key":"include_domains_with_ip_in_scope", "value": settings['Add domains whose IP are in scope'] == 1}, notify=False)
@@ -822,6 +846,7 @@ def getSettings() -> List[Dict[str, Any]]:
     Returns:
         List[Dict[str, Any]]: A list of dictionaries, each representing a setting.
     """
+    dbclient = DBClient.getInstance()
     res = dbclient.findInDb("pollenisator", "settings", {}, True)
     if res is None:
         return []
@@ -838,6 +863,7 @@ def getSetting(pipeline: Union[str, Dict[str, Any]]) -> Union[ErrorStatus, Dict[
     Returns:
         Union[ErrorStatus, Dict[str, Any]]: If the pipeline argument was not valid, returns an error message and status code. Otherwise, returns the setting.
     """
+    dbclient = DBClient.getInstance()
     if isinstance(pipeline, str):
         pipeline = json.loads(pipeline, cls=JSONDecoder)
     if not isinstance(pipeline, dict):
@@ -859,6 +885,7 @@ def createSetting(body: Dict[str, Union[str, Any]]) -> bool:
     """
     key = body['key']
     value = body["value"]
+    dbclient = DBClient.getInstance()
     res = dbclient.insertInDb("pollenisator", "settings", {"key":key, "value":value})
     if res:
         return True
@@ -877,6 +904,7 @@ def updateSetting(body: Dict[str, Union[str, Any]]) -> bool:
     Returns:
         bool: True if the setting was successfully updated, False otherwise.
     """
+    dbclient = DBClient.getInstance()
     key = body['key']
     value = body["value"]
     dbclient.updateInDb("pollenisator", "settings", {
@@ -902,6 +930,7 @@ def registerTag(body: Dict[str, Any]) -> bool:
     color = body["color"]
     level = body["level"]
     pentest = body["pentest"]
+    dbclient = DBClient.getInstance()
     return dbclient.doRegisterTag(pentest, Tag(name, color, level))
 
 @permission("pentester", "body.pentest")
@@ -919,6 +948,7 @@ def unregisterTag(body: Dict[str, Any]) -> Union[bool, ErrorStatus]:
     """
     name = body["name"]
     pentest = body.get("pentest", "pollenisator")
+    dbclient = DBClient.getInstance()
     if pentest == "pollenisator":
         tags = json.loads(dbclient.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=JSONDecoder)
         val = tags.pop(name, None)
@@ -956,6 +986,7 @@ def updatePentestTag(pentest: str, body: Dict[str, Any]) -> ErrorStatus:
     name = body["name"]
     color = body["color"]
     level = body["level"]
+    dbclient = DBClient.getInstance()
     tags = dbclient.findInDb(pentest, "settings", {"key":"tags"}, False)
     if tags is None:
         return "Not found", 404
@@ -984,6 +1015,7 @@ def updateTag(body: Dict[str, Any]) -> Union[ErrorStatus, bool]:
     name = body["name"]
     color = body["color"]
     level = body["level"]
+    dbclient = DBClient.getInstance()
     tags = json.loads(dbclient.findInDb("pollenisator", "settings", {"key":"tags"}, False)["value"], cls=JSONDecoder)
     if name not in tags:
         return "Not found", 404
@@ -1037,20 +1069,20 @@ def check_pentest_collection_exists(dbName: str, collection:str) -> Union[ErrorS
     Returns:
         Union[ErrorStatus, Dict[str, Any]]: If the database or collection does not exist, returns an error message and status code. Otherwise, returns the pentest record.
     """
-    dbclient_fresh = DBClient.getInstance()
-    if dbName != "pollenisator" and dbName not in dbclient_fresh.listPentestUuids():
+    dbclient = DBClient.getInstance()
+    if dbName != "pollenisator" and dbName not in dbclient.listPentestUuids():
         return "Database not found", 404
-    dbclient_fresh.connectToDb(dbName)
-    if dbclient_fresh.db is None:
-        dbclient_fresh.connect()
-    if dbclient_fresh.db is None:
+    dbclient.connectToDb(dbName)
+    if dbclient.db is None:
+        dbclient.connect()
+    if dbclient.db is None:
         return "Connection to database failed", 503
-    collections = dbclient_fresh.db.list_collection_names()
+    collections = dbclient.db.list_collection_names()
     if collection != "" and collection not in collections:
         return "Collection not found in database provided", 404
     if collection != "" and not re.match(r"^[a-zA-Z0-9_\-]+$", collection):
         return "Invalid collection name", 400
-    pentest_record = dbclient_fresh.findInDb("pollenisator", "pentests", {"uuid":dbName}, False)
+    pentest_record = dbclient.findInDb("pollenisator", "pentests", {"uuid":dbName}, False)
     if pentest_record is None:
         return "Pentest not found", 404
     return pentest_record
@@ -1085,8 +1117,169 @@ def dumpDb(dbName: str, collection: str = "") -> Union[ErrorStatus, Response]:
     response.call_on_close(lambda: shutil.rmtree(dirpath))
     return response
 
+def _extract_username_from_kwargs(**kwargs: Dict[str, Any]) -> Union[str, ErrorStatus]:
+    """
+    Extract username from kwargs, checking token_info first, then fallback to username key.
+    
+    Args:
+        **kwargs: Keyword arguments that may contain token_info or username
+        
+    Returns:
+        Union[str, ErrorStatus]: Username if found, otherwise error tuple
+    """
+    username = kwargs.get("token_info", {}).get("sub", None)
+    if username is None:
+        username = kwargs.get("username", None)
+    if username is None:
+        return "No username found", 400
+    return username
+
+def _validate_upload_file(upfile: Union[str, werkzeug.datastructures.FileStorage]) -> Union[None, ErrorStatus]:
+    """
+    Validate that the uploaded file has correct extension and mimetype.
+    
+    Args:
+        upfile: The file to validate
+        
+    Returns:
+        Union[None, ErrorStatus]: None if valid, error tuple otherwise
+    """
+    valid_extensions = (".zip", ".gz")
+    valid_mimetypes = ("application/zip", "application/x-zip-compressed")
+    
+    if not isinstance(upfile, str):
+        filename = getattr(upfile, "filename", "")
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in valid_extensions:
+            return "Invalid file extension", 400
+        mimetype = getattr(upfile, "mimetype", "")
+        if mimetype not in valid_mimetypes:
+            return "Invalid mime type", 400
+    else:
+        ext = os.path.splitext(upfile)[1].lower()
+        if ext not in valid_extensions:
+            return "Invalid file extension", 400
+    return None
+
+def _prepare_temp_file(upfile: Union[str, werkzeug.datastructures.FileStorage], dirpath: str) -> Union[str, ErrorStatus]:
+    """
+    Prepare temporary file from uploaded file or string path.
+    
+    Args:
+        upfile: The uploaded file or file path
+        dirpath: Directory to create temp file in
+        
+    Returns:
+        Union[str, ErrorStatus]: Path to temp file or error tuple
+    """
+    if not isinstance(upfile, str):
+        if upfile.filename is None:
+            return "Invalid filename", 400
+        with tempfile.NamedTemporaryFile(dir=dirpath, delete=False) as temp_file:
+            tmpfile = temp_file.name
+            temp_file.write(upfile.stream.read())
+    else:
+        tmpfile = upfile
+    return tmpfile
+
+def _extract_archive_contents(tmpfile: str, dirpath: str) -> Union[str, ErrorStatus]:
+    """
+    Extract archive contents and find pentest archive file.
+    
+    Args:
+        tmpfile: Path to archive file
+        dirpath: Directory to extract to
+        
+    Returns:
+        Union[str, ErrorStatus]: Path to pentest archive or error tuple
+    """
+    pentest_archive = ""
+    with zipfile.ZipFile(tmpfile, 'r') as zip_ref:
+        for member in zip_ref.namelist():
+            member_path = os.path.join(dirpath, os.path.basename(member))
+            if not os.path.commonprefix([dirpath, os.path.abspath(member_path)]) == dirpath:
+                return "Invalid file path", 400
+            if member.endswith(".gz"):
+                pentest_archive = os.path.join(dirpath, os.path.basename(member))
+            zip_ref.extract(os.path.basename(member), dirpath)
+    
+    if "pentest.json" not in os.listdir(dirpath):
+        return "Missing pentest.json file", 400
+    if pentest_archive == "":
+        return "Missing database dump file", 400
+    
+    return pentest_archive
+
+def _load_and_validate_pentest_config(dirpath: str) -> Union[Dict[str, Any], ErrorStatus]:
+    """
+    Load and validate pentest configuration from pentest.json.
+    
+    Args:
+        dirpath: Directory containing pentest.json
+        
+    Returns:
+        Union[Dict[str, Any], ErrorStatus]: Pentest config dict or error tuple
+    """
+    pentest_json_path = os.path.join(dirpath, "pentest.json")
+    with open(pentest_json_path, "r", encoding="utf-8") as f:
+        pentest = json.load(f)
+    
+    if "uuid" not in pentest or "nom" not in pentest:
+        return "Invalid pentest file", 400
+    
+    return pentest
+
+def _validate_pentest_import_conditions(pentest: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[None, ErrorStatus]:
+    """
+    Validate conditions for pentest import.
+    
+    Args:
+        pentest: Pentest configuration dictionary
+        **kwargs: Additional arguments including isCopy flag
+        
+    Returns:
+        Union[None, ErrorStatus]: None if valid, error tuple otherwise
+    """
+    orig_uuid = pentest["uuid"]
+    if orig_uuid == "pollenisator":
+        return "Cannot import into main database", 403
+    dbclient = DBClient.getInstance()
+    if orig_uuid in dbclient.listPentestUuids() and not kwargs.get("isCopy", False):
+        return "Pentest already exists", 400
+    return None
+
+def _import_database_and_files(username: str, pentest_archive: str, pentest: Dict[str, Any], 
+                               dirpath: str, **kwargs: Dict[str, Any]) -> Union[str, ErrorStatus]:
+    """
+    Import database and associated files.
+    
+    Args:
+        username: User performing the import
+        pentest_archive: Path to pentest archive
+        pentest: Pentest configuration
+        dirpath: Working directory
+        **kwargs: Additional arguments including toDb
+        
+    Returns:
+        Union[str, ErrorStatus]: New UUID if successful, error tuple otherwise
+    """
+    orig_uuid = pentest["uuid"]
+    to_name = kwargs.get("toDb", pentest["nom"])
+    dbclient = DBClient.getInstance()
+    msg, success_status = dbclient.importDatabase(username, pentest_archive, to_name, orig_uuid)
+    if success_status != 200:
+        return msg, success_status
+    
+    new_uuid = msg
+    if "files.zip" in os.listdir(dirpath):
+        output_file_path = os.path.abspath(os.path.join(getMainDir(), "files", new_uuid))
+        with zipfile.ZipFile(os.path.join(dirpath, "files.zip"), 'r') as zip_ref:
+            zip_ref.extractall(output_file_path)
+    
+    return new_uuid
+
 @permission("user")
-def importDb(upfile: Union[str,werkzeug.datastructures.FileStorage], **kwargs: Dict[str,Any]) -> ErrorStatus:
+def importDb(upfile: Union[str, werkzeug.datastructures.FileStorage], **kwargs: Dict[str, Any]) -> ErrorStatus:
     """
     Import a database dump from a file.
 
@@ -1097,70 +1290,50 @@ def importDb(upfile: Union[str,werkzeug.datastructures.FileStorage], **kwargs: D
     Returns:
         ErrorStatus: A message and status code indicating success or error.
     """
-    username = kwargs.get("token_info", {}).get("sub", None)
-    if username is None:
-        username = kwargs.get("username", None)
-    if username is None:
-        return "No username found", 400
-    dirpath = tempfile.mkdtemp()
-    # validate that the uploaded file is a zip archive
-    if not isinstance(upfile, str):
-        filename = getattr(upfile, "filename", "")
-        ext = os.path.splitext(filename)[1].lower()
-        if ext not in (".zip", ".gz"):
-            return "Invalid file extension", 400
-        mimetype = getattr(upfile, "mimetype", "")
-        if mimetype not in ("application/zip", "application/x-zip-compressed"):
-            return "Invalid mime type", 400
-    else:
-        ext = os.path.splitext(upfile)[1].lower()
-        if ext not in (".zip", ".gz"):
-            return "Invalid file extension", 400
-    if not isinstance(upfile, str):
-        if upfile.filename is None:
-            return "Invalid filename", 400
-        with tempfile.NamedTemporaryFile(dir=dirpath, delete=False) as temp_file:
-            tmpfile = temp_file.name
-            temp_file.write(upfile.stream.read())
-    else:
-        tmpfile = upfile
+    # Extract username from kwargs
+    username = _extract_username_from_kwargs(**kwargs)
+    if isinstance(username, tuple):
+        return username
     
-    pentest_archive = ""
-    with zipfile.ZipFile(tmpfile, 'r') as zip_ref:
-        for member in zip_ref.namelist():
-            member_path = os.path.join(dirpath, os.path.basename(member))
-            if not os.path.commonprefix([dirpath, os.path.abspath(member_path)]) == dirpath:
-                return "Invalid file path", 400
-            if member.endswith(".gz"):
-                pentest_archive = os.path.join(dirpath, os.path.basename(member))
-            zip_ref.extract(os.path.basename(member), dirpath)
-    if "pentest.json" not in os.listdir(dirpath):
-        return "Missing pentest.json file", 400
-    if pentest_archive == "":
-        return "Missing database dump file", 400
-    with open(os.path.join(dirpath, "pentest.json"), "r", encoding="utf-8") as f:
-        pentest = json.load(f)
-    if "uuid" not in pentest or "nom" not in pentest:
-        return "Invalid pentest file", 400
-   
-    orig_uuid = pentest["uuid"]
-    if orig_uuid == "pollenisator":
-        return "Cannot import into main database", 403
-    if orig_uuid in dbclient.listPentestUuids() and not kwargs.get("isCopy", False):
-        return "Pentest already exists", 400
-    to_name = kwargs.get("toDb", pentest["nom"])
-    msg, success_status = dbclient.importDatabase(username, pentest_archive, to_name, orig_uuid)
-    if success_status != 200:
+    # Create temporary directory
+    dirpath = tempfile.mkdtemp()
+    
+    try:
+        # Validate uploaded file
+        validation_error = _validate_upload_file(upfile)
+        if validation_error is not None:
+            return validation_error
+        
+        # Prepare temporary file
+        tmpfile = _prepare_temp_file(upfile, dirpath)
+        if isinstance(tmpfile, tuple):
+            return tmpfile
+        
+        # Extract archive contents
+        pentest_archive = _extract_archive_contents(tmpfile, dirpath)
+        if isinstance(pentest_archive, tuple):
+            return pentest_archive
+        
+        # Load and validate pentest configuration
+        pentest = _load_and_validate_pentest_config(dirpath)
+        if isinstance(pentest, tuple):
+            return pentest
+        
+        # Validate import conditions
+        validation_error = _validate_pentest_import_conditions(pentest, **kwargs)
+        if validation_error is not None:
+            return validation_error
+        
+        # Import database and files
+        result = _import_database_and_files(username, pentest_archive, pentest, dirpath, **kwargs)
+        if isinstance(result, tuple):
+            return result
+        
+        return result, 200
+        
+    finally:
+        # Always cleanup temporary directory
         shutil.rmtree(dirpath)
-        return msg, success_status
-    new_uuid = msg
-    if "files.zip" in os.listdir(dirpath):
-        output_file_path = os.path.abspath(os.path.join(getMainDir(), "files", new_uuid))
-        with zipfile.ZipFile(os.path.join(dirpath, "files.zip"), 'r') as zip_ref:
-            zip_ref.extractall(output_file_path)
-
-    shutil.rmtree(dirpath)
-    return new_uuid, 200
 
 
 @permission("pentester", "body.fromDb")
@@ -1223,6 +1396,163 @@ def doImportCommands(data: str, user: str) -> Union[ErrorStatus, List[Dict[str, 
             failed.append(command)
     return failed
 
+def _validate_cheatsheet_data(data: str) -> Union[ErrorStatus, Dict[str, Any]]:
+    """
+    Validate and parse cheatsheet data from JSON string.
+
+    Args:
+        data (str): The JSON string containing the cheatsheet.
+
+    Returns:
+        Union[ErrorStatus, Dict[str, Any]]: Error tuple if validation fails, otherwise parsed data.
+    """
+    try:
+        checks = json.loads(data, cls=JSONDecoder)
+    except:
+        return "Invalid file format, json expected", 400
+    
+    if not isinstance(checks, dict):
+        return "Invalid file format, object expected", 400
+    
+    # Validate required properties and their types
+    required_properties = {
+        "checkitems": "checkitems  properties must be lists",
+        "commands": "commands  properties must be lists", 
+        "defects": "defects  properties must be lists"
+    }
+    
+    for prop, error_msg in required_properties.items():
+        if prop not in checks.keys():
+            return f"Invalid file format, object expected property: {prop}", 400
+        if not isinstance(checks[prop], list):
+            return f"Invalid file format, {error_msg}", 400
+    
+    return checks
+
+
+def _import_cheatsheet_commands(commands: List[Dict[str, Any]], user: str, dbclient: Any, 
+                               failed: List[Dict[str, Any]]) -> Dict[str, str]:
+    """
+    Import commands from cheatsheet data.
+
+    Args:
+        commands (List[Dict[str, Any]]): List of command dictionaries to import.
+        user (str): The user performing the import.
+        dbclient (Any): Database client instance.
+        failed (List[Dict[str, Any]]): List to append failed imports to.
+
+    Returns:
+        Dict[str, str]: Mapping of original IDs to new IDs.
+    """
+    matching_commands = {}
+    
+    for command in commands:
+        save_id = str(command["_id"])
+        del command["_id"]
+        command_o = Command("pollenisator", command)
+        obj_ins = command_o.addInDb()
+        
+        if not obj_ins["res"]:
+            existing_command = Command.fetchObject("pollenisator", {"_id": ObjectId(obj_ins["iid"])})
+            if existing_command is not None:
+                existing_data = existing_command.getData()
+                existing_data |= command_o.getData()
+                if "_id" in existing_data:
+                    del existing_data["_id"]
+                dbclient.updateInDb("pollenisator", "commands", {"_id": ObjectId(obj_ins["iid"])}, {"$set": existing_data})
+        
+        command_o._id = ObjectId(obj_ins["iid"])
+        command_o.addOwner(user)
+        matching_commands[save_id] = str(obj_ins["iid"])
+        
+        if not obj_ins["res"]:
+            failed.append(command)
+    
+    return matching_commands
+
+
+def _import_cheatsheet_defects(defects: List[Dict[str, Any]], failed: List[Dict[str, Any]]) -> Dict[str, str]:
+    """
+    Import defects from cheatsheet data.
+
+    Args:
+        defects (List[Dict[str, Any]]): List of defect dictionaries to import.
+        failed (List[Dict[str, Any]]): List to append failed imports to.
+
+    Returns:
+        Dict[str, str]: Mapping of original IDs to new IDs.
+    """
+    matching_defects = {}
+    
+    for defect in defects:
+        save_id = str(defect["_id"])
+        del defect["_id"]
+        try:
+            obj_ins = Defect("pollenisator", defect).addInDb()
+            matching_defects[save_id] = str(obj_ins["iid"])
+            if not obj_ins["res"]:
+                failed.append(defect)
+        except ValueError as _e:
+            failed.append(defect)
+    
+    return matching_defects
+
+
+def _update_check_references(check: Dict[str, Any], matching_commands: Dict[str, str], 
+                           matching_defects: Dict[str, str]) -> None:
+    """
+    Update check item references to use new command and defect IDs.
+
+    Args:
+        check (Dict[str, Any]): Check item dictionary to update.
+        matching_commands (Dict[str, str]): Mapping of original command IDs to new IDs.
+        matching_defects (Dict[str, str]): Mapping of original defect IDs to new IDs.
+    """
+    check_commands = check.get("commands", [])
+    check_defects = check.get("defects", [])
+    check_defect_tags = check.get("defect_tags", [])
+    
+    # Update command references
+    check["commands"] = []
+    for command in check_commands:
+        if str(command) in matching_commands:
+            check["commands"].append(matching_commands[str(command)])
+    
+    # Update defect references
+    check["defects"] = []
+    for defect in check_defects:
+        if str(defect) in matching_defects:
+            check["defects"].append(matching_defects[str(defect)])
+    
+    # Update defect tag references
+    defect_tags = []
+    for defect_tag in check_defect_tags:
+        if str(defect_tag[1]) in matching_defects:
+            defect_tag[1] = str(matching_defects[str(defect_tag[1])])
+            defect_tags.append(defect_tag)
+    check["defect_tags"] = defect_tags
+
+
+def _import_cheatsheet_checkitems(checkitems: List[Dict[str, Any]], matching_commands: Dict[str, str], 
+                                 matching_defects: Dict[str, str]) -> None:
+    """
+    Import check items from cheatsheet data.
+
+    Args:
+        checkitems (List[Dict[str, Any]]): List of check item dictionaries to import.
+        matching_commands (Dict[str, str]): Mapping of original command IDs to new IDs.
+        matching_defects (Dict[str, str]): Mapping of original defect IDs to new IDs.
+    """
+    for check in checkitems:
+        save_id = str(check["_id"])
+        del check["_id"]
+        
+        _update_check_references(check, matching_commands, matching_defects)
+        
+        check_o = CheckItem("pollenisator", check)
+        check_o.addInDb()
+
+
 def doImportCheatsheet(data: str, user: str) -> Union[ErrorStatus, List[Dict[str, Any]]]:
     """
     Import a cheatsheet from a JSON string.
@@ -1234,78 +1564,24 @@ def doImportCheatsheet(data: str, user: str) -> Union[ErrorStatus, List[Dict[str
     Returns:
         Union[ErrorStatus, List[Dict[str, Any]]]: If the import was unsuccessful, returns an error message and status code. Otherwise, returns a list of items that failed to import.
     """
-    try:
-        checks = json.loads(data, cls=JSONDecoder)
-    except:
-        return "Invalid file format, json expected", 400
-    if not isinstance(checks, dict):
-        return "Invalid file format, object expected", 400
-    if "checkitems" not in checks.keys():
-        return "Invalid file format, object expected property: checkitems", 400
-    if not isinstance(checks["checkitems"], list):
-        return "Invalid file format, checkitems  properties must be lists", 400
-    matching_commands = {}
-    matching_defects = {}
+    # Validate and parse input data
+    checks = _validate_cheatsheet_data(data)
+    if isinstance(checks, tuple):
+        return checks
+    
+    # Initialize tracking variables
     dbclient = DBClient.getInstance()
-    failed = []
-    if "commands" not in checks.keys():
-        return "Invalid file format, object expected property: commands", 400
-    if not isinstance(checks["commands"], list):
-        return "Invalid file format, commands  properties must be lists", 400
-    if "defects" not in checks.keys():
-        return "Invalid file format, object expected property: defects", 400
-    if not isinstance(checks["defects"], list):
-        return "Invalid file format, defects  properties must be lists", 400
-    for command in checks["commands"]:
-        save_id = str(command["_id"])
-        del command["_id"]
-        command_o = Command("pollenisator", command)
-        obj_ins = command_o.addInDb()
-        if not obj_ins["res"]:
-            existing_command = Command.fetchObject("pollenisator", {"_id":ObjectId(obj_ins["iid"])})
-            if existing_command is not None:
-                existing_data = existing_command.getData()
-                existing_data |= command_o.getData()
-                if "_id" in existing_data:
-                    del existing_data["_id"]
-                dbclient.updateInDb("pollenisator",  "commands", {"_id":ObjectId(obj_ins["iid"])}, {"$set":existing_data})
-        command_o._id = ObjectId(obj_ins["iid"])
-        command_o.addOwner(user)
-        matching_commands[save_id] = str(obj_ins["iid"])
-        if not obj_ins["res"]:
-            failed.append(command)
-    for defect in checks["defects"]:
-        save_id = str(defect["_id"])
-        del defect["_id"]
-        try:
-            obj_ins = Defect("pollenisator", defect).addInDb()
-            matching_defects[save_id] = str(obj_ins["iid"])
-            if not obj_ins["res"]:
-                failed.append(defect)
-        except ValueError as _e:
-            failed.append(defect)
-    for check in checks["checkitems"]:
-        save_id = str(check["_id"])
-        del check["_id"]
-        check_commands = check.get("commands", [])
-        check_defects = check.get("defects", [])
-        check_defect_tags = check.get("defect_tags", [])
-        check["commands"] = []
-        for command in check_commands:
-            if str(command) in matching_commands:
-                check["commands"].append(matching_commands[str(command)])
-        check["defects"] = []
-        for defect in check_defects:
-            if str(defect) in matching_defects:
-                check["defects"].append(matching_defects[str(defect)])
-        defect_tags = []
-        for defect_tag in check_defect_tags:
-            if str(defect_tag[1]) in matching_defects:
-                defect_tag[1] = str(matching_defects[str(defect_tag[1])])
-                defect_tags.append(defect_tag)
-        check["defect_tags"] = defect_tags
-        check_o = CheckItem("pollenisator", check)
-        check_o.addInDb()
+    failed: List[Dict[str,Any]] = []
+    
+    # Import commands and track ID mappings
+    matching_commands = _import_cheatsheet_commands(checks["commands"], user, dbclient, failed)
+    
+    # Import defects and track ID mappings
+    matching_defects = _import_cheatsheet_defects(checks["defects"], failed)
+    
+    # Import check items with updated references
+    _import_cheatsheet_checkitems(checks["checkitems"], matching_commands, matching_defects)
+    
     return failed
 
 @permission("user")
@@ -1356,6 +1632,7 @@ def doExportCommands() -> Dict[str, List[Dict[str, Any]]]:
         Dict[str, List[Dict[str, Any]]]: A dictionary with a "commands" key containing a list of all commands in the database.
     """
     res: Dict[str, List[Dict[str, Any]]] = {"commands":[]}
+    dbclient = DBClient.getInstance()
     commands = dbclient.findInDb("pollenisator", "commands", {}, True)
     for command in commands:
         c = command
@@ -1374,6 +1651,7 @@ def doExportCheatsheet() -> Dict[str, List[Dict[str, Any]]]:
         Dict[str, List[Dict[str, Any]]]: A dictionary with "checkitems", "defects", and "commands" keys each containing a list of all items in the respective collections in the database.
     """
     res: Dict[str, List[Dict[str, Any]]] = {"checkitems":[], "commands":[], "defects":[]}
+    dbclient = DBClient.getInstance()
     checks = dbclient.findInDb("pollenisator", "checkitems", {}, True)
     for check in checks:
         c = check

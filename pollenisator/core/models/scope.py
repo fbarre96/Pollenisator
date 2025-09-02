@@ -25,6 +25,9 @@ class Scope(Element):
     """
     command_variables = ["scope", "parent_domain"]
     coll_name = "scopes"
+    trigger_on_range_add = "scope:onRangeAdd"
+    trigger_on_domain_add = "scope:onDomainAdd"
+    trigger_on_add = "scope:onAdd"
 
     def __init__(self, pentest: str, valuesFromDb: Optional[Dict[str, Any]] = None) -> None:
         """
@@ -325,7 +328,8 @@ class Scope(Element):
         Returns:
             List[str]: A list of trigger names.
         """
-        return ["scope:onRangeAdd", "scope:onDomainAdd", "scope:onAdd"]
+
+        return [Scope.trigger_on_range_add, Scope.trigger_on_domain_add, Scope.trigger_on_add]
 
     def checkAllTriggers(self) -> None:
         """
@@ -338,9 +342,9 @@ class Scope(Element):
         Adds the appropriate checks to this scope based on whether it is a network IP or a domain.
         """
         if utils.isNetworkIp(self.scope):
-            self.addChecks(["scope:onRangeAdd", "scope:onAdd"])
+            self.addChecks([Scope.trigger_on_range_add, Scope.trigger_on_add])
         else:
-            self.addChecks(["scope:onDomainAdd", "scope:onAdd"])
+            self.addChecks([Scope.trigger_on_domain_add, Scope.trigger_on_add])
 
     def addChecks(self, lvls: List[str]) -> None:
         """

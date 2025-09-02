@@ -293,7 +293,10 @@ components:
                 type: string
               title:
                 type: string
-    
+      required:
+        - title
+        - risk
+
     Intervals:
       properties:
         wave:
@@ -1165,6 +1168,7 @@ paths:
                   value: "Not found"
   "/search/{pentest}":
     get:
+      deprecated: true
       operationId: pollenisator.server.mongo.search
       tags:
         - Mongo

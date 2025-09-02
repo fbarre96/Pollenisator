@@ -362,6 +362,39 @@ def replace_defect_links(description: str, defects: List[Dict[str, Any]]) -> str
             raise KeyError(f"Defect {re_match.group(1)} is referenced and was not found")
     return description
 
+def add_global_infos_in_context(pentest: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Add global information about the pentest to the context.
+
+    Args:
+        pentest (str): The name of the pentest.
+        context (Dict[str, Any]): The context to add the global information to.
+
+    Returns:
+        Dict[str, Any]: The context with the added global information.
+    """
+    context["pentest"] = pentest
+    date = datetime.now()
+    context["year"] = date.strftime("%Y")
+    context["month"] = date.strftime("%B").lower()
+    context["colors"] = {
+        "fix": {
+            "Easy": "00B0F0",
+            "Moderate": "0070C0",
+            "Mean": "0070C0",
+            "Hard": "002060",
+            "Quick Win": "00B0F0",
+            "Weak": "00B0F0",
+            "Strong": "002060",
+        }
+    }
+    return context
+
+def add_scopes_in_context(pentest: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    dbclient = DBClient.getInstance()
+    scopes_list = [scope for scope in dbclient.findInDb(pentest, "scopes", {}, True)]
+    context["scopes"] = scopes_list
+    return context
 
 def craftContext(pentest: str, **kwargs: Any) -> Dict[str, Any]:
     """
@@ -374,55 +407,46 @@ def craftContext(pentest: str, **kwargs: Any) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: The crafted context for the report.
     """
-    dbclient = DBClient.getInstance()
     context = {}
     for k, v in kwargs.items():
         context[k] = v
-    context["pentest"] = pentest
-    date = datetime.now()
-    context["year"] = date.strftime("%Y")
-    context["month"] = date.strftime("%B").lower()
-    context["positive_remarks"] = []
-    context["negative_remarks"] = []
-    context["neutral_remarks"] = []
-    remarks = dbclient.findInDb(pentest, "remarks", {}, True)
-    for remark in remarks:
-        if remark["type"].lower() == "positive":
-            context["positive_remarks"].append(remark.get("description", remark.get("title", "")))
-        elif remark["type"].lower() == "negative":
-            context["negative_remarks"].append(remark.get("description", remark.get("title", "")))
-        elif remark["type"].lower() == "neutral":
-            context["neutral_remarks"].append(remark.get("description", remark.get("title", "")))
-    context["colors"] = {
-        "fix": {
-            "Easy": "00B0F0",
-            "Moderate": "0070C0",
-            "Mean": "0070C0",
-            "Hard": "002060",
-            "Quick Win": "00B0F0",
-            "Weak": "00B0F0",
-            "Strong": "002060",
-        }
-    }
-    scopes_list = [scope for scope in dbclient.findInDb(pentest, "scopes", {}, True)]
-    context["scopes"] = scopes_list
-    pentesters = dbclient.getPentestUsers(pentest)
-    context["pentesters"] = []
-    for pentesterName in pentesters:
-        p = dbclient.getUserRecordFromUsername(pentesterName)
-        if p is not None:
-            context["pentesters"].append(p)
-    owner = dbclient.getPentestOwner(pentest)
-    p = dbclient.getUserRecordFromUsername(owner)
-    context["owner"] = p if p is not None else None
-    ports = dbclient.findInDb(pentest, "ports", {}, True)
-    ports = [port for port in ports]
-    ports.sort(key=lambda x: (x["ip"],int(x["port"])))
-    context["ports"] = ports
-    defects = Defect.getGlobalDefects(pentest)
+    context = add_global_infos_in_context(pentest, context)
+    context = add_remarks_in_context(pentest, context)
+    context = add_scopes_in_context(pentest, context)
+    context = add_pentesters_in_context(pentest, context)
+    context = add_ports_in_context(pentest, context)
+    context = add_defects_in_context(pentest, context)
+    context = add_additional_sections_in_context(pentest, context)
+    return context
+
+def add_additional_sections_in_context(pentest: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    dbclient = DBClient.getInstance()
+    try:
+        additional_sections = dbclient.findInDb("pollenisator", "additionalreportsections", {}, True)
+        if additional_sections is None:
+            additional_sections = []
+        lookup = {}
+        for additional_section in additional_sections:
+            lookup[str(additional_section["_id"])] = additional_section.get("title", "")
+        pentest_sections = dbclient.findInDb(pentest, "additionalreportsections", {}, True)
+        if pentest_sections is None:
+            pentest_sections = []
+        for pentest_section in pentest_sections:
+            if "_id" in pentest_section:
+                del pentest_section["_id"]
+            title = lookup.get(str(pentest_section.get("section_id", "")), "")
+            if title != "":
+                context[title] = context.get(title, {}) | pentest_section
+    except Exception as e:
+        logger.error(f"Error while adding additional sections to the report: {e}")
+    return context
+
+def add_defects_in_context(pentest:str, context: Dict[str, Any]) -> Dict[str, Any]:
+    dbclient = DBClient.getInstance()
     completed_defects = []
     completed_fixes = []
     defect_id = 1
+    defects = Defect.getGlobalDefects(pentest)
     for defect in defects:
         defect_completed = defect
         defect_completed["id"] = str(defect_id)
@@ -471,25 +495,42 @@ def craftContext(pentest: str, **kwargs: Any) -> Dict[str, Any]:
         completed_defects.append(defect_completed)
     context["defects"] = completed_defects
     context["fixes"] = completed_fixes
-    try:
-        additional_sections = dbclient.findInDb("pollenisator", "additionalreportsections", {}, True)
-        if additional_sections is None:
-            additional_sections = []
-        lookup = {}
-        for additional_section in additional_sections:
-            lookup[str(additional_section["_id"])] = additional_section.get("title", "")
-        pentest_sections = dbclient.findInDb(pentest, "additionalreportsections", {}, True)
-        if pentest_sections is None:
-            pentest_sections = []
-        for pentest_section in pentest_sections:
-            if "_id" in pentest_section:
-                del pentest_section["_id"]
-            title = lookup.get(str(pentest_section.get("section_id", "")), "")
-            if title != "":
-                context[title] = context.get(title, {}) | pentest_section
-    except Exception as e:
-        logger.error(f"Error while adding additional sections to the report: {e}")
-    
+    return context
+
+def add_ports_in_context(pentest:str , context: Dict[str, Any]) -> Dict[str, Any]:
+    dbclient = DBClient.getInstance()
+    ports = dbclient.findInDb(pentest, "ports", {}, True)
+    ports = [port for port in ports]
+    ports.sort(key=lambda x: (x["ip"],int(x["port"])))
+    context["ports"] = ports
+    return context
+
+def add_pentesters_in_context(pentest: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    dbclient = DBClient.getInstance()
+    pentesters = dbclient.getPentestUsers(pentest)
+    context["pentesters"] = []
+    for pentesterName in pentesters:
+        p = dbclient.getUserRecordFromUsername(pentesterName)
+        if p is not None:
+            context["pentesters"].append(p)
+    owner = dbclient.getPentestOwner(pentest)
+    p = dbclient.getUserRecordFromUsername(owner)
+    context["owner"] = p if p is not None else None
+    return context
+
+def add_remarks_in_context(pentest: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    dbclient = DBClient.getInstance()
+    context["positive_remarks"] = []
+    context["negative_remarks"] = []
+    context["neutral_remarks"] = []
+    remarks = dbclient.findInDb(pentest, "remarks", {}, True)
+    for remark in remarks:
+        if remark["type"].lower() == "positive":
+            context["positive_remarks"].append(remark.get("description", remark.get("title", "")))
+        elif remark["type"].lower() == "negative":
+            context["negative_remarks"].append(remark.get("description", remark.get("title", "")))
+        elif remark["type"].lower() == "neutral":
+            context["neutral_remarks"].append(remark.get("description", remark.get("title", "")))
     return context
 
 def getProofPath(pentest: str, defect_iid: ObjectId) -> str:

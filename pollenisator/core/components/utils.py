@@ -8,7 +8,7 @@ from threading import Timer
 import json
 import shutil
 import re
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from netaddr import IPNetwork
 from netaddr.core import AddrFormatError
 from bson import ObjectId
@@ -346,7 +346,7 @@ def fitNowTime(dated: Optional[str], datef: Optional[str]) -> bool:
         return False
     return today > date_start and date_end > today
 
-def setupKillTimer(timeout: Optional[Union[float, datetime]], proc: subprocess.Popen) -> Optional[float]:
+def setupKillTimer(timeout: Optional[Union[float, datetime]], proc: subprocess.Popen) -> Tuple[Optional[float], Optional[Timer]]:
     """
     Calculate the timeout to use for a command based on the given timeout and end date.
 
@@ -355,11 +355,13 @@ def setupKillTimer(timeout: Optional[Union[float, datetime]], proc: subprocess.P
         proc (subprocess.Popen): The subprocess.Popen object for the command.
 
     Returns:
-        Optional[float]: The timeout in seconds to use for the command. If datef is given and is before the current time + timeout, returns the difference between datef and current time. If datef is None or is after the current time + timeout, returns the given timeout. If both are None, returns None.
+        Tuple[Optional[float], Optional[Timer]]: 
+            - The timeout in seconds to use for the command. If datef is given and is before the current time + timeout, returns the difference between datef and current time. If datef is None or is after the current time + timeout, returns the given timeout. If both are None, returns None.
+            - The Timer object that will kill the process after the timeout. If no timeout is set, returns None.
     """
     float_timeout = None
     if timeout is None:
-        return float_timeout
+        return None, None
     if isinstance(timeout, float):
         timer = Timer(timeout, proc.kill)
         timer.start()
@@ -372,7 +374,7 @@ def setupKillTimer(timeout: Optional[Union[float, datetime]], proc: subprocess.P
     else:
         logger.error(
             "ERROR in command execution: timeout must be a float or a datetime object")
-    return float_timeout
+    return float_timeout, timer
 
 def handle_print(printStdout: bool, raw_stdout: bytes, raw_stderr: bytes) -> None:
     """
@@ -419,7 +421,7 @@ def execute(command: str, timeout: Optional[Union[float, datetime]] = None, prin
         float_timeout = None
         timer = None
         try:
-            float_timeout = setupKillTimer(timeout, proc)
+            float_timeout, timer = setupKillTimer(timeout, proc)
             raw_stdout, raw_stderr = proc.communicate(None, float_timeout)
             handle_print(printStdout, raw_stdout, raw_stderr)
         except Exception as e:

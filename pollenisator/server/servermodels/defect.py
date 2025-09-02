@@ -172,7 +172,29 @@ def update(pentest: str, defect_iid: str, force: bool, body: Dict[str, Any], **k
     username = kwargs["token_info"]["sub"]
     return doUpdate(pentest, defect_iid, body, username, force)
 
-def doUpdate(pentest: str, defect_iid: str, body: Dict[str, Any], username: str, force: bool) -> Union[bool, Tuple[str, int]]:
+def doUpdateReviewState(old: Defect, new_redacted_state: str, force:bool, username: str) -> ErrorStatus:
+    #check order
+    if not force:
+        try:
+            order = ["New", "To review", "Reviewed", "Completed"]
+            if order.index(new_redacted_state) < order.index(old.redacted_state):
+                return "You are trying to rewind in the redacted state, this will delete any pending review.", 400
+            if order.index(new_redacted_state) > order.index(old.redacted_state)+1:
+                return "You are trying to skip a redaction step, this could leave some review unaccepted.", 400
+        except ValueError:
+            return "Unknown redacted state", 400
+    old.save_history(username)
+    
+    # Delete review if needed
+    if (new_redacted_state == "New" or new_redacted_state == "To review") and old.redacted_state == "Completed":
+        old.delete_review()
+        
+    if new_redacted_state == "To review":
+        old.get_review(force=True)
+    old.redacted_state = new_redacted_state
+    return "", 200
+
+def doUpdate(pentest: str, defect_iid: str, body: Dict[str, Any], username: str, force: bool) -> ErrorStatus:
     """
     Helper function to update a defect in the database.
     Args:
@@ -192,26 +214,10 @@ def doUpdate(pentest: str, defect_iid: str, body: Dict[str, Any], username: str,
     new_redacted_state = body.get("redacted_state")
     #STATE CHANGE
     if new_redacted_state is not None and new_redacted_state != old.redacted_state:
-        #check order
-        if not force:
-            try:
-                order = ["New", "To review", "Reviewed", "Completed"]
-                if order.index(new_redacted_state) < order.index(old.redacted_state):
-                    return "You are trying to rewind in the redacted state, this will delete any pending review.", 400
-                if order.index(new_redacted_state) > order.index(old.redacted_state)+1:
-                    return "You are trying to skip a redaction step, this could leave some review unaccepted.", 400
-            except ValueError:
-                return "Unknown redacted state", 400
-        old.save_history(username)
+        msg, statuscode = doUpdateReviewState(old, new_redacted_state, force, username)
+        if statuscode != 200:
+            return msg, statuscode
         body["editor"] = username
-        # Delete review if needed
-        if (new_redacted_state == "New" or new_redacted_state == "To review") and old.redacted_state == "Completed":
-            old.delete_review()
-            
-        if new_redacted_state == "To review":
-            old.get_review(force=True)
-        old.redacted_state = new_redacted_state
-        
         old.updateInDb(body, clean_proofs=True)
     else:
         # Defect change
@@ -219,7 +225,7 @@ def doUpdate(pentest: str, defect_iid: str, body: Dict[str, Any], username: str,
             old.save_review(body)
         else:
             old.updateInDb(body, clean_proofs=False)
-    return True
+    return "Success", 200
 
 @permission("pentester")
 def getDefectHistory(pentest: str, defect_iid: str) -> Union[ErrorStatus,List[Dict[str, Any]]]:
@@ -275,7 +281,7 @@ def update_template_suggestion(defect_iid: str, body: Dict[str, Any], username: 
     return True
 
 @permission("pentester")
-def review(pentest: str, defect_iid: str) -> Dict[str, Any]:
+def review(pentest: str, defect_iid: str) -> Union[Dict[str, Any], ErrorStatus]:
     """
     Get the review of a defect. 
     Args:
@@ -499,7 +505,7 @@ def validateDefectTemplate(iid: str, **kwargs) -> Union[bool, Tuple[str, int]]:
     existing = dbclient.findInDb("pollenisator", "defects", {"$or":[{"_id":ObjectId(iid)}, {"title": suggestion.get("title")}]}, False)
     if existing is not None:
         suggestion["suggestion_type"] = "update"
-        res = doUpdate("pollenisator", iid, suggestion, username, True)
+        doUpdate("pollenisator", iid, suggestion, username, True)
     else:
         suggestion["suggestion_type"] = "insert"
         res = doInsert("pollenisator", suggestion, username)

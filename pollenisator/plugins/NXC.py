@@ -1,6 +1,7 @@
 """A plugin to parse a NetExec scan"""
 
 import re
+from typing import Any, Dict, Tuple
 
 from bson import ObjectId
 from pollenisator.core.components.tag import Tag
@@ -20,6 +21,21 @@ def remove_term_colors(data: str) -> str:
         string: the string without colors
     """
     return re.sub(r'\x1b\[[0-9;]+[a-zA-Z]', '', data)
+
+def detect_mode_change(line: str) -> Tuple[bool, str]:
+    if "Dumping LSA secrets" in line:
+        return True, "lsa"
+    elif "Dumped"  in line and "LSA secrets" in line:
+        return True, ""
+    elif "Dumping SAM hashes" in line:
+        return True, "sam"
+    elif "Added " in line and " SAM hashes" in line:
+        return True, ""
+    elif "Dumping the NTDS" in line:
+        return True, "ntds"
+    elif "Dumped " in line and "NTDS hashes" in line:
+        return True, "endntds"
+    return False, ""
 
 def getInfos(nxc_file):
     r"""Read the given nxc output file results and return a dictionnary with ips and a list of their open ports and infos.
@@ -87,26 +103,13 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
         # Search ip in file
         if line.startswith("SMB") or line.startswith("LDAP"):
             nxcFound = True
-        if "Dumping LSA secrets" in line:
-            mode = "lsa"
-            continue
-        elif "Dumped"  in line and "LSA secrets" in line:
-            mode = ""
-            continue
-        elif "Dumping SAM hashes" in line:
-            mode = "sam"
-            continue
-        elif "Added " in line and " SAM hashes" in line:
-            mode = ""
-            continue
-        elif "Dumping the NTDS" in line:
-            mode = "ntds"
-            continue
-        elif "Dumped " in line and "NTDS hashes" in line:
-            mode = ""
-            ntds = toAdd["ntds"]
-            toAdd["type"] = "success"
-            retour.append(toAdd)
+        has_changed, mode = detect_mode_change(line)
+        if has_changed:
+            if mode == "endntds":
+                ntds = toAdd.get("ntds", [])
+                toAdd["type"] = "success"
+                mode = ""
+                retour.append(toAdd)
             continue
         if mode == "":
             toAdd = {}
@@ -119,15 +122,15 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                     toAdd["port"] = res_lsassy.group(2)
                     toAdd["machine_name"] = res_lsassy.group(3)
                     toAdd["domain"] = res_lsassy.group(4)
-                    toAdd["username"] = success_infos.group(5)
-                    password = success_infos.group(6)
+                    toAdd["username"] = res_lsassy.group(5)
+                    password = res_lsassy.group(6)
                     if len(password) == 32:
                         try:
-                            toAdd["hashNT"] = success_infos.group(6)
+                            toAdd["hashNT"] = res_lsassy.group(6)
                         except:
-                            toAdd["password"] = success_infos.group(6)
+                            toAdd["password"] = res_lsassy.group(6)
                     else:
-                        toAdd["password"] = success_infos.group(6)
+                        toAdd["password"] = res_lsassy.group(6)
             else:
                 res_infos = re.search(regex_info, line)
                 res_asrep = re.search(regex_module_asproast, line)

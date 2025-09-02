@@ -93,6 +93,32 @@ def getAvgDefectRisk(pentests):
         avg_defect_risk[key] = value / total * 100
     return avg_defect_risk
 
+def filter_pentests(pentests, start_date=None, end_date=None, pentest_types=None, start_duration=0, end_duration=99999999):
+    """
+    Filter pentests
+    """
+    dbclient = DBClient.getInstance()
+    filtered_pentests = []
+    for pentest in pentests:
+        if pentest_types is not None:
+            pentest_type_setting = dbclient.findInDb(pentest["uuid"], "settings", {"key": "pentest_type"}, False)
+            if pentest_type_setting is not None:
+                if pentest_type_setting.get("value", "").lower() not in pentest_types:
+                    continue
+        
+        intervals = Interval.fetchObjects(pentest["uuid"], {})
+        duration = 0
+        for interval in intervals:
+            if interval is not None:
+                interval = cast(Interval, interval)
+                dated = interval.getStartDate()
+                datef = interval.getEndingDate()
+                if dated is None or datef is None:
+                    continue
+                duration += (datef - dated).days
+        if duration >= start_duration and duration <= end_duration:
+            filtered_pentests.append(pentest["uuid"])
+    return filtered_pentests
 
 @permission("user")
 def getStatistics(body: Dict[str, Any], **kwargs):
@@ -127,27 +153,7 @@ def getStatistics(body: Dict[str, Any], **kwargs):
     pentests = [pentest for pentest in dbclient.findInDb("pollenisator", "pentests", {"creation_date":{"$gte":start_date,"$lt":end_date} }, True, use_cache=False)]
     if pentests is None or len(pentests) <= 0:
         return "No pentests found", 404 
-    filtered_pentests = []
-    for pentest in pentests:
-        if pentest_types is not None:
-            pentest_type_setting = dbclient.findInDb(pentest["uuid"], "settings", {"key": "pentest_type"}, False)
-            if pentest_type_setting is not None:
-                if pentest_type_setting.get("value", "").lower() not in pentest_types:
-                    continue
-        
-        intervals = Interval.fetchObjects(pentest["uuid"], {})
-        duration = 0
-        for interval in intervals:
-            if interval is not None:
-                interval = cast(Interval, interval)
-                dated = interval.getStartDate()
-                datef = interval.getEndingDate()
-                if dated is None or datef is None:
-                    continue
-                duration += (datef - dated).days
-        if duration >= start_duration and duration <= end_duration:
-            filtered_pentests.append(pentest["uuid"])
-
+    filtered_pentests = filter_pentests(pentests, start_date, end_date, pentest_types, start_duration, end_duration)
     if len(filtered_pentests) <= 0:
         return "No pentests found matching your criterion", 404
     stats = {}

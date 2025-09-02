@@ -1,0 +1,30 @@
+# Testing dependencies
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0
+pytest-flask>=1.2.0
+pytest-httpx>=0.21.0
+pytest-xdist
+pytest-mock
+pytest-timeout>=2.1.0
+
+# API testing specific
+httpx>=0.24.0
+requests-mock>=1.10.0
+fakeredis>=2.10.0
+mongomock>=4.1.2
+pytest-benchmark
+
+# Test data generation
+factory-boy>=3.2.0
+faker>=18.0.0
+
+# Coverage and reporting
+coverage>=7.0.0
+pytest-html>=3.1.0
+pytest-json-report>=1.5.0
+
+# Database testing utilities
+pymongo>=3.11.0
+testcontainers>=3.7.0

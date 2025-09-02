@@ -254,7 +254,7 @@ def _get_or_create_tools(pentest: str, target: Optional[Dict[str, Any]], tools_i
                 tool_m.scanner_ip = user
                 tool_iid = tool_m.getId()
 
-    if tools_m is None or len(tools_m) == 0:  # tool not found, create it
+    if len(tools_m) == 0:  # tool not found, create it
         if target is None:
             wave = scope = ip = port = proto = None
         else:
@@ -338,33 +338,36 @@ def _process_plugin_result(pentest: str, result: Dict[str, Any], default_target:
 
     # ADD THE RESULTING TOOL TO AFFECTED
     for target in targets.values():
-        date = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        check_iid: Optional[ObjectId] = None
+        create_tool_for_target(pentest, toolName, user, upfile, plugin, notes, tags, lvl, target)
+
+def create_tool_for_target(pentest, toolName, user, upfile, plugin, notes, tags, lvl, target):
+    date = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    check_iid: Optional[ObjectId] = None
         
-        if target is None:
-            tools_iids: List[ObjectId] = []
-        else:
-            lvl = str(target.get("lvl", lvl))
-            check_iid = target.get("check_iid", None)
-            check_iids = []
-            if not isinstance(check_iid, list):
-                try:
-                    check_iid = None if target.get("check_iid", None) is None else ObjectId(target["check_iid"])
-                    check_iids.append(check_iid)
-                except bson.errors.InvalidId:
-                    check_iid = None
-            check_iids = [ObjectId(x) for x in check_iids if x is not None]
-            tools_iids = target.get("tool_iid", [])
-            if not isinstance(tools_iids, list):
-                tools_iids = [tools_iids]
-            tools_iids = [ObjectId(x) for x in tools_iids if is_valid_object_id(x)]
+    if target is None:
+        tools_iids: List[ObjectId] = []
+    else:
+        lvl = str(target.get("lvl", lvl))
+        check_iid = target.get("check_iid", None)
+        check_iids = []
+        if not isinstance(check_iid, list):
+            try:
+                check_iid = None if target.get("check_iid", None) is None else ObjectId(target["check_iid"])
+                check_iids.append(check_iid)
+            except bson.errors.InvalidId:
+                check_iid = None
+        check_iids = [ObjectId(x) for x in check_iids if x is not None]
+        tools_iids = target.get("tool_iid", [])
+        if not isinstance(tools_iids, list):
+            tools_iids = [tools_iids]
+        tools_iids = [ObjectId(x) for x in tools_iids if is_valid_object_id(x)]
             
-        tools_m = _get_or_create_tools(pentest, target, tools_iids, toolName, check_iid, 
+    tools_m = _get_or_create_tools(pentest, target, tools_iids, toolName, check_iid, 
                                                lvl, user, notes, date)
-        _finalize_tool_processing(pentest, tools_m, tags, upfile, plugin)
+    _finalize_tool_processing(pentest, tools_m, tags, upfile, plugin)
 
 @permission("pentester")
-def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage, body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[str, Dict[str, int]]:
+def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage, body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[str, Dict[str, int], ErrorStatus]:
     """
     Import an existing file into the pentest.
 
@@ -383,7 +386,7 @@ def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage
     parse_result = _parse_import_parameters(body)
     if isinstance(parse_result, tuple) and len(parse_result) == 2:
         error_msg, statuscode = parse_result
-        return error_msg,statuscode  # Return just the error message
+        return error_msg, statuscode  # Return just the error message
     plugin, default_target, cmdline = cast(Tuple[str, Dict[str, Any], str], parse_result)
 
     # Prepare file information
@@ -428,6 +431,40 @@ def listFilesAll(pentest: str, filetype: FileType) -> Union[ErrorStatus, List[Di
         return "No files found", 404
     return files
 
+def _list_proof_files(pentest: str, attached_to: ObjectId) -> List[str]:
+    """
+    List all proof files attached to a defect by its id.
+    """
+    defect = Defect.fetchObject(pentest, {"_id": attached_to})
+    if defect is None:
+        return []
+    defect = cast(Defect, defect)
+    try:
+        return defect.listProofFiles()
+    except FileNotFoundError:
+        return []
+
+def _list_result_files(pentest: str, attached_to: ObjectId) -> List[str]:
+    tool = Tool.fetchObject(pentest, {"_id": attached_to})
+    if tool is None:
+        return []
+    tool = cast(Tool, tool)
+    return tool.listResultFiles()
+
+def _list_file_files(pentest: str) -> List[str]:
+    file_local_path = os.path.normpath(os.path.join(getMainDir(), "files"))
+    filepath = os.path.join(file_local_path, pentest, "file", "unassigned")
+    filepath = os.path.normpath(filepath)
+    if not filepath.startswith(file_local_path):
+        logger.error("Invalid path for listing files: %s", filepath)
+        return [] # invalid path
+    try:
+        return os.listdir(filepath)
+    except FileNotFoundError as e:
+        logger.error("Error listing files: %s", str(e))
+        return []
+    
+
 @permission("pentester")
 def listFiles(pentest: str, attached_to: str, filetype: FileType) -> Union[ErrorStatus, List[str]]:
     """
@@ -446,41 +483,20 @@ def listFiles(pentest: str, attached_to: str, filetype: FileType) -> Union[Error
     if not is_valid_object_id(attached_to) and attached_to != "unassigned":
         return "Invalid attached_iid", 400
     pentest = os.path.basename(pentest)
-    files: List[str] = []
     try:
         if filetype == "proof":
-            defect = Defect.fetchObject(pentest, {"_id": ObjectId(attached_to)})
-            if defect is None:
-                return "Defect not found", 404
-            defect = cast(Defect, defect)
-            try:
-                files = defect.listProofFiles()
-            except FileNotFoundError:
-                files = []
+            return _list_proof_files(pentest, ObjectId(attached_to))
         elif filetype == "result":
-            tool = Tool.fetchObject(pentest, {"_id": ObjectId(attached_to)})
-            if tool is None:
-                return "Tool not found", 404
-            tool = cast(Tool, tool)
-            files = tool.listResultFiles()
+            return _list_result_files(pentest, ObjectId(attached_to))
         elif filetype == "file":
-            file_local_path = os.path.normpath(os.path.join(getMainDir(), "files"))
-            filepath = os.path.join(file_local_path, pentest, "file", "unassigned")
-            filepath = os.path.normpath(filepath)
-            if not filepath.startswith(file_local_path):
-                raise ValueError("Invalid path")
-            try:
-                files = os.listdir(filepath)
-            except FileNotFoundError:
-                ##logger.error("Error listing files: %s", str(e))
-                return "File not found", 404
+            return _list_file_files(pentest)
         else:
             return "Invalid filetype", 400
     except ValueError:
         return "Invalid path", 400
     except FileNotFoundError:
         return "File not found", 404
-    return files
+    return []
 
 @permission("pentester")
 def downloadById(pentest: str, attachment_id: str) -> Union[ErrorStatus, Response]:
@@ -498,6 +514,37 @@ def downloadById(pentest: str, attachment_id: str) -> Union[ErrorStatus, Respons
     if attachment is None:
         return "Attachment not found", 404
     return download(pentest, attachment.get("attached_to", "unassigned"), attachment.get("type", "file"), attachment.get("name", None))
+
+def _download_by_filename(filepath: str, filename: str) -> Union[ErrorStatus, Response]:
+    filename = filename.replace("/", "_")
+    filepath = os.path.join(filepath, os.path.basename(filename))
+    if os.path.exists(filepath):
+        return send_file(filepath)
+    else:
+        filepath = os.path.join(local_path, "pollenisator", "file", "unassigned", os.path.basename(filename))
+        filepath = os.path.normpath(filepath)
+        if not filepath.startswith(local_path):
+            return "Invalid path", 400
+        if os.path.exists(filepath):
+            return send_file(filepath)
+    return "File not found", 404
+
+def send_zip_file(filepath: str, attached_to: ObjectId) -> Response:
+    # generate a temp zip file
+    temp_zipfile_dir = tempfile.mkdtemp()
+    temp_zipfile_path = os.path.join(temp_zipfile_dir, str(attached_to)+".zip")
+    dir_source = pathlib.Path(filepath)
+    @after_this_request
+    def remove_file(response):
+        try:
+            os.remove(temp_zipfile_path)
+        except (OSError, FileNotFoundError):
+            pass
+        return response
+    with zipfile.ZipFile(temp_zipfile_path, mode="w") as archive:
+        for file_path in dir_source.iterdir():
+            archive.write(file_path, arcname=file_path.name)
+    return send_file(temp_zipfile_path, mimetype="application/zip")
 
 @permission("pentester")
 def download(pentest: str, attached_to: str, filetype: FileType, filename: Optional[str]=None) -> Union[ErrorStatus, Response]:
@@ -524,41 +571,16 @@ def download(pentest: str, attached_to: str, filetype: FileType, filename: Optio
     if not filepath.startswith(local_path):
         return "Invalid path", 400
     if filename is not None and filename != "":
-        filename = filename.replace("/", "_")
-        filepath = os.path.join(filepath, os.path.basename(filename))
+        return _download_by_filename(filepath, filename)
+    
+    files = os.listdir(filepath)
+    if len(files) == 1:
+        filepath = os.path.join(filepath, files[0])
         if os.path.exists(filepath):
             return send_file(filepath)
-        else:
-            filepath = os.path.join(local_path, "pollenisator", "file", "unassigned", os.path.basename( filename))
-            filepath = os.path.normpath(filepath)
-            if not filepath.startswith(local_path):
-                return "Invalid path", 400
-            if os.path.exists(filepath):
-                return send_file(filepath)
-    else:
-        files = os.listdir(filepath)
-        if len(files) == 1:
-            filepath = os.path.join(filepath, files[0])
-        elif len(files) >= 1:
-            # generate a temp zip file
-            temp_zipfile_dir = tempfile.mkdtemp()
-            temp_zipfile_path = os.path.join(temp_zipfile_dir, str(attached_to)+".zip")
-            dir_source = pathlib.Path(filepath)
-            @after_this_request
-            def remove_file(response):
-                try:
-                    os.remove(temp_zipfile_path)
-                except (OSError, FileNotFoundError):
-                    pass
-                return response
-            with zipfile.ZipFile(temp_zipfile_path, mode="w") as archive:
-                for file_path in dir_source.iterdir():
-                    archive.write(file_path, arcname=file_path.name)
-            return send_file(temp_zipfile_path, mimetype="application/zip")
-
-    if os.path.exists(filepath):
-        return send_file(filepath)
-    elif filename is not None:
+    if len(files) >= 1:
+        return send_zip_file(filepath, attached_to)
+    if filename is not None:
         filename = os.path.basename(filename)
         filepath = os.path.join(local_path, "pollenisator", "file", "unassigned", filename)
         filepath = os.path.normpath(filepath)
@@ -566,6 +588,38 @@ def download(pentest: str, attached_to: str, filetype: FileType, filename: Optio
             return "Invalid path", 400
         if os.path.exists(filepath):
             return send_file(filepath)
+    return "File not found", 404
+
+def _rm_proof_file(pentest: str, attached_to: str, filename: str) -> ErrorStatus:
+    """
+    Remove a proof file from a defect.
+    """
+    if not is_valid_object_id(attached_to):
+        return "Invalid attached_iid", 400
+    defect = Defect.fetchObject(pentest, {"_id": ObjectId(attached_to)})
+    if defect is None:
+        return "Defect not found", 404
+    defect = cast(Defect, defect)
+    try:
+        defect.rmProof(filename)
+    except FileNotFoundError:
+        return "File not found", 404
+    return "Success", 200
+
+def _rm_file_file(pentest: str, attachment_id: str, filename: str) -> ErrorStatus:
+    file_local_path = os.path.normpath(os.path.join(getMainDir(), "files"))
+    filepath = os.path.join(file_local_path, pentest, "file", "unassigned", filename)
+    filepath = os.path.normpath(filepath)
+    if not filepath.startswith(file_local_path):
+        return "Invalid path", 400
+    try:
+        dbclient.deleteFromDb(pentest, "attachments", {"attachment_id": attachment_id}, many=False, notify=True)
+    except (ValueError, KeyError) as e:
+        logger.error("Error deleting attachment: %s", str(e))
+        return "Error deleting attachment", 500
+    if os.path.exists(filepath):
+        os.remove(filepath)
+        return "Success", 200
     return "File not found", 404
 
 @permission("pentester")
@@ -588,33 +642,10 @@ def rmFile(pentest: str,  attachment_id: str) -> ErrorStatus:
     attached_to = attachment.get("attached_to", "unassigned")
     filename = attachment.get("name", None)
     if filetype == "proof":
-        if not is_valid_object_id(attached_to):
-            return "Invalid attached_iid", 400
-        defect = Defect.fetchObject(pentest, {"_id": ObjectId(attached_to)})
-        if defect is None:
-            return "Defect not found", 404
-        defect = cast(Defect, defect)
-        try:
-            defect.rmProof(filename)
-        except FileNotFoundError:
-            return "File not found", 404
+        return _rm_proof_file(pentest, attached_to, filename)
     elif filetype == "result":
         return "Results cannot be deleted", 403
     elif filetype == "file":
-        file_local_path = os.path.normpath(os.path.join(getMainDir(), "files"))
-        filepath = os.path.join(file_local_path, pentest, "file", "unassigned", filename)
-        filepath = os.path.normpath(filepath)
-        if not filepath.startswith(file_local_path):
-            return "Invalid path", 400
-        try:
-            dbclient.deleteFromDb(pentest, "attachments", {"attachment_id": attachment_id}, many=False, notify=True)
-        except (ValueError, KeyError) as e:
-            logger.error("Error deleting attachment: %s", str(e))
-            return "Error deleting attachment", 500 
-        if os.path.exists(filepath):
-            os.remove(filepath)
-        else:
-            return "File not found", 404
+        return _rm_file_file(pentest, attachment_id, filename)
     else:
         return "Invalid filetype", 400
-    return "Success", 200

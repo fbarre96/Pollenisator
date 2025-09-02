@@ -131,9 +131,9 @@ def search_hosts(pentest: str, query: str, limit: int, offset: int) -> List[Dict
         return []
     
     results = []
-    cursor = dbclient.findInDb(pentest, "ips", search_query, multi=True, skip=offset, limit=limit)
+    ips = dbclient.findInDb(pentest, "ips", search_query, multi=True, skip=offset, limit=limit)
     
-    for host_data in cursor:
+    for host_data in ips:
         # Find matching snippets
         matches = []
         for field in search_fields:

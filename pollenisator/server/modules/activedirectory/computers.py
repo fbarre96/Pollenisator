@@ -4,7 +4,7 @@ Active directory computer module, handle a computer with SMB port open.
 # coding: utf-8
 
 from __future__ import absolute_import
-from typing import Dict, Iterator, List, Optional, Any, Tuple, Union, cast
+from typing import Dict, Generator, List, Optional, Any, Tuple, Union, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 from pymongo import UpdateOne
@@ -31,6 +31,19 @@ class Computer(Element):
     """
     coll_name = "computers"
     command_variables = ["domain"]
+    trigger_on_new_domain_discovered = "AD:onNewDomainDiscovered"
+    trigger_on_first_user_on_dc = "AD:onFirstUserOnDC"
+    trigger_on_first_admin_on_dc = "AD:onFirstAdminOnDC"
+    trigger_on_new_user_on_dc = "AD:onNewUserOnDC"
+    trigger_on_new_admin_on_dc = "AD:onNewAdminOnDC"
+    trigger_on_first_user_on_computer = "AD:onFirstUserOnComputer"
+    trigger_on_first_admin_on_computer = "AD:onFirstAdminOnComputer"
+    trigger_on_new_user_on_computer = "AD:onNewUserOnComputer"
+    trigger_on_new_admin_on_computer = "AD:onNewAdminOnComputer"
+    trigger_on_new_sqlserver = "AD:onNewSQLServer"
+    trigger_on_first_user_on_sqlserver = "AD:onFirstUserOnSQLServer"
+    trigger_on_first_admin_on_sqlserver = "AD:onFirstAdminOnSQLServer"
+    trigger_on_new_dc = "AD:onNewDC"
 
     def __init__(self, pentest: str, valuesFromDb: Optional[Dict[str, Any]] = None) -> None:
         """
@@ -147,7 +160,7 @@ class Computer(Element):
         return ret
     
     @classmethod
-    def fetchObjects(cls, pentest: str, pipeline: Dict[str, Any]) -> Iterator['Computer']:
+    def fetchObjects(cls, pentest: str, pipeline: Dict[str, Any]) -> Generator['Computer', None, None]:
         """
         Fetch many commands from database and return a Cursor to iterate over model objects.
 
@@ -185,6 +198,31 @@ class Computer(Element):
         if d is None:
             return None
         return Computer(pentest, d)
+    
+    @classmethod
+    def create_computer_from_port(cls, port):
+        # Basic computer
+        if int(port.port) == 445:
+            computer_o = Computer(port.pentest, {"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[], "infos":{"is_dc":False}})
+            computer_o.addInDb()
+        # Domain controller with kerberos
+        if int(port.port) == 88:
+            computer_o = Computer(port.pentest, {"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[], "infos":{"is_dc":True}})
+            res = computer_o.addInDb()
+            if not res["res"]:
+                comp_existing_o = Computer.fetchObject(port.pentest, {"_id":ObjectId(res["iid"])})
+                if comp_existing_o is not None:
+                    comp_existing_o.infos.is_dc = True
+                    comp_existing_o.update()
+        # SQL server
+        if int(port.port) == 1433 or (port.service == "ms-sql"):
+            computer_o = Computer(port.pentest, {"name":"", "ip":port.ip, "domain":"", "admins":[], "users":[], "infos":{"is_sqlserver":True}})
+            res = computer_o.addInDb()
+            if not res["res"]:
+                comp_existing_o = Computer.fetchObject(port.pentest, {"_id":ObjectId(res["iid"])})
+                if comp_existing_o is not None:
+                    comp_existing_o.infos.is_sqlserver = True
+                    comp_existing_o.update()
 
     def update(self) -> Union[bool, Tuple[str, int]]:
         """
@@ -236,7 +274,7 @@ class Computer(Element):
         if domain is not None and domain != "":
             existingDomain = Computer.fetchObject(self.pentest, {"domain":domain.lower()})
             if existingDomain is None:
-                self.addCheck("AD:onNewDomainDiscovered", {"domain":domain.lower()})
+                self.addCheck(Computer.trigger_on_new_domain_discovered, {"domain":domain.lower()})
         iid = ins_result.inserted_id
         return {"res": True, "iid": iid}
 
@@ -274,8 +312,51 @@ class Computer(Element):
             return None
         dbclient = DBClient.getInstance()
         dbclient.create_index(pentest, "computers", [("ip", 1), ("type", 1)])
-        update_operations = []
+        update_operations, set_of_ips = cls._prepare_update_operations(computers_to_add)
+        if not update_operations:
+            return None
+        result = dbclient.bulk_write(pentest, "computers", list(update_operations))
+        if result is None:
+            return None
+        upserted_ids = result.upserted_ids
+        if upserted_ids is None:
+            return None
+        if not upserted_ids and result.modified_count == 0:
+            return None
+        cls.apply_check_operations(pentest, set_of_ips)
+        return list(upserted_ids.values())
+
+    @classmethod
+    def apply_check_operations(cls, pentest: str, set_of_ips: set) -> None:
+        dbclient = DBClient.getInstance()
+        computers_inserted = Computer.fetchObjects(pentest, {"type":"computer", "ip":{"$in":list(set_of_ips)}})
+        for computer_o in computers_inserted:
+            if computer_o.infos.is_dc:
+                computer_o.add_dc_checks()
+                computer_o.add_domain_checks()
+            if computer_o.infos.is_sqlserver:
+                computer_o.add_sqlserver_checks()
+            domain = computer_o.domain
+            if domain is not None:
+                domain = domain.lower()
+            if domain is not None and domain != "":
+                existingDomain = dbclient.findInDb(pentest, 
+                    "computers", {"type":"computer", "domain":domain.lower()}, False)
+                if existingDomain is None:
+                    computer_o.addCheck(Computer.trigger_on_new_domain_discovered, {"domain":domain.lower()})
+
+    @classmethod
+    def _prepare_update_operations(cls, computers_to_add: List[Dict[str, Any]]) -> Tuple[List[UpdateOne], set]:
+        """
+        Prepare the update operations for bulk inserting or updating Computer objects in the database.
+        Args:
+            computers_to_add (List[Dict[str, Any]]): A list of dictionaries, each representing a Computer object to be 
+            inserted or updated.
+        Returns:
+            Tuple[List[UpdateOne], set]: A tuple containing a list of UpdateOne operations and a set of IPs.
+        """
         set_ip = set()
+        update_operations = []
         for computer in computers_to_add:
             data = computer
             data["type"] = "computer"
@@ -297,33 +378,8 @@ class Computer(Element):
                     del updater["$setOnInsert"]
                 if updater:
                     update_operations.append(UpdateOne({"ip": data["ip"].strip(), "type": "computer"}, updater, upsert=True))
-        if not update_operations:
-            return None
-        result = dbclient.bulk_write(pentest, "computers", list(update_operations))
-        if result is None:
-            return None
-        upserted_ids = result.upserted_ids
-        if upserted_ids is None:
-            return None
-        if not upserted_ids and result.modified_count == 0:
-            return None
-        computers_inserted = Computer.fetchObjects(pentest, {"type":"computer", "ip":{"$in":list(set_ip)}})
-        for computer_o in computers_inserted:
-            if computer_o.infos.is_dc:
-                computer_o.add_dc_checks()
-                computer_o.add_domain_checks()
-            if computer_o.infos.is_sqlserver:
-                computer_o.add_sqlserver_checks()
-            domain = computer_o.domain
-            if domain is not None:
-                domain = domain.lower()
-            if domain is not None and domain != "":
-                existingDomain = dbclient.findInDb(pentest, 
-                    "computers", {"type":"computer", "domain":domain.lower()}, False)
-                if existingDomain is None:
-                    computer_o.addCheck("AD:onNewDomainDiscovered", {"domain":domain.lower()})
-        return list(upserted_ids.values())
-
+        return update_operations, set_ip
+    
     @classmethod
     def getTriggers(cls) -> List[str]:
         """
@@ -332,10 +388,14 @@ class Computer(Element):
         Returns:
             List[str]: The list of triggers.
         """
-        return ["AD:onFirstUserOnDC", "AD:onFirstAdminOnDC",  "AD:onNewUserOnDC", "AD:onNewAdminOnDC", 
-                            "AD:onFirstUserOnComputer", "AD:onFirstAdminOnComputer", "AD:onNewUserOnComputer", "AD:onNewAdminOnComputer",
-                            "AD:onNewDomainDiscovered", "AD:onNewDC", "AD:onNewSQLServer","AD:onFirstUserOnSQLServer", "AD:onFirstAdminOnSQLServer"]
 
+
+        return [
+            Computer.trigger_on_first_user_on_dc, Computer.trigger_on_first_admin_on_dc,  Computer.trigger_on_new_user_on_dc, Computer.trigger_on_new_admin_on_dc, 
+            Computer.trigger_on_first_user_on_computer, Computer.trigger_on_first_admin_on_computer,  Computer.trigger_on_new_user_on_computer, Computer.trigger_on_new_admin_on_computer,
+            Computer.trigger_on_new_sqlserver, Computer.trigger_on_first_user_on_sqlserver, Computer.trigger_on_first_admin_on_sqlserver,
+            Computer.trigger_on_new_dc, Computer.trigger_on_new_domain_discovered
+        ]
 
     @property
     def infos(self) -> 'ComputerInfos':
@@ -381,50 +441,59 @@ class Computer(Element):
         Add domain related checks
         """
         if self.infos.is_dc:
-            self.addCheck("AD:onNewDC", { "domain":self.domain})
+            self.addCheck(Computer.trigger_on_new_dc, { "domain":self.domain})
 
     def add_dc_checks(self) -> None:
         """
         Add domain controller related checks
         """
         if len(self.users) > 0:
-            self.addCheck("AD:onFirstUserOnDC", {"user":self.users[0]})
+            self.addCheck(Computer.trigger_on_first_user_on_dc, {"user":self.users[0]})
         if len(self.admins) > 0:
-            self.addCheck("AD:onFirstAdminOnDC", {"user":self.admins[0]})
+            self.addCheck(Computer.trigger_on_first_admin_on_dc, {"user":self.admins[0]})
 
     def add_sqlserver_checks(self) -> None:
         """
         Add sql server related checks
         """
         if self.infos.is_sqlserver:
-            self.addCheck("AD:onNewSQLServer", { "domain":self.domain})
+            self.addCheck(Computer.trigger_on_new_sqlserver, { "domain":self.domain})
             if len(self.users) > 0:
-                self.addCheck("AD:onFirstUserOnSQLServer", {"user":self.users[0]})
+                self.addCheck(Computer.trigger_on_first_user_on_sqlserver, {"user":self.users[0]})
             if len(self.admins) > 0:
-                self.addCheck("AD:onFirstAdminOnSQLServer", {"user":self.admins[0]})
+                self.addCheck(Computer.trigger_on_first_admin_on_sqlserver, {"user":self.admins[0]})
+
+    def add_first_user_checks(self) -> None:
+        """
+        Add first user related checks
+        """
+        if self.infos.is_dc:
+            self.addCheck(Computer.trigger_on_first_user_on_dc, {"user":self.users[-1]})
+            self.addCheck(Computer.trigger_on_new_user_on_dc, {"user":self.users[-1]})
+        if self.infos.is_sqlserver:
+            self.addCheck(Computer.trigger_on_first_user_on_sqlserver, {"user":self.users[-1]})
+        self.addCheck(Computer.trigger_on_first_user_on_computer, {"user":self.users[-1]})
 
     def add_user_checks(self) -> None:
         """
         Add users related checks
         """
         if len(self.users) == 1:
-            if self.infos.is_dc:
-                self.addCheck("AD:onFirstUserOnDC", {"user":self.users[-1]})
-                self.addCheck("AD:onNewUserOnDC", {"user":self.users[-1]})
-            if self.infos.is_sqlserver:
-                self.addCheck("AD:onFirstUserOnSQLServer", {"user":self.users[-1]})
-            self.addCheck("AD:onFirstUserOnComputer", {"user":self.users[-1]})
+            self.add_first_user_checks()
         if len(self.users) >= 1:
-            find_user = None
-            for user in self.users:
-                user_o = User.fetchObject(self.pentest, {"_id":ObjectId(user)})
-                if user_o is not None:
-                    if user_o.username != "" and user_o.password != "":
-                        find_user = user_o.getId()
-                        break
-            if find_user is None:
-                find_user = self.users[-1]
-            self.addCheck("AD:onNewUserOnComputer", {"user":find_user})
+            self.add_new_user_checks()
+
+    def add_new_user_checks(self):
+        find_user = None
+        for user in self.users:
+            user_o = User.fetchObject(self.pentest, {"_id":ObjectId(user)})
+            if user_o is not None:
+                if user_o.username != "" and user_o.password != "":
+                    find_user = user_o.getId()
+                    break
+        if find_user is None:
+            find_user = self.users[-1]
+        self.addCheck(Computer.trigger_on_new_user_on_computer, {"user":find_user})
 
     def add_admin_checks(self) -> None:
         """
@@ -432,13 +501,13 @@ class Computer(Element):
         """
         if len(self.admins) == 1:
             if self.infos.is_dc:
-                self.addCheck("AD:onFirstAdminOnDC", {"user":self.admins[-1]})
-                self.addCheck("AD:onNewAdminOnDC", {"user":self.admins[-1]})
+                self.addCheck(Computer.trigger_on_first_admin_on_dc, {"user":self.admins[-1]})
+                self.addCheck(Computer.trigger_on_new_admin_on_dc, {"user":self.admins[-1]})
             if self.infos.is_sqlserver:
-                self.addCheck("AD:onFirstAdminOnSQLServer", {"user":self.admins[-1]})
-            self.addCheck("AD:onFirstAdminOnComputer", {"user":self.admins[-1]})
+                self.addCheck(Computer.trigger_on_first_admin_on_sqlserver, {"user":self.admins[-1]})
+            self.addCheck(Computer.trigger_on_first_admin_on_computer, {"user":self.admins[-1]})
         if len(self.admins) >= 1:
-            self.addCheck("AD:onNewAdminOnComputer", {"user":self.admins[-1]})
+            self.addCheck(Computer.trigger_on_new_admin_on_computer, {"user":self.admins[-1]})
 
     def add_user(self, domain: str, username: str, password: str, infos: Optional[Dict[str, Any]] = None) -> ObjectId:
         """
@@ -508,7 +577,7 @@ class Computer(Element):
     def addCheck(self, lvl: str, info: Dict[str, Any]) -> None:
         """
         Add a check to this Computer object. The check is fetched from the database using the provided level. If the level 
-        is "AD:onNewDomainDiscovered", "AD:onNewDC", or "AD:onNewSQLServer", the domain is fetched from the info dictionary. 
+        is Computer.trigger_on_new_domain_discovered, trigger_on_new_dc, or trigger_on_new_sqlserver, the domain is fetched from the info dictionary. 
         Otherwise, the user is fetched from the database using the user id from the info dictionary, and the username, 
         password, and domain are fetched from the user object. If the user is not found, an error is logged and the function 
         returns. For each fetched check, a CheckInstance is created from the CheckItem.
@@ -518,7 +587,7 @@ class Computer(Element):
             info (Dict[str, Any]): The dictionary containing the information for the check.
         """
         checks = CheckItem.fetchObjects("pollenisator", {"lvl":lvl})
-        if lvl in ["AD:onNewDomainDiscovered", "AD:onNewDC", "AD:onNewSQLServer"]:
+        if lvl in [Computer.trigger_on_new_domain_discovered, Computer.trigger_on_new_dc, Computer.trigger_on_new_sqlserver]:
             infos = {"domain":info.get("domain")}
         else:
             user_o = User.fetchObject(self.pentest, {"_id":ObjectId(info.get("user"))})
@@ -584,7 +653,7 @@ def update(pentest: str, computer_iid: ObjectId, body: Dict[str, Any]) -> Union[
         existingDomain = dbclient.findInDb(pentest,
              "computers", {"type":"computer", "domain":domain}, False)
         if existingDomain is None:
-            computer.addCheck("AD:onNewDomainDiscovered", {"domain":domain})
+            computer.addCheck(Computer.trigger_on_new_domain_discovered, {"domain":domain})
     if existing.infos.is_dc != computer.infos.is_dc:
         existing.add_dc_checks()
         existing.add_domain_checks()

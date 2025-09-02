@@ -917,7 +917,6 @@ class DBClient:
                 if self.client is None:
                     raise ValueError(error_no_pentest)
             pentests = self.findInDb("pollenisator", "pentests", {}, True)
-            
             try:
                 if not isinstance(pentests, Iterable) or pentests is None:
                     return None
@@ -1520,20 +1519,14 @@ class DBClient:
         Returns:
             Tuple[str, str, str, str]: A tuple containing
             - the attachment_id (uuidv4 as str),
-            - the uploadName (the original filename with / and \ replaced by _),
+            - the uploadName (the original filename with / and \\ replaced by _),
             - the name (the name of the file on disk),
             - the full_filepath (the full path to the file on disk).
         """
         local_path = os.path.normpath(os.path.join(utils.getMainDir(), "files"))
-        try:
-            os.makedirs(local_path)
-        except FileExistsError:
-            pass
+        os.makedirs(local_path,  exist_ok=True)
         filepath = os.path.join(local_path, pentest, filetype, attached_to)
-        try:
-            os.makedirs(filepath)
-        except FileExistsError:
-            pass
+        os.makedirs(filepath, exist_ok=True)
         uploadName = filename.replace("/", "_").replace("\\", "_")
         name, ext = os.path.splitext(filename.replace("/", "_"))
         ext = ext.replace("/","_")

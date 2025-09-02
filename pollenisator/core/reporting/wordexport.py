@@ -44,6 +44,36 @@ def debug(string):
     print(string)
     return string
 
+def setup_context_proofs(doc: DocxTemplate, context: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Setup the context for the report by replacing proof file paths with InlineImage objects.
+    Args:
+        doc (DocxTemplate): The document template.
+        context (Dict[str, Any]): The context for the report, including defects and their proofs.
+    Raises:
+        ValueError: If a proof file is not found.
+    Returns:
+        Dict[str, Any]: The updated context with InlineImage objects for proofs.
+    """
+    context["proof_by_names"] = {}
+    for defect in context["defects"]:
+        proofs = defect.get("proofs", [])
+        proofs_by_name = {}
+        for proof in proofs:
+            proofs_by_name[os.path.basename(proof)] = proof
+        for i, para in enumerate(defect.get("description_paragraphs", [])):
+            re_matches = re.finditer(r"!\[(.*)\]\(.*\)", para.strip())
+            for re_match in re_matches:
+                if re_match.group(1).strip() in proofs_by_name:
+                    proof = proofs_by_name[re_match.group(1).strip()]
+                    if not os.path.isfile(proof):
+                        raise ValueError(f"Proof file not found : {str(re_match.group(1).strip())} for defect {str(defect.get('title', ''))}")
+                    defect["description_paragraphs"][i] = InlineImage(doc, proof, width=Cm(17))
+                    context["proof_by_names"][os.path.basename(proof)] = defect["description_paragraphs"][i]
+        for instance in defect.get("instances", []):
+            for i,proof in enumerate(instance.get("proofs", [])):
+                instance["proofs"][i] = InlineImage(doc, proof)
+    return context
 
 def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs: Any) -> Union[Tuple[bool, str], Tuple[bool, str]]:
     """
@@ -68,24 +98,10 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
     jinja_env.filters['regex_findall'] = regex_findall
     jinja_env.filters['debug'] = debug
     # TODO : MAYBE This code could removed now that the file:/// is supported in markwdown (see replaceUnassingedFIleImages)
-    context["proof_by_names"] = {}
-    for defect in context["defects"]:
-        proofs = defect.get("proofs", [])
-        proofs_by_name = {}
-        for proof in proofs:
-            proofs_by_name[os.path.basename(proof)] = proof
-        for i, para in enumerate(defect.get("description_paragraphs", [])):
-            re_matches = re.finditer(r"!\[(.*)\]\(.*\)", para.strip())
-            for re_match in re_matches:
-                if re_match.group(1).strip() in proofs_by_name:
-                    proof = proofs_by_name[re_match.group(1).strip()]
-                    if not os.path.isfile(proof):
-                        return False, f"Proof file not found : {str(re_match.group(1).strip())} for defect {str(defect.get('title', ''))}"
-                    defect["description_paragraphs"][i] = InlineImage(doc, proof, width=Cm(17))
-                    context["proof_by_names"][os.path.basename(proof)] = defect["description_paragraphs"][i] 
-        for instance in defect.get("instances", []):
-            for i,proof in enumerate(instance.get("proofs", [])):
-                instance["proofs"][i] = InlineImage(doc, proof)
+    try:
+        context = setup_context_proofs(doc, context)
+    except ValueError as e:
+        return False, str(e) # Proof file not found
     # TODO : END
     recursiveEdits(context, context["pentest"])
     
@@ -116,6 +132,32 @@ regex_replace_lonely_lf = re.compile(r"(?<!\n)\n(?!\n)")
 regex_replace_images = re.compile(r"(?<!\n\n)(!\[.*\]\((.*?)\))")
 regex_replace_images_no_newline = re.compile(r"(!\[.*\]\((.*?)\))(?!\n\n)")
 
+# Maximum recursion depth for context processing
+MAX_RECURSION_DEPTH = 10
+
+def _get_file_path_if_exists(url: str, file_list: list, base_path_parts: list) -> str:
+    """
+    Helper function to check if a URL exists in the file list and return the file path if it exists.
+    
+    Args:
+        url (str): The URL to check
+        file_list (list): List of files to check against
+        base_path_parts (list): Parts of the base path to construct the full path
+        
+    Returns:
+        str: The file path with file:// prefix if found and exists, empty string otherwise
+    """
+    if url not in file_list:
+        return ""
+        
+    base_dir = os.path.normpath(os.path.join(getMainDir(), *base_path_parts))
+    file_path = os.path.normpath(os.path.join(base_dir, os.path.basename(url)))
+    
+    if file_path.startswith(base_dir) and os.path.isfile(file_path):
+        return f"![{file_path}](file://{file_path})"
+    
+    return ""
+
 def recursiveEdits(context: dict, pentest: str) -> None:
     """
     Recursively iterate over the context dictionary (up to 10 levels deep)
@@ -133,8 +175,34 @@ def recursiveEdits(context: dict, pentest: str) -> None:
     pollenisator_files = listFiles("pollenisator", "unassigned", "file")
     if pollenisator_files is None or not isinstance(pollenisator_files, list):
         pollenisator_files = []
+    
+    def _create_replacement_function():
+        """Create the replacement function for markdown images."""
+        def repl(match):
+            alt_text = match.group(1)
+            url = match.group(2)
+            
+            # Try pentest files first
+            file_path = _get_file_path_if_exists(url, files, ["files", pentest, "file", "unassigned"])
+            if file_path:
+                return file_path
+            
+            # Try pollenisator files
+            file_path = _get_file_path_if_exists(url, pollenisator_files, ["files", "pollenisator", "file", "unassigned"])
+            if file_path:
+                return file_path
+            
+            # If neither found, return original alt text
+            if url in files or url in pollenisator_files:
+                return alt_text
+            else:
+                return match.group(0)
+        return repl
+    
+    replacement_func = _create_replacement_function()
+    
     def _recursive_process(obj, depth: int):
-        if depth > 10:
+        if depth > MAX_RECURSION_DEPTH:
             return obj
 
         if isinstance(obj, dict):
@@ -150,27 +218,7 @@ def recursiveEdits(context: dict, pentest: str) -> None:
             # Regex to find markdown images with http/https URLs
             obj = regex_replace_images.sub(r"\n\1", obj)
             obj = regex_replace_images_no_newline.sub(r"\1\n", obj)
-            def repl(match):
-                alt_text = match.group(1)
-                url = match.group(2)
-                if url in files:
-                    pentest_base_dir = os.path.normpath(os.path.join(getMainDir(), "files", pentest, "file", "unassigned"))
-                    pentest_path = os.path.normpath(os.path.join(pentest_base_dir, os.path.basename(url)))
-                    if pentest_path.startswith(pentest_base_dir):
-                        if os.path.isfile(pentest_path):
-                            return f"![{pentest_path}](file://{pentest_path})"
-                   
-                    return alt_text
-                elif url in pollenisator_files:
-                    pollenisator_base_dir = os.path.normpath(os.path.join(getMainDir(), "files", "pollenisator", "file", "unassigned"))
-                    pollenisator_path = os.path.normpath(os.path.join(pollenisator_base_dir, os.path.basename(url)))
-                    if pollenisator_path.startswith(pollenisator_base_dir):
-                        if os.path.isfile(pollenisator_path):
-                            return f"![{pollenisator_path}](file://{pollenisator_path})"
-                    return alt_text
-                else:
-                    return match.group(0)
-            obj = re.sub(pattern, repl, obj)
+            obj = re.sub(pattern, replacement_func, obj)
         return obj
 
     _recursive_process(context, 0)

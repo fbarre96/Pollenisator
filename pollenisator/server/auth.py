@@ -12,6 +12,7 @@ from pollenisator.server.permission import permission
 from pollenisator.server.token import getTokenFor
 from pollenisator.server.mongo import doImportCheatsheet
 from pollenisator.core.components.utils import getDefaultCheatsheetFile
+from pollenisator.core.components.logger_config import logger
 from flask import make_response, jsonify
 import re
 ErrorStatus = Tuple[str, int]
@@ -198,17 +199,18 @@ def changePassword(body: Dict[str, str], **kwargs: Any) -> ErrorStatus:
     elif oldPwd == newPwd:
         return "The new password must be different from the old password", 400
     check_res = password_check(newPwd)
+    errors = {
+        'length_error' : "at least 12 characters long",
+        'digit_error' : "at least one digit",
+        'uppercase_error' : "at least one uppercase letter",
+        'lowercase_error' : "at least one lowercase letter",
+        'symbol_error' : "at least one symbol",
+    }
     if not check_res["password_ok"]:
-        if check_res["length_error"]:
-            return "The new password must be at least 12 character long", 400
-        if check_res["digit_error"]:
-            return "The new password must contain at least one digit", 400
-        if check_res["uppercase_error"]:
-            return "The new password must contain at least one uppercase", 400
-        if check_res["lowercase_error"]:
-            return "The new password must contain at least one lower case", 400
-        if check_res["symbol_error"]:
-            return "The new password must contain at least one symbol", 400
+        for key in errors:
+            if check_res[key]:
+                return f"The new password must contain {errors[key]}", 400
+       
     username = thisUser
     dbclient = DBClient.getInstance()
     user_record = dbclient.findInDb("pollenisator", "users", {"username":username}, False)
@@ -301,6 +303,7 @@ def login(body: Dict[str, str]) -> Union[Any, ErrorStatus]:
     if user_record["username"] == username:
         if bcrypt.checkpw(pwd.encode(), user_record["hash"]):
             # Set token in httpOnly cookie and return mustChangePassword flag
+            logger.info(f"User {username} successfully logged in")
             token = getTokenFor(username)
             response = make_response(jsonify({"token":token, "mustChangePassword": user_record.get("mustChangePassword", True)}))
             response.set_cookie(
@@ -313,6 +316,7 @@ def login(body: Dict[str, str]) -> Union[Any, ErrorStatus]:
             return response
     return "Authentication failure", 401
 
+@permission("user")
 def connectToPentest(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union[Any, ErrorStatus]:
     """
     Connect to a pentest with the given details.

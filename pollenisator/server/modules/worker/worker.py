@@ -207,7 +207,7 @@ def startWorker(pentest: str, **kwargs: Any) -> ErrorStatus:
     existing = dbclient.findInDb("pollenisator", "workers", {"pentest": pentest}, False)
     if existing is not None:
         return str(existing["name"]), 200
-    docker_id = uuid.uuid4()
+    docker_id = str(uuid.uuid4())
     existing = dbclient.insertInDb("pollenisator", "workers", {"pentest": pentest, "name":str(docker_id)}, False, False)
     ret, msg = start_docker(True, docker_id)
     if ret:

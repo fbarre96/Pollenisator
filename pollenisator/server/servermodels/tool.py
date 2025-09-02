@@ -359,50 +359,71 @@ def getQueue(pentest: str) -> Dict[str, List[Dict[str, Any]]]:
     Returns:
         List[Dict[str, Any]]: A list of dictionaries where each dictionary contains the data for a tool in the queue.
     """
-    dbclient = DBClient.getInstance()
+    
     res: Dict[str, List[Dict[str, Any]]] = {"queued": [], "running": []}
-    queue = dbclient.findInDb(pentest, "autoscan", {"type":"queue"}, False)
+    res["queued"] = get_queued(pentest)
+    res["running"] = get_running_tools(pentest)
+    return res
+
+def get_running_tools(pentest: str) -> List[Dict[str, Any]]:
+    dbclient = DBClient.getInstance()
+    running_tools_ret: List[Dict[str, Any]] = []
     running_tools = dbclient.findInDb("pollenisator", "workers", {"pentest":pentest}, multi=True)
-    if queue is not None:
-        tools = queue["tools"]
-        tools_objects = Tool.fetchObjects(pentest, {"_id": {"$in": [ObjectId(tool_info.get("iid")) for tool_info in tools]}})
+    if running_tools is None:
+        return []
+    for worker in running_tools:
+        running = worker.get("running_tools", [])
+        tools_objects = Tool.fetchObjects(pentest, {"_id": {"$in": [ObjectId(tool_info.get("iid")) for tool_info in running]}})
         if tools_objects is None:
-            return res
+            continue
         commands = Command.fetchObjects(pentest, {})
         commands_dict = {str(command.getId()):command for command in commands}
         for tool in tools_objects:
             tool = cast(Tool, tool)
             tool_data = {}
             tool_data = tool.getData()
-            if tool.text == "":
-                command = commands_dict.get(str(tool.command_iid))
-                if command is not None:
-                    try:
-                        tool_data["text"] = command.text
-                    except AttributeError:
-                        tool_data["text"] = ""
-            res["queued"].append(tool_data)
-    if running_tools is not None:
-        for worker in running_tools:
-            running = worker.get("running_tools", [])
-            tools_objects = Tool.fetchObjects(pentest, {"_id": {"$in": [ObjectId(tool_info.get("iid")) for tool_info in running]}})
-            if tools_objects is None:
+            if tool.text != "":
+                running_tools_ret.append(tool_data)
                 continue
-            commands = Command.fetchObjects(pentest, {})
-            commands_dict = {str(command.getId()):command for command in commands}
-            for tool in tools_objects:
-                tool = cast(Tool, tool)
-                tool_data = {}
-                tool_data = tool.getData()
-                if tool.text == "":
-                    command = commands_dict.get(str(tool.command_iid))
-                    if command is not None:
-                        try:
-                            tool_data["text"] = command.text
-                        except AttributeError:
-                            tool_data["text"] = ""
-                res["running"].append(tool_data)
-    return res
+            command = commands_dict.get(str(tool.command_iid))
+            if command is not None:
+                try:
+                    tool_data["text"] = command.text
+                except AttributeError:
+                    tool_data["text"] = ""
+            running_tools_ret.append(tool_data)
+    return running_tools_ret
+
+def get_queued(pentest: str) -> List[Dict[str, Any]]:
+    dbclient = DBClient.getInstance()
+    queued = []
+    queue = dbclient.findInDb(pentest, "autoscan", {"type":"queue"}, False)
+    if queue is None:
+        return queued
+    tools = queue["tools"]
+    tools_objects = Tool.fetchObjects(pentest, {"_id": {"$in": [ObjectId(tool_info.get("iid")) for tool_info in tools]}})
+    if tools_objects is None:
+        return queued
+    commands = Command.fetchObjects(pentest, {})
+    commands_dict = {str(command.getId()):command for command in commands}
+    for tool in tools_objects:
+        tool = cast(Tool, tool)
+        tool_data = {}
+        tool_data = tool.getData()
+        if tool.text != "":
+            queued.append(tool_data)
+            continue
+        # If tool text is empty, try to get it from command
+        command = commands_dict.get(str(tool.command_iid))
+        if command is None:
+            logger.warning("Command not found for queued tool %s", str(tool._id))
+            continue # nothing to do
+        try:
+            tool_data["text"] = command.text
+        except AttributeError:
+            tool_data["text"] = ""
+        queued.append(tool_data)
+    return queued
 
 def isLaunchable(pentest: str, tool_iid: ObjectId, authorized_commands: Optional[List[str]], force: bool = False) -> Tuple[str, int]:
     """

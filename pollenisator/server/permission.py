@@ -90,6 +90,15 @@ def permission(*dec_args, **deckwargs):
                     logger.debug(f"{arg_value} for workers is not in the token scope {token_info}")
                     return f"Forbidden : scope required worker and name {arg_value}", 403
             
+            args_recalc = recalculate_arguments(args, kwargs, args_spec)
+            expect_kw = args_spec.varkw is not None
+            if expect_kw:
+                result = function(*args_recalc, **kwargs)
+            else:
+                result = function(*args_recalc)
+            return result
+
+        def recalculate_arguments(args, kwargs, args_spec):
             args_recalc = []
             for expected_arg_names in args_spec.args:
                 value = kwargs.get(expected_arg_names, None)
@@ -104,11 +113,7 @@ def permission(*dec_args, **deckwargs):
                         pass
 
                 args_recalc.append(value)
-            expect_kw = args_spec.varkw is not None
-            if expect_kw:
-                result = function(*args_recalc, **kwargs)
-            else:
-                result = function(*args_recalc)
-            return result
+            return args_recalc
+        
         return wrapper
     return _permission

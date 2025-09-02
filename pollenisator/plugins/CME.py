@@ -119,15 +119,15 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                     toAdd["port"] = res_lsassy.group(2)
                     toAdd["machine_name"] = res_lsassy.group(3)
                     toAdd["domain"] = res_lsassy.group(4)
-                    toAdd["username"] = success_infos.group(5)
-                    password = success_infos.group(6)
+                    toAdd["username"] = res_lsassy.group(5)
+                    password = res_lsassy.group(6)
                     if len(password) == 32:
                         try:
-                            toAdd["hashNT"] = success_infos.group(6)
+                            toAdd["hashNT"] = res_lsassy.group(6)
                         except:
-                            toAdd["password"] = success_infos.group(6)
+                            toAdd["password"] = res_lsassy.group(6)
                     else:
-                        toAdd["password"] = success_infos.group(6)
+                        toAdd["password"] = res_lsassy.group(6)
             else:
                 res_infos = re.search(regex_info, line)
                 res_asrep = re.search(regex_module_asproast, line)

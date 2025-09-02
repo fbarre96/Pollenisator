@@ -42,12 +42,9 @@ class Tag:
         """
         self.name: str = ""
         self.do_init(args, kwargs)
-        if kwargs.get("color", None) is not None:
-            color = kwargs.get("color", None)
-        if kwargs.get("level", None) is not None:
-            level = kwargs.get("level", None)
-        if kwargs.get("notes", None) is not None:
-            notes = kwargs.get("notes", None)
+        color = kwargs.get("color", None)
+        level = kwargs.get("level", None)
+        notes = kwargs.get("notes", None)
         self.color: str = color if color is not None else "transparent" # if no color is provided, set to transparent
         self.level: str = level if level is not None else "info" # if no level is provided, set to info
         self.notes: str = notes if notes is not None else "" # if no notes are provided, set to empty string

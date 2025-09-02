@@ -538,7 +538,7 @@ class Tool(Element):
         ext = mod.getFileOutputExt()
         return {"comm":comm, "ext":ext, "comm_with_output":comm_complete}
 
-    def getCommandLineMulti(self, commandline_options: str = "") -> Union[ErrorStatus, Tuple[str, str, str]]:
+    def getCommandLineMulti(self, commandline_options: str = "") -> Union[ErrorStatus, Dict[str,str]]:
         if commandline_options != "":
             self.text_multi = commandline_options
             self.updateInDb({"text_multi":commandline_options})
@@ -609,10 +609,7 @@ class Tool(Element):
                 self.text_multi = command
         else:
             if toolHasCommand is not None and toolHasCommand.strip() != "":
-                if is_multi is False:
-                    command = self.text
-                else:
-                    command = self.text_multi
+                command = self.text if is_multi is False else self.text_multi
             else:
                 command = command_o.text if is_multi is False else command_o.text_multi
         data = self.getCommandData()
@@ -949,6 +946,21 @@ class Tool(Element):
         dbclient = DBClient.getInstance()
         dbclient.send_notify(pentest, "tools", str(tool_iid), "tool_start")
         return
+    
+    def getMyTerminalSessions(self) -> List[Dict[str, Any]]:
+        """
+        Get the terminal sessions associated with this tool.
+
+        Returns:
+            List[Dict[str, Any]]: A list of terminal sessions associated with this tool.
+        """
+        dbclient = DBClient.getInstance()
+        terminalsessionsCursor = dbclient.findInDb(self.pentest, "terminalsessions", {"target_check_iid":str(self.check_iid)+"|"+str(self._id)}, True)
+        if terminalsessionsCursor is None:
+            terminalsessions = []
+        else:
+            terminalsessions = [session for session in terminalsessionsCursor]
+        return terminalsessions
 
     def stopTask(self, **kwargs) -> ErrorStatus:
         """
@@ -963,15 +975,11 @@ class Tool(Element):
         logger.info("Trying to stop task %s",str(self))
         dbclient = DBClient.getInstance()
         workers = dbclient.getWorkers({})
-        terminalsessionsCursor = dbclient.findInDb(self.pentest, "terminalsessions", {"target_check_iid":str(self.check_iid)+"|"+str(self._id)}, True)
+        terminalsessions = self.getMyTerminalSessions()
         if workers is None:
             workerNames = []
         else:
             workerNames = [worker["name"] for worker in workers]
-        if terminalsessionsCursor is None:
-            terminalsessions = []
-        else:
-            terminalsessions = [session for session in terminalsessionsCursor]
         forceReset = kwargs.get("forceReset", False)
         saveScannerip = self.scanner_ip
         if forceReset:
@@ -983,24 +991,35 @@ class Tool(Element):
             return "Tools running in localhost cannot be stopped through API", 405
         if saveScannerip not in workerNames and len(terminalsessions) == 0:
             return "The worker running this tool is not running anymore", 404
+        msg, status = self.send_stop_notification()
+        if status != 200:
+            return msg, status
+        if not forceReset:
+            self.markAsNotDone()
+            self.updateInDb()
+        return "Success", 200
+    
+    def send_stop_notification(self) -> ErrorStatus:
+        """
+        Send a stop notification to the worker or terminal sessions associated with this tool.
+        Returns:
+            ErrorStatus: A string indicating the result of the operation or an integer indicating the status code.
+        """
+        dbclient = DBClient.getInstance()
+        sm = SocketManager.getInstance()
         socketsCursor = dbclient.findInDb("pollenisator", "sockets", {"pentest":self.pentest}, True)
         sockets = []
         if socketsCursor is not None:
             sockets = [x for x in socketsCursor]
         if len(sockets) == 0:
             return "The worker running this tool is not running anymore", 404
-        sm = SocketManager.getInstance()
         for socket in sockets:
             if socket.get("type") == "worker":
                 sm.socketio.emit('stopCommand', {'pentest': self.pentest, "tool_iid":str(self.getId())}, room=socket["sid"])
             elif socket.get("type") == "terminal":
                 sm.socketio.emit('stop-terminal-command', {'pentest': self.pentest, "tool_iid":str(self.getId())}, room=socket["sid"])
-
-        if not forceReset:
-            self.markAsNotDone()
-            self.updateInDb()
         return "Success", 200
-
+    
     def isLaunchable(self, authorized_commands: Optional[List[str]], force: bool = False) -> ErrorStatus:
         """
         Check if a tool is launchable. The tool and its command are fetched from the database. If the command is not 
