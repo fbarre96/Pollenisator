@@ -178,9 +178,9 @@ def doUpdateReviewState(old: Defect, new_redacted_state: str, force:bool, userna
         try:
             order = ["New", "To review", "Reviewed", "Completed"]
             if order.index(new_redacted_state) < order.index(old.redacted_state):
-                return "You are trying to rewind in the redacted state, this will delete any pending review.", 400
+                return "You are trying to rewind in the redacted state, this will delete any pending review.", 409
             if order.index(new_redacted_state) > order.index(old.redacted_state)+1:
-                return "You are trying to skip a redaction step, this could leave some review unaccepted.", 400
+                return "You are trying to skip a redaction step, this could leave some review unaccepted.", 409
         except ValueError:
             return "Unknown redacted state", 400
     old.save_history(username)
