@@ -500,6 +500,17 @@ def getServerConfigFolder() -> str:
     os.makedirs(c, exist_ok=True)
     return c
 
+def getServerLocalFolder() -> str:
+    """
+    Get the server local folder path. If the folder does not exist, it is created.
+
+    Returns:
+        str: The path to the server local folder.
+    """
+    c = os.path.join(os.path.expanduser("~"), ".local/pollenisator/")
+    os.makedirs(c, exist_ok=True)
+    return c
+
 def loadServerConfig() -> Dict[str, Any]:
     """
     Load the server configuration from the config/server.cfg file. If the file does not exist, it tries to create it from a sample config file.
