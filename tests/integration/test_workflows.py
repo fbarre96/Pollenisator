@@ -140,7 +140,10 @@ class TestToolExecutionWorkflow:
         assert status_response.status_code == 200
         
         # Step 4: Simulate tool completion and result import
-        mock_db.updateInDb.return_value = {"n": 1, "nModified": 1}
+        class mockResult:
+            def __init__(self, raw_result):
+                self.raw_result = raw_result    
+        mock_db.updateInDb.return_value = mockResult({"n": 1, "nModified": 1, "ok": 1})
         
         completion_response = client.post('/api/v1/update/test-pentest/tools',
                                         headers=auth_headers,

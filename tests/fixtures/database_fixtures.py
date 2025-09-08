@@ -49,7 +49,7 @@ class ThrowableDBClient(DBClient):
             self.client = mongomock.MongoClient()
         else:
             # Use real MongoDB for integration tests
-            mongo_uri = os.getenv('TEST_MONGO_URI', 'mongodb://localhost:27017/')
+            mongo_uri = os.getenv('TEST_MONGO_URI', 'mongodb://localhost:27018/')
             from pymongo import MongoClient
             self.client = MongoClient(mongo_uri)
             print(f"Creating ThrowableDBClient with real MongoDB at {mongo_uri}")
@@ -206,7 +206,7 @@ def real_throwable_db() -> Generator[ThrowableDBClient, None, None]:
     Requires TEST_MONGO_URI environment variable or MongoDB running on localhost.
     """
     # Skip if no MongoDB available
-    mongo_uri = os.getenv('TEST_MONGO_URI', 'mongodb://localhost:27017/')
+    mongo_uri = os.getenv('TEST_MONGO_URI', 'mongodb://localhost:27018/')
     
     try:
         # Test connection
@@ -234,7 +234,7 @@ def real_throwable_db_with_data() -> Generator[ThrowableDBClient, None, None]:
     Create a throwable database instance with real MongoDB and test data.
     """
     # Skip if no MongoDB available
-    mongo_uri = os.getenv('TEST_MONGO_URI', 'mongodb://localhost:27017/')
+    mongo_uri = os.getenv('TEST_MONGO_URI', 'mongodb://localhost:27018/')
     
     try:
         # Test connection

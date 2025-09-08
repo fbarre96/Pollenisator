@@ -31,7 +31,8 @@ class TestDefectManagement:
         """Test defect creation with validation errors."""
         invalid_defect = {
             "title": "",  # Empty title
-            "description": "Test description"
+            "description": "Test description",
+            "risk": "Critical"
             # Missing required fields
         }
         
@@ -197,6 +198,7 @@ class TestDefectValidation:
         invalid_defect = {
             "title": "Test Defect",
             "description": "Test description",
+            "risk": "Critical",
             "cvss_score": 15.0  # Invalid score > 10
         }
         

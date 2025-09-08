@@ -91,7 +91,10 @@ class TestMongoOperations:
     def test_update_operation_success(self, client: Client, mock_db, auth_headers):
         """Test successful update operation."""
         mock_db.listPentestUuids.return_value = ["test-pentest"]
-        mock_db.updateInDb.return_value = {"n": 1, "nModified": 1, "ok": 1}
+        class mockResult:
+            def __init__(self, raw_result):
+                self.raw_result = raw_result    
+        mock_db.updateInDb.return_value = mockResult({"n": 1, "nModified": 1, "ok": 1})
         
         response = client.post('/api/v1/update/test-pentest/ips',
                              headers=auth_headers,
@@ -106,7 +109,10 @@ class TestMongoOperations:
     
     def test_update_operation_many(self, client: Client, mock_db, auth_headers):
         """Test update operation with many=true."""
-        mock_db.updateInDb.return_value = {"n": 3, "nModified": 3, "ok": 1}
+        class mockResult:
+            def __init__(self, raw_result):
+                self.raw_result = raw_result    
+        mock_db.updateInDb.return_value = mockResult({"n": 3, "nModified": 3, "ok": 1})
         mock_db.listPentestUuids.return_value = ["test-pentest"]
         response = client.post('/api/v1/update/test-pentest/ips',
                              headers=auth_headers,
