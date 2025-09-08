@@ -34,6 +34,7 @@ lang_translation = dict()
 
 ErrorStatus = Tuple[str, int]
 SearchResults = TypedDict("SearchResults", {"answers": List[Dict[str, Any]]})
+SearchResultsPrevReports = TypedDict("SearchResultsPrevReports", {"existing_defects": List[Dict[str, Any]]})
 
 def validate_lang(lang: str) -> bool:
     """
@@ -284,8 +285,49 @@ def _generateDoc(ext: str, context: Dict[str, Any], template_to_use_path: str, o
         return_dict["res"] = False
         return_dict["msg"] = "Unknown template file extension"
 
+def searchDefectTemplates(terms: str, lang: str, perimeter: str, coll: str) -> List[Dict[str, Any]]:
+    dbclient = DBClient.getInstance()
+    res = dbclient.findInDb("pollenisator", coll, {}, True)
+    ret = []
+    if res is None:
+        return ret
+    for item in res:
+        title = unidecode(item["title"]).lower()
+        if terms not in title:
+            continue
+        if lang not in item.get("language", "").lower():
+            continue
+        if perimeter not in "\n".join(list(item.get("perimeter", []))).lower():
+            continue
+        ret.append(item)
+    return ret
+
+def searchDefectInPreviousReports(for_pentest: str, username:str, terms: str, lang: str, perimeter: str, coll: str) -> List[Dict[str, Any]]:
+    dbclient = DBClient.getInstance()
+    pentests = dbclient.listPentests(username)
+    if pentests is None:
+        return []
+    ret = []
+    for pentest in pentests:
+        res = dbclient.findInDb(str(pentest.get("uuid","")), coll, {"target_id": None}, True)
+        if res is None:
+            continue
+        for item in res:
+            title = unidecode(item["title"]).lower()
+            if terms not in title:
+                continue
+            if lang not in item.get("language", "").lower():
+                continue
+            if perimeter not in "\n".join(list(item.get("perimeter", []))).lower():
+                continue
+            item["from_pentest_name"] = pentest.get("nom","")
+            item["from_pentest_uuid"] = str(pentest.get("uuid",""))
+            item["pentest"] = for_pentest
+            ret.append(item)
+    return ret
+
 @permission("user")
-def search(body: Dict[str, str]) -> Union[ErrorStatus, SearchResults]:
+def search(body: Dict[str, str], **kwargs) -> Union[ErrorStatus, SearchResults]:
     """
     Search for defects or remarks in the database based on the given parameters.
 
@@ -299,6 +341,9 @@ def search(body: Dict[str, str]) -> Union[ErrorStatus, SearchResults]:
     Returns:
         Union[ErrorStatus, SearchResults]: A dictionary containing any errors and the search results if successful, otherwise an error message and status code.
     """
+    username = kwargs["token_info"]["sub"]
+    if username == "" or username is None:
+        return "Invalid token: no username found", 400
     defect_type = body.get("type", "")
     terms = unidecode(body.get("terms", "")).lower()
     lang = body.get("language", "").lower()
@@ -309,21 +354,41 @@ def search(body: Dict[str, str]) -> Union[ErrorStatus, SearchResults]:
         coll = "defects"
     else:
         return "Invalid parameter: type must be either defect or remark.", 400
-    dbclient = DBClient.getInstance()
-    res = dbclient.findInDb("pollenisator", coll, {}, True)
     answers: SearchResults = {"answers": []}
-    if res is None:
-        return answers
-    for item in res:
-        title = unidecode(item["title"]).lower()
-        if terms not in title:
-            continue
-        if lang not in item.get("language", "").lower():
-            continue
-        if perimeter not in "\n".join(list(item.get("perimeter", []))).lower():
-            continue
-        answers["answers"].append(item)
+    answers["answers"] = searchDefectTemplates(terms, lang, perimeter, coll)
     return answers
+
+@permission("pentester")
+def searchInPreviousReports(pentest:str, body: Dict[str, str], **kwargs) -> Union[ErrorStatus, SearchResultsPrevReports]:
+    """
+    Search for defects or remarks in the database based on the given parameters.
+
+    Args:
+        body (Dict[str, str]): A dictionary containing the search parameters. 
+            "type" (str): The type of item to search for (either "defect" or "remark").
+            "terms" (str): The search terms.
+            "language" (str): The language of the items to search for.
+            "perimeter" (str): The perimeter of the items to search for.
+
+    Returns:
+        Union[ErrorStatus, SearchResults]: A dictionary containing any errors and the search results if successful, otherwise an error message and status code.
+    """
+    username = kwargs["token_info"]["sub"]
+    if username == "" or username is None:
+        return "Invalid token: no username found", 400
+    defect_type = body.get("type", "")
+    terms = unidecode(body.get("terms", "")).lower()
+    lang = body.get("language", "").lower()
+    perimeter = body.get("perimeter", "").lower()
+    if defect_type == "remark":
+        coll = "remarks"
+    elif defect_type == "defect":
+        coll = "defects"
+    else:
+        return "Invalid parameter: type must be either defect or remark.", 400
+    existing_defects: SearchResultsPrevReports = {"existing_defects": []}
+    existing_defects["existing_defects"] = searchDefectInPreviousReports(pentest, username, terms, lang, perimeter, coll)
+    return existing_defects
 
 def getDefectColor(risk: str) -> str:
     """
