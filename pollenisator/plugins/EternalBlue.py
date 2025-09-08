@@ -102,4 +102,4 @@ class EternalBlue(Plugin):
                 tags= [self.getTags()["pwned-eternalblue"]]
                 if res_insert is not None:
                     p_o.addTag(Tag(self.getTags()["pwned-eternalblue"], notes=notes))
-        return allnotes, tags, "port", targets
+        return allnotes, [], "port", targets
