@@ -111,7 +111,10 @@ def update(pentest: str, collection: str, body: Dict[str, Union[str, bool]]) -> 
         return "Pentest argument is not a valid pollenisator pentest", 403
     if collection == "settings":
         return "Settings collection cannot be updated directly", 403
-    return dbclient.updateInDb(pentest, collection, pipeline, updatePipeline, body.get("many", False), body.get("notify", True), body.get("upsert", False))
+    result = dbclient.updateInDb(pentest, collection, pipeline, updatePipeline, body.get("many", False), body.get("notify", True), body.get("upsert", False))
+    if result is None:
+        return "Update failed", 500
+    return result.raw_result, 200
 
 @permission("pentester")
 def insert(pentest: str, collection: str, body: Dict[str,Any]) -> ErrorStatus:
