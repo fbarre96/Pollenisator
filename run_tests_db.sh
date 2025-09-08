@@ -160,7 +160,7 @@ show_help() {
     echo ""
     echo "Environment Variables:"
     echo "  TEST_MONGO_URI        # MongoDB URI for real database tests"
-    echo "                        # Default: mongodb://localhost:27017/"
+    echo "                        # Default: mongodb://localhost:27018/"
 }
 
 # Main script logic

@@ -12,6 +12,7 @@ import bson
 from PIL import Image
 import pymongo
 from bson import ObjectId
+import re
 from pymongo import InsertOne, MongoClient, UpdateOne
 from pymongo.errors import OperationFailure, ServerSelectionTimeoutError
 from pollenisator.core.components.cacher import Cacher
@@ -1217,6 +1218,10 @@ class DBClient:
             raise ValueError(error_no_pentest)
         if dbName is None or dbName not in pentest_uuids:
             raise ValueError("Database not found")
+        if re.match("^[a-zA-Z0-9_-]+$", dbName) is None:
+            raise ValueError("Database name is not alphanumeric")
+        if re.match("^[a-zA-Z0-9_-]*$", collection) is None:
+            raise ValueError("Collection name is not alphanumeric")
         if directory == "":
             dir_path = os.path.dirname(os.path.realpath(__file__))
             out_path = os.path.join(
@@ -1288,6 +1293,9 @@ class DBClient:
         # else:
         #     toDbName = os.path.splitext(os.path.basename(filename))[0]
         success, msg = self.registerPentest(owner, str(pentest_name), orig_uuid, True, False)
+        # validate filename: only alphanumeric, hyphen, slash or dot allowed
+        if re.match(r'^[A-Za-z0-9\-\/\.]+$', filename) is None:
+            return "Invalid filename: only letters, numbers, hyphens, slashes and dots are allowed", 400
         new_pentest_uuid = msg
         if not self.try_uuid(new_pentest_uuid):
             return msg, 403
@@ -1461,10 +1469,12 @@ class DBClient:
             res = dbclient.findInDb(pentest, "tools", {"_id": ObjectId(attached_to)}, False)
             if res is None:
                 return {"msg":"The given iid does not match an existing tool", "attachment_id":None}, 404
+            return {}, 200
         elif filetype == "proof" and attached_to != "unassigned":
             res = dbclient.findInDb(pentest, "defects", {"_id": ObjectId(attached_to)}, False)
             if res is None:
                 return {"msg":"The given iid does not match an existing defect", "attachment_id":None}, 404
+            return {}, 200
         elif filetype == "proof" and attached_to == "unassigned":
             return {}, 200
         elif filetype == "file" and attached_to != "unassigned":
