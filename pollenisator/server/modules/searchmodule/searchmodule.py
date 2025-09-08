@@ -277,16 +277,7 @@ def search_checkinstances(pentest: str, query: str, limit: int, offset: int) -> 
     for check_data in cursor:
         # Get the check item for more details
         check_item = None
-        representation = "Unknown Check"
-        
-        if check_data.get("check_iid"):
-            try:
-                from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
-                check_item = CheckItem.fetchObject("pollenisator", {"_id": ObjectId(check_data["check_iid"])})
-                if check_item:
-                    representation = check_item.title
-            except:
-                pass
+        representation = check_data.get("target_repr","Unknown Check")
         
         # Find matching snippets
         matches = []
@@ -308,7 +299,7 @@ def search_checkinstances(pentest: str, query: str, limit: int, offset: int) -> 
             "matches": matches,
             "data": {
                 "_id": str(check_data["_id"]),
-                "representation": representation,
+                "target_repr": representation,
                 "status": check_data.get("status", ""),
                 "target": {
                     "target_iid": str(check_data.get("target_iid", "")),

@@ -835,23 +835,33 @@ class Tool(Element):
         Returns:
             bool: The updated tool data.
         """
+        dbclient = DBClient.getInstance()
+        tool_status = "tool_ready"
         if "done" in new_status:
             if arg == "":
                 arg = None
             self.markAsDone(None)
+            tool_status = "tool_done"
         elif "running" in new_status:
             self.markAsRunning(arg if arg is not None else "")
+            tool_status = "tool_running"
         elif "not_done" in new_status:
             self.markAsNotDone()
+            tool_status = "tool_ready"
         elif "ready" in new_status:
             self.markAsNotDone()
+            tool_status = "tool_ready"
         elif "error" in new_status:
             self.markAsError(arg if arg is not None else "")
+            tool_status = "tool_error"
         elif "timedout" in new_status:
             self.markAsTimedout()
+            tool_status = "tool_timedout"
         elif len(new_status) == 0:
             self.markAsNotDone()
-        res: bool = self.updateInDb(self.getData())
+            tool_status = "tool_ready"
+        dbclient.send_notify(self.pentest, "tools", self.getId(), "status_update", data={"status":tool_status, "check_iid":self.check_iid})
+        res: bool = self.updateInDb(self.getData(), )
         return res
 
     @staticmethod
