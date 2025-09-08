@@ -40,9 +40,9 @@ class CheckInstance(Element):
         super().__init__(pentest, valuesFromDb)
         self.status = ""
         self.initialize(valuesFromDb.get("check_iid", None), valuesFromDb.get("target_iid", None), valuesFromDb.get(
-            "target_type", ""), valuesFromDb.get("status", ""), valuesFromDb.get("notes", ""), valuesFromDb.get("target_rep", None))
+            "target_type", ""), valuesFromDb.get("status", ""), valuesFromDb.get("notes", ""), valuesFromDb.get("target_repr", None))
 
-    def initialize(self, check_iid: Optional[ObjectId], target_iid: Optional[ObjectId], target_type: str, status: str, notes: str, target_rep: Optional[str]) -> 'CheckInstance':
+    def initialize(self, check_iid: Optional[ObjectId], target_iid: Optional[ObjectId], target_type: str, status: str, notes: str, target_repr: Optional[str]) -> 'CheckInstance':
         """
         Initialize a CheckInstance object.
 
@@ -52,7 +52,7 @@ class CheckInstance(Element):
             target_type (str): The type of the target.
             status (str): The status of the check instance.
             notes (str): The notes for the check instance.
-            target_rep (Optional[str]): The representation of the target.
+            target_repr (Optional[str]): The representation of the target.
 
         Returns:
             CheckInstance: The initialized CheckInstance object.
@@ -63,7 +63,7 @@ class CheckInstance(Element):
         self.target_type = target_type
         self.status = status
         self.notes = notes
-        self.target_rep = target_rep
+        self.target_repr = target_repr
         return self
 
     @classmethod
@@ -552,8 +552,23 @@ class CheckInstance(Element):
         else:
             data["status"] = ""
         data["forced_status"] = self.status
+        data["target_repr"] = self.getTargetRepresentation()
         return data
-
+    
+    def getTargetRepresentation(self) -> str:
+        """
+        Get a string representation of the target.
+        
+        Returns:
+            str: The string representation of the target.
+        """
+        if self.target_repr is not None:
+            return self.target_repr
+        repres = getTargetRepr(self.pentest, [self.getId()])
+        if repres is not None and self.getId() in repres:
+            return repres[self.getId()]
+        return "Target not found"
+    
     def _add_tool_information(self, data: Dict[str, Any], tool_model: 'tool.Tool') -> Tuple[bool, bool]:
         """
         Add tool information to the provided data dictionary.
@@ -605,6 +620,7 @@ class CheckInstance(Element):
         Returns:
             Optional[ErrorStatus]: An error message if the CheckItem is not found, None otherwise.
         """
+        dbclient = DBClient.getInstance()
         if check_item is None:
             check_item = CheckItem.fetchObject("pollenisator", {"_id": ObjectId(self.check_iid)})
         if check_item is None:
@@ -622,9 +638,9 @@ class CheckInstance(Element):
                 data["status"] = "todo"
         else:
             data["status"] = ""
-        if data["status"] != "":
-            self.status = data["status"]
-            self.update()
+        if data["status"] != "" and self.status != data["status"]:
+            dbclient.updateInDb(self.pentest, CheckInstance.coll_name, {"_id": self.getId(), "type": "checkinstance"}, {"$set": {"status": data["status"]}}, many=False, notify=False)
+            dbclient.send_notify(self.pentest, "checkinstances",  self.getId(), action="status_update", data={"status": data["status"]})
         return None
 
     def get_tools_data(self, data: Dict[str, Any]) -> Tuple[bool, bool]:

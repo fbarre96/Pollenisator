@@ -152,7 +152,7 @@ def getChecksData(pentest: str) -> Union[ErrorStatus, List[Dict[str, Any]]]:
         return_values[check._id]["checkinstances"] = []
     for checkinstance in checkinstances_list:
         inst_data = checkinstance.getData()
-        inst_data["representation"] = repres.get(str(checkinstance.target_iid), return_values.get(str(checkinstance.check_iid), {}).get("title"))
+        inst_data["target_repr"] = repres.get(str(checkinstance.target_iid), return_values.get(str(checkinstance.check_iid), {}).get("title"))
         return_values[ObjectId(checkinstance.check_iid)]["checkinstances"].append(inst_data)
     return sorted([x for x in return_values.values()], key=lambda x: x["priority"])
 
@@ -188,9 +188,13 @@ def startMultiCommand(pentest:str, body: Dict[str, Any], **kwargs: Dict[str, Any
         return replaced_command
     # we have some files to create
     tools_data = []
+    default_bin = None
     for tool in tools:
         tool = cast(Tool, tool)
         data = tool.getCommandData()
+        command_data = tool.getCommand()
+        if default_bin is None and command_data is not None:
+            default_bin = command_data.get("bin_path", None) or default_bin
         tools_data.append(data)
     dbclient = DBClient.getInstance()
     for param in params_to_get:
@@ -208,9 +212,11 @@ def startMultiCommand(pentest:str, body: Dict[str, Any], **kwargs: Dict[str, Any
     if socket is None:
         return "No terminal socket found", 404
     sm = SocketManager.getInstance()
+    binary = default_bin if plugin == "Default" and default_bin is not None else plugin
+
     data = {
         "action": "pty-input",
-        "input": "pollex " + plugin + " " + replaced_command + "\r",
+        "input": "pollex " + binary + " " + replaced_command + "\r",
         "id": session_id
     }
     sm.socketio.emit("proxy-term", data, room=socket["sid"])
