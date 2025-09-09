@@ -629,11 +629,11 @@ class Tool(Element):
         Returns:
             str: The command with the variables replaced by the corresponding information from the data.
         """
-        command = cls.unpack_info(data.get("infos",{}), command, depth=0, max_depth=3)
+        command = cls.unpack_info(data.get("infos",{}), command, depth=0, max_depth=5)
         return command
 
     @classmethod
-    def unpack_info(cls, infos_dict: Dict[str, Any], command: str, depth: int = 0, max_depth: int = 3) -> str:
+    def unpack_info(cls, infos_dict: Dict[str, Any], command: str, depth: int = 0, max_depth: int = 3, cummulated_key: str= "") -> str:
         """
         Recursively unpack infos dict into command string.
 
@@ -649,10 +649,17 @@ class Tool(Element):
         if depth > max_depth:
             return ""
         for key in infos_dict.keys():
+            cummulated_key_next = cummulated_key + "." + str(key) if cummulated_key != "" else str(key)
             if isinstance(infos_dict[key], dict):
-                command = cls.unpack_info(infos_dict[key], command, depth+1, max_depth)
+                command = cls.unpack_info(infos_dict[key], command, depth+1, max_depth, cummulated_key=cummulated_key_next)
+            elif isinstance(infos_dict[key], list):
+                for i, v in enumerate(infos_dict[key]):
+                    if isinstance(v, dict):
+                        command = cls.unpack_info(v, command, depth+1, max_depth, cummulated_key=cummulated_key_next+"."+str(i))
+                    else:
+                        command = command.replace("|tool.infos."+str(cummulated_key_next)+"."+str(i)+"|", str(v))
             else:
-                command = command.replace("|tool.infos."+str(key)+"|", str(infos_dict.get(key, '')))
+                command = command.replace("|tool.infos."+str(cummulated_key_next)+"|", str(infos_dict.get(key, '')))
         return command
 
     def getPluginName(self) -> Optional[str]:
