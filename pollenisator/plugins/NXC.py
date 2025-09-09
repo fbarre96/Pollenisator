@@ -83,6 +83,9 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
     countFound = 0
     countPwn = 0
     countSuccess = 0
+    countUserExists = 0
+    countUserRoastable = 0
+    lockedOut = 0
     nxcFound = False
     lsassy = False
     mode = ""
@@ -143,6 +146,8 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                     toAdd["domain"] = res_asrep.group(4)
                     toAdd["username"] = res_asrep.group(5)
                     toAdd["reason"] = res_asrep.group(6).strip()
+                    countUserRoastable += 1
+                    countUserExists += 1
                     notes += f"ASREPROASTABLE USER FOUND: "+str(toAdd)
                 
                 if res_infos is not None:
@@ -203,6 +208,12 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                             toAdd["username"] = failure_infos.group(5)
                             #password is group 6 and its empty
                             toAdd["reason"] = failure_infos.group(7).strip()
+                            if toAdd["reason"] in  ["STATUS_LOGON_FAILURE","KDC_ERR_PREAUTH_FAILED", "KDC_ERR_CLIENT_REVOKED"]:
+                                countUserExists += 1
+                            elif toAdd["reason"] == "STATUS_ACCOUNT_LOCKED_OUT":
+                                lockedOut += 1
+                            
+                            
 
             if toAdd.keys():
                 retour.append(toAdd)
@@ -234,7 +245,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
         return result
     if lsassy:
         notes = f"NXC LSASSY Success"
-    notes = f"Pwn3d count : {countPwn}\nConnection success count : {countSuccess}\nHost found : {countFound}\nNTDS dump : {len(ntds)}\nSecrets found : {len(secrets)}\n"+ ("\n".join(secrets)) + notes
+    notes = f"Pwn3d count : {countPwn}\nConnection success count : {countSuccess}\nUser accounts found : {countUserExists}\nHost found : {countFound}\nNTDS dump : {len(ntds)}\nSecrets found : {len(secrets)}\n"+ ("\n".join(secrets)) + notes
     result["retour"] = retour
     result["notes"] = notes
     result["countPwn"] = countPwn
@@ -279,6 +290,7 @@ def editScopeIPs(pentest, hostsInfos):
                     infosToAdd["domain"] = domain
             elif infos["type"] == "failure":
                 if infos["reason"] in ["KDC_ERR_PREAUTH_FAILED", "KDC_ERR_CLIENT_REVOKED"]:
+                    countUserExists += 1
                     user_model = User(pentest).initialize(infos.get("domain"), infos.get("username"), None)
                     infosToAdd["users"] = infosToAdd.get("users", []) + [user_model]
             elif infos["type"] == "interesting":
@@ -352,6 +364,9 @@ def editScopeIPs(pentest, hostsInfos):
                             user_m.addTag(Tag("asreproastable", color="orange", level="high", notes=f"{user.domain}\\{user.username} is asreproastable"), True)
                         if user.infos.get("secrets", []):
                             user_m.addTag(Tag("user-secrets-found", color="red", level="high", notes=f"{user.domain}\\{user.username} has secrets : {infos.get('secrets')}"), True)
+                            for secret in user.infos.get("secrets", []):
+                                if secret.startswith("$krb5asrep$"):
+                                    user_m.addTag(Tag("asrep-hash-found", color="red", level="todo", notes=f"{user.domain}\\{user.username} has asreproastable secret : {secret}"), True)
                         if user.infos.get("hashLM", "") != "":
                             user_m.addTag(Tag("hashLM-found", color="red", level="high", notes=f"{user.domain}\\{user.username} has hashLM : {user.infos.get('hashLM')}"), True)
                         if user.infos.get("hashNT", "") != "":
@@ -431,6 +446,7 @@ class NXC(Plugin):
                 "smbv1-enabled" : Tag("smbv1-enabled", "orange", "medium"),
                 "null-auth-allowed": Tag("null-auth-allowed", "red", "high"),
                 "pwned-ntds": Tag("pwned-ntds", "black", "critical"),
+                "asrep-hash-found": Tag("asrep-hash-found", "red", "high"),
                 "hashLM-found": Tag("hashLM-found", "red", "high")}
 
 
