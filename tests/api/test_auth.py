@@ -149,6 +149,15 @@ class TestAuthentication:
         
         assert response.status_code == 403
         assert 'incorrect' in response.get_json()
+    
+    def test_request_empty_token(self, client: Client):
+        """Test accessing protected endpoint without token."""
+        response = client.get('/api/v1/pentests', headers={'Authorization': '', "Cookies": "session_token=;"})
+        assert response.status_code == 401
+        response = client.get('/api/v1/pentests', headers={'Authorization': ''})
+        assert response.status_code == 401
+        response = client.get('/api/v1/pentests', headers={"Cookies": "session_token=;"})
+        assert response.status_code == 401
 
 
 class TestUserManagement:
