@@ -565,8 +565,8 @@ class CheckInstance(Element):
         if self.target_repr is not None:
             return self.target_repr
         repres = getTargetRepr(self.pentest, [self.getId()])
-        if repres is not None and self.getId() in repres:
-            return repres[self.getId()]
+        if repres is not None and str(self.getId()) in repres:
+            return repres[str(self.getId())]
         return "Target not found"
     
     def _add_tool_information(self, data: Dict[str, Any], tool_model: 'tool.Tool') -> Tuple[bool, bool]:
