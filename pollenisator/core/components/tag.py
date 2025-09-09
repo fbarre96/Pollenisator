@@ -42,12 +42,12 @@ class Tag:
         """
         self.name: str = ""
         self.do_init(args, kwargs)
-        color = kwargs.get("color", None)
-        level = kwargs.get("level", None)
-        notes = kwargs.get("notes", None)
-        self.color: str = color if color is not None else "transparent" # if no color is provided, set to transparent
-        self.level: str = level if level is not None else "info" # if no level is provided, set to info
-        self.notes: str = notes if notes is not None else "" # if no notes are provided, set to empty string
+        if self.color is None or self.color == "":
+            self.color: str = kwargs.get("color", "transparent") # if no color is provided, set to transparent
+        if self.level is None or self.level == "":
+            self.level: str =  kwargs.get("level", "info") # if no level is provided, set to info
+        if self.notes is None or self.notes == "":
+            self.notes: str = kwargs.get("notes", "") # if no notes are provided, set to default message
 
     def do_init(self, args, kwargs):
         """
