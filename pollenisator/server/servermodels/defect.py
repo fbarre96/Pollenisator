@@ -464,6 +464,29 @@ def findDefectTemplate(body: Dict[str, Any]) -> Union[Dict[str, Any], Tuple[str,
     return  "No defect template found with this criteria", 404
 
 @permission("user")
+def findDefectTemplatesByIds(body: Dict[str, Any]) -> Union[Dict[str, Dict[str, Any]], Tuple[str, int]]:
+    """
+    Find many defects template in the "pollenisator" database using a set of criteria. If the "_id" field is present in the 
+    criteria, it is converted to an ObjectId.
+
+    Args:
+        body (Dict[str, Any]): A dictionary containing the search criteria.
+
+    Returns:
+        Union[Dict[str, [Dict[str, Any]]], Tuple[str, int]]: The found defect templates as a list of dictionary, or a tuple containing an error 
+        message and status code if no template was found.
+    """
+    dbclient = DBClient.getInstance()
+    lists_ids = set()
+    if "ids" in body:
+        for id_str in body["ids"]:
+            lists_ids.add(ObjectId(detect_objectid(id_str)))
+    res = dbclient.findInDb("pollenisator", "defects", {"_id":{"$in": list(lists_ids)}}, True)
+    if res is not None:
+        return {str(x["_id"]): x for x in res}
+    return  "No defect template found with this criteria", 404
+
+@permission("user")
 def insertDefectTemplate(body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[DefectInsertResult, Tuple[str, int]]:
     """
     Insert a new defect template into the "pollenisator" database. If a template with the same id or title already exists, 

@@ -256,6 +256,32 @@ paths:
               examples:
                 Server issue:
                   value: 'Failed to export'
+  "/report/DefectTemplate/findByIds":
+    post:
+      operationId: pollenisator.server.servermodels.defect.findDefectTemplatesByIds
+      tags:
+        - Defect Template
+      summary: Find Defect templates by their ids
+      requestBody:
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ids:
+                    type: array
+                    items:
+                      type: string
+                required:
+                  - ids
+      responses:
+        "200":
+          description:  DefectTemplates per id
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: "A Dictionnary of defect template body with key=id and value=DefectTemplate "
   "/report/DefectTemplates/find":
     post:
       operationId: pollenisator.server.servermodels.defect.findDefectTemplate
