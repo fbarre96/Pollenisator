@@ -455,7 +455,7 @@ class DBClient:
         elems = db[collection].find(pipeline)
         if notify:
             for elem in elems:
-                self.send_notify(dbName, collection, elem["_id"], "update")
+                self.send_notify(dbName, collection, elem["_id"], "update", data=updatePipeline)
         return res
 
     def _updateOne(self, dbName: str, collection: str, pipeline: Dict[str, Any], updatePipeline: Dict[str, Any], notify: bool = True, upsert: bool = False) -> pymongo.results.UpdateResult:
@@ -485,7 +485,7 @@ class DBClient:
             elem = db[collection].find_one(pipeline)
             if elem is not None:
                 if notify:
-                    self.send_notify(dbName, collection, elem["_id"], "update")
+                    self.send_notify(dbName, collection, elem["_id"], "update", data=updatePipeline)
         return res
     
     def _update(self, dbName: str, collection: str, pipeline: Dict[str, Any], updatePipeline: Dict[str, Any], many: bool = False, notify: bool = True, upsert: bool = False) -> pymongo.results.UpdateResult:
@@ -632,7 +632,7 @@ class DBClient:
             self.cacher.cacheSet(pentest, collection, res_solo.inserted_id, values)
         if res_solo.inserted_id is not None and notify:
             self.send_notify(pentest, collection,
-                        str(res_solo.inserted_id), "insert", str(parentId))
+                        str(res_solo.inserted_id), "insert", str(parentId), data=values)
         return res_solo
 
     def find(self, collection: str, pipeline: Optional[Dict[str, Any]] = None, multi: bool = True) -> Union[pymongo.cursor.Cursor, None, List[Dict[str, Any]]]:
