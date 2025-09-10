@@ -17,9 +17,9 @@ def remove_term_colors(data):
     return re.sub(r'\x1b\[[0-9;]+[a-zA-Z]', '', data)
 
 def getInfos(enum4linux_file):
-    parts = [["Starting enum4linux", "ENUM4LINUX"], "Target Information", "via LDAP", "Workgroup/Domain", "Session Check on", 
-       "Users", "Groups", ["complete","Completed"]]
-    infos = {"domain_users":{}, "computers":{}}
+    parts = [["Starting enum4linux", "ENUM4LINUX"], "Target Information", "via LDAP", "via SMB", "Workgroup/Domain", "Session Check on",
+             "Users", "Groups", ["complete", "Completed"]]
+    infos = {"domain_users": {}, "computers": {}}
     current_part = -1
     found_marker = False
     regex_user = re.compile(r"^index: 0x[\da-f]+ RID: 0x[\da-f]+ \S+: 0x[\da-f]+ Account: (.+)(?=\s+Name:)\s+Name:.+(?=Desc:)Desc: (.+)$")
@@ -57,7 +57,10 @@ def getInfos(enum4linux_file):
         elif current_part == 2: #"Enumerating LDAP info"
             if "Long domain name is" in line:
                 infos["domain"] = line.strip().split(" ")[-1].lower()
-        elif current_part == 3: #"Enumerating Workgroup/Domain"
+        elif current_part == 3: #"via SMB"
+            if "DNS domain:" in line:
+                infos["domain"] = line.strip().split("DNS domain: ")[-1].strip().lower()
+        elif current_part == 4: #"Enumerating Workgroup/Domain"
             if "[+] Got domain/workgroup name: " in line:
                 netbios_domain = line.strip().split(" ")[-1].lower()
                 if "domain" in infos:
@@ -65,7 +68,7 @@ def getInfos(enum4linux_file):
                         infos["domain"] = netbios_domain+"."+infos["domain"]
                 else:
                     infos["domain"] = netbios_domain
-        elif current_part == 4: #"Session Check on"
+        elif current_part == 5: #"Session Check on"
             if line.startswith("[+] Server"):
                 if "doesn't allow session" in line:
                     infos["session_allowed"] = False
@@ -76,7 +79,7 @@ def getInfos(enum4linux_file):
                     if username.strip() == "" or username.strip() == infos.get("random_username"):
                         infos["null_session_allowed"] = True
 
-        elif current_part == 5: # user on
+        elif current_part == 6: # user on
             found = re.search(regex_user, line)
             if found is not None:
                 account = found.group(1)
@@ -84,7 +87,7 @@ def getInfos(enum4linux_file):
                 infos["domain_users"][infos["domain"]+"\\"+account] = {"desc":desc}
             else:
                 global_users += line
-        elif current_part == 6: # Groups on
+        elif current_part == 7: # Groups on
             # also means that users are finished
             if global_users != "":
                 users = re.findall(ng_regex_user, global_users)
@@ -111,7 +114,7 @@ def getInfos(enum4linux_file):
                     infos["domain_users"][domain+"\\"+member] = user_info
             else:
                 global_groups += line
-        elif current_part == 7: #enum4linux complete
+        elif current_part == 8: #enum4linux complete
             # also means that groups are finished
             if global_groups != "":
                 groups = re.findall(ng_regex_groups, global_groups)
@@ -154,7 +157,8 @@ def updateDatabase(pentest, enum_infos):
         password = ""
         user_m = User(pentest).initialize( domain, username, password, user_add_infos.get("groups",[]), user_add_infos.get("desc"))
         res = user_insert(pentest, user_m.getData())
-        user_update(pentest, ObjectId(res["iid"]), user_m.getData())
+        update_data = {"groups": user_add_infos.get("groups", []), "description": user_add_infos.get("desc", "")}
+        user_update(pentest, ObjectId(res["iid"]), update_data)
     for computer, computer_infos in enum_infos.get("computers", {}).items():
         ip_m = Ip(pentest).initialize(str(computer_infos["ip"]), infos={"plugin":Enum4Linux.get_name()})
         insert_ret = ip_m.addInDb()

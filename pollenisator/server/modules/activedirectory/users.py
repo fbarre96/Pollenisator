@@ -446,7 +446,7 @@ def update(pentest: str, user_iid: str, body: Dict[str, Any]) -> Union[bool, Tup
         del body["type"]
     if "_id" in body:
         del body["_id"]
-    if str(user.description) != "None" or str(user.description) != "":
+    if str(user.description) == "None" or str(user.description) == "":
         del body["description"]
-    dbclient.updateInDb(pentest, "users", {"_id": ObjectId(user_iid), "type":"user"}, {"$set": body}, False, True)
+    dbclient.updateInDb(pentest, "users", {"_id": ObjectId(user_iid), "type":"user"}, {"$set": body}, False, notify=True)
     return True
