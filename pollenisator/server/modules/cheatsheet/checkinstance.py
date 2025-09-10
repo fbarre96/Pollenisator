@@ -848,7 +848,7 @@ def multiChangeOfStatus(pentest: str, body: Dict[str, BodyMultiChangeOfStatus]) 
     if "status" not in body:
         return "No status", 400
     iids_list = [ ObjectId(x) for x in body["iids"] ]
-    dbclient.updateInDb(pentest, "checkinstances", {"_id": {"$in": iids_list}}, {"$set": {"status": body["status"]}}, many=True, notify=True)
+    dbclient.updateInDb(pentest, "checkinstances", {"_id": {"$in": iids_list}}, {"$set": {"status": body["status"], "force_status": body.get("force_status", body["status"])}}, many=True, notify=True)
     return "Success", 200
 
 @permission("pentester")
