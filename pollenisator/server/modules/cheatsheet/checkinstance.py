@@ -63,7 +63,8 @@ class CheckInstance(Element):
         self.target_type = target_type
         self.status = status
         self.notes = notes
-        self.target_repr = target_repr
+        self.target_repr = target_repr # define it 
+        self.target_repr = self.getTargetRepresentation() # populate it if not initialized
         return self
 
     @classmethod
@@ -165,7 +166,7 @@ class CheckInstance(Element):
         Returns:
             Dict[str, Any]: A dictionary containing the data of the CheckInstance object.
         """
-        return {"_id": self._id, "type": self.type, "check_iid": self.check_iid, "target_iid": self.target_iid, "target_type": self.target_type, "parent": self.parent, "status": self.status, "notes": self.notes}
+        return {"_id": self._id, "type": self.type, "check_iid": self.check_iid, "target_iid": self.target_iid, "target_type": self.target_type, "parent": self.parent, "status": self.status, "notes": self.notes, "target_repr": self.target_repr}
 
     def addInDb(self, checkItem: Optional[CheckItem] = None, toolInfos: Optional[Dict[str, Any]] = None) -> Union[CheckInstanceInsertResult, ErrorStatus]:
         """

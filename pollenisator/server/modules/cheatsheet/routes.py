@@ -153,7 +153,11 @@ def getChecksData(pentest: str) -> Union[ErrorStatus, List[Dict[str, Any]]]:
     for checkinstance in checkinstances_list:
         inst_data = checkinstance.getData()
         inst_data["target_repr"] = repres.get(str(checkinstance.target_iid), return_values.get(str(checkinstance.check_iid), {}).get("title"))
-        return_values[ObjectId(checkinstance.check_iid)]["checkinstances"].append(inst_data)
+        try:
+            return_values[ObjectId(checkinstance.check_iid)]["checkinstances"].append(inst_data)
+        except KeyError:
+            # the checkinstance is linked to a check that does not exist anymore
+            pass
     return sorted([x for x in return_values.values()], key=lambda x: x["priority"])
 
 @permission("pentester")
@@ -224,13 +228,12 @@ def startMultiCommand(pentest:str, body: Dict[str, Any], **kwargs: Dict[str, Any
     
 
 @permission("pentester")
-def applyToPentest(pentest: str, iid: str, body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[ErrorStatus, Dict[str, bool]]:
+def triggerRetest(pentest: str, body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[ErrorStatus, Dict[str, bool]]:
     """
     Apply a cheatsheet to a pentest.
 
     Args:
         pentest (str): The name of the pentest.
-        iid (str): The id of the cheatsheet item.
         body (Dict[str, Any]): The body of the request.
         **kwargs (Dict[str, Any]): Additional keyword arguments.
 
@@ -238,19 +241,25 @@ def applyToPentest(pentest: str, iid: str, body: Dict[str, Any], **kwargs: Dict[
         Union[ErrorStatus, Dict[str, bool]]: Returns "Not found" and 404 if the cheatsheet item is not found, or a dictionary with the result of the operation.
     """
     user = kwargs["token_info"]["sub"]
-    check_item = CheckItem.fetchObject("pollenisator", {"_id":ObjectId(iid)})
-    if check_item is None:
+    list_of_ids = body.get("ids", [])
+    if not isinstance(list_of_ids, list):
+        return "ids must be a list", 400
+    list_of_ids = [detect_objectid(x) for x in list_of_ids]
+    check_items = CheckItem.fetchObjects("pollenisator", {"_id":{"$in":list_of_ids}})
+    if check_items is None:
         return "Not found", 404
-    for command in check_item.commands:
-        pentest_equiv_command = Command.fetchObject(pentest, {"original_iid":str(command)})
-        if pentest_equiv_command is None:
-            orig = Command.fetchObject("pollenisator", {"_id":ObjectId(command)})
-            if orig:
-                mycommand =  orig.getData()
-                mycommand["original_iid"] = str(mycommand["_id"])
-                mycommand["_id"] = None
-                mycommand["indb"] = pentest
-                mycommand["owner"] = user
-                Command(pentest, mycommand).addInDb()
-    check_item.apply_retroactively(pentest)
+    for check_item in check_items:
+        check_item = cast(CheckItem, check_item)
+        for command in check_item.commands:
+            pentest_equiv_command = Command.fetchObject(pentest, {"original_iid":str(command)})
+            if pentest_equiv_command is None:
+                orig = Command.fetchObject("pollenisator", {"_id":ObjectId(command)})
+                if orig:
+                    mycommand =  orig.getData()
+                    mycommand["original_iid"] = str(mycommand["_id"])
+                    mycommand["_id"] = None
+                    mycommand["indb"] = pentest
+                    mycommand["owner"] = user
+                    Command(pentest, mycommand).addInDb()
+        check_item.apply_retroactively(pentest)
     return {"res": True}

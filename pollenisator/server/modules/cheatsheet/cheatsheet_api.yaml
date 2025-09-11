@@ -261,6 +261,32 @@ paths:
       responses:
         '200':
           description: OK
+  '/cheatsheet/{pentest}/triggerRetest':
+    parameters:
+      - schema:
+          type: string
+        name: pentest
+        in: path
+        required: true
+    post:
+      tags:
+        - Cheatsheet
+      summary: trigger retest of CheckItems in a pentest
+      operationId: pollenisator.server.modules.cheatsheet.routes.triggerRetest
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+      description: 'trigger retest of CheckItems in a pentest'
+      responses:
+        '200':
+          description: OK
   '/cheatsheet/{pentest}/{iid}':
     parameters:
       - schema:
@@ -292,14 +318,7 @@ paths:
         '200':
           description: OK
       description: Delete checkinstance item
-    post:
-      summary: "Apply the checkitem to the pentest"
-      tags:
-        - Cheatsheet
-      operationId: pollenisator.server.modules.cheatsheet.routes.applyToPentest
-      responses:
-        '200':
-          description: OK
+
     put:
       summary: ''
       tags:
