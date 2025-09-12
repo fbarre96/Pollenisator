@@ -254,5 +254,5 @@ class Command(Element):
             if not res["res"]:
                 comm_o = Command(pentest, {"_id": ObjectId(res["iid"])})
                 comm_o.addOwner(user)
-                dbclient.updateInDb(pentest, "commands", {"_id": ObjectId(res["iid"])}, {"$set": {"owners":[user], "text":command.text, "text_multi":command.text_multi, "original_iid": ObjectId(original_id)}})
+                dbclient.updateInDb(pentest, "commands", {"_id": ObjectId(res["iid"])}, {"$set": {"owners":[user], "text":command.text, "text_multi":command.text_multi, "plugin":command.plugin, "bin_path":command.bin_path,"original_iid": ObjectId(original_id)}})
         return True

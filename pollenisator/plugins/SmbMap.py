@@ -18,7 +18,7 @@ def smbmap_format(row):
             0. if the filename matched a pattern, the pattern. None otherwise
             1. the targeted host
     """
-    interesting_name_list = ["passwd", "password", "pwd", "mot_de_passe", "motdepasse", "auth",
+    interesting_name_list = ["passwd", "password", "pwd", "mot_de_passe", "motdepasse", "auth", "secret",".ps1"
                              "creds", "confidentiel", "confidential", "backup", ".xml", ".conf", ".cfg", "unattended"]
     interesting_type = None
     if row[3] == "f": # isDir
@@ -165,7 +165,7 @@ class SmbMap(Plugin):
             if computer_m is not None:
                 computer_m.add_user(domain, user, password)
             for share_name in share_dict:
-                share_m = Share().initialize(host, share_name)
+                share_m = Share(pentest).initialize(host, share_name)
                 flagged_files = []
                 for share_info in share_dict[share_name]:
                     #share_info[] = path, isInteresting, privs, fileSize, domain, user
