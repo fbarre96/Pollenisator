@@ -661,9 +661,11 @@ class Element(metaclass=AbstractMetaElement):
         for tag_data in tagged_item.get("tags", []):
             if isinstance(tag_data, str):
                 tag_names.append(tag_data)
-            else:
+            elif isinstance(tag_data, (list, tuple)) and len(tag_data) > 0:
                 # Handle tuple/list format where tag name is first element
                 tag_names.append(tag_data[0])
+            elif isinstance(tag_data, dict) and "name" in tag_data:
+                tag_names.append(tag_data["name"])
         return tag_names
     
     @classmethod
