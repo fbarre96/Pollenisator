@@ -162,8 +162,8 @@ class Port(Element):
         command = command.replace("|port.service|", port_db.get("service", ""))
         command = command.replace("|port.product|", port_db.get("product",""))
         port = data.get("port")
-        is_ssl = "ssl" in port_db.get("service", "") or "https" in port_db.get("service", "")
-        command = command.replace("|url|", "https" if is_ssl else "http"+"://"+data.get("ip", "")+ (":"+str(port) if str(port) != "" else ""))
+        is_ssl = "ssl" in port_db.get("service", "") or "https" in port_db.get("service", "") or port_db.get("infos", {}).get("SSL", False) is True or str(port) in ["443", "8443", "9443"]
+        command = command.replace("|url|", ("https" if is_ssl else "http")+"://"+data.get("ip", "")+ (":"+str(port) if str(port) != "" else ""))
         port_infos = port_db.get("infos", {})
         for info in port_infos:
             command = command.replace("|port.infos."+str(info)+"|", str(port_infos[info]))
