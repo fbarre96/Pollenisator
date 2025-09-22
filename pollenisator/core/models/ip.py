@@ -1,6 +1,6 @@
 """Ip Model. Describes Hosts (not just IP now but domains too)"""
 
-from typing import Any, Dict, Iterator, List, Optional, cast
+from typing import Any, Dict, Generator, Iterator, List, Optional, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 import re
@@ -197,6 +197,21 @@ class Ip(Element):
             (str) Returns the string ipv4 of this ip.
         """
         return self.ip
+    
+    @classmethod
+    def fetchInScopeObjects(cls, pentest: str,  pipeline: Dict[str, Any]) -> Generator['Element', None, None]:
+        """
+        Fetch many IPS from database and return a Cursor to iterate over model objects.
+
+        Args:
+            pentest (str): The name of the current pentest.
+            pipeline: Dict[str, Any]: A mongo query pipeline to filter objects.
+
+        Returns:
+            Iterator[Computer]: Returns a cursor to iterate on model objects.
+        """
+        pipeline["in_scopes"] = {"$ne": []}
+        return cls.fetchObjects(pentest, pipeline)
 
     @classmethod
     def getSearchableTextAttribute(cls) -> List[str]:
@@ -466,7 +481,8 @@ class Ip(Element):
         if "_id" in new_data:
             del new_data["_id"]
         dbclient.updateInDb(self.pentest, "ips", {"_id":ObjectId(self.getId())}, {"$set":new_data}, False, True)
-        new_self.add_ip_checks()
+        if len(new_data.get("in_scopes", [])) > 0:
+            new_self.add_ip_checks()
         return True
 
     def addInDb(self) -> IpInsertResult:

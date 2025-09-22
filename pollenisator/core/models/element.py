@@ -226,6 +226,20 @@ class Element(metaclass=AbstractMetaElement):
             yield cls(pentest, d)
 
     @classmethod
+    def fetchInScopeObjects(cls, pentest: str, pipeline: Dict[str, Any]) -> Generator['Element', None, None]:
+        """
+        Fetch many elements from database and hcecks if in scopes and return a Cursor to iterate over model objects.
+
+        Args:
+            pentest (str): The name of the pentest.
+            pipeline (Dict[str, Any]): A MongoDB search pipeline.
+
+        Returns:
+            Generator['Element', None, None]: A cursor to iterate on model objects.
+        """
+        return cls.fetchObjects(pentest, pipeline) # default case does not have scope, so just fetch all
+
+    @classmethod
     def fetchObject(cls, pentest: str, pipeline: Dict[str, Any]) -> Optional['Element']:
         """
         Fetch a single command from the database and return a model object.

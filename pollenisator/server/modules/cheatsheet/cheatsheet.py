@@ -2,7 +2,7 @@
 CheckItem in cheatsheet module,
 A checkitem is something you want to test in a pentest. It is then instanciated many time for each pentest as CheckInstances.
 """
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple, Union, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
 import pymongo
@@ -80,7 +80,7 @@ class CheckItem(Element):
         return self
 
     @classmethod
-    def fetchObjects(cls, _pentest: str, pipeline: Dict[str, Any]) -> Iterator['CheckItem']:
+    def fetchObjects(cls, _pentest: str, pipeline: Dict[str, Any]) -> Generator['CheckItem', None, None]:
         """
         Fetch many commands from database and return a Cursor to iterate over model objects.
 
@@ -217,7 +217,7 @@ class CheckItem(Element):
         elif class_registered == Element:
             Element.apply_retroactively_custom(pentest, self)
             return
-        all_objects = class_registered.fetchObjects(pentest, {})
+        all_objects = class_registered.fetchInScopeObjects(pentest, {})
         if all_objects is None:
             return
         for obj in all_objects:

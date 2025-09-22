@@ -152,12 +152,14 @@ def getChecksData(pentest: str) -> Union[ErrorStatus, List[Dict[str, Any]]]:
         return_values[check._id]["checkinstances"] = []
     for checkinstance in checkinstances_list:
         inst_data = checkinstance.getData()
-        inst_data["target_repr"] = repres.get(str(checkinstance.target_iid), return_values.get(str(checkinstance.check_iid), {}).get("title"))
-        try:
-            return_values[ObjectId(checkinstance.check_iid)]["checkinstances"].append(inst_data)
-        except KeyError:
-            # the checkinstance is linked to a check that does not exist anymore
-            pass
+        target = repres.get(str(checkinstance.target_iid),None)
+        if target:
+            inst_data["target_repr"] = target
+            try:
+                return_values[ObjectId(checkinstance.check_iid)]["checkinstances"].append(inst_data)
+            except KeyError:
+                # the checkinstance is linked to a check that does not exist anymore
+                pass
     return sorted([x for x in return_values.values()], key=lambda x: x["priority"])
 
 @permission("pentester")
@@ -202,7 +204,7 @@ def startMultiCommand(pentest:str, body: Dict[str, Any], **kwargs: Dict[str, Any
         tools_data.append(data)
     dbclient = DBClient.getInstance()
     for param in params_to_get:
-        with tempfile.NamedTemporaryFile(delete_on_close=False, suffix=".txt") as tmpfile:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as tmpfile:
             for tool_data in tools_data:
                 replaced_param = Element.replaceAllCommandVariables(pentest, param, tool_data)
                 tmpfile.write(replaced_param.encode()+"\n".encode())

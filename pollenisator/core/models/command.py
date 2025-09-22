@@ -1,5 +1,5 @@
 """Command Model."""
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Generator, Iterator, List, Optional
 from typing_extensions import TypedDict
 
 from bson import ObjectId
@@ -166,7 +166,7 @@ class Command(Element):
         return {"name": self.name}
 
     @classmethod
-    def fetchObjects(cls, pentest: Any, pipeline: Dict[str, Any]) -> Iterator['Command']:
+    def fetchObjects(cls, pentest: Any, pipeline: Dict[str, Any]) -> Generator['Command', None, None]:
         """
         Fetch many commands from database and return a Cursor to iterate over Command objects.
 

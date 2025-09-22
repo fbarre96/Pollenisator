@@ -180,6 +180,40 @@ class Computer(Element):
             yield Computer(pentest, d)
 
     @classmethod
+    def fetchInScopeObjects(cls, pentest: str,  pipeline: Dict[str, Any]) -> Generator[ 'Element', None, None]:
+        """
+        Fetch many elements from database and hcecks if in scopes and return a Cursor to iterate over model objects.
+
+        Args:
+            pentest (str): The name of the pentest.
+            pipeline (Dict[str, Any]): A MongoDB search pipeline.
+
+        Returns:
+            Iterator: A cursor to iterate on model objects.
+        """
+        dbclient = DBClient.getInstance()
+        for key in list(pipeline.keys()):
+            if not key.startswith("computer.") :
+                pipeline["computer."+key] = pipeline[key]
+                del pipeline[key]
+        aggregat_computer_ips = dbclient.aggregateFromDb(pentest, "ips", [
+            {"$match": {"in_scopes": {"$ne":[]}}},
+            {"$lookup": {
+                "from": "computers",
+                "localField": "ip",
+                "foreignField": "ip",
+                "as": "computer"
+            }},
+            {"$unwind": "$computer"},
+            {"$match": pipeline}
+        ])
+        if aggregat_computer_ips is None:
+            return None
+        for ip_data in aggregat_computer_ips:
+            if ip_data.get("computer", None) is not None:
+                yield Computer(pentest, ip_data.get("computer"))
+
+    @classmethod
     def fetchObject(cls, pentest: str, pipeline: Dict[str, Any]) -> Optional['Computer']:
         """
         Fetch a single Computer object from the database using the provided Mongo search pipeline. If no object is found, 

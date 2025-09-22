@@ -2,7 +2,7 @@
 # coding: utf-8
 
 from __future__ import absolute_import
-from typing import Dict, Iterator, List, Optional, Any, Tuple, Union
+from typing import Dict, Generator, Iterator, List, Optional, Any, Tuple, Union
 from typing_extensions import TypedDict
 from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
@@ -104,7 +104,7 @@ class Share(Element):
         return res
 
     @classmethod
-    def fetchObjects(cls, pentest: str, pipeline: Dict[str, Any]) -> Optional[Iterator['Share']]:
+    def fetchObjects(cls, pentest: str, pipeline: Dict[str, Any]) -> Generator[ 'Share', None, None]:
         """
         Fetch many shares from the database and return a Cursor to iterate over Share objects.
 
@@ -122,6 +122,40 @@ class Share(Element):
             return None
         for d in ds:
             yield Share(pentest, d)
+
+    @classmethod
+    def fetchInScopeObjects(cls, pentest: str, pipeline: Dict[str, Any]) -> Generator[ 'Share', None, None]:
+        """
+        Fetch many elements from database and hcecks if in scopes and return a Cursor to iterate over model objects.
+
+        Args:
+            pentest (str): The name of the pentest.
+            pipeline (Dict[str, Any]): A MongoDB search pipeline.
+
+        Returns:
+            Iterator: A cursor to iterate on model objects.
+        """
+        dbclient = DBClient.getInstance()
+        for key in list(pipeline.keys()):
+            if not key.startswith("share.") :
+                pipeline["share."+key] = pipeline[key]
+                del pipeline[key]
+        aggregat_share_ips = dbclient.aggregateFromDb(pentest, "ips", [
+            {"$match": {"in_scopes": {"$ne":[]}}},
+            {"$lookup": {
+                "from": "shares",
+                "localField": "ip",
+                "foreignField": "ip",
+                "as": "share"
+            }},
+            {"$unwind": "$share"},
+            {"$match": pipeline}
+        ])
+        if aggregat_share_ips is None:
+            return None
+        for ip_data in aggregat_share_ips:
+            if ip_data.get("share", None) is not None:
+                yield Share(pentest, ip_data.get("share", None))
 
     @classmethod
     def fetchObject(cls, pentest: str, pipeline: Dict[str, Any]) -> Optional['Share']:

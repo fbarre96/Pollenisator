@@ -2,7 +2,7 @@
 # coding: utf-8
 
 from __future__ import absolute_import
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple, Union, cast
 from typing_extensions import TypedDict
 from pollenisator.core.components.logger_config import logger
 from bson import ObjectId
@@ -98,7 +98,7 @@ class User(Element):
 
 
     @classmethod
-    def fetchObjects(cls, pentest: str, pipeline: Dict[str, Any]) -> Optional[Iterator['User']]:
+    def fetchObjects(cls, pentest: str, pipeline: Dict[str, Any]) -> Generator['User', None, None]:
         """
         Fetch many users from the database and return a Cursor to iterate over User objects.
 

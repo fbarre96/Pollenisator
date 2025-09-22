@@ -4,6 +4,7 @@ Instanciation of a checkItem, with a target and a status
 from typing import Callable, Generator, Iterable, List, Optional, Dict, Any, Set, Union, Tuple, cast
 from typing_extensions import TypedDict
 from bson import ObjectId
+from pymongo import UpdateOne
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.utils import detect_objectid
 from pollenisator.core.models.command import Command
@@ -785,13 +786,13 @@ def getTargetRepr(pentest: str, body: List[str]) -> Dict[str, str]:
     elements = _getElementsPerType(checkinstances)
     ret = generate_target_representations(pentest, elements)
     # Update the checkinstances with the representation string
+    update_operations = []
     for data in checkinstances:
         if str(data["_id"]) in ret:
             data["target_repr"] = ret[str(data["_id"])]
-        else:
-            data["target_repr"] = "Target not found"
-        dbclient.updateInDb(pentest, "checkinstances", {"_id": data["_id"]}, {"$set": {"target_repr": data["target_repr"]}}, many=False, notify=True)
-
+            update_operations.append(UpdateOne({"_id":ObjectId(data["_id"])}, {"$set":{"target_repr": data["target_repr"]}}))
+    dbclient.bulk_write(pentest, "checkinstances", update_operations, notify=True)
+    
     return ret
 
 def generate_target_representations(pentest: str, elements: Dict[str, Set[ObjectId]]) -> Dict[str, str]:
@@ -807,7 +808,7 @@ def generate_target_representations(pentest: str, elements: Dict[str, Set[Object
     for element_type, element_iids in elements.items():
         class_element = Element.classFactory(element_type)
         if class_element is not None:
-            elems = class_element.fetchObjects(pentest, {"_id": {"$in":list(element_iids)}})
+            elems = class_element.fetchInScopeObjects(pentest, {"_id": {"$in":list(element_iids)}})
             if not elems or elems is None:
                 ret_str = "Target not found"
             else:

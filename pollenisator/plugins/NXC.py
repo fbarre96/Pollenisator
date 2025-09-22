@@ -290,7 +290,6 @@ def editScopeIPs(pentest, hostsInfos):
                     infosToAdd["domain"] = domain
             elif infos["type"] == "failure":
                 if infos["reason"] in ["KDC_ERR_PREAUTH_FAILED", "KDC_ERR_CLIENT_REVOKED"]:
-                    countUserExists += 1
                     user_model = User(pentest).initialize(infos.get("domain"), infos.get("username"), None)
                     infosToAdd["users"] = infosToAdd.get("users", []) + [user_model]
             elif infos["type"] == "interesting":
@@ -390,7 +389,7 @@ def editScopeIPs(pentest, hostsInfos):
                 computer_m.update()
                 if str(d["infos"].get("signing", True)).lower() == "false":
                     computer_m.addTag(Tag("signing-disabled", "orange", "medium", f"Signing is disabled on {computer_m.name}"), True)
-                if str(d["infos"].get("smbv1", True)).lower() == "false":
+                if str(d["infos"].get("smbv1", False)).lower() == "true":
                     computer_m.addTag(Tag("smbv1-enabled", "orange", "medium", f"SMBv1 is enabled on {computer_m.name}"), True)
                 if str(d["infos"].get("null_auth", "")).lower() == "true":
                     computer_m.addTag(Tag("null-auth-allowed", "red", "high", f"Null authentication is allowed on {computer_m.name}"), True)

@@ -1,7 +1,7 @@
 """Port Model"""
 
 import time
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, Generator, Iterable, List, Optional, Tuple, Union, cast
 from typing_extensions import TypedDict
 
 from pymongo import UpdateOne, InsertOne
@@ -87,6 +87,41 @@ class Port(Element):
     @classmethod
     def getSearchableTextAttribute(cls):
         return ["port", "proto", "service", "product"]
+    
+    @classmethod
+    def fetchInScopeObjects(cls, pentest: str,  pipeline: Dict[str, Any]) -> Generator[ 'Element', None, None]:
+        """
+        Fetch many elements from database and hcecks if in scopes and return a Cursor to iterate over model objects.
+
+        Args:
+            pentest (str): The name of the pentest.
+            pipeline: Dict[str, Any]: A dictionary containing the search criteria.
+
+        Returns:
+            Generator['Element', None, None]: A cursor to iterate on model objects.
+        """
+        dbclient = DBClient.getInstance()
+        for key in list(pipeline.keys()):
+            if not key.startswith("port."):
+                pipeline["port."+key] = pipeline[key]
+                del pipeline[key]
+                
+        aggregate_ips_ports = dbclient.aggregateFromDb(pentest, "ips", [
+            {"$match": {"in_scopes": {"$ne":[]}}},
+            {"$lookup": {
+                "from": "ports",
+                "localField": "ip",
+                "foreignField": "ip",
+                "as": "port"
+            }},
+            {"$unwind": "$port"},
+            {"$match": pipeline}
+        ])
+        if aggregate_ips_ports is None:
+            return None
+        for ip in aggregate_ips_ports:
+            if ip.get("port", None) is not None:
+                yield Port(pentest,  ip["port"])
 
     def getDetailedString(self):
         """Returns a detailed string describing this port.
