@@ -70,7 +70,7 @@ paths:
                 Lang invalid:
                   value: '"There is no existing templates for this lang"'
     post:
-      operationId: pollenisator.server.modules.report.report.setTranslationsSettings
+      operationId: pollenisator.server.modules.report.report.setTranslationSettings
       tags:
         - Report
       summary: Set the translations settings for a language.

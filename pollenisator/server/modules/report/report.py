@@ -130,7 +130,7 @@ def create_lang(lang: str, body: Dict[str, Any]) -> str:
     return lang_file
 
 @permission("report_template_writer")
-def setTranslationsSettings(lang: str, body: Dict[str, Any]) -> ErrorStatus:
+def setTranslationSettings(lang: str, body: Dict[str, Any]) -> ErrorStatus:
     """
     Set the translation settings for a given language.
 
