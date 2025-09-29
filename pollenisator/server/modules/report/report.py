@@ -305,9 +305,7 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
         return_dict = manager.dict()
         p = Process(target=_generateDoc, args=(ext, context, template_to_use_path, out_name, lang_translation, return_dict))
         p.start()
-        logger.info(f"Generating report for {pentest} using template {templateName} started in process {p.pid}")
         p.join()
-        logger.info(f"Generating report for {pentest} using template {templateName} finished")
     except KeyError as e:
         return str(e), 400
     except Exception as e:
@@ -315,7 +313,6 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
         return "An error occured while generating the report.", 500
     if "res" not in return_dict:
         return "An error occured while generating the report.", 500
-    logger.info(f"Report generation result: {return_dict['res']}, message: {return_dict['msg']}")
     if return_dict["res"] is True:
         try:
             return send_file(return_dict["msg"], attachment_filename=out_name+ext)
@@ -341,7 +338,6 @@ def _generateDoc(ext: str, context: Dict[str, Any], template_to_use_path: str, o
             context, template_to_use_path, out_name, translation=translation)
         return_dict["res"] = res
         return_dict["msg"] = msg
-        print("Word export done")
         return
 
     elif ext == ".pptx":
