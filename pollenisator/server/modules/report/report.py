@@ -171,10 +171,10 @@ def downloadTemplate(lang: str, templateName: str) -> Union[ErrorStatus, Respons
     template_to_download_path = os.path.join(template_path, lang+"/"+fileName)
     if not os.path.isfile(template_to_download_path):
         return "Template file not found", 404
-    # try:
-    #     return send_file(template_to_download_path, attachment_filename=fileName)
-    # except TypeError: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
-    return send_file(template_to_download_path, download_name=fileName)
+    try:
+        return send_file(template_to_download_path, attachment_filename=fileName)
+    except TypeError: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
+        return send_file(template_to_download_path, download_name=fileName)
 
 
 @permission("report_template_writer")
@@ -315,11 +315,12 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
         return "An error occured while generating the report.", 500
     if "res" not in return_dict:
         return "An error occured while generating the report.", 500
+    logger.info(f"Report generation result: {return_dict['res']}, message: {return_dict['msg']}")
     if return_dict["res"] is True:
-        # try:
-        #     return send_file(return_dict["msg"], attachment_filename=out_name+ext)
-        # except TypeError as _e: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
-        return send_file(return_dict["msg"], download_name=out_name+ext)
+        try:
+            return send_file(return_dict["msg"], attachment_filename=out_name+ext)
+        except TypeError as _e: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
+            return send_file(return_dict["msg"], download_name=out_name+ext)
     else:
         return return_dict["msg"], 400
 
