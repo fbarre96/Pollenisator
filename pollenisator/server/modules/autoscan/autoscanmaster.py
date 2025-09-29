@@ -153,7 +153,7 @@ def autoScan(pentest: str, endoded_token: str, autoqueue: bool) -> None:
             autoscan_state = dbclient.findInDb(
                 pentest, "autoscan", {"special": True}, False)
             if autoscan_state is None:
-                continue
+                break
             authorized_commands = autoscan_state["authorized_commands"]
             launchableTools = [] if queue is None else queue.get("tools", [])
             logger.debug("Autoscan : launchable tools: %s", str(len(launchableTools)))
