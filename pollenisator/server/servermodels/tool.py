@@ -261,7 +261,7 @@ def importResult(pentest: str, tool_iid: str, upfile: Any, body: Dict[str, Any])
             toolModel.notes = notes
             for tag in tags:
                 toolModel.addTag(tag)
-            toolModel.markAsDone(filepath)
+            toolModel._setStatus(["done"], filepath)
             # And update the tool in database
             update(pentest, tool_iid, toolModel.getData())
             # Upload file to SFTP
@@ -269,11 +269,11 @@ def importResult(pentest: str, tool_iid: str, upfile: Any, body: Dict[str, Any])
         except IOError as _e:
             toolModel.addTag(Tag("no-output", "red", "error", "Failed to read results file"))
             toolModel.notes = "Failed to read results file"
-            toolModel.markAsDone()
+            toolModel._setStatus(["done"], None)
             update(pentest, tool_iid, toolModel.getData())
     else:
         msg = "TASK FAILED (no plugin found) : "+toolModel.name
-        toolModel.markAsNotDone()
+        toolModel._setStatus(["not_done"], None)
         update(pentest, tool_iid, toolModel.getData())
         raise Exception(msg)
     return "Success", 200
