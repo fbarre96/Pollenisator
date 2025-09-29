@@ -127,16 +127,17 @@ class NXCSpiderPlus(Plugin):
                     share_object = cast(Share, share_db)
                 else:
                     continue
-
+            
+            interesting_name_list = ["passwd", "password", "pwd", "mot_de_passe", "motdepasse", "auth", "secret",".ps1"
+                             "creds", "confidentiel", "confidential", "backup", ".xml", ".conf", ".cfg", "unattended"]
             # Update share with sharefiles
             for share_content in share[1].items():
                 file_path = share_content[0]
                 file_size = convert_size(share_content[1]["size"])
                 file_info = share_content[1]
                 user_domain = file_path.split("/")[0]
-
                 # Add file to Share object
-                share_object.add_file(path=file_path, flagged=None, priv="READ", size=file_size, domain=user_domain, user=username, infos=file_info)
+                share_object.add_file(path=file_path, flagged=False, priv="READ", size=file_size, domain=user_domain, user=username, infos=file_info)
 
                 # Create Tag
                 sharefile_tag = Tag("todo-nxc-sharefile-found", "green", "todo", notes=f"Found file in {share_name} share with {username} user.")

@@ -39,7 +39,7 @@ class Defect(Element):
             valuesFromDb (Optional[Dict[str, Any]], optional): A dict holding values to load into the object. 
                 A mongo fetched defect is optimal. Possible keys with default values are : _id (None), parent (None), 
                 infos({}), target_id, target_type, title(""), synthesis(""), impacts(""), description(""), ease(""), impact(""), 
-                risk(""), cvss_score(-1), cvss_string(""), redactor("N/A"), type([]),  language(""), notes(""), proofs([]), fixes([]), creation_time, 
+                risk(""), cvss_score(0.0), cvss_string(""), redactor("N/A"), type([]),  language(""), notes(""), proofs([]), fixes([]), creation_time, 
                 redacted_state("New"), editor="", infos, index(None),  perimeter([]). Defaults to None.
         """
         if valuesFromDb is None:
@@ -56,7 +56,7 @@ class Defect(Element):
                             valuesFromDb.get("ease", ""), valuesFromDb.get(
                                 "impact", ""),
                             valuesFromDb.get(
-                                "risk", ""), valuesFromDb.get("cvss_score", -1), valuesFromDb.get("cvss_string",""), valuesFromDb.get("redactor", "N/A"), valuesFromDb.get("type", []),
+                                "risk", ""), valuesFromDb.get("cvss_score", 0.0), valuesFromDb.get("cvss_string",""), valuesFromDb.get("redactor", "N/A"), valuesFromDb.get("type", []),
                             valuesFromDb.get("language", ""),
                             valuesFromDb.get("notes", ""), valuesFromDb.get(
                                 "proofs", []),
@@ -66,7 +66,7 @@ class Defect(Element):
                             valuesFromDb.get("index", 0), valuesFromDb.get("perimeter", []))
 
     def initialize(self, target_id: Optional[ObjectId] = None, target_type: str = "", title: str = "", synthesis: str = "",
-                   impacts: str= "", description: str = "", ease: str = "", impact: str = "", risk: str = "", cvss_score: float = -1, cvss_string: str = "", redactor: str = "N/A",
+                   impacts: str= "", description: str = "", ease: str = "", impact: str = "", risk: str = "", cvss_score: float = 0.0, cvss_string: str = "", redactor: str = "N/A",
                    mtype: Optional[Union[str, List[str]]] = None, language: str = "", notes: str = "",
                    proofs: Optional[List[str]] = None, fixes: Optional[List[Dict[str, Any]]] = None,
                    creation_time: Optional[datetime] = None, redacted_state: str = "New", editor="", infos: Optional[Dict[str, Any]] = None,
@@ -84,7 +84,7 @@ class Defect(Element):
             ease (str, optional): Ease of exploitation for this defect described as a string. Defaults to "".
             impact (str, optional): Impact the defect has on system. Described as a string. Defaults to "".
             risk (str, optional): The combination of impact/ease gives a resulting risk value. Described as a string. Defaults to "".
-            cvss_score (float, optional): The CVSS score of this defect. Defaults to -1.
+            cvss_score (float, optional): The CVSS score of this defect. Defaults to 0.
             cvss_string (str, optional): The CVSS string of this defect. Defaults to "".
             redactor (str, optional): A pentester that will be the redactor for this defect. Defaults to "N/A".
             mtype (Optional[Union[str, List[str]]], optional): Types of this security defects (Application, data, etc...). Default is None.
