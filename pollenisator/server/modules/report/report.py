@@ -92,6 +92,65 @@ def getTemplateList(lang: str) -> Union[ErrorStatus, List[str]]:
     return onlyfiles
 
 @permission("user")
+def getTranslationsSettings(lang: str) -> Union[ErrorStatus, Dict[str, Any]]:
+    """
+    Get the translation settings for a given language.
+
+    Args:
+        lang (str): The language to get translation settings for.
+    Returns:
+        Union[ErrorStatus, Dict[str, Any]]: The translation settings for the given language if successful, otherwise an error message and status code.
+    """
+    if not validate_lang(lang):
+        return "There is no existing templates for this lang", 400
+    lang = os.path.basename(lang)
+    if not validate_lang(lang):
+        return "There is no existing templates for this lang", 400
+    lang_file = os.path.join(template_path, lang, "lang.json")
+    if not os.path.isfile(lang_file):
+        return "There is no lang.json file for this lang", 400
+    with open(lang_file, encoding="utf8") as f:
+        return json.loads(f.read())
+
+def create_lang(lang: str, body: Dict[str, Any]) -> str:
+    """
+    Create a new language folder and lang.json file with the given settings.
+
+    Args:
+        lang (str): The language to create.
+        body (Dict[str, Any]): The translation settings to set.
+    Returns:
+        str: The path to the created lang.json file.
+    """
+    lang_folder = os.path.join(template_path, lang)
+    os.makedirs(lang_folder, exist_ok=True)
+    lang_file = os.path.join(lang_folder, "lang.json")
+    with open(lang_file, "w", encoding="utf8") as f:
+        f.write(json.dumps(body, indent=4, ensure_ascii=False))
+    return lang_file
+
+@permission("report_template_writer")
+def setTranslationsSettings(lang: str, body: Dict[str, Any]) -> ErrorStatus:
+    """
+    Set the translation settings for a given language.
+
+    Args:
+        lang (str): The language to set translation settings for.
+        body (Dict[str, Any]): The translation settings to set.
+
+    Returns:
+        ErrorStatus: A success message if the translation settings were successfully set, otherwise an error message and status code.
+    """
+    lang = os.path.basename(lang)
+    if not validate_lang(lang):
+        new_lang = os.path.basename(lang).lower().strip()
+        if re.match(r"^[a-z]{2}(-[A-Z]{2})?$", new_lang) is None:
+            return "Invalid lang format, must be xx or xx-XX where x is a letter", 400
+        lang = new_lang
+    create_lang(lang, body)
+    return "Success", 200
+
+@permission("user")
 def downloadTemplate(lang: str, templateName: str) -> Union[ErrorStatus, Response]:
     """
     Download a template for a given language.
@@ -138,9 +197,14 @@ def uploadTemplate(upfile: werkzeug.datastructures.FileStorage, lang: str, overw
     fileName = upfile.filename.replace("/", "_")
     if not fileName.endswith(".pptx") and not fileName.endswith(".docx") and not fileName.endswith(".xlsx"):
         return "Invalid extension for template, must be pptx, xlsx or docx", 400
-    lang = os.path.basename(lang)
+    new_lang = os.path.basename(lang).lower().strip()
+    if re.match(r"^[a-z]{2}(-[A-Z]{2})?$", new_lang) is None:
+        return "Invalid lang format, must be xx or xx-XX where x is a letter", 400
+    if not validate_lang(new_lang):
+        create_lang(new_lang, {})
+    lang = new_lang
     folder_to_upload_path = os.path.join(template_path, lang+"/")
-    os.makedirs(folder_to_upload_path, exist_ok=True)
+    
     template_to_upload_path = os.path.join(folder_to_upload_path, fileName)
     if os.path.isfile(template_to_upload_path) and not overwrite:
         return "Template already exists, use edition button to replace it", 400
