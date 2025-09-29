@@ -340,6 +340,7 @@ def _generateDoc(ext: str, context: Dict[str, Any], template_to_use_path: str, o
             context, template_to_use_path, out_name, translation=translation)
         return_dict["res"] = res
         return_dict["msg"] = msg
+        print("Word export done")
         return
 
     elif ext == ".pptx":
