@@ -172,7 +172,7 @@ def downloadTemplate(lang: str, templateName: str) -> Union[ErrorStatus, Respons
     if not os.path.isfile(template_to_download_path):
         return "Template file not found", 404
     try:
-        return send_file(template_to_download_path, attachment_filename=fileName)
+        return send_file(template_to_download_path, attachment_filename=fileName) # python < 3.10
     except TypeError: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
         return send_file(template_to_download_path, download_name=fileName)
 
