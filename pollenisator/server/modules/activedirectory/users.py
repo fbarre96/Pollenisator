@@ -279,7 +279,7 @@ class User(Element):
         if dc_ip is None:
             return
         for check in checks:
-            CheckInstance.createFromCheckItem(self.pentest, check, ObjectId(self._id), "user", infos=infos)
+            CheckInstance.createFromCheckItem(self.pentest, check, ObjectId(self._id), "user", target_repr=self.getDetailedString(), infos=infos)
 
     @classmethod
     def getTriggers(cls) -> List[str]:

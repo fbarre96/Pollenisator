@@ -173,7 +173,7 @@ class Port(Element):
         for check in checkitems:
             allowed_ports_services = check.ports.split(",")
             if checkCommandService(allowed_ports_services, self.port, self.proto, self.service):
-                CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "port")
+                CheckInstance.createFromCheckItem(self.pentest, check, str(self._id), "port", target_repr=self.getDetailedString())
 
     @classmethod
     def getTriggers(cls):

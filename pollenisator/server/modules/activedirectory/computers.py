@@ -633,7 +633,7 @@ class Computer(Element):
             domain = user_o.domain if user_o.domain is not None else ""
             infos = {"username":username, "password":password, "domain":domain}
         for check in checks:
-            CheckInstance.createFromCheckItem(self.pentest, check, ObjectId(self._id), "computer", infos=infos)
+            CheckInstance.createFromCheckItem(self.pentest, check, ObjectId(self._id), "computer", target_repr= self.getDetailedString(), infos=infos)
 
 @permission("pentester")
 def delete(pentest: str, computer_iid: ObjectId) -> int:

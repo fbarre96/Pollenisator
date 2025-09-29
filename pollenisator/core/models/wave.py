@@ -169,7 +169,7 @@ class Wave(Element):
         if checkitems is None:
             return None
         for check in checkitems:
-            CheckInstance.createFromCheckItem(self.pentest, check, ObjectId(self._id), "wave")
+            CheckInstance.createFromCheckItem(self.pentest, check, ObjectId(self._id), "wave", target_repr=str(self))
 
     def getTools(self) -> Optional[Iterator[Element]]:
         """

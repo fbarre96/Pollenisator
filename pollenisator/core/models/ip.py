@@ -450,7 +450,7 @@ class Ip(Element):
         if checkitems is None:
             return
         for check in checkitems:
-            CheckInstance.createFromCheckItem(self.pentest, check, ObjectId(self._id), "ip")
+            CheckInstance.createFromCheckItem(self.pentest, check, ObjectId(self._id), "ip", target_repr=str(self))
 
     @classmethod
     def getTriggers(cls) -> List[str]:

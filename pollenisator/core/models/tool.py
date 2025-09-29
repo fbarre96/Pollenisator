@@ -847,7 +847,7 @@ class Tool(Element):
         if "done" in new_status:
             if arg == "":
                 arg = None
-            self.markAsDone(None)
+            self.markAsDone(arg)
             tool_status = "tool_done"
         elif "running" in new_status:
             self.markAsRunning(arg if arg is not None else "")

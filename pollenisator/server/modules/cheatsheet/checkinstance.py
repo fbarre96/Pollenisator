@@ -5,6 +5,7 @@ from typing import Callable, Generator, Iterable, List, Optional, Dict, Any, Set
 from typing_extensions import TypedDict
 from bson import ObjectId
 from pymongo import UpdateOne
+from pymongo.cursor import Cursor
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.utils import detect_objectid
 from pollenisator.core.models.command import Command
@@ -28,7 +29,7 @@ class CheckInstance(Element):
     """
     coll_name = 'checkinstances'
 
-    def __init__(self, pentest: str, valuesFromDb: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(self, pentest: str, valuesFromDb: Optional[Dict[str, Any]] = None, init=True) -> None:
         """
         Initialize a CheckInstance object.
 
@@ -40,8 +41,9 @@ class CheckInstance(Element):
             valuesFromDb = {}
         super().__init__(pentest, valuesFromDb)
         self.status = ""
-        self.initialize(valuesFromDb.get("check_iid", None), valuesFromDb.get("target_iid", None), valuesFromDb.get(
-            "target_type", ""), valuesFromDb.get("status", ""), valuesFromDb.get("notes", ""), valuesFromDb.get("target_repr", None))
+        if init:
+            self.initialize(valuesFromDb.get("check_iid", None), valuesFromDb.get("target_iid", None), valuesFromDb.get(
+                "target_type", ""), valuesFromDb.get("status", ""), valuesFromDb.get("notes", ""), valuesFromDb.get("target_repr", None))
 
     def initialize(self, check_iid: Optional[ObjectId], target_iid: Optional[ObjectId], target_type: str, status: str, notes: str, target_repr: Optional[str]) -> 'CheckInstance':
         """
@@ -468,7 +470,7 @@ class CheckInstance(Element):
         dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":queue_final}})
 
     @classmethod
-    def createFromCheckItem(cls, pentest: str, checkItem: 'CheckItem', target_iid: ObjectId, target_type: str, infos: Optional[Dict[str, Any]] = None) -> Union[CheckInstanceInsertResult, ErrorStatus]:
+    def createFromCheckItem(cls, pentest: str, checkItem: 'CheckItem', target_iid: ObjectId, target_type: str, target_repr=None, infos: Optional[Dict[str, Any]] = None) -> Union[CheckInstanceInsertResult, ErrorStatus]:
         """
         Create a CheckInstance from a CheckItem.
 
@@ -477,14 +479,15 @@ class CheckInstance(Element):
             checkItem (CheckItem): The CheckItem to create the CheckInstance from.
             target_iid (ObjectId): The id of the target.
             target_type (str): The type of the target.
+            target_repr (Optional[str], optional): The representation of the target. Defaults to None.
             infos (Optional[Dict[str, Any]], optional): Additional information. Defaults to {}.
 
         Returns:
             Dict[str, Any]: The result of the insertion of the CheckInstance into the database.
         """
         infos = {} if infos is None else infos
-        checkinstance = CheckInstance(pentest).initialize(ObjectId(
-            checkItem.getId()), ObjectId(target_iid), target_type, "", "", None)
+        checkinstance = CheckInstance(pentest, {}, init=False).initialize(ObjectId(
+            checkItem.getId()), ObjectId(target_iid), target_type, "", "", target_repr)
         return checkinstance.addInDb(checkItem=checkItem, toolInfos=infos)
 
     def update(self) -> Union[ErrorStatus, bool]:
@@ -566,9 +569,12 @@ class CheckInstance(Element):
         """
         if self.target_repr is not None:
             return self.target_repr
-        repres = getTargetRepr(self.pentest, [self.getId()])
-        if repres is not None and str(self.getId()) in repres:
-            return repres[str(self.getId())]
+        # similar to getTargetRepr but for a single instance
+        repres = generate_target_representations(self.pentest, {self.target_type: set([ObjectId(self.target_iid)])})
+        if repres is not None:
+            self.target_repr = list(repres.values())[0]  # save it
+            self.update()  # update the db
+            return self.target_repr
         return "Target not found"
     
     def _add_tool_information(self, data: Dict[str, Any], tool_model: 'tool.Tool') -> Tuple[bool, bool]:
@@ -783,6 +789,8 @@ def getTargetRepr(pentest: str, body: List[str]) -> Dict[str, str]:
     dbclient = DBClient.getInstance()
     iids_list = [ ObjectId(x) for x in body if ObjectId.is_valid(x) ]
     checkinstances = dbclient.findInDb(pentest, "checkinstances", {"_id": {"$in": iids_list}}, True)
+    if isinstance(checkinstances, Cursor):
+        checkinstances = list(checkinstances)
     elements = _getElementsPerType(checkinstances)
     ret = generate_target_representations(pentest, elements)
     # Update the checkinstances with the representation string

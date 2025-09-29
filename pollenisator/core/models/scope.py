@@ -363,4 +363,4 @@ class Scope(Element):
         if checkitems is None:
             return
         for check in checkitems:
-            CheckInstance.createFromCheckItem(self.pentest, check, ObjectId(self._id), "scope")
+            CheckInstance.createFromCheckItem(self.pentest, check, ObjectId(self._id), "scope", target_repr=str(self))
