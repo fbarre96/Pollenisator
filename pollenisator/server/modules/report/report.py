@@ -305,7 +305,9 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
         return_dict = manager.dict()
         p = Process(target=_generateDoc, args=(ext, context, template_to_use_path, out_name, lang_translation, return_dict))
         p.start()
+        logger.info(f"Generating report for {pentest} using template {templateName} started in process {p.pid}")
         p.join()
+        logger.info(f"Generating report for {pentest} using template {templateName} finished")
     except KeyError as e:
         return str(e), 400
     except Exception as e:
