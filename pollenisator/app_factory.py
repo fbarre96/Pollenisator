@@ -22,7 +22,7 @@ from pollenisator.core.components.utils import JSONEncoder, loadServerConfig
 from pollenisator.core.components.socketmanager import SocketManager
 import pollenisator.core.components.mongo as mongo
 from pollenisator.migrate import migrate
-from pollenisator.server.permission import checkPentestPermission
+from pollenisator.server.permission import checkPentestPermission, all_permissions
 from pollenisator.server.modules.worker.worker import doSetInclusion
 
 server_folder = os.path.join(os.path.dirname(
@@ -475,7 +475,7 @@ def create_admin(username: str = "", password: str = "") -> None:
     salt = bcrypt.gensalt()
     dbclient = mongo.DBClient.getInstance()
     dbclient.insertInDb("pollenisator", "users", {"username": username, "hash": bcrypt.hashpw(
-        password.encode(), salt), "scope": ["admin", "user"]})
+        password.encode(), salt), "scope": all_permissions})
     print("Administrator created")
 
 

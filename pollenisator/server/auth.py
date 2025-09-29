@@ -141,7 +141,7 @@ def updateUserRoles(body: Dict[str, Union[str|list[str]]], **kwargs) -> ErrorSta
     username = body.get("username", "")
     if username == "":
         return "Username is required", 400
-    if kwargs["token_info"]["sub"] != username and "admin" not in kwargs["token_info"]["scope"]:
+    if "admin" not in kwargs["token_info"]["scope"]:
         return "Forbidden", 403
     dbclient = DBClient.getInstance()
     user = dbclient.findInDb("pollenisator", "users", {"username":username}, False)
@@ -154,6 +154,18 @@ def updateUserRoles(body: Dict[str, Union[str|list[str]]], **kwargs) -> ErrorSta
     roles.append("user")
     roles = list(set(roles))
     dbclient.updateInDb("pollenisator", "users", {"username":username}, {"$set":{"scope":roles, "token":""}})
+    if username == kwargs["token_info"]["sub"]:
+        # If the user is updating his own roles, we need to update his token too
+        token = getTokenFor(str(username))
+        response = make_response(jsonify({"message":"Successully updated user", "token":token}))
+        response.set_cookie(
+            'session_token', 
+            token,
+            httponly=True,
+            secure=not isdebug,
+            samesite='Strict'
+        )
+        return response
     return "Successully updated user", 200
 
 @permission("admin")
