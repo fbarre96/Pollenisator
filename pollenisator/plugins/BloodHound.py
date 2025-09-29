@@ -103,7 +103,7 @@ class BloodHound(Plugin):
         # zip all
         if "--zip" not in command:
             command += "  --zip "
-        return command+" && find . -name '*bloodhound.zip' -exec mv {} "+outputDir+toolname+" \\;"
+        return command+" && find "+outputDir+" -name '*bloodhound.zip' -exec mv {} "+outputDir+toolname+" \\;"
 
 
     def getFileOutputExt(self):
