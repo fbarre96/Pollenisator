@@ -29,23 +29,23 @@ class CheckInstance(Element):
     """
     coll_name = 'checkinstances'
 
-    def __init__(self, pentest: str, valuesFromDb: Optional[Dict[str, Any]] = None, init=True) -> None:
+    def __init__(self, pentest: str, valuesFromDb: Optional[Dict[str, Any]] = None, lookupTarget:bool =True) -> None:
         """
         Initialize a CheckInstance object.
 
         Args:
             pentest (str): The name of the pentest.
             valuesFromDb (Optional[Dict[str, Any]], optional): A dictionary with values from the database. Defaults to None.
+
         """
         if valuesFromDb is None:
             valuesFromDb = {}
         super().__init__(pentest, valuesFromDb)
         self.status = ""
-        if init:
-            self.initialize(valuesFromDb.get("check_iid", None), valuesFromDb.get("target_iid", None), valuesFromDb.get(
-                "target_type", ""), valuesFromDb.get("status", ""), valuesFromDb.get("notes", ""), valuesFromDb.get("target_repr", None))
+        self.initialize(valuesFromDb.get("check_iid", None), valuesFromDb.get("target_iid", None), valuesFromDb.get(
+            "target_type", ""), valuesFromDb.get("status", ""), valuesFromDb.get("notes", ""), valuesFromDb.get("target_repr", None), lookupTarget=lookupTarget)
 
-    def initialize(self, check_iid: Optional[ObjectId], target_iid: Optional[ObjectId], target_type: str, status: str, notes: str, target_repr: Optional[str]) -> 'CheckInstance':
+    def initialize(self, check_iid: Optional[ObjectId], target_iid: Optional[ObjectId], target_type: str, status: str, notes: str, target_repr: Optional[str]=None, lookupTarget: bool= True) -> 'CheckInstance':
         """
         Initialize a CheckInstance object.
 
@@ -67,7 +67,8 @@ class CheckInstance(Element):
         self.status = status
         self.notes = notes
         self.target_repr = target_repr # define it 
-        self.target_repr = self.getTargetRepresentation() # populate it if not initialized
+        if lookupTarget and (target_type != "" and target_iid is not None):
+            self.target_repr = self.getTargetRepresentation() # populate it if not initialized
         return self
 
     @classmethod
@@ -293,8 +294,7 @@ class CheckInstance(Element):
                     ObjectId(target.getId()), 
                     targets_type, 
                     "", 
-                    "", 
-                    None
+                    ""
                 )
                 checks_to_add.append(check_instance)
                 
@@ -486,7 +486,7 @@ class CheckInstance(Element):
             Dict[str, Any]: The result of the insertion of the CheckInstance into the database.
         """
         infos = {} if infos is None else infos
-        checkinstance = CheckInstance(pentest, {}, init=False).initialize(ObjectId(
+        checkinstance = CheckInstance(pentest, {}, lookupTarget=False).initialize(ObjectId(
             checkItem.getId()), ObjectId(target_iid), target_type, "", "", target_repr)
         return checkinstance.addInDb(checkItem=checkItem, toolInfos=infos)
 
@@ -572,6 +572,8 @@ class CheckInstance(Element):
         # similar to getTargetRepr but for a single instance
         repres = generate_target_representations(self.pentest, {self.target_type: set([ObjectId(self.target_iid)])})
         if repres is not None:
+            if repres == {}:
+                return "Target not found"
             self.target_repr = list(repres.values())[0]  # save it
             self.update()  # update the db
             return self.target_repr
@@ -735,7 +737,7 @@ def update(pentest: str, iid: str, body: Dict[str, Any]) -> Union[ErrorStatus, b
     """
     if pentest == "pollenisator":
         return "Forbidden", 403
-    checkinstance = CheckInstance(pentest, body)
+    checkinstance = CheckInstance(pentest, body, lookupTarget=False)
     data = {"status": checkinstance.status, "notes": checkinstance.notes}
 
     dbclient = DBClient.getInstance()

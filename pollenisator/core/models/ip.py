@@ -581,6 +581,8 @@ class Ip(Element):
             scopes = dbclient.findInDb(pentest, "scopes", {}, True)
             if scopes is None:
                 scopes = []
+            else:
+                scopes = list(scopes)
             settings = cls.getScopeSettings(pentest, None)
         
         # Prepare IP data for insertion

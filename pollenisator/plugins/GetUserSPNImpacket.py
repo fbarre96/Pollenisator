@@ -1,5 +1,6 @@
 """A plugin to parse getuserspn from impacket scan"""
 
+import os
 import shlex
 from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
@@ -12,19 +13,37 @@ from pollenisator.server.modules.activedirectory.users import User
 
 class GetUserSPNImpacket(Plugin):
     default_bin_names = ["GetUserSPNs.py","GetUserSPNs"]
-    def getFileOutputArg(self):
-        """Returns the command line paramater giving the output file
-        Returns:
-            string
+
+    def changeCommand(self, command, outputDir, toolname):
         """
-        return " -outputfile "
+        Summary: Complete the given command with the tool output file option and filename absolute path.
+        Args:
+            * command : the command line to complete
+            * outputDir : the output dir variable
+            * toolname : the tool name (to be included in the output file name)
+        Return:
+            The command completed with the tool output file option and filename absolute path.
+        """
+        # zip all
+        if "-outputfile" not in command:
+            command += "  -outputfile "+outputDir+".hashes"
+        if "| tee " not in command:
+            command += " | tee "+outputDir
+        return command+" && cat "+outputDir+".hashes"+" | tee -a "+outputDir
 
     def getFileOutputExt(self):
         """Returns the expected file extension for this command result file
         Returns:
             string
         """
-        return ".txt"
+        return ".log.txt"
+
+    def getFileOutputArg(self):
+        """Returns the command line paramater giving the output file
+        Returns:
+            string
+        """
+        return "tee -a "
 
     def getFileOutputPath(self, commandExecuted):
         """Returns the output file path given in the executed command using getFileOutputArg
@@ -35,22 +54,6 @@ class GetUserSPNImpacket(Plugin):
         """
         return commandExecuted.split(self.getFileOutputArg())[-1].strip().split(" ")[0]
     
-    def changeCommand(self, command, outputDir, toolname):
-        """
-        Summary: Complete the given command with the tool output file option and filename absolute path.
-        Args:
-            * command : the command line to complete
-            * outputDir : the directory where the output file must be generated
-            * toolname : the tool name (to be included in the output file name)
-        Return:
-            The command completed with the tool output file option and filename absolute path.
-        """
-        # default is append at the end
-        if self.getFileOutputArg() not in command:
-            parts = shlex.split(command) 
-            parts.insert(1, self.getFileOutputArg()+outputDir+toolname)
-            return " ".join(parts)
-        return command
     
     def getTags(self):
         """Returns a list of tags that can be added by this plugin
@@ -82,9 +85,18 @@ class GetUserSPNImpacket(Plugin):
             return None, None, None, None
         if notes == "":
             return None, None, None, None
+        is_impacket = False
+        header_found = False
         for line in notes.split("\n"):
             line = line.strip()
-            if line.startswith("$krb5t"):
+            if line.startswith("Impacket "):
+                is_impacket = True
+                continue
+            if line.startswith("ServicePrincipalName "):
+                header_found = True
+                # header line
+                continue
+            if line.startswith("$krb5t") and is_impacket and header_found:
                 # ticket found
                 tags.append(self.getTags()["kerberoastable"])
                 hash_parts = line.split("$")
@@ -112,5 +124,10 @@ class GetUserSPNImpacket(Plugin):
                         user_m.addTag(self.getTags()["kerberoastable"])
                 except IndexError:
                     continue
+        if is_impacket and header_found:
+            if notes == "":
+                notes = "No Kerberoastable users found"
+        else:
+            return None, None, None, None
 
         return notes, tags, "user", targets
