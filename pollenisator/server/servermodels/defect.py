@@ -550,13 +550,14 @@ def updateDefectTemplate(iid: str, body: Dict[str, Any], **kwargs: Dict[str, Any
         Union[bool, Tuple[str, int]]: True if the operation was successful, otherwise a tuple containing an error message 
         and status code.
     """
-    is_suggestion = "admin" not in kwargs["token_info"]["scope"] and "template_writer" not in kwargs["token_info"]["scope"] or body.get("is_suggestion", False)
-    res: Union[bool, Tuple[str, int]]
-    if is_suggestion:
-        res = update_template_suggestion(iid, body, kwargs["token_info"]["sub"])
-    else:
-        res = doUpdate("pollenisator", iid, body, kwargs["token_info"]["sub"], True)
-    return res
+    # is_suggestion = "admin" not in kwargs["token_info"]["scope"] and "template_writer" not in kwargs["token_info"]["scope"] or body.get("is_suggestion", False)
+    # res: Union[bool, Tuple[str, int]]
+    # if is_suggestion:
+    #     res = update_template_suggestion(iid, body, kwargs["token_info"]["sub"])
+    # else:
+    #     res = doUpdate("pollenisator", iid, body, kwargs["token_info"]["sub"], True)
+    # return res
+    return update_template_suggestion(iid, body, kwargs["token_info"]["sub"]) # always create a suggestion
 
 @permission("user")
 def deleteDefectTemplate(iid: str, is_suggestion: bool=False, **kwargs) -> Union[int, Any]:
