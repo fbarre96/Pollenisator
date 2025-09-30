@@ -434,7 +434,7 @@ class NXC(Plugin):
         Returns:
             list of strings
         """
-        return {"pwned-nxc" : Tag("pwned-,xc", "red", "high"), 
+        return {"pwned-nxc" : Tag("pwned-nxc", "red", "high"), 
                 "info-nxc-connection-success": Tag("info-nxc-connection-success", "green", "info"),
                 "todo-nxc-secrets-found": Tag("todo-nxc-secrets-found", "red", "todo"),
                 "todo-lsassy-success": Tag("todo-lsassy-success", "red", "todo"),
