@@ -2405,6 +2405,36 @@ paths:
                 Already exist:
                   value : '{"res":false, "iid":"ObjectId|5f9150fbed75193ef71ba47f"}'
 
+  "/defects/{pentest}/insertMany":
+    post:
+      operationId: pollenisator.server.servermodels.defect.insertMany
+      tags:
+        - Defects
+      summary: Insert many defects at once
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/Defects"
+      responses:
+        "200":
+          description: Defect insertion success or already existing object
+          content:
+            application/json:
+              examples:
+                Success:
+                  value : '{"inserted_count":3, "inserted_ids":["ObjectId|5f9150fbed75193ef71ba47f", "ObjectId|5f9150fbed75193ef71ba480", "ObjectId|5f9150fbed75193ef71ba481"]}'
+                Already exist:
+                  value : '{"inserted_count":0, "inserted_ids":[]}'
+
   "/defects/{pentest}/getTargetRepr":
     post:
       operationId: pollenisator.server.servermodels.defect.getTargetRepr

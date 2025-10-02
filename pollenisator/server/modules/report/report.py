@@ -18,7 +18,7 @@ import pollenisator.core.reporting.wordexport as wordexport
 import pollenisator.core.reporting.powerpointexport as powerpointexport
 from pollenisator.server import settings
 from pollenisator.core.components.mongo import DBClient
-from pollenisator.core.components.utils import getMainDir
+from pollenisator.core.components.utils import getMainDir, getServerLocalFolder
 from pollenisator.server.permission import permission
 from pollenisator.core.components.logger_config import logger
 from pollenisator.server.modules.filemanager.filemanager import listFiles
@@ -208,7 +208,14 @@ def uploadTemplate(upfile: werkzeug.datastructures.FileStorage, lang: str, overw
     template_to_upload_path = os.path.join(folder_to_upload_path, fileName)
     if os.path.isfile(template_to_upload_path) and not overwrite:
         return "Template already exists, use edition button to replace it", 400
-    
+    local_folder = getServerLocalFolder()
+    backup_dir = os.path.join(local_folder, "backups")
+    os.makedirs(backup_dir, exist_ok=True)
+    if os.path.isfile(template_to_upload_path):
+        with open(os.path.join(backup_dir, "backup_template_"+fileName+"_"+str(datetime.now().isoformat())+".bak"), "wb") as f:
+            with open(template_to_upload_path, "rb") as original:
+                f.write(original.read())
+
     with open(template_to_upload_path, "wb") as f:
         f.write(upfile.stream.read())
         return "Success", 200

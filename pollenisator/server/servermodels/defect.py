@@ -1,6 +1,7 @@
 """
 handle the defect related API calls
 """
+import os
 import re
 from typing import Any, Dict, List, Tuple, Union, cast
 from typing_extensions import TypedDict
@@ -8,7 +9,7 @@ from bson import ObjectId
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.models.defect import Defect
 from pollenisator.server.permission import permission
-from pollenisator.core.components.utils import  JSONDecoder, JSONEncoder, detect_objectid
+from pollenisator.core.components.utils import  JSONDecoder, JSONEncoder, detect_objectid, getServerLocalFolder
 import json
 import datetime
 DefectInsertResult = TypedDict('DefectInsertResult', {'res': bool, 'iid': ObjectId})
@@ -37,6 +38,29 @@ def delete(pentest: str, defect_iid: str) -> int:
     defect = cast(Defect, defect)
     return defect.deleteFromDb()
 
+@permission("pentester")
+def insertMany(pentest: str, body: List[Dict[str, Any]], **kwargs: Dict[str, Any]) -> List[Union[DefectInsertResult, Tuple[str, int]]]:
+    """
+    Insert many defects into the database.
+
+    Args:
+        pentest (str): The name of the pentest.
+        body (List[Dict[str, Any]]): A list of dictionaries, each containing the details of a defect to be inserted.
+
+    Returns:
+        List[Union[Dict[str, Union[bool, Any]], str]]: A list of dictionaries with keys "res" and "iid" if the operation was successful for each defect,
+        or a string error message otherwise.
+    """
+    username = kwargs["token_info"]["sub"]
+    results: List[Union[DefectInsertResult, Tuple[str, int]]] = []
+    for defect_body in body:
+        if "_id" in defect_body:
+            del defect_body["_id"]
+        if "index" in defect_body:
+            del defect_body["index"]
+        res = doInsert(pentest, defect_body, username)
+        results.append(res)
+    return results
 
 @permission("pentester")
 def insert(pentest: str, body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[DefectInsertResult, Tuple[str, int]]:
@@ -342,6 +366,13 @@ def importDefectTemplates(upfile: Any, **kwargs: Dict[str,Any ]) -> Union[Tuple[
         otherwise True indicating the operation was successful.
     """
     username = kwargs["token_info"]["sub"]
+    export_backup = exportDefectTemplates()
+    local_folder = getServerLocalFolder()
+    backup_dir = os.path.join(local_folder, "backups")
+    os.makedirs(backup_dir, exist_ok=True)
+   
+    with open(os.path.join(backup_dir, "backup_defect_templates_"+str(datetime.datetime.now().isoformat())+".json"), "w", encoding="utf-8") as fh:
+        fh.write(json.dumps(export_backup, indent=4, cls=JSONEncoder))
     try:
         file_content = json.loads(upfile.stream.read())
         defects = file_content.get("defects", [])

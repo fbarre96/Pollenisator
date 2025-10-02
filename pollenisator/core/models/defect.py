@@ -614,7 +614,7 @@ class Defect(Element):
         Returns:
             int: The position to insert the new defect.
         """
-        riskLevels = ["Critical", "Major",  "Important", "Minor"] # TODO do not hardcode those things
+        riskLevels = ["Critical", "Major",  "Important", "Minor", "N/A"] # TODO do not hardcode those things
         riskLevelPos = riskLevels.index(risk)
         highestInd = 0
         for risklevel_i, riskLevel in enumerate(riskLevels):
