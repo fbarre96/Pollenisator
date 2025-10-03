@@ -23,5 +23,6 @@ services:
     image: redis:latest
     ports:
       - "6379:6379"     # Map container port to host port
+      
 volumes:
   mongodb_data:
