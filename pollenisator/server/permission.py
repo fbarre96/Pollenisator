@@ -45,15 +45,15 @@ def checkPentestPermission(token_info: dict[str, Any], pentest: str, check_owner
 def permission(*dec_args, **deckwargs):
     def _permission(function):
         def wrapper(*args, **kwargs):
+            token_info = kwargs.get("token_info", None)
+            if token_info is None: # permission called from already checked function, assume authorization
+                result = function(*args, **kwargs)
+                return result
             scope = dec_args[0]
             arg_name = dec_args[1] if len(dec_args) == 2 else "pentest"
             #Check token_info and user kwargs supplied to the function by connexion specifying a security
             args_spec = inspect.getfullargspec(function)
             user = kwargs.get("user", "")
-            token_info = kwargs.get("token_info", None)
-            if token_info is None: # permission called from already checked function, assume authorization
-                result = function(*args, **kwargs)
-                return result
             if user == "":
                 return "Unauthorized", 401
             if not checkTokenValidity(token_info, []):

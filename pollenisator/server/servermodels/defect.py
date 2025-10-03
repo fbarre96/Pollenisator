@@ -269,6 +269,7 @@ def getDefectHistory(pentest: str, defect_iid: str) -> Union[ErrorStatus,List[Di
     defect = cast(Defect, defect)
     return defect.get_history()
 
+
 @permission("user")
 def update_template_suggestion(defect_iid: str, body: Dict[str, Any], username: str) -> Union[bool, Tuple[str, int]]:
     """
@@ -286,9 +287,14 @@ def update_template_suggestion(defect_iid: str, body: Dict[str, Any], username: 
     dbclient = DBClient.getInstance()
     
     body = json.loads(json.dumps(body), cls=JSONDecoder)
-    defect = Defect("pollenisator", body)
+    
+    partialUpdate = len(body) == 1
+    if not partialUpdate:
+        defect = Defect("pollenisator", body) # just to validate the body
+        new_data = defect.getData()
+    else:
+        new_data = body
     dbclient = DBClient.getInstance()
-    new_data = defect.getData()
     if "_id" in new_data:
         del new_data["_id"]
     if "index" in new_data:
