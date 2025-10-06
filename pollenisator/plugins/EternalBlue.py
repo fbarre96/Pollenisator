@@ -81,7 +81,7 @@ class EternalBlue(Plugin):
         # Parsing
         sub_notes = allnotes.split("Nmap scan report for")[1:]
         for notes in sub_notes:
-            ip = ip_group.group(1).strip()
+            ip = notes.split("\n")[0].strip()
             Ip(pentest).initialize(ip, infos={"plugin":EternalBlue.get_name()}).addInDb()
             port_re = r"(\d+)\/(\S+)\s+open\s+microsoft-ds"
             res_search = re.search(port_re, notes)

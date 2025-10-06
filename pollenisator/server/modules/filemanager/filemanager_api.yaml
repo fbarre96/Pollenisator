@@ -234,7 +234,7 @@ paths:
               examples:
                 file not found:
                   value: '"File not found"'
-  "/files/{pentest}/download/file/{attachment_id}":
+  "/files/{pentest}/downloadById/file/{attachment_id}":
     get:
       operationId: pollenisator.server.modules.filemanager.filemanager.downloadById
       tags:
