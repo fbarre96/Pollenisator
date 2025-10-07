@@ -299,6 +299,10 @@ def update_template_suggestion(defect_iid: str, body: Dict[str, Any], username: 
         del new_data["_id"]
     if "index" in new_data:
         del new_data["index"]
+    if "defect_id" in new_data:
+        del new_data["defect_id"]
+    if "common_translation_id" in new_data:
+        del new_data["common_translation_id"]
     old_data = dbclient.findInDb("pollenisator", "defectssuggestions", {"_id":ObjectId(defect_iid)}, False)
     if old_data is None:
         old_data = dbclient.findInDb("pollenisator", "defects", {"_id":ObjectId(defect_iid)}, False)
@@ -545,6 +549,27 @@ def insertDefectTemplate(body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Unio
         res = doInsert("pollenisator", body, username)
     return res
 
+@permission("user")
+def translateDefectTemplate(language: str, defect_id: str, **kwargs) -> Union[DefectInsertResult, Tuple[str, int]]:
+    username = kwargs["token_info"]["sub"]
+    dbclient = DBClient.getInstance()
+    existing = dbclient.findInDb("pollenisator", "defects", {"_id":ObjectId(defect_id)}, False)
+    if existing is None:
+        return "Not found", 404
+    
+    
+    existing_translation = dbclient.findInDb("pollenisator", "defects", {"language": language, "common_translation_id":existing["common_translation_id"]}, False)
+    if existing_translation is not None:
+        return {"res":False, "iid":existing_translation["_id"]}
+    existing_translation_suggestion = dbclient.findInDb("pollenisator", "defectssuggestions", {"language": language, "common_translation_id":existing["common_translation_id"]}, False)
+    if existing_translation_suggestion is not None:
+        return {"res":False, "iid":existing_translation_suggestion["_id"]}
+    del existing["_id"]
+    del existing["defect_id"]
+    existing["language"] = language
+    res = insert_template_suggestion("pollenisator", existing, username)
+    return res
+
 @permission("template_writer")
 def validateDefectTemplate(iid: str, **kwargs) -> Union[bool, Tuple[str, int]]:
     """
@@ -552,17 +577,20 @@ def validateDefectTemplate(iid: str, **kwargs) -> Union[bool, Tuple[str, int]]:
     The suggestion is removed
 
     Args:
-        iid (str): The id of the defect template suggestion to be validated.
+        iid (str): The defect_id of the defect template suggestion to be validated.
 
     Returns:
         Union[bool, Tuple[str, int]]: True if the operation was successful, otherwise a tuple containing an error message and status code.
     """
     username = kwargs["token_info"]["sub"]
     dbclient = DBClient.getInstance()
-    suggestion = dbclient.findInDb("pollenisator", "defectssuggestions", {"_id":ObjectId(iid)}, False)
+    suggestion = dbclient.findInDb("pollenisator", "defectssuggestions", {"defect_id":iid}, False)
     if suggestion is None:
         return "Not found", 404
-    existing = dbclient.findInDb("pollenisator", "defects", {"$or":[{"_id":ObjectId(iid)}, {"title": suggestion.get("title")}]}, False)
+    language = suggestion.get("language", "")
+    if language == "":
+        return "The suggestion has no language, cannot validate it", 400
+    existing = dbclient.findInDb("pollenisator", "defects", {"$or":[{"_id":ObjectId(suggestion.get("_id")), "language":language}, {"title": suggestion.get("title"), "language":language}]}, False)
     if existing is not None:
         suggestion["suggestion_type"] = "update"
         doUpdate("pollenisator", iid, suggestion, username, True)
@@ -571,7 +599,7 @@ def validateDefectTemplate(iid: str, **kwargs) -> Union[bool, Tuple[str, int]]:
         res = doInsert("pollenisator", suggestion, username)
         if not res["res"]:
             return res
-    dbclient.deleteFromDb("pollenisator", "defectssuggestions", {"_id":ObjectId(iid)})
+    dbclient.deleteFromDb("pollenisator", "defectssuggestions", {"defect_id":iid})
     return True
 
 @permission("user")

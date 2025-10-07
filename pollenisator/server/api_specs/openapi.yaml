@@ -198,6 +198,10 @@ components:
 
     Defects:
       properties:
+        common_translation_id:
+          type: string
+        defect_id:
+          type: string
         target_id:
           type: string
           nullable: true
@@ -395,6 +399,10 @@ components:
             type: string
     DefectTemplate:
       properties:
+        common_translation_id:
+          type: string
+        defect_id:
+          type: string
         title:
           type: string
           minLength: 2

@@ -41,6 +41,8 @@ def migrate():
         version = migrate_2_13()
     if version == "2.13":
         version = migrate_2_14()
+    if version == "2.14":
+        version = migrate_2_15()
     logger.info("DB version is %s", version)
 
 def migrate_0():
@@ -370,4 +372,54 @@ def migrate_2_14():
         {"$set": {"key": "version", "value": "2.14"}}
     )
     return "2.14"
+
+def migrate_2_15():
+    """add defect_id to defects"""
+    dbclient = mongo.DBClient.getInstance()
+    defects = dbclient.findInDb("pollenisator","defects",{}, True)
+    updates = []
+    updates_suggestions = []
+
+    for defect in defects:
+        defect_id = None
+        common_translation_id = None
+        if "defect_id" not in defect:
+            defect_id = str(uuid.uuid4())
+            updates.append(pymongo.UpdateOne({"_id":ObjectId(defect["_id"])},{"$set":{"defect_id":defect_id}}))
+        else:
+            defect_id = defect["defect_id"]
+        if "common_translation_id" not in defect:
+            common_translation_id = str(uuid.uuid4())
+            updates.append(pymongo.UpdateOne({"_id":ObjectId(defect["_id"])},{"$set":{"common_translation_id":common_translation_id}}))
+        else:
+            common_translation_id = defect["common_translation_id"]
+        updates_suggestions.append(pymongo.UpdateOne({"_id":ObjectId(defect["_id"])},{"$set":{"defect_id":defect_id}}))
+        updates_suggestions.append(pymongo.UpdateOne({"_id":ObjectId(defect["_id"])},{"$set":{"common_translation_id":common_translation_id}}))
+    if len(updates) > 0:
+        dbclient.bulk_write("pollenisator", "defects", updates)
+    if len(updates_suggestions) > 0:
+        dbclient.bulk_write("pollenisator", "defectssuggestions", updates_suggestions)
+    pentests = dbclient.findInDb("pollenisator","pentests",{}, True)
+    for pentest in pentests:
+        pentest_uuid = pentest["uuid"]
+        logger.info("Migrating pentest %s (%s)", pentest["nom"], pentest_uuid)
+        defects = dbclient.findInDb(pentest_uuid,"defects",{}, True)
+        updates = []
+        for defect in defects:
+            if "defect_id" not in defect:
+                defect_id = str(uuid.uuid4())
+                updates.append(pymongo.UpdateOne({"_id":ObjectId(defect["_id"])},{"$set":{"defect_id":defect_id}}))
+            if "common_translation_id" not in defect:
+                common_translation_id = str(uuid.uuid4())
+                updates.append(pymongo.UpdateOne({"_id":ObjectId(defect["_id"])},{"$set":{"common_translation_id":common_translation_id}}))
+        if len(updates) > 0:
+            dbclient.bulk_write(pentest_uuid, "defects", updates)
+
+    dbclient.updateInDb(
+        "pollenisator",
+        "infos",
+        {"key": "version"},
+        {"$set": {"key": "version", "value": "2.15"}}
+    )
+    return "2.15"
 

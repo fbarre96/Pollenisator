@@ -377,6 +377,33 @@ paths:
               examples:
                 Success:
                   value: "True"
+  "/report/DefectTemplates/translate/{language}/{defect_id}":
+    post:
+      operationId: pollenisator.server.servermodels.defect.translateDefectTemplate
+      tags:
+        - Defect Template
+      summary: Creat a Defect template translation
+      parameters:
+        - name: language
+          in: path
+          description: language of the translation
+          required: true
+          schema:
+            type: string
+        - name: defect_id
+          in: path
+          description: defect_id to translate 
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: a indicator of success
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: "True"
   '/report/DefectTemplates/delete/{iid}':
     delete:
       operationId: pollenisator.server.servermodels.defect.deleteDefectTemplate
@@ -451,7 +478,7 @@ paths:
       parameters:
         - name: iid
           in: path
-          description: Defect template iid to validate
+          description: Defect template iid to validate, it's defect_id not ObjectId
           required: true
           schema:
             type: string

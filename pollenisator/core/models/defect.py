@@ -2,6 +2,7 @@
 
 from datetime import datetime
 import os
+import uuid
 import re
 import shutil
 import threading
@@ -37,8 +38,8 @@ class Defect(Element):
         Args:
             pentest (str): An object representing a penetration test.
             valuesFromDb (Optional[Dict[str, Any]], optional): A dict holding values to load into the object. 
-                A mongo fetched defect is optimal. Possible keys with default values are : _id (None), parent (None), 
-                infos({}), target_id, target_type, title(""), synthesis(""), impacts(""), description(""), ease(""), impact(""), 
+                A mongo fetched defect is optimal. Possible keys with default values are : _id (None), , parent (None), 
+                infos({}), defect_id(None), common_translation_id(None), target_id, target_type, title(""), synthesis(""), impacts(""), description(""), ease(""), impact(""), 
                 risk(""), cvss_score(0.0), cvss_string(""), redactor("N/A"), type([]),  language(""), notes(""), proofs([]), fixes([]), creation_time, 
                 redacted_state("New"), editor="", infos, index(None),  perimeter([]). Defaults to None.
         """
@@ -51,7 +52,7 @@ class Defect(Element):
         self.redacted_state = "New"
         self.mtype: Optional[Union[str, List[str]]] = []
         if valuesFromDb is not None:
-            self.initialize(valuesFromDb.get("target_id", None), valuesFromDb.get("target_type", ""),
+            self.initialize(valuesFromDb.get("defect_id", None), valuesFromDb.get("common_translation_id",None), valuesFromDb.get("target_id", None), valuesFromDb.get("target_type", ""),
                             valuesFromDb.get("title", ""), valuesFromDb.get("synthesis", ""), valuesFromDb.get("impacts", ""), valuesFromDb.get("description", ""),
                             valuesFromDb.get("ease", ""), valuesFromDb.get(
                                 "impact", ""),
@@ -65,7 +66,7 @@ class Defect(Element):
                             valuesFromDb.get("infos", {}),
                             valuesFromDb.get("index", 0), valuesFromDb.get("perimeter", []))
 
-    def initialize(self, target_id: Optional[ObjectId] = None, target_type: str = "", title: str = "", synthesis: str = "",
+    def initialize(self, defect_id: Optional[str] = None, common_translation_id: Optional[str] = None, target_id: Optional[ObjectId] = None, target_type: str = "", title: str = "", synthesis: str = "",
                    impacts: str= "", description: str = "", ease: str = "", impact: str = "", risk: str = "", cvss_score: float = 0.0, cvss_string: str = "", redactor: str = "N/A",
                    mtype: Optional[Union[str, List[str]]] = None, language: str = "", notes: str = "",
                    proofs: Optional[List[str]] = None, fixes: Optional[List[Dict[str, Any]]] = None,
@@ -75,6 +76,8 @@ class Defect(Element):
         Set values of defect.
 
         Args:
+            defect_id (Optional[str], optional): A unique identifier for this defect. Defaults to None.
+            common_translation_id (Optional[str], optional): The common translation id for this defect if it is a template defect. Defaults to None.
             target_id (Optional[ObjectId], optional): Defect will be assigned to this target_id. Defaults to "".
             target_type (str, optional): Defect will be assigned to this target_type(target_id). Defaults to "".
             title (str, optional): A title for this defect describing what it is. Defaults to "".
@@ -101,6 +104,11 @@ class Defect(Element):
         Returns:
             Defect: This object.
         """
+        if defect_id is None:
+            self.defect_id = str(uuid.uuid4())
+        else:
+            self.defect_id = str(defect_id)
+        self.common_translation_id = str(common_translation_id) if common_translation_id is not None else str(uuid.uuid4())
         self.title = title
         self.synthesis = synthesis
         self.impacts = impacts
@@ -141,11 +149,11 @@ class Defect(Element):
 
         Returns:
             Dict[str,Any]: A dictionary with keys title, 
-            synthesis, impacts, description, ease, impact, risk, cvss_score, cvss_string, redactor, type, language, notes, target_id, target_type, index, 
+            defect_id, common_translation_id, synthesis, impacts, description, ease, impact, risk, cvss_score, cvss_string, redactor, type, language, notes, target_id, target_type, index, 
             proofs, creation_time, redacted_state, editor, fixes, _id, infos.
         """
 
-        return {"title": self.title, "synthesis":self.synthesis, "impacts":self.impacts, "description":self.description, "ease": self.ease, "impact": self.impact,
+        return {"defect_id": self.defect_id,  "common_translation_id": self.common_translation_id, "title": self.title, "synthesis":self.synthesis, "impacts":self.impacts, "description":self.description, "ease": self.ease, "impact": self.impact,
                 "risk": self.risk, "cvss_score":self.cvss_score, "cvss_string":self.cvss_string, "redactor": self.redactor, "type": self.mtype, "language":self.language, "notes": self.notes,
                 "target_id": self.target_id, "target_type": self.target_type, "index":int(self.index),
                 "proofs": self.proofs, "creation_time": self.creation_time, "redacted_state":self.redacted_state, "editor":self.editor, "fixes":self.fixes, "perimeter":self.perimeter, "_id": self.getId(), "infos": self.infos}
@@ -203,12 +211,12 @@ class Defect(Element):
         Return a dict from model to use as unique composed key.
 
         Returns:
-            Dict[str, Any]: A dict with keys "target_id", "target_type", "title" if pentest is not "pollenisator". 
-            If pentest is "pollenisator", returns a dict with only "title" key.
+            Dict[str, Any]: A dict with keys "target_id", "target_type", "defect_id" if pentest is not "pollenisator". 
+            If pentest is "pollenisator", returns a dict with only "defect_id" key.
         """
         if self.isTemplate():
-            return {"title": self.title}
-        return {"target_id": self.target_id, "target_type": self.target_type, "title": self.title}
+            return {"defect_id": self.defect_id}
+        return {"target_id": self.target_id, "target_type": self.target_type, "defect_id": self.defect_id}
 
     def isAssigned(self) -> bool:
         """
@@ -537,10 +545,14 @@ class Defect(Element):
         data = {} if data is None else data
         if "_id" in data:
             del data["_id"]
+        if "defect_id" in data:
+            del data["defect_id"]
         new_data |= data
         new_self = Defect(self.pentest, new_data)
         if "_id" in new_data:
             del new_data["_id"]
+        if "defect_id" in new_data:
+            del new_data["defect_id"]
         oldRisk = self.risk
         if not new_self.isAssigned() and not self.isTemplate():
             if data.get("risk", None) is not None and not self.isTemplate():
