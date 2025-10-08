@@ -11,6 +11,7 @@ from pollenisator.core.models.defect import Defect
 from pollenisator.server.permission import permission
 from pollenisator.core.components.utils import  JSONDecoder, JSONEncoder, detect_objectid, getServerLocalFolder
 import json
+import uuid
 import datetime
 DefectInsertResult = TypedDict('DefectInsertResult', {'res': bool, 'iid': ObjectId})
 RemarkInsertResult = TypedDict('RemarkInsertResult', {'res': bool, 'iid': ObjectId})
@@ -569,6 +570,49 @@ def translateDefectTemplate(language: str, defect_id: str, **kwargs) -> Union[De
     existing["language"] = language
     res = insert_template_suggestion("pollenisator", existing, username)
     return res
+
+@permission("report_template_writer")
+def changeDefectTranslation(iid: str, body: Dict[str,Any], **kwargs) -> Union[bool, Tuple[str, int]]:
+    """
+    Change the common_translation_id of a defect template in the "pollenisator" database using its id.
+    Args:
+        iid (str): The id of the defect template to be updated.
+        body:
+            common_translation_id (str): The new common_translation_id to be set.
+            language (str): The language of the defect template to be updated.
+    Returns:
+        Union[bool, Tuple[str, int]]: True if the operation was successful, otherwise a tuple containing an error message and status code.
+    """
+    dbclient = DBClient.getInstance()
+    existing = dbclient.findInDb("pollenisator", "defects", {"_id":ObjectId(iid)}, False)
+    if existing is None:
+        return "Not found", 404
+    common_translation_id = body.get("common_translation_id", "")
+    language = body.get("language", "")
+    if common_translation_id == "":
+        return "common_translation_id cannot be empty", 400
+    if language == "":
+        return "language cannot be empty", 400
+    language = language.lower()
+    dbclient.updateInDb("pollenisator", "defects", {"_id":ObjectId(iid)}, {"$set":{"common_translation_id":common_translation_id, "language": language}}, False, True)
+    return True
+
+@permission("report_template_writer")
+def unlinkDefectTranslation(iid: str, **kwargs) -> Union[bool, Tuple[str, int]]:
+    """
+    Unlink the common_translation_id of a defect template in the "pollenisator" database using its id.
+    Args:
+        iid (str): The id of the defect template to be updated.
+    Returns:
+        Union[bool, Tuple[str, int]]: True if the operation was successful, otherwise a tuple containing an error message and status code.
+    """
+    dbclient = DBClient.getInstance()
+    existing = dbclient.findInDb("pollenisator", "defects", {"_id":ObjectId(iid)}, False)
+    if existing is None:
+        return "Not found", 404
+    common_translation_id = str(uuid.uuid4())
+    dbclient.updateInDb("pollenisator", "defects", {"_id":ObjectId(iid)}, {"$set":{"common_translation_id":common_translation_id}}, False, True)
+    return True
 
 @permission("template_writer")
 def validateDefectTemplate(iid: str, **kwargs) -> Union[bool, Tuple[str, int]]:

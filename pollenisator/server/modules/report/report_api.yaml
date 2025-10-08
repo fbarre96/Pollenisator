@@ -319,7 +319,7 @@ paths:
               examples:
                 Server issue:
                   value: 'Failed to export'
-  "/report/DefectTemplate/findByIds":
+  "/report/DefectTemplates/findByIds":
     post:
       operationId: pollenisator.server.servermodels.defect.findDefectTemplatesByIds
       tags:
@@ -404,6 +404,63 @@ paths:
               examples:
                 Success:
                   value: "True"
+
+  "/report/DefectTemplates/{iid}/changeTranslation":
+    post:
+      operationId: pollenisator.server.servermodels.defect.changeDefectTranslation
+      tags:
+        - Defect Template
+      summary: Change the translation of a Defect template
+      parameters:
+        - name: iid
+          in: path
+          description: iid of the defect template to change the translation
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - language 
+                - common_translation_id
+              properties:
+                language:
+                  type: string
+                common_translation_id:
+                  type: string
+      responses:
+        "200":
+          description: a indicator of success
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: "True"
+        '404':
+          description: not found
+  '/report/DefectTemplates/{iid}/unlinkTranslation':
+    delete:
+      operationId: pollenisator.server.servermodels.defect.unlinkDefectTranslation
+      tags:
+        - Defect Template
+      summary: Unlink the translation of a Defect template
+      parameters:
+        - name: iid
+          in: path
+          description: iid of the defect template to unlink the translation
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: successfully deleted a template
+        '404':
+          description: not found
+
+      
   '/report/DefectTemplates/delete/{iid}':
     delete:
       operationId: pollenisator.server.servermodels.defect.deleteDefectTemplate
