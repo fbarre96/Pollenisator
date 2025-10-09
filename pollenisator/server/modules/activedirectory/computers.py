@@ -99,6 +99,13 @@ class Computer(Element):
         self.users = users if users is not None else []
         self._infos = ComputerInfos(infos)
         return self
+    
+    def getParentId(self) -> Optional[ObjectId]:
+        dbclient = DBClient.getInstance()
+        ip_o = dbclient.findInDb(self.pentest, "ips", {"ip":self.ip}, False)
+        if ip_o is None:
+            return None
+        return ip_o.get("_id", None)
 
     def __str__(self) -> str:
         """
@@ -689,9 +696,11 @@ def update(pentest: str, computer_iid: ObjectId, body: Dict[str, Any]) -> Union[
         if existingDomain is None:
             computer.addCheck(Computer.trigger_on_new_domain_discovered, {"domain":domain})
     if existing.infos.is_dc != computer.infos.is_dc:
+        existing.infos.is_dc = True
         existing.add_dc_checks()
         existing.add_domain_checks()
     if existing.infos.is_sqlserver != computer.infos.is_sqlserver:
+        existing.infos.is_sqlserver = True
         existing.add_sqlserver_checks()
 
     dbclient.updateInDb(pentest, "computers", {"_id": ObjectId(computer_iid), "type":"computer"}, {"$set": body}, False, True)

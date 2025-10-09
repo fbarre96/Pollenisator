@@ -479,8 +479,10 @@ class Element(metaclass=AbstractMetaElement):
             
             # Skip defect if language doesn't match pentest language
             if not cls._should_include_defect(defect, pentest_language):
-                continue
-                
+                defect_translation = Defect.fetchObject("pollenisator", {"common_translation_id": defect.common_translation_id, "language": pentest_language})
+                if defect_translation is None:
+                    continue
+                defect = cast(Defect, defect_translation)
             cls._create_new_defect(pentest, tag, target_data, defect)
 
     @classmethod
@@ -511,6 +513,7 @@ class Element(metaclass=AbstractMetaElement):
         """
         if pentest_language is None or pentest_language == "":
             return True
+        
         return defect.language == pentest_language
 
     @classmethod

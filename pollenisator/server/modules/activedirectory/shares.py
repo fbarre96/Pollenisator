@@ -64,6 +64,14 @@ class Share(Element):
         """
         return {"_id": self._id, "ip":self.ip, "share": self.share,  "files":[f.getData() for f in self.files], "infos":self.infos}
 
+
+    def getParentId(self) -> Optional[ObjectId]:
+        dbclient = DBClient.getInstance()
+        ip_o = dbclient.findInDb(self.pentest, "ips", {"ip":self.ip}, False)
+        if ip_o is None:
+            return None
+        return ip_o.get("_id", None)
+    
     def addInDb(self) -> ShareInsertResult:
         """
         Add this Share object to the database. The data of the object is fetched using the getData method and inserted into 

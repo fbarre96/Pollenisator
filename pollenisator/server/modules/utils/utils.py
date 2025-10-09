@@ -104,5 +104,8 @@ def get_visible_target(pentest: str, body: Dict[str, Any], **kwargs) -> Union[Er
         return "Target not found", 404
     if target_type in ["ips","scopes","waves"]:
         return target_id
-    return target.getParentId()
+    try:
+        return target.getParentId()
+    except AttributeError:
+        return "Target type does not support parent retrieval", 400
         
