@@ -71,7 +71,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
 """
     result = {}
     retour = []
-    regex_info = re.compile(r"(?:LDAP|SMB)\s+(\S+)\s+(\d+)\s+\S+\s+\[\*\]\s*([^\(]+)\(name:(.*)\) \(domain:(.*)\) \(signing:(True|False)\) \(SMBv1:(False|True)\)(?:\s+\(Null Auth:(False|True)\)|)$", re.MULTILINE)
+    regex_info = re.compile(r"(?:LDAP|SMB)\s+(\S+)\s+(\d+)\s+\S+\s+\[\*\]\s*([^\(]+)\(name:(.*)\) \(domain:(.*)\) \(signing:(True|False)\) \(SMBv1:(False|True|None)\)(?:\s+\(Null Auth:(False|True)\)|)$", re.MULTILINE)
     regex_logon_failed = re.compile(
         r"(?:LDAP|SMB)\s+(\S+)\s+(\d+)\s+(\S+)\s+\[\-\]\s*([^\\]+)\\([^:\n]+):(.*?) ([A-Z_]+)$", re.MULTILINE)
     regex_success = re.compile(
