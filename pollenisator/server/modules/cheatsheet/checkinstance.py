@@ -69,6 +69,10 @@ class CheckInstance(Element):
         self.target_repr = target_repr # define it 
         if lookupTarget and (target_type != "" and target_iid is not None):
             self.target_repr = self.getTargetRepresentation() # populate it if not initialized
+        if not isinstance(self.target_repr, str) and not isinstance(self.target_repr, type(None)):
+            self.target_repr = None
+            raise ValueError("target_repr must be a string or None")
+
         return self
 
     @classmethod
@@ -470,7 +474,7 @@ class CheckInstance(Element):
         dbclient.updateInDb(pentest, "autoscan", {"type":"queue"}, {"$set":{"tools":queue_final}})
 
     @classmethod
-    def createFromCheckItem(cls, pentest: str, checkItem: 'CheckItem', target_iid: ObjectId, target_type: str, target_repr=None, infos: Optional[Dict[str, Any]] = None) -> Union[CheckInstanceInsertResult, ErrorStatus]:
+    def createFromCheckItem(cls, pentest: str, checkItem: 'CheckItem', target_iid: ObjectId, target_type: str, target_repr: Optional[str]=None, infos: Optional[Dict[str, Any]] = None) -> Union[CheckInstanceInsertResult, ErrorStatus]:
         """
         Create a CheckInstance from a CheckItem.
 

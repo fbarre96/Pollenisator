@@ -564,7 +564,7 @@ class Element(metaclass=AbstractMetaElement):
         if checkitems is None:
             return
         for check in checkitems:
-            CheckInstance.createFromCheckItem(pentest, check, ObjectId(infos.get("target_iid")), str(infos.get("target_type", "")), infos)
+            CheckInstance.createFromCheckItem(pentest, check, ObjectId(infos.get("target_iid")), str(infos.get("target_type", "")), infos=infos)
 
     def addTagChecks(self, lvls: List[str], infos: Dict[str, Any]) -> None:
         """
