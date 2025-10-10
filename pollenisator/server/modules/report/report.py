@@ -348,8 +348,10 @@ def _generateDoc(ext: str, context: Dict[str, Any], template_to_use_path: str, o
     if ext == ".docx":
         res, msg = wordexport.createReport(
             context, template_to_use_path, out_name, translation=translation)
+        logger.info("Report generation result: %s, message: %s", str(res), str(msg))
         return_dict["res"] = res
         return_dict["msg"] = msg
+        logger.info("Report generation finished, result: %s, message: %s", str(res), str(msg))
         return
 
     elif ext == ".pptx":
