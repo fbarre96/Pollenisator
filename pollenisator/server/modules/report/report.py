@@ -7,6 +7,8 @@ import re
 import json
 from datetime import datetime
 from multiprocessing import Process, Manager
+from queue import Queue
+import threading
 from typing import Any, Dict, List, Tuple, Union
 from typing_extensions import TypedDict
 from unidecode import unidecode
@@ -308,12 +310,23 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
         context.update(additional_context)
     
 
-        manager = Manager()
-        return_dict = manager.dict()
-        p = Process(target=_generateDoc, args=(ext, context, template_to_use_path, out_name, lang_translation, return_dict))
-        p.start()
+        #manager = Manager()
+        result_queue = Queue()
+
+        #return_dict = manager.dict()
+        #p = Process(target=_generateDoc, args=(ext, context, template_to_use_path, out_name, lang_translation, return_dict))
+        #p.start()
+        thread = threading.Thread(target=_generateDoc, args=(ext, context, template_to_use_path, out_name, lang_translation, result_queue))
+        thread.start()
         logger.info("Waiting for the report generation process to end...")
-        p.join()
+        thread.join(timeout=50)
+        if thread.is_alive():
+            logger.warning("Report generation is taking too long, terminating the process...")
+            return "Report generation is taking too long and was terminated.", 500
+        if result_queue.empty():
+            return "An error occured while generating the report.", 500
+        return_dict = result_queue.get()
+        #p.join()
         logger.info("Report generation process ended.")
     except KeyError as e:
         return str(e), 400
@@ -333,7 +346,7 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
     else:
         return return_dict["msg"], 400
 
-def _generateDoc(ext: str, context: Dict[str, Any], template_to_use_path: str, out_name: str, translation: Dict[str, Any], return_dict: Dict[str, Any]) -> None:
+def _generateDoc(ext: str, context: Dict[str, Any], template_to_use_path: str, out_name: str, translation: Dict[str, Any], result_queue: Queue) -> None:
     """
     Generate a document report based on the given context and template.
 
@@ -349,19 +362,22 @@ def _generateDoc(ext: str, context: Dict[str, Any], template_to_use_path: str, o
         res, msg = wordexport.createReport(
             context, template_to_use_path, out_name, translation=translation)
         logger.info("Report generation result: %s, message: %s", str(res), str(msg))
-        return_dict["res"] = res
-        return_dict["msg"] = msg
+        #return_dict["res"] = res
+        #return_dict["msg"] = msg
+        result_queue.put({"res": res, "msg": msg})
         logger.info("Report generation finished, result: %s, message: %s", str(res), str(msg))
         return
 
     elif ext == ".pptx":
         res, msg = powerpointexport.createReport(
             context, template_to_use_path, out_name, translation=translation)
-        return_dict["res"] = res
-        return_dict["msg"] = msg
+        # return_dict["res"] = res
+        # return_dict["msg"] = msg
+        result_queue.put({"res": res, "msg": msg})
     else:
-        return_dict["res"] = False
-        return_dict["msg"] = "Unknown template file extension"
+        # return_dict["res"] = False
+        # return_dict["msg"] = "Unknown template file extension"
+        result_queue.put({"res": res, "msg": msg})
 
 def searchDefectTemplates(terms: str, lang: str, perimeter: str, coll: str) -> List[Dict[str, Any]]:
     dbclient = DBClient.getInstance()
