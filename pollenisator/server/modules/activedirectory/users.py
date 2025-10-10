@@ -221,6 +221,7 @@ class User(Element):
         Update this User object in the database.
         """
         dbclient = DBClient.getInstance()
+        self.add_user_checks()
         dbclient.updateInDb(self.pentest, "users", {"_id": ObjectId(self.getId()), "type":"user"}, {"$set": self.getData()})
 
     @classmethod
@@ -448,5 +449,9 @@ def update(pentest: str, user_iid: str, body: Dict[str, Any]) -> Union[bool, Tup
         del body["_id"]
     if str(user.description) == "None" or str(user.description) == "":
         del body["description"]
+    if user_existing.password != "" and (user.password == "" or user.password is None):
+        del body["password"]
+    if user_existing.password == "" and user.password != "":
+        user.addCheck("AD:onNewValidUser", {"user":user})
     dbclient.updateInDb(pentest, "users", {"_id": ObjectId(user_iid), "type":"user"}, {"$set": body}, False, notify=True)
     return True
