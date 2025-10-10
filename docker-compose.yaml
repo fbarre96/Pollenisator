@@ -8,7 +8,7 @@ services:
       - mongodb         # Ensure MongoDB container is up before starting Flask app
     volumes:
       - ./:/opt/pollenisator  # share source
-    command: gunicorn --worker-class eventlet -w 1 --threads 10 --timeout 600 pollenisator.api:app 
+    command: gunicorn --worker-class eventlet -w 1 --threads 10 --timeout 600 pollenisator.api:flask_app 
     environment:
       - POLLENISATOR_NON_INTERACTIVE=1
     env_file:
