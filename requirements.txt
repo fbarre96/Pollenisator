@@ -14,7 +14,8 @@ requests>=2.18.4
 connexion==2.14.2
 flask==2.2.3
 lark-parser
-eventlet>=0.24.1
+eventlet>=0.30.2
+gunicorn
 bcrypt
 python-jose>=3.3.0
 flask_socketio
