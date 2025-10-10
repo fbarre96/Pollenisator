@@ -312,7 +312,9 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
         return_dict = manager.dict()
         p = Process(target=_generateDoc, args=(ext, context, template_to_use_path, out_name, lang_translation, return_dict))
         p.start()
+        logger.info("Waiting for the report generation process to end...")
         p.join()
+        logger.info("Report generation process ended.")
     except KeyError as e:
         return str(e), 400
     except Exception as e:
@@ -321,7 +323,7 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
     if "res" not in return_dict:
         return "An error occured while generating the report.", 500
     if return_dict["res"] is True:
-        logger.info(f"Report generated successfully: {return_dict["msg"]}")
+        logger.info("Report generated successfully")
         try:
             logger.info("Sending report file the old way "+out_name+ext)
             return send_file(return_dict["msg"], attachment_filename=out_name+ext)
