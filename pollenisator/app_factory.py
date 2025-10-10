@@ -510,6 +510,7 @@ def add_default_admin_if_needed(dbclient: mongo.DBClient) -> None:
                 """)
             if arg == "--non-interactive":
                 noninteractive = True
+        noninteractive = noninteractive or os.environ.get("POLLENISATOR_NON_INTERACTIVE", 0)
         if noninteractive:
             create_admin("admin", "admin")
         else:
