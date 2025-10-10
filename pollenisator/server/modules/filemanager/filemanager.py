@@ -295,8 +295,8 @@ def _finalize_tool_processing(pentest: str, tools_m: List[Tool], tags: List[str]
             tag_objects = [Tag(tag) for tag in tags]
             tool_m.setTags(tag_objects)
             upfile.stream.seek(0)
-            _res, status, filepath = db_client.do_upload(pentest, "unassigned", "result", upfile, str(tool_m.getId()))
-            if status == 200:
+            _res, status, filepath = db_client.do_upload(pentest, "unassigned", "result", upfile, str(tool_m.getId()), force_replace=True)
+            if status == 200 or status == 409:
                 tool_m.plugin_used = plugin
                 # Use the protected method as intended by the original code
                 tool_m._setStatus(["done"], filepath)  # type: ignore
@@ -426,10 +426,10 @@ def listFilesAll(pentest: str, filetype: FileType) -> Union[ErrorStatus, List[Di
     files = db_client.findInDb(pentest, "attachments", {"type": filetype}, multi=True)
     if files is None:
         return "No files found", 404
-    files = [file for file in files]
-    if not files:
+    files_dict = {file.get("filedigest",None): file for file in files if file is not None}
+    if not files_dict:
         return "No files found", 404
-    return files
+    return list(files_dict.values())
 
 def _list_proof_files(pentest: str, attached_to: ObjectId) -> List[str]:
     """

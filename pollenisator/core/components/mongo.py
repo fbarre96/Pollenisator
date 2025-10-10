@@ -9,6 +9,7 @@ from collections.abc import Iterable
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union, cast, overload
 from uuid import UUID, uuid4
 import bson
+import hashlib
 from PIL import Image
 import pymongo
 from bson import ObjectId
@@ -1434,7 +1435,7 @@ class DBClient:
             data = {}
         notify_clients({"iid": iid, "db": db, "collection": collection, "action": action, "parent": parentId, "time":datetime.datetime.now(), "data":data})
 
-    def do_upload(self, pentest: str, attachement_iid:  Union[Literal["unassigned"], str], filetype: str, upfile: Any, attached_to: Union[Literal["unassigned"], str]) -> Tuple[Dict[str, Any], int, str]:
+    def do_upload(self, pentest: str, attachement_iid:  Union[Literal["unassigned"], str], filetype: str, upfile: Any, attached_to: Union[Literal["unassigned"], str], force_replace:bool=False) -> Tuple[Dict[str, Any], int, str]:
         """
         Upload a file and attach it to a specific tool or defect in a pentest.
 
@@ -1445,10 +1446,11 @@ class DBClient:
             upfile (Any): The file to be uploaded.
             attached_to ( Union[Literal["unassigned"], str]): The id of the tool or defect to which the file is attached.
             filename (str): The name of the file to be uploaded.
+            force_replace (bool): Whether to force replace the file if it already exists.
         Returns:
             Tuple[str, int, str]: A tuple containing a message indicating the result of the operation, a HTTP-like status code, and the path of the uploaded file if succeedeed only.
         """
-        return self.do_upload_with_filename(pentest, attachement_iid, filetype, attached_to, upfile.filename, upfile.stream)
+        return self.do_upload_with_filename(pentest, attachement_iid, filetype, attached_to, upfile.filename, upfile.stream, force_replace)
 
     def _check_file_upload(self, pentest:str, filetype: str, attached_to: Union[Literal["unassigned"], str]) -> Tuple[Dict[str, Any], int]:
         """
@@ -1483,7 +1485,7 @@ class DBClient:
             return {}, 200
         return {"msg":"Filetype is not in allowed file types", "attachment_id":None}, 400
 
-    def do_upload_with_filename(self, pentest: str, attachement_iid:  Union[Literal["unassigned"], str], filetype: str, attached_to: Union[Literal["unassigned"], str], filename: str, file_stream: Any) -> Tuple[Dict[str, Any], int, str]:
+    def do_upload_with_filename(self, pentest: str, attachement_iid:  Union[Literal["unassigned"], str], filetype: str, attached_to: Union[Literal["unassigned"], str], filename: str, file_stream: Any, force_replace: bool=False) -> Tuple[Dict[str, Any], int, str]:
         """
         Upload a file and attach it to a specific tool or defect in a pentest.
 
@@ -1494,6 +1496,7 @@ class DBClient:
             attached_to ( Union[Literal["unassigned"], str]): The id of the tool or defect to which the file is attached.
             filename (str): The name of the file to be uploaded.
             file_stream (Any): The file stream to be uploaded.
+            force_replace (bool): Whether to force replace the file if it already exists.
         Returns:
             Tuple[str, int, str]: A tuple containing a message indicating the result of the operation, a HTTP-like status code, and the path of the uploaded file if succeedeed only.
         """
@@ -1501,10 +1504,15 @@ class DBClient:
         check_res, statuscode = self._check_file_upload(pentest, filetype, attached_to)
         if statuscode != 200:
             return check_res, statuscode, ""
-        attachment_id, uploadName, name, full_filepath = self._get_upload_path(pentest, filetype, attached_to, filename, attachement_iid)
+        attachment_id, uploadName, name, full_filepath = self._get_upload_path(pentest, filetype, attached_to, filename, attachement_iid, force_replace)
+        filedigest = hashlib.md5(file_stream.read()).hexdigest()
+        file_stream.seek(0)
+        existing_attachment = dbclient.findInDb(pentest, "attachments", {"filedigest": filedigest, "attached_to": attached_to, "type": filetype}, False)
+        if existing_attachment is not None:
+            return {"msg":"This file already exists", "attachment_id":existing_attachment.get("attachment_id")}, 409, ""
         with open(full_filepath, "wb") as f:
             f.write(file_stream.read())
-        dbclient.updateInDb(pentest, "attachments", {"attachment_id": attachment_id}, {"$set": {"name": name, "uploadName":uploadName, "type": filetype, "attached_to": attached_to}}, many=False, notify=True, upsert=True)
+        dbclient.updateInDb(pentest, "attachments", {"attachment_id": attachment_id}, {"$set": {"name": name, "uploadName":uploadName, "type": filetype, "attached_to": attached_to, "filedigest":filedigest}}, many=False, notify=True, upsert=True)
         if filetype == "proof":
             self.assignFileToDefect(pentest, attached_to, file_stream, dbclient, name, full_filepath)
         return {"msg":uploadName + " was successfully uploaded", "attachment_id":attachment_id}, 200, full_filepath
@@ -1517,7 +1525,7 @@ class DBClient:
             dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(attached_to)}, {"$addToSet":{"proofs":name}})
 
     def _get_upload_path(self, pentest: str, filetype: str, attached_to: Union[Literal["unassigned"], str] , filename: str\
-                         , attachment_id: Union[Literal["unassigned"], str]) -> Tuple[str, str, str, str]:
+                         , attachment_id: Union[Literal["unassigned"], str], force_replace: bool=False) -> Tuple[str, str, str, str]:
         """
         Get the upload path for a file.
         Args:
@@ -1526,6 +1534,7 @@ class DBClient:
             attached_to ( Union[Literal["unassigned"], str]): The id of the tool or defect or "unassigned" to which the file is attached.
             filename (str): The name of the file to be uploaded.
             attachment_id ( Union[Literal["unassigned"], str]): The id of attachment if replacing or "unassigned" to get one automatically.
+            force_replace (bool): Whether to force replace the file if it already exists.
         Returns:
             Tuple[str, str, str, str]: A tuple containing
             - the attachment_id (uuidv4 as str),
@@ -1557,6 +1566,7 @@ class DBClient:
         else:
             name = name + ext
         full_filepath = os.path.join(filepath, name)
+        replace = replace or force_replace
         while os.path.exists(full_filepath) and not replace:
             attachment_id = str(uuid4())
             if filetype == "proof":
