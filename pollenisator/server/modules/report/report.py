@@ -321,9 +321,12 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
     if "res" not in return_dict:
         return "An error occured while generating the report.", 500
     if return_dict["res"] is True:
+        logger.info(f"Report generated successfully: {return_dict["msg"]}")
         try:
+            logger.info("Sending report file the old way "+out_name+ext)
             return send_file(return_dict["msg"], attachment_filename=out_name+ext)
         except TypeError as _e: # python3.10.6 breaks https://stackoverflow.com/questions/73276384/getting-an-error-attachment-filename-does-not-exist-in-my-docker-environment
+            logger.info("Sending report file the new way "+out_name+ext)
             return send_file(return_dict["msg"], download_name=out_name+ext)
     else:
         return return_dict["msg"], 400
