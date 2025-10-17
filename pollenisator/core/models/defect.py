@@ -547,12 +547,16 @@ class Defect(Element):
             del data["_id"]
         if "defect_id" in data:
             del data["defect_id"]
+        if "index" in data:
+            del new_data["index"] # index is not updatable directly
         new_data |= data
         new_self = Defect(self.pentest, new_data)
         if "_id" in new_data:
             del new_data["_id"]
         if "defect_id" in new_data:
             del new_data["defect_id"]
+        if "index" in data:
+            del new_data["index"] # index is not updatable directly
         oldRisk = self.risk
         if not new_self.isAssigned() and not self.isTemplate():
             if data.get("risk", None) is not None and not self.isTemplate():
@@ -688,11 +692,14 @@ class Defect(Element):
         if "_id" in data:
             del data["_id"] # remove _id cause it's not updatable
         dbclient = DBClient.getInstance()
+        if "index" in data:
+            del data["index"] # index is not updatable directly
         if not self.isAssigned() and not self.isTemplate() and data.get("risk", None) is not None:
             if data["risk"] != self.risk:
                 data = self.update_defect_index(data)
         if not self.isTemplate():
             data = self.remove_proofs_from_description(data)
+
         dbclient.updateInDb(self.pentest, "defects", {"_id":ObjectId(self.getId())}, {"$set":data})
         return True
 
