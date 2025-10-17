@@ -200,6 +200,7 @@ components:
       properties:
         common_translation_id:
           type: string
+          nullable: true
         defect_id:
           type: string
         target_id:
