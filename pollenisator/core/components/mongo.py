@@ -1507,7 +1507,7 @@ class DBClient:
         attachment_id, uploadName, name, full_filepath = self._get_upload_path(pentest, filetype, attached_to, filename, attachement_iid, force_replace)
         filedigest = hashlib.md5(file_stream.read()).hexdigest()
         file_stream.seek(0)
-        existing_attachment = dbclient.findInDb(pentest, "attachments", {"filedigest": filedigest, "attached_to": attached_to, "type": filetype}, False)
+        existing_attachment = dbclient.findInDb(pentest, "attachments", {"filedigest": filedigest,"name": name, "attached_to": attached_to, "type": filetype}, False)
         if existing_attachment is not None:
             return {"msg":"This file already exists", "attachment_id":existing_attachment.get("attachment_id")}, 409, ""
         with open(full_filepath, "wb") as f:

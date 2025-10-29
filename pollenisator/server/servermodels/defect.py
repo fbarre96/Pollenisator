@@ -637,7 +637,7 @@ def validateDefectTemplate(iid: str, **kwargs) -> Union[bool, Tuple[str, int]]:
     existing = dbclient.findInDb("pollenisator", "defects", {"$or":[{"_id":ObjectId(suggestion.get("_id")), "language":language}, {"title": suggestion.get("title"), "language":language}]}, False)
     if existing is not None:
         suggestion["suggestion_type"] = "update"
-        doUpdate("pollenisator", iid, suggestion, username, True)
+        doUpdate("pollenisator", str(suggestion.get("_id")), suggestion, username, True)
     else:
         suggestion["suggestion_type"] = "insert"
         res = doInsert("pollenisator", suggestion, username)
