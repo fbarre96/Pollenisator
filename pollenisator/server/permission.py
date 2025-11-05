@@ -56,8 +56,12 @@ def permission(*dec_args, **deckwargs):
             user = kwargs.get("user", "")
             if user == "":
                 return "Unauthorized", 401
-            if not checkTokenValidity(token_info, []):
-                return "Unauthorized", 401
+            if "api_key_id" not in token_info:
+                if not checkTokenValidity(token_info, []):
+                    return "Unauthorized", 401
+            else:
+                # already verified api key
+                pass
             token_scope = token_info.get("scope", []) 
             if "admin" in token_scope:
                 for perm in all_permissions:

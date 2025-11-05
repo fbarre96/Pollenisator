@@ -60,6 +60,88 @@ paths:
         required: true
         description: auth_iid object to link
 
+  '/api-keys':
+    post:
+      summary: Generate a new API key
+      operationId: pollenisator.server.modules.auth.auth.create_api_key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApiKeyRequest'
+      responses:
+        '201':
+          description: API key created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyResponse'
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+      tags:
+        - API Keys
+    get:
+      summary: List user's API keys
+      operationId: pollenisator.server.modules.auth.auth.list_api_keys
+      responses:
+        '200':
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApiKeyInfo'
+        '401':
+          description: Unauthorized
+      tags:
+        - API Keys
+
+  '/api-keys/{key_id}':
+    delete:
+      summary: Revoke an API key
+      operationId: pollenisator.server.modules.auth.auth.revoke_api_key
+      parameters:
+        - name: key_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: API key ID
+      responses:
+        '200':
+          description: API key revoked successfully
+        '401':
+          description: Unauthorized
+        '404':
+          description: API key not found
+      tags:
+        - API Keys
+
+  '/api-keys/{key_id}/remove':
+    delete:
+      summary: Delete an API key
+      operationId: pollenisator.server.modules.auth.auth.remove_api_key
+      parameters:
+        - name: key_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: API key ID
+      responses:
+        '200':
+          description: API key removed successfully
+        '401':
+          description: Unauthorized
+        '404':
+          description: API key not found
+      tags:
+        - API Keys
+
 components:
   schemas:
     AuthInfo:
@@ -77,3 +159,95 @@ components:
         - name
         - value
         - type
+
+    CreateApiKeyRequest:
+      title: Create API Key Request
+      type: object
+      properties:
+        name:
+          type: string
+          description: Human-readable name for the API key
+          maxLength: 100
+          minLength: 1
+        expires_in_days:
+          type: integer
+          description: Number of days until the key expires (1-365)
+          minimum: 1
+          maximum: 365
+        permissions:
+          type: array
+          items:
+            type: string
+            enum: [read, write, delete, pentester, user]
+          description: Permissions granted to this API key
+          default: [read]
+      required:
+        - name
+        - expires_in_days
+
+    ApiKeyResponse:
+      title: API Key Response
+      type: object
+      properties:
+        key_id:
+          type: string
+          description: Unique identifier for the API key
+        api_key:
+          type: string
+          description: The actual API key (only returned once)
+        name:
+          type: string
+          description: Human-readable name for the API key
+        expires_at:
+          type: string
+          format: date-time
+          description: When the API key expires
+        permissions:
+          type: array
+          items:
+            type: string
+          description: Permissions granted to this API key
+      required:
+        - key_id
+        - api_key
+        - name
+        - expires_at
+        - permissions
+
+    ApiKeyInfo:
+      title: API Key Information
+      type: object
+      properties:
+        key_id:
+          type: string
+          description: Unique identifier for the API key
+        name:
+          type: string
+          description: Human-readable name for the API key
+        created_at:
+          type: string
+          format: date-time
+          description: When the API key was created
+        expires_at:
+          type: string
+          format: date-time
+          description: When the API key expires
+        last_used_at:
+          type: string
+          format: date-time
+          description: When the API key was last used (nullable)
+        permissions:
+          type: array
+          items:
+            type: string
+          description: Permissions granted to this API key
+        is_active:
+          type: boolean
+          description: Whether the API key is active and not expired
+      required:
+        - key_id
+        - name
+        - created_at
+        - expires_at
+        - permissions
+        - is_active

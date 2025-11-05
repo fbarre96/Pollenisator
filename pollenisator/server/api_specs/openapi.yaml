@@ -20,6 +20,11 @@ components:
       in: cookie
       name: session_token
       x-apikeyInfoFunc: pollenisator.server.token.decode_cookie  # Custom function to decode cookie
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      x-apikeyInfoFunc: pollenisator.server.modules.auth.auth.verify_api_key_header
 
   requestBodies:
     Tools:
@@ -487,6 +492,7 @@ components:
 security:
   - jwt: []
   - cookieAuth: []
+  - apiKey: []
 
 paths:
   /:
@@ -517,7 +523,7 @@ paths:
             application/json:
               examples:
                 Version:
-                  value: '1.1.0'      
+                  value: '2.15'      
   /users/me:
     get:
       operationId: pollenisator.server.mongo.getUser
@@ -527,7 +533,7 @@ paths:
       security: []
       responses:
         '200':
-          description: Successful read user
+          description: The username of the current logged user
 
   
     

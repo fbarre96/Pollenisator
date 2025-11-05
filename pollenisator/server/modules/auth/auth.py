@@ -10,6 +10,10 @@ from pollenisator.core.models.element import Element
 from pymongo.results import InsertOneResult
 from pollenisator.core.models.tool import Tool
 from pollenisator.server.permission import permission
+from pollenisator.core.components.logger_config import logger
+from .api_key_manager import ApiKeyManager
+from werkzeug.exceptions import Unauthorized
+import six
 
 TypeEnumeration = Union[Literal["password"], Literal["cookie"]]
 AuthInfoInsertResult = TypedDict('AuthInfoInsertResult', {'res': bool, 'iid': ObjectId})
@@ -157,3 +161,172 @@ def link(pentest: str, auth_iid: str, object_iid: str) -> Tuple[str, int]:
                 lvl=lvl_found)
         tool.addInDb()
     return "OK", 200
+
+
+@permission("user")
+def create_api_key(body: Dict[str, Any], **kwargs: Any) -> Union[Dict[str, Any], Tuple[str, int]]:
+    """
+    Create a new API key for the authenticated user.
+    
+    Args:
+        body: Request body containing name, expires_in_days, and permissions
+        **kwargs: Contains token_info with user information
+        
+    Returns:
+        API key information or error response
+    """
+    try:
+        username = kwargs["token_info"]["sub"]
+        name = body.get("name", "").strip()
+        expires_in_days = body.get("expires_in_days")
+        permissions = body.get("permissions", ["read"])
+        
+        # Validate input
+        if not name:
+            return "Name is required", 400
+        
+        if not expires_in_days or not isinstance(expires_in_days, int):
+            return "expires_in_days is required and must be an integer", 400
+            
+        if not 1 <= expires_in_days <= 365:
+            return "expires_in_days must be between 1 and 365", 400
+        
+        # Validate permissions
+        valid_permissions = ["read", "write", "delete", "pentester", "user"]
+        if not isinstance(permissions, list) or not all(p in valid_permissions for p in permissions):
+            return f"Invalid permissions. Must be a list containing only: {valid_permissions}", 400
+        
+        # Ensure user scope is included
+        if "user" not in permissions:
+            permissions.append("user")
+        
+        # Create API key
+        manager = ApiKeyManager()
+        api_key_instance, plain_key = manager.create_api_key(
+            user_id=username,
+            name=name,
+            expires_in_days=expires_in_days,
+            permissions=permissions
+        )
+        
+        return {
+            "key_id": api_key_instance.key_id,
+            "api_key": plain_key,
+            "name": api_key_instance.name,
+            "expires_at": api_key_instance.expires_at.isoformat(),
+            "permissions": api_key_instance.permissions
+        }, 201
+        
+    except ValueError as e:
+        return str(e), 400
+    except Exception as e:
+        logger.error(f"Failed to create API key: {e}")
+        return "Internal server error", 500
+
+
+@permission("user")
+def list_api_keys(**kwargs: Any) -> List[Dict[str, Any]]:
+    """
+    List all API keys for the authenticated user.
+    
+    Args:
+        **kwargs: Contains token_info with user information
+        
+    Returns:
+        List of API key information (excluding sensitive data)
+    """
+    try:
+        username = kwargs["token_info"]["sub"]
+        manager = ApiKeyManager()
+        return manager.list_user_api_keys(username)
+    except Exception as e:
+        logger.error(f"Failed to list API keys: {e}")
+        return []
+
+
+@permission("user")
+def revoke_api_key(key_id: str, **kwargs: Any) -> Union[str, Tuple[str, int]]:
+    """
+    Revoke an API key for the authenticated user.
+    
+    Args:
+        key_id: The API key ID to revoke
+        **kwargs: Contains token_info with user information
+        
+    Returns:
+        Success message or error response
+    """
+    try:
+        username = kwargs["token_info"]["sub"]
+        
+        if not key_id:
+            return "key_id is required", 400
+        
+        manager = ApiKeyManager()
+        success = manager.revoke_api_key(username, key_id)
+        
+        if success:
+            return "API key revoked successfully", 200
+        else:
+            return "API key not found", 404
+            
+    except Exception as e:
+        logger.error(f"Failed to revoke API key: {e}")
+        return "Internal server error", 500
+
+@permission("user")
+def remove_api_key(key_id: str, **kwargs: Any) -> Union[str, Tuple[str, int]]:
+    """
+    Remove an API key for the authenticated user.
+    
+    Args:
+        key_id: The API key ID to remove
+        **kwargs: Contains token_info with user information
+    Returns:
+        Success message or error response
+    """
+    username = kwargs["token_info"]["sub"]
+    
+    if not key_id:
+        return "key_id is required", 400
+    
+    manager = ApiKeyManager()
+    success = manager.remove_api_key(username, key_id)
+    if success:
+        return "API key removed successfully", 200
+    else:
+        return "API key not found", 404
+        
+
+
+def verify_api_key_header(api_key: str) -> Optional[Dict[str, Any]]:
+    """
+    Verify API key from X-API-Key header for OpenAPI security.
+    
+    Args:
+        api_key: The API key from the header
+        
+    Returns:
+        Token info dictionary if valid, None otherwise
+    """
+    try:
+        if not api_key:
+            return None
+            
+        manager = ApiKeyManager()
+        api_key_instance = manager.verify_api_key(api_key)
+        
+        if api_key_instance and api_key_instance.is_valid():
+            # Return token info in the same format as JWT tokens
+            return {
+                "sub": api_key_instance.user_id,
+                "scope": api_key_instance.permissions,
+                "api_key_id": api_key_instance.key_id,
+                "exp": int(api_key_instance.expires_at.timestamp())
+            }
+        
+        six.raise_from(Unauthorized, e)
+    except Exception as e:
+        logger.error(f"Failed to verify API key: {e}")
+        return {}
+    return {}

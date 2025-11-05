@@ -62,12 +62,11 @@ def getVersion() -> str:
     return str(version_key["value"])
 
 @permission("user")
-def getUser(**kwargs: Any) -> str:
+def getUser(*args, **kwargs: Any) -> str:
     """
     Return the user associated with the token.
 
     Args:
-        pentest (str): The name of the pentest.
         kwargs (Any): Additional keyword arguments.
     
     Returns:
