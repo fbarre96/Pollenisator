@@ -115,7 +115,7 @@ def insert_template_suggestion(pentest: str, body: Dict[str, Any], username: str
         del body["_id"]
     if "index" in body:
         del body["index"]
-    body = json.loads(json.dumps(body), cls=JSONDecoder)
+    body = json.loads(json.dumps(body, cls=JSONEncoder), cls=JSONDecoder)
     defect = Defect(pentest, body)
     dbclient = DBClient.getInstance()
     data = defect.getData()
