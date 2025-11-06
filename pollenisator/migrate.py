@@ -43,6 +43,8 @@ def migrate():
         version = migrate_2_14()
     if version == "2.14":
         version = migrate_2_15()
+    if version == "2.15":
+        version = migrate_2_16()
     logger.info("DB version is %s", version)
 
 def migrate_0():
@@ -379,7 +381,7 @@ def migrate_2_15():
     defects = dbclient.findInDb("pollenisator","defects",{}, True)
     updates = []
     updates_suggestions = []
-
+    
     for defect in defects:
         defect_id = None
         common_translation_id = None
@@ -423,3 +425,29 @@ def migrate_2_15():
     )
     return "2.15"
 
+def migrate_2_16():
+    dbclient = mongo.DBClient.getInstance()
+    updates_suggestions = []
+    defects_suggestions = dbclient.findInDb("pollenisator","defectssuggestions",{}, True)
+    for sugg in defects_suggestions:
+        defect_id = None
+        common_translation_id = None
+        if "defect_id" not in sugg:
+            defect_id = str(uuid.uuid4())
+            updates_suggestions.append(pymongo.UpdateOne({"_id":ObjectId(sugg["_id"])},{"$set":{"defect_id":defect_id}}))
+        else:
+            defect_id = sugg["defect_id"]
+        if "common_translation_id" not in sugg:
+            common_translation_id = str(uuid.uuid4())
+            updates_suggestions.append(pymongo.UpdateOne({"_id":ObjectId(sugg["_id"])},{"$set":{"common_translation_id":common_translation_id}}))
+        else:
+            common_translation_id = sugg["common_translation_id"]
+    if len(updates_suggestions) > 0:
+        dbclient.bulk_write("pollenisator", "defectssuggestions", updates_suggestions)
+    dbclient.updateInDb(
+        "pollenisator",
+        "infos",
+        {"key": "version"},
+        {"$set": {"key": "version", "value": "2.16"}}
+    )
+    return "2.16"
