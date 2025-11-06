@@ -27,11 +27,17 @@ from pollenisator.server.modules.filemanager.filemanager import listFiles
 import os
 import re
 import requests
+import shutil
 from hashlib import md5
 
 
 main_dir = getMainDir()
-template_path = os.path.normpath(os.path.join(main_dir, "./Templates/"))
+server_dir = getServerLocalFolder()
+template_path = os.path.normpath(os.path.join(server_dir, "./Templates/"))
+old_template_path = os.path.normpath(os.path.join(main_dir, "./Templates/"))
+if(os.path.exists(template_path) is False) and os.path.exists(server_dir) is True:
+    os.makedirs(template_path, exist_ok=True)
+    shutil.copytree(old_template_path, template_path, dirs_exist_ok=True)
 lang_translation = dict()
 
 ErrorStatus = Tuple[str, int]
