@@ -392,7 +392,7 @@ def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage
     # Prepare file information
     md5File = md5(upfile.stream)
     upfile.stream.seek(0)
-    name = upfile.filename.replace("/", "_") if upfile.filename is not None else "file_"+str(time.time()).replace(".", "_")
+    name = DBClient.sanitize_filename(upfile.filename) if upfile.filename is not None else "file_"+str(time.time()).replace(".", "_")
     toolName = os.path.splitext(os.path.basename(name))[0] + md5File[:6]
     ext = os.path.splitext(name)[-1]
     
@@ -516,7 +516,7 @@ def downloadById(pentest: str, attachment_id: str) -> Union[ErrorStatus, Respons
     return download(pentest, attachment.get("attached_to", "unassigned"), attachment.get("type", "file"), attachment.get("name", None))
 
 def _download_by_filename(filepath: str, filename: str) -> Union[ErrorStatus, Response]:
-    filename = filename.replace("/", "_")
+    filename = DBClient.sanitize_filename(filename)
     filepath = os.path.join(filepath, os.path.basename(filename))
     if os.path.exists(filepath):
         return send_file(filepath)

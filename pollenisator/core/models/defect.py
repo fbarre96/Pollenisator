@@ -817,7 +817,8 @@ class Defect(Element):
         
         """
         filename = str(filename)
-        filename = os.path.basename(filename.replace("/", "_"))
+        filename = DBClient.sanitize_filename(filename)
+        filename = os.path.basename(filename)
         my_proof_dir = self.getProofPath()
         unassigned_proof_dir = self.getProofPath(True)
         proof_path = os.path.join(unassigned_proof_dir, filename)
@@ -840,7 +841,8 @@ class Defect(Element):
             ValueError: If the file is not found.
         """
         filename = str(filename)
-        filename = os.path.basename(filename.replace("/", "_"))
+        filename = DBClient.sanitize_filename(filename)
+        filename = os.path.basename(filename)
         proof_dir = self.getProofPath()
         proof_path = os.path.join(proof_dir, filename)
         if not os.path.isfile(proof_path):

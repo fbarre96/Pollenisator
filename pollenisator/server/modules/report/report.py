@@ -202,7 +202,7 @@ def uploadTemplate(upfile: werkzeug.datastructures.FileStorage, lang: str, overw
         return "No file received", 400
     if upfile.filename is None:
         return "Empty filename received", 400
-    fileName = upfile.filename.replace("/", "_")
+    fileName = DBClient.sanitize_filename(upfile.filename)
     if not fileName.endswith(".pptx") and not fileName.endswith(".docx") and not fileName.endswith(".xlsx"):
         return "Invalid extension for template, must be pptx, xlsx or docx", 400
     new_lang = os.path.basename(lang).lower().strip()

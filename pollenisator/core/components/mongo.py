@@ -1524,6 +1524,22 @@ class DBClient:
         if attached_to != "unassigned":
             dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(attached_to)}, {"$addToSet":{"proofs":name}})
 
+    @staticmethod
+    def sanitize_filename(filename: str) -> str:
+        """
+        Sanitize a filename by replacing invalid characters.
+
+        Args:
+            filename (str): The filename to sanitize.
+
+        Returns:
+            str: The sanitized filename.
+        """
+        chars="()[] &#?="
+        for c in chars:
+            filename = filename.replace(c, "_")
+        return filename
+
     def _get_upload_path(self, pentest: str, filetype: str, attached_to: Union[Literal["unassigned"], str] , filename: str\
                          , attachment_id: Union[Literal["unassigned"], str], force_replace: bool=False) -> Tuple[str, str, str, str]:
         """
@@ -1546,8 +1562,8 @@ class DBClient:
         os.makedirs(local_path,  exist_ok=True)
         filepath = os.path.join(local_path, pentest, filetype, attached_to)
         os.makedirs(filepath, exist_ok=True)
-        uploadName = filename.replace("/", "_").replace("\\", "_")
-        name, ext = os.path.splitext(filename.replace("/", "_"))
+        uploadName = DBClient.sanitize_filename(filename)
+        name, ext = os.path.splitext(uploadName)
         ext = ext.replace("/","_")
         basename = os.path.basename(name)
         if attachment_id != "unassigned":

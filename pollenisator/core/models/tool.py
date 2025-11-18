@@ -191,6 +191,7 @@ class Tool(Element):
 
         """
         var_to_path = var_to_path.replace("/", "_")
+        var_to_path = var_to_path.replace("\\", "_")
         var_to_path = var_to_path.replace(" ", "_")
         var_to_path = var_to_path.replace(":", "_")
         return var_to_path
