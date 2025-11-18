@@ -271,6 +271,48 @@ paths:
               examples:
                 file not found:
                   value: '"File not found"'
+
+  "/files/{pentest}/proof/{attached_to}/{filename}":
+    delete:
+      operationId: pollenisator.server.modules.filemanager.filemanager.rmProofFile
+      tags:
+        - FileManager
+      summary: Remove a proof file
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: attached_to
+          in: path
+          description: defect iid the proof is attached to
+          required: true
+          schema:
+            type: string
+        - name: filename
+          in: path
+          description: filename to delete
+          required: true
+          schema:
+            type: string
+        
+      responses:
+        "200":
+          description: Successfully deleted the file
+          content:
+            application/json:
+              examples:
+                Successful:
+                  value: '"Successfully deleted {filename}"'
+        "404":
+          description: File not found
+          content:
+            application/json:
+              examples:
+                file not found:
+                  value: '"File not found"'
   "/files/{pentest}/{attachment_id}":
     delete:
       operationId: pollenisator.server.modules.filemanager.filemanager.rmFile

@@ -649,3 +649,19 @@ def rmFile(pentest: str,  attachment_id: str) -> ErrorStatus:
         return _rm_file_file(pentest, attachment_id, filename)
     else:
         return "Invalid filetype", 400
+    
+@permission("pentester")
+def rmProofFile(pentest: str, attached_to: str, filename: str) -> ErrorStatus:
+    """
+    Remove a proof file from a defect in a pentest by its name.
+
+    Args:
+        pentest (str): The name of the pentest.
+        attached_to (str): The id of the defect the file is attached to.
+        filename (str): The name of the file to delete.
+
+    Returns:
+        ErrorStatus: A success message if the file was successfully deleted, otherwise an error message and status code.
+    """
+    pentest = os.path.basename(pentest)
+    return _rm_proof_file(pentest, attached_to, filename)
