@@ -1006,7 +1006,20 @@ paths:
               examples:
                 Success:
                   value: 'Pentest not found'
-          
+  "/logout":
+    post:
+      operationId: pollenisator.server.auth.logout
+      tags:
+        - Security
+      summary: Logout from the app
+      responses:
+        "200":
+          description: successfully logged out
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: 'Successfully logged out'
   "/update/{pentest}/{collection}":
     post:
       operationId: pollenisator.server.mongo.update

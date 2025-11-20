@@ -13,7 +13,7 @@ from pollenisator.server.token import getTokenFor
 from pollenisator.server.mongo import doImportCheatsheet
 from pollenisator.core.components.utils import getDefaultCheatsheetFile
 from pollenisator.core.components.logger_config import logger
-from flask import make_response, jsonify
+from flask import Response, make_response, jsonify
 import re
 ErrorStatus = Tuple[str, int]
 
@@ -327,6 +327,30 @@ def login(body: Dict[str, str]) -> Union[Any, ErrorStatus]:
             )
             return response
     return "Authentication failure", 401
+
+@permission("user")
+def logout(**kwargs: Any) -> Response:
+    """
+    Logout the current user by clearing the session token cookie.
+
+    Args:
+        **kwargs (Any): Additional parameters, including the user token.
+
+    Returns:
+        ErrorStatus: A success message if the user was successfully logged out.
+    """
+    response = make_response(jsonify({"message":"Successfully logged out"}))
+    response.set_cookie(
+        'session_token', 
+        '',
+        httponly=True,
+        secure=not isdebug,
+        samesite='Strict',
+        expires=0
+    )
+    dbclient = DBClient.getInstance()
+    dbclient.updateInDb("pollenisator", "users", {"username":kwargs["token_info"]["sub"]}, {"$set":{"token":""}}, False)
+    return response
 
 @permission("user")
 def connectToPentest(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union[Any, ErrorStatus]:
