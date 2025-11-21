@@ -124,6 +124,25 @@ def upload(pentest: str, attached_to: Union[Literal["unassigned"], str], filetyp
         return {"remote_path": f"files/{pentest}/download/{filetype}/{attached_to}/{name}", "attachment_id": str(result.get("attachment_id","")), "msg":str(result.get("msg","")), "status":status}
     return str(result.get("msg","")), status
 
+@permission("user")
+def upload_template_file(attached_to: Union[Literal["unassigned"], str], filetype: FileType, upfile: werkzeug.datastructures.FileStorage) -> Union[FileUploadResult, ErrorStatus]:
+    """
+    Upload a file as proof for a defect.
+
+    Args:
+        attached_to (Union[Literal["unassigned"], str]): An id of a defect to link the file with (deletion of the defect will delete the file).
+        filetype (FileType): The type of the file to upload. (proof, file or result)
+        upfile (werkzeug.datastructures.FileStorage): The file to upload.
+
+    Returns:
+        Union[FileUploadResult, ErrorStatus]: A dictionary containing the remote path, message, and status if the upload was successful, otherwise a tuple containing the message and status.
+    """
+    result, status, filepath = dbclient.do_upload("pollenisator", "unassigned", filetype, upfile, attached_to)
+    if status == 200:
+        name = os.path.basename(filepath)
+        return {"remote_path": f"files/pollenisator/download/{filetype}/{attached_to}/{name}", "attachment_id": str(result.get("attachment_id","")), "msg":str(result.get("msg","")), "status":status}
+    return str(result.get("msg","")), status
+
 def _parse_import_parameters(body: Dict[str, Any]) -> Union[Tuple[str, Dict[str, Any], str], ErrorStatus]:
     """
     Parse and validate import parameters from the request body.

@@ -1,4 +1,46 @@
 paths:
+  "/files/pollenisator/upload/{filetype}/{attached_to}":
+    post:
+      operationId: pollenisator.server.modules.filemanager.filemanager.upload_template_file
+      tags:
+        - FileManager
+      summary: Upload a new template file (file will be renamed if already exists)
+      parameters:
+        - name: filetype
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - result
+              - proof
+              - file
+        - name: attached_to
+          in: path
+          description: file will be tied to given template id (if template is deleted, so is this file)
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                upfile:
+                  description: The file to upload
+                  type: string
+                  format: binary
+              required:
+                - upfile
+      responses:
+        "200":
+          description: Successfully uploaded file
+          content:
+            application/json:
+              examples:
+                Successful:
+                  value: '{"msg":"{filename} was successfully uploaded", "attachment_id":"uuid-v4"}'
   "/files/{pentest}/upload/{filetype}/{attached_to}":
     post:
       operationId: pollenisator.server.modules.filemanager.filemanager.upload
