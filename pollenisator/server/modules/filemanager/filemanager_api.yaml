@@ -225,6 +225,57 @@ paths:
                 type: array
                 items:
                   type: string
+  "/files/pollenisator/download/{filetype}/{attached_to}":
+    get:
+      operationId: pollenisator.server.modules.filemanager.filemanager.download_template_file
+      tags:
+        - FileManager
+      summary: Download a template file
+      parameters:
+        - name: attached_to
+          in: path
+          description: file will be tied to given template id
+          required: true
+          schema:
+            type: string
+        - name: filetype
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - result
+              - proof
+              - file
+        - name: filename
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ""
+        - name: cb
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+
+      responses:
+        "200":
+          description: Successfully downloaded file
+          content:
+            application/octet-steam:
+              schema:
+                type: string
+                format: binary
+                
+        "404":
+          description: File not found
+          content:
+            application/json:
+              examples:
+                file not found:
+                  value: '"File not found"'
   "/files/{pentest}/download/{filetype}/{attached_to}":
     get:
       operationId: pollenisator.server.modules.filemanager.filemanager.download

@@ -137,11 +137,7 @@ def upload_template_file(attached_to: Union[Literal["unassigned"], str], filetyp
     Returns:
         Union[FileUploadResult, ErrorStatus]: A dictionary containing the remote path, message, and status if the upload was successful, otherwise a tuple containing the message and status.
     """
-    result, status, filepath = dbclient.do_upload("pollenisator", "unassigned", filetype, upfile, attached_to)
-    if status == 200:
-        name = os.path.basename(filepath)
-        return {"remote_path": f"files/pollenisator/download/{filetype}/{attached_to}/{name}", "attachment_id": str(result.get("attachment_id","")), "msg":str(result.get("msg","")), "status":status}
-    return str(result.get("msg","")), status
+    return upload("pollenisator", attached_to, filetype, upfile)
 
 def _parse_import_parameters(body: Dict[str, Any]) -> Union[Tuple[str, Dict[str, Any], str], ErrorStatus]:
     """
@@ -564,6 +560,22 @@ def send_zip_file(filepath: str, attached_to: ObjectId) -> Response:
         for file_path in dir_source.iterdir():
             archive.write(file_path, arcname=file_path.name)
     return send_file(temp_zipfile_path, mimetype="application/zip")
+
+@permission("user")
+def download_template_file(attached_to: str, filetype: FileType, filename: Optional[str]=None) -> Union[ErrorStatus, Response]:
+    """ 
+    Download a template file of a specific type attached to a specific item.
+
+    Args:
+        attached_to (str): The id of the item the file is attached to.
+        filetype (str): The type of the file to download.
+        filename (Optional[str], optional): The name of the file to download. Defaults to None. If not specified and multiple files are found, 
+            the file will be zipped and the zip file will be downloaded. 
+            If specified, the file will be downloaded directly.
+    Returns:
+        Union[ErrorStatus, Response]: The file to download if successful, otherwise an error message and status code.
+    """ 
+    return download("pollenisator", attached_to, filetype, filename)
 
 @permission("pentester")
 def download(pentest: str, attached_to: str, filetype: FileType, filename: Optional[str]=None) -> Union[ErrorStatus, Response]:
