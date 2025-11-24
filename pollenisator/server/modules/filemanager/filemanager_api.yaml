@@ -496,3 +496,266 @@ paths:
                   value: '{
                     "Nmap.py": 1
                     }'
+
+  "/files/{pentest}/import/async":
+    post:
+      operationId: pollenisator.server.modules.filemanager.filemanager.importExistingFileAsync
+      tags:
+        - FileManager
+      summary: Import an existing tool file asynchronously (recommended for large files)
+      description: |
+        Queue a file import for asynchronous processing. This endpoint returns immediately with a task ID
+        that can be used to check the import status and retrieve results. Recommended for large files
+        that might timeout with the synchronous endpoint.
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                upfile:
+                  description: The file to upload
+                  type: string
+                  format: binary
+                plugin:
+                  description: plugin name to use or auto-detect
+                  type: string
+                  default: "auto-detect"
+                default_target:
+                  description: Default pentest object to affect to
+                  type: string
+                  default: ""
+                cmdline:
+                  description: command line used if knowingly
+                  type: string
+                  default: ""
+              required:
+                - upfile
+                - plugin
+      responses:
+        "200":
+          description: File import queued for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                    format: uuid
+                    description: Unique task ID to track the import
+                  status:
+                    type: string
+                    enum: [queued]
+                  message:
+                    type: string
+              examples:
+                successful queuing:
+                  value: 
+                    task_id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "queued"
+                    message: "File import queued for processing"
+        "400":
+          description: Invalid parameters
+        "500":
+          description: Server error while queueing task
+
+  "/files/import/task/{task_id}/status":
+    get:
+      operationId: pollenisator.server.modules.filemanager.filemanager.getImportTaskStatus
+      tags:
+        - FileManager
+      summary: Get the status of an async file import task
+      description: |
+        Retrieve the current status of an import task. The status can be:
+        - queued: Task is waiting to be processed
+        - processing: Task is currently being processed
+        - completed: Task completed successfully (results available)
+        - failed: Task failed (error message available)
+      parameters:
+        - name: task_id
+          in: path
+          description: The unique task ID returned from the async import endpoint
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Task status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [queued, processing, completed, failed]
+                  results:
+                    type: object
+                    nullable: true
+                    description: Results only present when status is completed
+                    additionalProperties:
+                      type: integer
+                  error:
+                    type: string
+                    nullable: true
+                    description: Error message only present when status is failed
+                  created_at:
+                    type: number
+                    description: Unix timestamp when task was created
+                  updated_at:
+                    type: number
+                    description: Unix timestamp when task was last updated
+              examples:
+                queued:
+                  value:
+                    task_id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "queued"
+                    results: null
+                    error: null
+                    created_at: 1700000000.123
+                    updated_at: 1700000000.123
+                processing:
+                  value:
+                    task_id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "processing"
+                    results: null
+                    error: null
+                    created_at: 1700000000.123
+                    updated_at: 1700000001.456
+                completed:
+                  value:
+                    task_id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "completed"
+                    results: 
+                      "Nmap.py": 1
+                    error: null
+                    created_at: 1700000000.123
+                    updated_at: 1700000005.789
+                failed:
+                  value:
+                    task_id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "failed"
+                    results: null
+                    error: "Plugin exception: Invalid file format"
+                    created_at: 1700000000.123
+                    updated_at: 1700000002.345
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                type: string
+              examples:
+                not found:
+                  value: "Task not found"
+
+  "/files/import/task/{task_id}/result":
+    get:
+      operationId: pollenisator.server.modules.filemanager.filemanager.getImportTaskResult
+      tags:
+        - FileManager
+      summary: Get the result of a completed async file import task
+      description: |
+        Retrieve the final result of an import task. This endpoint returns:
+        - HTTP 200 if completed successfully (with results)
+        - HTTP 202 if still processing (check back later)
+        - HTTP 400 if failed (with error message)
+        - HTTP 404 if task not found
+      parameters:
+        - name: task_id
+          in: path
+          description: The unique task ID returned from the async import endpoint
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Task completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [completed]
+                  results:
+                    type: object
+                    description: Dictionary mapping plugin names to the number of results
+                    additionalProperties:
+                      type: integer
+              examples:
+                completed:
+                  value:
+                    task_id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "completed"
+                    results:
+                      "Nmap.py": 1
+                      "Masscan.py": 3
+        "202":
+          description: Task is still processing (check back later)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [queued, processing]
+                  message:
+                    type: string
+              examples:
+                processing:
+                  value:
+                    task_id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "processing"
+                    message: "Import is still processing"
+        "400":
+          description: Task failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [failed]
+                  error:
+                    type: string
+              examples:
+                failed:
+                  value:
+                    task_id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "failed"
+                    error: "Plugin exception: Invalid file format"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                type: string
+              examples:
+                not found:
+                  value: "Task not found"

@@ -26,7 +26,16 @@ from pollenisator.core.models.defect import Defect
 from pollenisator.core.models.tool import Tool
 from pollenisator.server.modules.cheatsheet.checkinstance import getTargetRepr
 from pollenisator.server.permission import permission
+from pollenisator.core.components.socketmanager import SocketManager
 from enum import Enum
+import uuid
+try:
+    import eventlet
+    HAS_EVENTLET = True
+    logger.info("filemanager module: eventlet is available, async imports will use green threads")
+except ImportError:
+    HAS_EVENTLET = False
+    logger.warning("filemanager module: eventlet NOT available, async imports will run synchronously")
 
 class FileType(str, Enum):
     PROOF = "proof"
@@ -34,6 +43,33 @@ class FileType(str, Enum):
     FILE = "file"
 
 POSSIBLE_TYPES = [ft.value for ft in FileType]
+
+# Import task tracking for async operations
+ImportTaskStatus = TypedDict('ImportTaskStatus', {
+    'task_id': str, 
+    'status': str, 
+    'results': Optional[Dict[str, int]], 
+    'error': Optional[str], 
+    'created_at': float, 
+    'updated_at': float
+})
+
+# Global in-memory task storage
+# NOTE: This is shared within a single process/worker. If running with multiple 
+# gunicorn workers, each worker will have its own dictionary. For multi-worker 
+# deployments, consider using Redis or the database for task storage.
+# With eventlet (default), this works correctly as all green threads share memory.
+IMPORT_TASKS: Dict[str, ImportTaskStatus] = {}
+IMPORT_TASKS_CLEANUP_TIME = 3600  # Clean up completed tasks older than 1 hour
+
+# For thread safety in debug/threading mode
+try:
+    import threading
+    IMPORT_TASKS_LOCK = threading.RLock()
+    HAS_THREADING = True
+except ImportError:
+    IMPORT_TASKS_LOCK = None  # type: ignore
+    HAS_THREADING = False
 
 dbclient = DBClient.getInstance()
 local_path = os.path.normpath(os.path.join(getMainDir(), "files"))
@@ -81,6 +117,129 @@ def md5(f: IO[bytes]) -> str:
     for chunk in iter(lambda: f.read(4096), b""):
         hash_md5.update(chunk)
     return hash_md5.hexdigest()
+
+def _get_task(task_id: str) -> Optional[ImportTaskStatus]:
+    """Thread-safe task retrieval."""
+    if HAS_THREADING and IMPORT_TASKS_LOCK:
+        with IMPORT_TASKS_LOCK:
+            return IMPORT_TASKS.get(task_id)
+    return IMPORT_TASKS.get(task_id)
+
+def _set_task(task_id: str, task_data: ImportTaskStatus) -> None:
+    """Thread-safe task storage."""
+    if HAS_THREADING and IMPORT_TASKS_LOCK:
+        with IMPORT_TASKS_LOCK:
+            IMPORT_TASKS[task_id] = task_data
+    else:
+        IMPORT_TASKS[task_id] = task_data
+
+def _update_task_status(task_id: str, status: str, **kwargs: Any) -> None:
+    """Thread-safe task status update."""
+    if HAS_THREADING and IMPORT_TASKS_LOCK:
+        with IMPORT_TASKS_LOCK:
+            if task_id in IMPORT_TASKS:
+                IMPORT_TASKS[task_id]['status'] = status
+                IMPORT_TASKS[task_id]['updated_at'] = time.time()
+                for key, value in kwargs.items():
+                    IMPORT_TASKS[task_id][key] = value  # type: ignore
+    else:
+        if task_id in IMPORT_TASKS:
+            IMPORT_TASKS[task_id]['status'] = status
+            IMPORT_TASKS[task_id]['updated_at'] = time.time()
+            for key, value in kwargs.items():
+                IMPORT_TASKS[task_id][key] = value  # type: ignore
+
+def _cleanup_old_import_tasks() -> None:
+    """
+    Clean up completed import tasks older than IMPORT_TASKS_CLEANUP_TIME.
+    This is called periodically to prevent memory leaks from accumulating task data.
+    Thread-safe implementation.
+    """
+    current_time = time.time()
+    tasks_to_remove = []
+    
+    if HAS_THREADING and IMPORT_TASKS_LOCK:
+        with IMPORT_TASKS_LOCK:
+            for task_id, task_info in IMPORT_TASKS.items():
+                if current_time - task_info['updated_at'] > IMPORT_TASKS_CLEANUP_TIME:
+                    tasks_to_remove.append(task_id)
+            for task_id in tasks_to_remove:
+                del IMPORT_TASKS[task_id]
+                logger.info("Cleaned up old import task: %s", task_id)
+    else:
+        for task_id, task_info in IMPORT_TASKS.items():
+            if current_time - task_info['updated_at'] > IMPORT_TASKS_CLEANUP_TIME:
+                tasks_to_remove.append(task_id)
+        for task_id in tasks_to_remove:
+            del IMPORT_TASKS[task_id]
+            logger.info("Cleaned up old import task: %s", task_id)
+
+def _execute_import_task_async(task_id: str, pentest: str, upfile_data: Tuple[bytes, str], body: Dict[str, Any], user: str) -> None:
+    """
+    Execute the import task asynchronously in a background thread.
+    This function processes the file import in the background to avoid blocking the HTTP request.
+    
+    Args:
+        task_id (str): The unique task ID for tracking.
+        pentest (str): The pentest name.
+        upfile_data (Tuple[bytes, str]): Tuple of (file content bytes, filename).
+        body (Dict[str, Any]): The request body with plugin, default_target, cmdline.
+        user (str): The user performing the import.
+    """
+    try:
+        logger.info("=== ASYNC TASK STARTED === Import task %s for pentest %s by user %s", task_id, pentest, user)
+        _update_task_status(task_id, 'processing')
+        logger.info("Task %s status updated to 'processing'", task_id)
+        # Create a file-like object from the data
+        from io import BytesIO
+        file_content, filename = upfile_data
+        file_stream = BytesIO(file_content)
+        
+        # Parse and validate parameters
+        parse_result = _parse_import_parameters(body)
+        if isinstance(parse_result, tuple) and len(parse_result) == 2:
+            error_msg, _ = parse_result
+            _update_task_status(task_id, 'failed', error=error_msg)
+            logger.warning("Import task %s failed: %s", task_id, error_msg)
+            return
+        
+        plugin, default_target, cmdline = cast(Tuple[str, Dict[str, Any], str], parse_result)
+        
+        # Prepare file information
+        md5_file = md5(file_stream)
+        file_stream.seek(0)
+        name = DBClient.sanitize_filename(filename) if filename is not None else "file_"+str(time.time()).replace(".", "_")
+        tool_name = os.path.splitext(os.path.basename(name))[0] + md5_file[:6]
+        ext = os.path.splitext(name)[-1]
+        
+        # Create a mock file object for compatibility with existing functions
+        class MockFileStorage:
+            def __init__(self, stream: IO[bytes], filename: Optional[str]):
+                self.stream = stream
+                self.filename = filename
+        
+        mock_file = MockFileStorage(file_stream, filename)
+        
+        # Process plugins
+        plugin_results, results_count, error_msg_optional = _process_plugin_results(pentest, mock_file, plugin, cmdline, ext)  # type: ignore
+        
+        if error_msg_optional:
+            _update_task_status(task_id, 'failed', error=error_msg_optional)
+            logger.warning("Import task %s failed during plugin processing: %s", task_id, error_msg_optional)
+            return
+        
+        # Process each plugin result
+        for result in plugin_results:
+            file_stream.seek(0)  # Reset stream for each result
+            _process_plugin_result(pentest, result, default_target, tool_name, user, mock_file, plugin)  # type: ignore
+        
+        _update_task_status(task_id, 'completed', results=results_count)
+        logger.info("Import task %s completed successfully with results: %s", task_id, results_count)
+        
+    except Exception as e:  # pylint: disable=broad-except
+        logger.error("Import task %s failed with exception: %s", task_id, str(e))
+        logger.error(traceback.format_exc())
+        _update_task_status(task_id, 'failed', error=f"Internal error: {str(e)}")
 
 @permission("pentester")
 def upload_replace(pentest: str, attachment_id: str, filetype: FileType, attached_to: Union[Literal["unassigned"]|str], upfile: werkzeug.datastructures.FileStorage) -> Union[FileUploadResult, ErrorStatus]:
@@ -422,6 +581,135 @@ def importExistingFile(pentest: str, upfile: werkzeug.datastructures.FileStorage
         _process_plugin_result(pentest, result, default_target, toolName, user, upfile, plugin)
     
     return results_count
+
+@permission("pentester")
+def importExistingFileAsync(pentest: str, upfile: werkzeug.datastructures.FileStorage, body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[Dict[str, str], ErrorStatus]:
+    """
+    Import an existing file into the pentest asynchronously.
+    This endpoint queues the import task and returns immediately with a task ID.
+    Use getImportTaskStatus to check the progress and getImportTaskResult to get the final result.
+
+    Args:
+        pentest (str): The name of the pentest.
+        upfile (werkzeug.datastructures.FileStorage): The file to import.
+        body (Dict[str, Any]): Additional parameters for the import, such as the plugin to use, the default target, and the command line.
+        **kwargs (Dict[str, Any]): Additional keyword arguments, including the user token.
+
+    Returns:
+        Union[Dict[str, str], ErrorStatus]: A dictionary containing the task_id if the import was queued successfully, 
+        otherwise an error message and status code.
+    """
+    user = kwargs["token_info"]["sub"]
+    
+    # Validate parameters early to fail fast
+    parse_result = _parse_import_parameters(body)
+    if isinstance(parse_result, tuple) and len(parse_result) == 2:
+        error_msg, statuscode = parse_result
+        return error_msg, statuscode
+    
+    try:
+        # Read file content into memory
+        file_content = upfile.stream.read()
+        filename = upfile.filename if upfile.filename is not None else "file_"+str(time.time()).replace(".", "_")
+        
+        # Generate a unique task ID
+        task_id = str(uuid.uuid4())
+        
+        # Initialize task tracking (thread-safe)
+        current_time = time.time()
+        task_data: ImportTaskStatus = {
+            'task_id': task_id,
+            'status': 'queued',
+            'results': None,
+            'error': None,
+            'created_at': current_time,
+            'updated_at': current_time
+        }
+        _set_task(task_id, task_data)
+        
+        # Cleanup old tasks periodically
+        _cleanup_old_import_tasks()
+        
+        # Execute the import asynchronously using SocketIO's background task manager
+        # This ensures the task runs in the proper eventlet/threading context
+        sm = SocketManager.getInstance()
+        logger.info("Spawning background import task %s for pentest %s using SocketIO", task_id, pentest)
+        sm.socketio.start_background_task(
+            _execute_import_task_async, 
+            task_id, 
+            pentest, 
+            (file_content, filename), 
+            body, 
+            user
+        )
+        logger.info("Import task %s queued successfully", task_id)
+        
+        return {
+            'task_id': task_id,
+            'status': 'queued',
+            'message': 'File import queued for processing'
+        }
+        
+    except Exception as e:  # pylint: disable=broad-except
+        logger.error("Error queueing import task: %s", str(e))
+        logger.error(traceback.format_exc())
+        return f"Error queueing file import: {str(e)}", 500
+
+@permission("pentester")
+def getImportTaskStatus(task_id: str) -> Union[ImportTaskStatus, ErrorStatus]:
+    """
+    Get the status of an import task.
+    Returns the current state of the task including status, results (if completed), and error (if failed).
+
+    Args:
+        task_id (str): The ID of the import task returned from importExistingFileAsync.
+
+    Returns:
+        Union[ImportTaskStatus, ErrorStatus]: The task status if found, otherwise an error message and status code.
+    """
+    task_info = _get_task(task_id)
+    if task_info is None:
+        return "Task not found", 404
+    
+    return task_info
+
+@permission("pentester")
+def getImportTaskResult(task_id: str) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int], ErrorStatus]:
+    """
+    Get the result of a completed import task.
+    This endpoint returns the final result only if the task has completed.
+    Returns HTTP 202 if still processing, HTTP 400 if failed.
+
+    Args:
+        task_id (str): The ID of the import task returned from importExistingFileAsync.
+
+    Returns:
+        Union[Dict[str, Any], Tuple[Dict[str, Any], int], ErrorStatus]: The task result if completed, 
+        HTTP 202 if still processing, HTTP 400 if failed, or HTTP 404 if not found.
+    """
+    task_info = _get_task(task_id)
+    if task_info is None:
+        return "Task not found", 404
+    
+    if task_info['status'] == 'completed':
+        return {
+            'task_id': task_id,
+            'status': 'completed',
+            'results': task_info['results']
+        }
+    elif task_info['status'] == 'failed':
+        return {
+            'task_id': task_id,
+            'status': 'failed',
+            'error': task_info['error']
+        }, 400
+    else:
+        # Task is still queued or processing
+        return {
+            'task_id': task_id,
+            'status': task_info['status'],
+            'message': 'Import is still processing'
+        }, 202  # HTTP 202 Accepted - still processing
 
 @permission("pentester")
 def listFilesAll(pentest: str, filetype: FileType) -> Union[ErrorStatus, List[Dict[str, Any]]]:
