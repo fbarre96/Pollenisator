@@ -18,6 +18,7 @@ import werkzeug
 from pollenisator.core.models.defect import Defect
 import pollenisator.core.reporting.wordexport as wordexport
 import pollenisator.core.reporting.powerpointexport as powerpointexport
+import pollenisator.core.reporting.htmlexport as htmlexport
 from pollenisator.server import settings
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.utils import getMainDir, getServerLocalFolder
@@ -171,8 +172,9 @@ def downloadTemplate(lang: str, templateName: str) -> Union[ErrorStatus, Respons
         Union[ErrorStatus, Response]: The template to download if successful, otherwise an error message and status code.
     """
     fileName = os.path.basename(templateName)
-    if not fileName.endswith(".pptx") and not fileName.endswith(".docx") and not fileName.endswith(".xlsx"):
-        return "A template is either a pptx, xlsx or a docx document", 400
+    valid_extensions = [".pptx", ".docx", ".xlsx", ".html"]
+    if os.path.splitext(fileName)[-1] not in valid_extensions:
+        return "Invalid extension for template, must be one of:"+str(",".join(valid_extensions)), 400
     lang = os.path.basename(lang)
     if not validate_lang(lang):
         return "There is no existing templates for this lang", 400
@@ -203,8 +205,9 @@ def uploadTemplate(upfile: werkzeug.datastructures.FileStorage, lang: str, overw
     if upfile.filename is None:
         return "Empty filename received", 400
     fileName = DBClient.sanitize_filename(upfile.filename)
-    if not fileName.endswith(".pptx") and not fileName.endswith(".docx") and not fileName.endswith(".xlsx"):
-        return "Invalid extension for template, must be pptx, xlsx or docx", 400
+    valid_extensions = [".pptx", ".docx", ".xlsx", ".html"]
+    if os.path.splitext(fileName)[-1] not in valid_extensions:
+        return "Invalid extension for template, must be one of:"+str(",".join(valid_extensions)), 400
     new_lang = os.path.basename(lang).lower().strip()
     if re.match(r"^[a-z]{2}(-[A-Z]{2})?$", new_lang) is None:
         return "Invalid lang format, must be xx or xx-XX where x is a letter", 400
@@ -245,8 +248,9 @@ def deleteTemplate(lang: str, body: Dict[str, Any]) -> ErrorStatus:
     if not (templateName and templateName.strip() != ""):
         return "Empty template name received", 400
     fileName = os.path.basename(templateName)
-    if not fileName.endswith(".pptx") and not fileName.endswith(".docx") and not fileName.endswith(".xlsx"):
-        return "Invalid extension for template, must be pptx, xlsx or docx", 400
+    valid_extensions = [".pptx", ".docx", ".xlsx", ".html"]
+    if os.path.splitext(fileName)[-1] not in valid_extensions:
+        return "Invalid extension for template, must be one of:"+str(",".join(valid_extensions)), 400
     lang = os.path.basename(lang)
     if not validate_lang(lang):
         return "There is no existing templates for this lang", 400
@@ -277,8 +281,9 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
     mainRedactor = body.get("mainRedactor", "")
     lang = body.get("lang", "en")
     additional_context = body.get("additional_context", {})
-    if not templateName.endswith(".pptx") and not templateName.endswith(".docx") and not templateName.endswith(".xlsx"):
-        return "Invalid extension for template, must be pptx, xlsx or docx", 400
+    valid_extensions = [".pptx", ".docx", ".xlsx", ".html"]
+    if os.path.splitext(templateName)[-1] not in valid_extensions:
+        return "Invalid extension for template, must be one of:"+str(",".join(valid_extensions)), 400
     client_name = settings.find(pentest, "client_name")
     mission_name = settings.find(pentest, "mission_name")
     pentest_type = settings.find(pentest, "pentest_type")
@@ -380,10 +385,15 @@ def _generateDoc(ext: str, context: Dict[str, Any], template_to_use_path: str, o
         # return_dict["res"] = res
         # return_dict["msg"] = msg
         result_queue.put({"res": res, "msg": msg})
+    elif ext == ".html":
+        res, msg = htmlexport.createReport(
+            context, template_to_use_path, out_name, translation=translation)
+        logger.info("HTML Report generation result: %s, message: %s", str(res), str(msg))
+        result_queue.put({"res": res, "msg": msg})
     else:
         # return_dict["res"] = False
         # return_dict["msg"] = "Unknown template file extension"
-        result_queue.put({"res": res, "msg": msg})
+        result_queue.put({"res": False, "msg": "Unknown template file extension"})
 
 def searchDefectTemplates(terms: str, lang: str, perimeter: str, coll: str) -> List[Dict[str, Any]]:
     dbclient = DBClient.getInstance()

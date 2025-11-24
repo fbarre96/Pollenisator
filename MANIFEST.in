@@ -4,6 +4,7 @@ recursive-include pollenisator/exports *.gz
 recursive-include pollenisator/server/logs *
 recursive-include pollenisator/server/modules *
 recursive-include pollenisator/Templates *.docx
+recursive-include pollenisator/Templates *.html
 recursive-include pollenisator/Templates *.json
 include pollenisator/server/api_specs/openapi.yaml
 include pollenisator/Templates/en/Modele.docx

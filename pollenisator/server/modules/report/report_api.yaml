@@ -33,7 +33,7 @@ paths:
             application/json:
               examples:
                 Success:
-                  value: '["Mddel.docx", "Model2.pptx", ...]'
+                  value: '["Model.docx", "Model2.pptx", "Report.html", ...]'
         "400":
           description: Invalid parameters
           content:
@@ -117,7 +117,7 @@ paths:
             application/json:
               examples:
                 Success:
-                  value: '{fr: ["Mddel.docx", "Model2.pptx", ...], "en": ["Mddel-english.docx", "Model2-english.pptx", ...]}'
+                  value: '{"fr": ["Model.docx", "Model2.pptx", "Report.html", ...], "en": ["Model-english.docx", "Model2-english.pptx", "Report-english.html", ...]}'
         "400":
           description: Invalid parameters
           content:
@@ -147,7 +147,7 @@ paths:
             type: string
       responses:
         "200":
-          description: A template file docx, pptx or xlsx
+          description: A template file docx, pptx, xlsx or html
           content:
             application/vnd.openxmlformats-officedocument.wordprocessingml.document:
               schema:
@@ -161,14 +161,18 @@ paths:
               schema:
                 type: string
                 format: binary
+            text/html:
+              schema:
+                type: string
+                format: binary
               
         "400":
           description: Invalid parameters
           content:
             application/json:
               examples:
-                docx, xlsx or pptx expected:
-                  value: '"A template is either a pptx, xlsx or a docx document"'
+                docx, xlsx, pptx or html expected:
+                  value: '"A template is either a pptx, xlsx, docx or html document"'
                 no template:
                   value: '"There is no existing templates for this lang"'
         "404":
@@ -219,8 +223,8 @@ paths:
           content:
             application/json:
               examples:
-                docx, xlsx or pptx expected:
-                  value: '"A template is either a pptx, xlsx or a docx document"'
+                docx, xlsx, pptx or html expected:
+                  value: '"A template is either a pptx, xlsx, docx or html document"'
                 no template:
                   value: '"There is no existing templates for this lang"'
 
@@ -272,7 +276,7 @@ paths:
             application/json:
               examples:
                 unexpected extension:
-                  value: '"Invalid extension for template, must be xlsx, pptx or docx"'
+                  value: '"Invalid extension for template, must be xlsx, pptx, docx or html"'
   "/report/DefectTemplates/import":
     post:
       operationId: pollenisator.server.servermodels.defect.importDefectTemplates
@@ -592,13 +596,17 @@ paths:
               schema:
                 type: string
                 format: binary
+            text/html:
+              schema:
+                type: string
+                format: binary
         "400":
           description: Invalid parameter
           content:
             application/json:
               examples:
                 Invalid extension:
-                  value: '"Invalid extension for template, must be xlsx, pptx or docx"'
+                  value: '"Invalid extension for template, must be xlsx, pptx, docx or html"'
                 No template for lang:
                   value: '"There is no existing templates for this lang"'
         "404":
