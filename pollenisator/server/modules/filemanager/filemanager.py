@@ -623,7 +623,8 @@ def importExistingFileAsync(pentest: str, upfile: werkzeug.datastructures.FileSt
             'results': None,
             'error': None,
             'created_at': current_time,
-            'updated_at': current_time
+            'updated_at': current_time,
+            "pentest": pentest
         }
         _set_task(task_id, task_data)
         
@@ -655,7 +656,7 @@ def importExistingFileAsync(pentest: str, upfile: werkzeug.datastructures.FileSt
         logger.error(traceback.format_exc())
         return f"Error queueing file import: {str(e)}", 500
 
-@permission("pentester")
+@permission("user")
 def getImportTaskStatus(task_id: str) -> Union[ImportTaskStatus, ErrorStatus]:
     """
     Get the status of an import task.
@@ -673,7 +674,7 @@ def getImportTaskStatus(task_id: str) -> Union[ImportTaskStatus, ErrorStatus]:
     
     return task_info
 
-@permission("pentester")
+@permission("user")
 def getImportTaskResult(task_id: str) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int], ErrorStatus]:
     """
     Get the result of a completed import task.
