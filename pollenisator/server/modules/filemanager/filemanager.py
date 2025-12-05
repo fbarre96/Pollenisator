@@ -722,7 +722,7 @@ def listFilesAll(pentest: str, filetype: FileType) -> Union[ErrorStatus, List[Di
         filetype (FileType): The type of the files to list. (proof, file or result)
 
     Returns:
-       Union[ErrorStatus, List[Dict[str, Any]]]: A list of file documents if successful, otherwise an error message and status code.
+        Union[ErrorStatus, List[Dict[str, Any]]]: A list of file documents if successful, otherwise an error message and status code.
     """
     if filetype not in POSSIBLE_TYPES:
         return "Invalid filetype", 400
