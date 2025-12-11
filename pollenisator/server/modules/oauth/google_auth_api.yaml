@@ -1,0 +1,171 @@
+openapi: 3.0.0
+info:
+  description: Google Workspace OAuth authentication endpoints
+  version: 1.0.0
+  title: Google Authentication API
+
+paths:
+  /auth/google/login:
+    get:
+      operationId: pollenisator.server.modules.oauth.google_auth.google_login
+      tags:
+        - Google Authentication
+      summary: Initiate Google OAuth login
+      security: []  # No authentication required for login
+      responses:
+        "302":
+          description: Redirect to Google OAuth consent screen
+        "503":
+          description: Google authentication not configured
+          content:
+            application/json:
+              examples:
+                NotConfigured:
+                  value: 'Google authentication is not configured on this server'
+        "500":
+          description: Failed to initialize authentication
+          content:
+            application/json:
+              examples:
+                InitError:
+                  value: 'Failed to initialize Google authentication'
+
+  /auth/google/callback:
+    get:
+      operationId: pollenisator.server.modules.oauth.google_auth.google_callback
+      tags:
+        - Google Authentication
+      summary: Handle Google OAuth callback
+      security: []  # No authentication required for callback
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Authorization code from Google
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+          description: State token to prevent CSRF
+        - name: error
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Error message from Google if authentication failed
+      responses:
+        "200":
+          description: Successfully authenticated, returns JWT token and user info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: JWT authentication token
+                  mustChangePassword:
+                    type: boolean
+                    description: Always false for OAuth users
+                  username:
+                    type: string
+                    description: Username in Pollenisator
+                  email:
+                    type: string
+                    description: User's email from Google
+                  name:
+                    type: string
+                    description: User's full name from Google
+                  picture:
+                    type: string
+                    description: URL to user's profile picture
+              examples:
+                Success:
+                  value: 
+                    token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    mustChangePassword: false
+                    username: "john.doe"
+                    email: "john.doe@example.com"
+                    name: "John Doe"
+                    picture: "https://lh3.googleusercontent.com/..."
+        "400":
+          description: Invalid state parameter or missing required parameters
+          content:
+            application/json:
+              examples:
+                InvalidState:
+                  value: 'Invalid state parameter'
+        "401":
+          description: Authentication failed
+          content:
+            application/json:
+              examples:
+                NotVerified:
+                  value: 'Email not verified with Google'
+                OAuthError:
+                  value: 'Authentication failed: access_denied'
+                InvalidToken:
+                  value: 'Invalid token'
+        "403":
+          description: Access denied - user not authorized
+          content:
+            application/json:
+              examples:
+                UserNotFound:
+                  value: 'User not found. Please contact administrator to create your account.'
+                DomainRestriction:
+                  value: 'Access restricted to example.com domain'
+        "500":
+          description: Server error during authentication
+          content:
+            application/json:
+              examples:
+                AuthError:
+                  value: 'Authentication error: ...'
+        "503":
+          description: Google authentication not configured
+          content:
+            application/json:
+              examples:
+                NotConfigured:
+                  value: 'Google authentication is not configured on this server'
+
+  /auth/google/status:
+    get:
+      operationId: pollenisator.server.modules.oauth.google_auth.get_google_auth_status
+      tags:
+        - Google Authentication
+      summary: Get Google authentication configuration status
+      security: []  # Public endpoint
+      responses:
+        "200":
+          description: Google authentication configuration status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                    description: Whether Google authentication is configured
+                  domain_restriction:
+                    type: boolean
+                    description: Whether domain restriction is enabled
+                  allowed_domain:
+                    type: string
+                    nullable: true
+                    description: Allowed domain if restriction is enabled
+              examples:
+                Enabled:
+                  value:
+                    enabled: true
+                    domain_restriction: true
+                    allowed_domain: "example.com"
+                Disabled:
+                  value:
+                    enabled: false
+                    domain_restriction: false
+                    allowed_domain: null
