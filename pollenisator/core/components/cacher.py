@@ -45,6 +45,15 @@ class Cacher:
                 "No redis server found, continuing without will slow down the app.")
             self.redis = None
 
+    def isAvailable(self) -> bool:
+        """
+        Check if the Redis cache is available.
+
+        Returns:
+            bool: True if the Redis cache is connected, False otherwise.
+        """
+        return self.redis is not None
+
     def deleteKeyWithPipeline(self, pentest: str, collection: str, pipeline: dict) -> None:
         """
         Delete a key from the Redis cache based on the provided pentest, collection, and pipeline.

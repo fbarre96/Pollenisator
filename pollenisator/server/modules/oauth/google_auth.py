@@ -5,8 +5,9 @@ Module for Google Workspace OAuth authentication.
 """
 
 import os
+import datetime
 from typing import Any, Dict, Optional, Tuple, Union
-from flask import redirect, request, session, url_for
+from flask import redirect, request, url_for
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from google_auth_oauthlib.flow import Flow
@@ -93,8 +94,23 @@ def google_login() -> Union[Any, ErrorStatus]:
     
     # Generate and store state token to prevent CSRF
     state = secrets.token_urlsafe(32)
-    session['oauth_state'] = state
     
+    # Store state token in database with expiration (5 minutes)
+    dbclient = DBClient.getInstance()
+    expires_at = datetime.datetime.now() + datetime.timedelta(minutes=5)
+    if dbclient.cacher.isAvailable():
+        dbclient.cacher.setCacheFromFindResult(f"oauth_state.{state}", {
+            "state": state,
+            "created_at":  datetime.datetime.now() ,
+            "expires_at": expires_at
+        })
+    else:
+        dbclient.insertInDb("pollenisator", "oauth_states", {
+            "state": state,
+            "created_at":  datetime.datetime.now() ,
+            "expires_at": expires_at
+        })
+        
     authorization_url, _ = flow.authorization_url(
         access_type='online',
         state=state,
@@ -115,13 +131,33 @@ def google_callback() -> Union[Any, ErrorStatus]:
         return "Google authentication is not configured on this server", 503
     
     # Verify state token to prevent CSRF
-    state = session.get('oauth_state')
-    if not state or state != request.args.get('state'):
-        logger.warning("OAuth state mismatch - possible CSRF attack")
+    state_from_request = request.args.get('state')
+    if not state_from_request:
+        logger.warning("OAuth callback missing state parameter")
         return "Invalid state parameter", 400
     
-    # Clear the state from session
-    session.pop('oauth_state', None)
+    # Verify state token exists in database and is not expired
+    dbclient = DBClient.getInstance()
+    state_record = None
+    if dbclient.cacher.isAvailable():
+        state_record, _ = dbclient.cacher.cacheGet(f"oauth_state.{state_from_request}", {}, False)
+    if state_record is None:
+        state_record = dbclient.findInDb("pollenisator", "oauth_states", {"state": state_from_request}, False)
+    
+    if state_record is None:
+        logger.warning("OAuth state not found in database - possible CSRF attack or expired state")
+        return "Invalid or expired state parameter", 400
+    
+    # Check if state has expired
+    expires_at = state_record.get("expires_at")
+    if expires_at and isinstance(expires_at, datetime.datetime):
+        if datetime.datetime.now() > expires_at:
+            logger.warning("OAuth state has expired")
+            dbclient.deleteFromDb("pollenisator", "oauth_states", {"state": state_from_request}, False)
+            return "State token has expired, please try again", 400
+    
+    # State is valid, delete it (one-time use)
+    dbclient.deleteFromDb("pollenisator", "oauth_states", {"state": state_from_request}, False)
     
     # Check for errors from Google
     error = request.args.get('error')
@@ -259,3 +295,31 @@ def get_google_auth_status() -> Dict[str, Any]:
         "domain_restriction": bool(GOOGLE_WORKSPACE_DOMAIN),
         "allowed_domain": GOOGLE_WORKSPACE_DOMAIN if GOOGLE_WORKSPACE_DOMAIN else None
     }
+
+
+def cleanup_expired_oauth_states() -> int:
+    """
+    Clean up expired OAuth state tokens from the database.
+    This should be called periodically (e.g., via a cron job or background task).
+    
+    Returns:
+        int: Number of expired states deleted.
+    """
+    dbclient = DBClient.getInstance()
+    now = datetime.datetime.now()
+    
+    # Find all expired states
+    expired_states = dbclient.findInDb("pollenisator", "oauth_states", {
+        "expires_at": {"$lt": now}
+    }, True)
+    
+    count = 0
+    if expired_states:
+        for state_record in expired_states:
+            dbclient.deleteFromDb("pollenisator", "oauth_states", {"_id": state_record["_id"]}, False)
+            count += 1
+    
+    if count > 0:
+        logger.info(f"Cleaned up {count} expired OAuth state tokens")
+    
+    return count
