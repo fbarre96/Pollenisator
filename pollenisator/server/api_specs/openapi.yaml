@@ -63,6 +63,11 @@ components:
           schema:
             $ref: "#/components/schemas/DefectTemplate"
       required: true
+    DefectTemplateSearch:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/DefectTemplateSearch"
     Tags:
       content:
         application/json:
@@ -403,6 +408,94 @@ components:
           type: array
           items:
             type: string
+    DefectTemplateSearch:
+      properties:
+        common_translation_id:
+          type: string
+        defect_id:
+          type: string
+        title:
+          type: string
+          minLength: 2
+        synthesis:
+          type: string
+        impacts:
+          type: string
+        description:
+          type: string
+        ease:
+          type: string
+          enum:
+            - Easy
+            - Moderate
+            - Difficult
+            - Arduous
+            - N/A
+        impact:
+          type: string
+          enum:
+            - Minor
+            - Important
+            - Major
+            - Critical
+            - N/A
+        risk:
+          type: string
+          enum:
+            - Minor
+            - Important
+            - Major
+            - Critical
+            - N/A
+        cvss_string:
+          type: string
+          nullable: true
+        cvss_score:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0.0
+          maximum: 10.0
+        type:
+          type: array
+          items:
+            type: string
+        language:
+          type: string
+        perimeter:
+          type: array
+          items:
+            type: string
+        is_suggestion:
+          type: boolean
+          default: false
+        script:
+          type: string
+          description: Python script code written by a user for this defect template
+        fixes:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              execution:
+                type: string
+                enum:
+                  - Quick Win
+                  - Moderate
+                  - Hard
+              gain:
+                type: string
+                enum:
+                  - Weak
+                  - Moderate
+                  - Mean
+                  - Strong
+              synthesis:
+                type: string
+              title:
+                type: string
     DefectTemplate:
       required:
         - title
@@ -471,6 +564,9 @@ components:
         is_suggestion:
           type: boolean
           default: false
+        script:
+          type: string
+          description: Python script code written by a user for this defect template
         fixes:
           type: array
           items:
@@ -719,6 +815,7 @@ paths:
                       - user
                       - template_writer
                       - report_template_writer
+                      - write_defect_script
       responses:
         '200':
           description: successfully updated user
@@ -2607,6 +2704,23 @@ paths:
       responses:
         "200":
           description: Get defect history as list of defects data
+
+  "/report/DefectTemplates/{defect_template_iid}/history":
+    get:
+      operationId: pollenisator.server.servermodels.defect.getDefectTemplateHistory
+      tags:
+        - DefectTemplates
+      summary: Get defect template history
+      parameters:
+        - name: defect_template_iid
+          in: path
+          description: defect template iid to get
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get defect template history as list of defect templates data
   "/intervals/{pentest}":
     post:
       operationId: pollenisator.server.servermodels.interval.insert

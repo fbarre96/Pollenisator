@@ -352,7 +352,7 @@ paths:
         - Defect Template
       summary: Find a Defect template
       requestBody:
-         $ref: "#/components/requestBodies/DefectTemplate"
+         $ref: "#/components/requestBodies/DefectTemplateSearch"
       responses:
         "200":
           description: a indicator of success

@@ -6,7 +6,7 @@ import inspect
 from pollenisator.server.token import checkTokenValidity
 # permission decorator
 
-all_permissions = ["admin", "user", "owner", "pentester", "template_writer", "worker", "report_template_writer"]
+all_permissions = ["admin", "user", "owner", "pentester", "template_writer", "worker", "report_template_writer", "write_defect_script"]
 
 def checkPentestPermission(token_info: dict[str, Any], pentest: str, check_owner: bool) -> bool:
     """

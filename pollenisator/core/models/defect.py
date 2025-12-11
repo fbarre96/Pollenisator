@@ -41,7 +41,7 @@ class Defect(Element):
                 A mongo fetched defect is optimal. Possible keys with default values are : _id (None), , parent (None), 
                 infos({}), defect_id(None), common_translation_id(None), target_id, target_type, title(""), synthesis(""), impacts(""), description(""), ease(""), impact(""), 
                 risk(""), cvss_score(0.0), cvss_string(""), redactor("N/A"), type([]),  language(""), notes(""), proofs([]), fixes([]), creation_time, 
-                redacted_state("New"), editor="", infos, index(None),  perimeter([]). Defaults to None.
+                redacted_state("New"), editor="", infos, index(None),  perimeter([]), script(""). Defaults to None.
         """
         if valuesFromDb is None:
             valuesFromDb = {}
@@ -64,14 +64,14 @@ class Defect(Element):
                             valuesFromDb.get("fixes", []), valuesFromDb.get("creation_time", None), valuesFromDb.get("redacted_state", "New"),
                             valuesFromDb.get("editor", ""),
                             valuesFromDb.get("infos", {}),
-                            valuesFromDb.get("index", 0), valuesFromDb.get("perimeter", []))
+                            valuesFromDb.get("index", 0), valuesFromDb.get("perimeter", []), valuesFromDb.get("script", ""))
 
     def initialize(self, defect_id: Optional[str] = None, common_translation_id: Optional[str] = None, target_id: Optional[ObjectId] = None, target_type: str = "", title: str = "", synthesis: str = "",
                    impacts: str= "", description: str = "", ease: str = "", impact: str = "", risk: str = "", cvss_score: float = 0.0, cvss_string: str = "", redactor: str = "N/A",
                    mtype: Optional[Union[str, List[str]]] = None, language: str = "", notes: str = "",
                    proofs: Optional[List[str]] = None, fixes: Optional[List[Dict[str, Any]]] = None,
                    creation_time: Optional[datetime] = None, redacted_state: str = "New", editor="", infos: Optional[Dict[str, Any]] = None,
-                   index: int = 0, perimeter: Optional[List[str]] = None) -> 'Defect':
+                   index: int = 0, perimeter: Optional[List[str]] = None, script: str = "") -> 'Defect':
         """
         Set values of defect.
 
@@ -101,6 +101,7 @@ class Defect(Element):
             infos (Optional[Dict[str, Any]], optional): A dictionary with key values as additional information. Default to None.
             index (int, optional): The index of this defect in global defect table (only for unassigned defect). Defaults to 0.
             perimeter (Optional[List[str]], optional): A list of perimeters for this defect. Defaults to None.
+            script (str, optional): A Python script code written by a user for this defect template. Defaults to "".
         Returns:
             Defect: This object.
         """
@@ -139,6 +140,7 @@ class Defect(Element):
         self.creation_time = datetime.now() if creation_time is None else creation_time
         self.redacted_state = "New" if redacted_state is None or redacted_state == "" else redacted_state
         self.editor = "" if editor is None else editor
+        self.script = script if script is not None else ""
         self.repr_string = self.getDetailedString()
 
         return self
@@ -150,13 +152,13 @@ class Defect(Element):
         Returns:
             Dict[str,Any]: A dictionary with keys title, 
             defect_id, common_translation_id, synthesis, impacts, description, ease, impact, risk, cvss_score, cvss_string, redactor, type, language, notes, target_id, target_type, index, 
-            proofs, creation_time, redacted_state, editor, fixes, _id, infos.
+            proofs, creation_time, redacted_state, editor, fixes, _id, infos, script.
         """
 
         return {"defect_id": self.defect_id,  "common_translation_id": self.common_translation_id, "title": self.title, "synthesis":self.synthesis, "impacts":self.impacts, "description":self.description, "ease": self.ease, "impact": self.impact,
                 "risk": self.risk, "cvss_score":self.cvss_score, "cvss_string":self.cvss_string, "redactor": self.redactor, "type": self.mtype, "language":self.language, "notes": self.notes,
                 "target_id": self.target_id, "target_type": self.target_type, "index":int(self.index),
-                "proofs": self.proofs, "creation_time": self.creation_time, "redacted_state":self.redacted_state, "editor":self.editor, "fixes":self.fixes, "perimeter":self.perimeter, "_id": self.getId(), "infos": self.infos}
+                "proofs": self.proofs, "creation_time": self.creation_time, "redacted_state":self.redacted_state, "editor":self.editor, "fixes":self.fixes, "perimeter":self.perimeter, "_id": self.getId(), "infos": self.infos, "script": self.script}
 
     @classmethod
     def getSearchableTextAttribute(cls) -> List[str]:
@@ -415,7 +417,45 @@ class Defect(Element):
             globalDefect = cast(Defect, globalDefect)
             if int(globalDefect.index) > int(self.index):
                 globalDefect.update_index(int(globalDefect.index)-1)
+
+    @classmethod
+    def save_template_history(cls, defect_iid: ObjectId, username: str) -> None:
+        """
+            Save the current version of a template defect in the database under the version collection.
+
+            Args:
+                defect_iid (ObjectId): The ObjectId of the template defect.
+                username (str): The username of the user saving the history.
+        """
+        dbclient = DBClient.getInstance()
+        data = dbclient.findInDb("pollenisator", "defects", {"_id": ObjectId(defect_iid)}, False)
+        if data is None:
+            raise ValueError("Defect not found")
+        if "_id" in data:
+            data["history_defect_iid"] = ObjectId(data["_id"])
+            del data["_id"]
+        data["date"] = datetime.now()
+        data["editor"] = username
+        dbclient.insertInDb("pollenisator", "defects_history", data)
         
+    @classmethod    
+    def get_template_history(cls, defect_iid: ObjectId) -> List[Dict[str, Any]]:
+        """
+        Get the history of a template defect.
+
+        Args:
+            defect_iid (ObjectId): The ObjectId of the template defect.
+
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries representing the history of the template defect.
+        """
+        dbclient = DBClient.getInstance()
+        history = dbclient.findInDb("pollenisator", "defects_history", {"history_defect_iid": ObjectId(defect_iid)}, multi=True)
+        if history is None:
+            return []
+        
+        return [x for x in history]
+
     def save_history(self, username: str) -> None:
         """
             Save the current version in the database under the version collection.
@@ -453,7 +493,6 @@ class Defect(Element):
         
         return [x for x in history]
     
-        
     def save_review(self, data) -> None:
         """
         Save current version in the database under the version collection.

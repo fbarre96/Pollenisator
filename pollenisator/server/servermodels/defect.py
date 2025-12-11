@@ -270,6 +270,23 @@ def getDefectHistory(pentest: str, defect_iid: str) -> Union[ErrorStatus,List[Di
     defect = cast(Defect, defect)
     return defect.get_history()
 
+@permission("user")
+def getDefectTemplateHistory(defect_template_iid: str) -> Union[ErrorStatus,List[Dict[str, Any]]]:
+    """
+    Get the history of a defect template. The history includes all changes made to the defect template.
+
+    Args:
+        defect_template_iid (str): The id of the defect template.
+
+    Returns:
+        List[Dict[str, Any]]: A list of dictionaries, each representing a version of the defect template. The versions are ordered by their index.
+    """
+    defect = Defect.fetchObject("pollenisator", {"_id":ObjectId(defect_template_iid)})
+    if defect is None:
+        return "Not found", 404
+    defect = cast(Defect, defect)
+    return Defect.get_template_history(str(defect.getId()))
+
 
 @permission("user")
 def update_template_suggestion(defect_iid: str, body: Dict[str, Any], username: str) -> Union[bool, Tuple[str, int]]:
@@ -485,7 +502,7 @@ def findDefectSuggestions(body: Dict[str, Any]) -> Union[ErrorStatus, returnDefe
     return {"answers": [x for x in res]}
 
 @permission("user")
-def findDefectTemplate(body: Dict[str, Any]) -> Union[Dict[str, Any], Tuple[str, int]]:
+def findDefectTemplate(body: Dict[str, Any], **kwargs) -> Union[Dict[str, Any], Tuple[str, int]]:
     """
     Find a defect template in the "pollenisator" database using a set of criteria. If the "_id" field is present in the 
     criteria, it is converted to an ObjectId.
@@ -506,7 +523,7 @@ def findDefectTemplate(body: Dict[str, Any]) -> Union[Dict[str, Any], Tuple[str,
     return  "No defect template found with this criteria", 404
 
 @permission("user")
-def findDefectTemplatesByIds(body: Dict[str, Any]) -> Union[Dict[str, Dict[str, Any]], Tuple[str, int]]:
+def findDefectTemplatesByIds(body: Dict[str, Any], **kwargs) -> Union[Dict[str, Dict[str, Any]], Tuple[str, int]]:
     """
     Find many defects template in the "pollenisator" database using a set of criteria. If the "_id" field is present in the 
     criteria, it is converted to an ObjectId.
@@ -547,6 +564,14 @@ def insertDefectTemplate(body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Unio
     defect_types = body.get("type", [])
     if defect_types is None or not isinstance(defect_types, list) or len(defect_types) == 0:
         return "Defect type must be a non empty list", 400
+    
+    # Handle script field - only users with write_defect_script permission can add scripts
+    if "script" in body and body.get("script", ""):
+        if "write_defect_script" not in kwargs["token_info"]["scope"]:
+            return "Forbidden: write_defect_script permission required to add scripts to defect templates", 403
+    else:
+        # Ensure script field is empty if not provided or if user doesn't have permission
+        body["script"] = ""
     
     if is_suggestion:
         res = insert_template_suggestion("pollenisator", body, kwargs["token_info"]["sub"])
@@ -632,7 +657,9 @@ def validateDefectTemplate(iid: str, **kwargs) -> Union[bool, Tuple[str, int]]:
     """
     username = kwargs["token_info"]["sub"]
     dbclient = DBClient.getInstance()
-    suggestion = dbclient.findInDb("pollenisator", "defectssuggestions", {"defect_id":iid}, False)
+    if iid.startswith("ObjectId|"):
+        iid = iid[9:]
+    suggestion = dbclient.findInDb("pollenisator", "defectssuggestions", {"_id":ObjectId(iid)}, False)
     if suggestion is None:
         return "Not found", 404
     language = suggestion.get("language", "")
@@ -641,14 +668,16 @@ def validateDefectTemplate(iid: str, **kwargs) -> Union[bool, Tuple[str, int]]:
     existing = dbclient.findInDb("pollenisator", "defects", {"$or":[{"_id":ObjectId(suggestion.get("_id")), "language":language}, {"title": suggestion.get("title"), "language":language}]}, False)
     if existing is not None:
         suggestion["suggestion_type"] = "update"
-        doUpdate("pollenisator", str(suggestion.get("_id")), suggestion, username, True)
+        Defect.save_template_history(str(existing.get("_id")), username)
+        doUpdate("pollenisator", str(existing.get("_id")), suggestion, username, True)
     else:
         suggestion["suggestion_type"] = "insert"
         res = doInsert("pollenisator", suggestion, username)
         if not res["res"]:
             return res
-    dbclient.deleteFromDb("pollenisator", "defectssuggestions", {"defect_id":iid})
+    dbclient.deleteFromDb("pollenisator", "defectssuggestions", {"_id":ObjectId(iid)})
     return True
+
 
 @permission("user")
 def updateDefectTemplate(iid: str, body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[bool, Tuple[str, int]]:
@@ -663,6 +692,19 @@ def updateDefectTemplate(iid: str, body: Dict[str, Any], **kwargs: Dict[str, Any
         Union[bool, Tuple[str, int]]: True if the operation was successful, otherwise a tuple containing an error message 
         and status code.
     """
+    # Handle script field - only users with write_defect_script permission can modify scripts
+    if "script" in body:
+        if body.get("script", "") and "write_defect_script" not in kwargs["token_info"]["scope"]:
+            return "Forbidden: write_defect_script permission required to modify scripts in defect templates", 403
+        # If user doesn't have permission and script is empty string, it's fine (removing script)
+        if not body.get("script", "") and "write_defect_script" not in kwargs["token_info"]["scope"]:
+            # User is trying to remove script, check if they have permission by checking existing script
+            dbclient = DBClient.getInstance()
+            existing = dbclient.findInDb("pollenisator", "defects", {"_id": ObjectId(iid)}, False)
+            if existing is not None and existing.get("script", ""):
+                # There's an existing script, user needs permission to modify/remove it
+                return "Forbidden: write_defect_script permission required to modify scripts in defect templates", 403
+    
     # is_suggestion = "admin" not in kwargs["token_info"]["scope"] and "template_writer" not in kwargs["token_info"]["scope"] or body.get("is_suggestion", False)
     # res: Union[bool, Tuple[str, int]]
     # if is_suggestion:
