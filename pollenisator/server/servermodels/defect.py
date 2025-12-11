@@ -462,6 +462,7 @@ def getDefectSuggestion(suggestion_iid: str) -> Union[Dict[str, Any], Tuple[str,
     suggestion = dbclient.findInDb("pollenisator", "defectssuggestions", {"_id":ObjectId(suggestion_iid)}, False)
     if suggestion is None:
         return "Not found", 404
+    suggestion["is_suggestion"] = True
     return suggestion
 
 returnDefectSuggestionsType = TypedDict('returnDefectSuggestionsType', {'answers': List[Dict[str, Any]]})
