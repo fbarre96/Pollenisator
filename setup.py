@@ -170,7 +170,7 @@ setup(
     # MANIFEST.in as well.
     include_package_data=True,
     package_data={  # Optional
-        '': ['requirements.txt', ],
+        '': ['requirements.txt', '*.env' ],
 		
     },
 

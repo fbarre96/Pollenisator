@@ -4,8 +4,12 @@ Start api server
 
 # ENABLE debug mode early because evenlet monkey patch other libs
 import os
-
+from dotenv import load_dotenv
+import pathlib
 debug = bool(os.environ.get("FLASK_DEBUG", False))
+env_path = pathlib.Path(__file__).resolve().parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
 if debug:
     async_mode = "threading" # Be aware thats sockets does not seems to work when debugging
 else:

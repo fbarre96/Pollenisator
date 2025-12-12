@@ -26,6 +26,7 @@ ruamel.yaml
 redis[hiredis]
 typing-extensions
 unidecode
+python-dotenv
 google-auth
 google-auth-oauthlib 
 google-auth-httplib2
