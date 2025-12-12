@@ -7,4 +7,4 @@ recursive-include pollenisator/Templates *.docx
 recursive-include pollenisator/Templates *.json
 include pollenisator/server/api_specs/openapi.yaml
 include pollenisator/Templates/en/Modele.docx
-include pollenisator/ *.env
+recursive-include pollenisator *.env
