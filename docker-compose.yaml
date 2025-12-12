@@ -12,7 +12,7 @@ services:
     environment:
       - POLLENISATOR_NON_INTERACTIVE=1
     env_file:
-      - .env
+      - pollenisator/.env
   mongodb:
     image: mongo:4.4.7
     ports:
