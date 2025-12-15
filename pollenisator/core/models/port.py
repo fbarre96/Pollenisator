@@ -184,7 +184,7 @@ class Port(Element):
 
     @classmethod
     def replaceCommandVariables(cls, pentest: str, command: str, data: Dict[str, Any]) -> str:
-        command = command.replace("|port|", data.get("port", ""))
+        command = command.replace("|port|", str(data.get("port", "")))
         command = command.replace("|port.proto|", data.get("proto", ""))
         if data.get("ip") is not None:
             command = command.replace("|ip_port|", data.get("ip", "")+":"+data.get("port", ""))
