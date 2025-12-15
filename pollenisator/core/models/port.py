@@ -72,7 +72,7 @@ class Port(Element):
         Returns:
             dict with keys ip, port, proto, service, product, notes, _id,  infos
         """
-        return {"ip": self.ip, "port": self.port, "proto": self.proto,
+        return {"ip": self.ip, "port": str(self.port), "proto": self.proto,
                 "service": self.service, "product": self.product, "notes": self.notes, "_id": self.getId(), "infos": self.infos}
 
     def __str__(self):
@@ -187,16 +187,16 @@ class Port(Element):
         command = command.replace("|port|", str(data.get("port", "")))
         command = command.replace("|port.proto|", data.get("proto", ""))
         if data.get("ip") is not None:
-            command = command.replace("|ip_port|", data.get("ip", "")+":"+data.get("port", ""))
+            command = command.replace("|ip_port|", data.get("ip", "")+":"+str(data.get("port", "")))
         if data.get("port") is None or data.get("ip") is None:
             return command
         dbclient = DBClient.getInstance()
-        port_db = dbclient.findInDb(pentest, "ports", {"port":data.get("port") , "proto":data.get("proto", "tcp") , "ip":data.get("ip") }, False)
+        port_db = dbclient.findInDb(pentest, "ports", {"port":str(data.get("port")) , "proto":data.get("proto", "tcp") , "ip":data.get("ip") }, False)
         if port_db is None:
             return command
         command = command.replace("|port.service|", port_db.get("service", ""))
         command = command.replace("|port.product|", port_db.get("product",""))
-        port = data.get("port")
+        port =str(data.get("port"))
         is_ssl = "ssl" in port_db.get("service", "") or "https" in port_db.get("service", "") or port_db.get("infos", {}).get("SSL", False) is True or str(port) in ["443", "8443", "9443"]
         command = command.replace("|url|", ("https" if is_ssl else "http")+"://"+data.get("ip", "")+ (":"+str(port) if str(port) != "" else ""))
         port_infos = port_db.get("infos", {})
