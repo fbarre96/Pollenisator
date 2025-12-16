@@ -317,7 +317,7 @@ def login(body: Dict[str, str]) -> Union[Any, ErrorStatus]:
             # Set token in httpOnly cookie and return mustChangePassword flag
             logger.info(f"User {username} successfully logged in")
             token = getTokenFor(username)
-            response = make_response(jsonify({"token":token, "mustChangePassword": user_record.get("mustChangePassword", True)}))
+            response = make_response( jsonify({"token":token, "mustChangePassword": user_record.get("mustChangePassword", True)}))
             response.set_cookie(
                 'session_token', 
                 token,
@@ -368,11 +368,12 @@ def connectToPentest(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union
     """
     username = kwargs["token_info"]["sub"]
     dbclient = DBClient.getInstance()
+    logger.debug(f"User {username} is trying to connect to pentest {pentest}")
     if pentest not in dbclient.listPentestUuids():
-        return "Pentest not found", 404
+        return "Pentest not found in pentests list", 404
     pentest_rec = dbclient.findInDb("pollenisator", "pentests", {"uuid":pentest}, False)
     if pentest_rec is None:
-        return "Pentest not found", 404
+        return "Pentest record not found", 404
     pentest_name =  pentest_rec["nom"]
     testers = dbclient.getPentestUsers(pentest)
     token = kwargs.get("token_info", {})
