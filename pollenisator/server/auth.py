@@ -371,7 +371,7 @@ def connectToPentest(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union
     logger.debug(f"User {username} is trying to connect to pentest {pentest}")
     if pentest not in dbclient.listPentestUuids():
         return "Pentest not found in pentests list", 404
-    pentest_rec = dbclient.findInDb("pollenisator", "pentests", {"uuid":pentest}, False)
+    pentest_rec = dbclient.findInDb("pollenisator", "pentests", {"uuid":pentest}, False, use_cache=False)
     if pentest_rec is None:
         return "Pentest record not found", 404
     pentest_name =  pentest_rec["nom"]
