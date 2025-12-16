@@ -58,9 +58,6 @@ paths:
               schema:
                 type: object
                 properties:
-                  token:
-                    type: string
-                    description: JWT authentication token
                   mustChangePassword:
                     type: boolean
                     description: Always false for OAuth users
