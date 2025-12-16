@@ -262,7 +262,7 @@ def google_callback(code: str, state: str) -> Union[Any, ErrorStatus]:
                 "mustChangePassword": False,  # OAuth users don't need password
                 "scope": ["user"],  # Default user scope
                 "created_via": "google_oauth",
-                "created_at": dbclient.getTimestamp()
+                "created_at": datetime.datetime.now()
             }
             
             # Insert the new user
@@ -275,7 +275,7 @@ def google_callback(code: str, state: str) -> Union[Any, ErrorStatus]:
         # Update last login and OAuth info
         update_data = {
             "last_login_provider": "google",
-            "last_login": dbclient.getTimestamp(),
+            "last_login": datetime.datetime.now(),
             "google_id": google_user_id,
             "picture": picture
         }
