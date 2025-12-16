@@ -197,5 +197,6 @@ class Cacher:
             return return_value
         except redis.exceptions.ConnectionError as e:
             logger.warning("Failed to set to redis, connection error %s", e)
+            self.redis = None
             return None
         

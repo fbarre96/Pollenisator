@@ -717,7 +717,7 @@ class DBClient:
         dbMongo: pymongo.database.Database[Any] = self.client[db]
         find_res: Union[pymongo.cursor.Cursor, None, List[Dict[str, Any]]] =  self._find(dbMongo, collection, pipeline, multi, skip, limit)
         if cache_key is not None and find_res:
-            return self.cacher.setCacheFromFindResult(cache_key, find_res)
+            self.cacher.setCacheFromFindResult(cache_key, find_res)
         return find_res
 
     def fetchNotifications(self, pentest: str, fromTime: str) -> List[Dict[str, Any]]:
