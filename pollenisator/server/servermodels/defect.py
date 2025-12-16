@@ -566,11 +566,13 @@ def insertDefectTemplate(body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Unio
     if defect_types is None or not isinstance(defect_types, list) or len(defect_types) == 0:
         return "Defect type must be a non empty list", 400
     
-    del body["script"]
+    
     
     if is_suggestion:
         res = insert_template_suggestion("pollenisator", body, kwargs["token_info"]["sub"])
     else:
+        if "write_defect_script" not in kwargs["token_info"]["scope"]:
+            del body["script"]
         res = doInsert("pollenisator", body, username)
     return res
 
@@ -691,7 +693,7 @@ def updateDefectTemplate(iid: str, body: Dict[str, Any], **kwargs: Dict[str, Any
         and status code.
     """
     # Handle script field - only users with write_defect_script permission can modify scripts
-    if "script" in body:
+    if "script" in body and body.get("is_suggestion", True) is False:
         if body.get("script", "") and "write_defect_script" not in kwargs["token_info"]["scope"]:
             return "Forbidden: write_defect_script permission required to modify scripts in defect templates", 403
         # If user doesn't have permission and script is empty string, it's fine (removing script)
