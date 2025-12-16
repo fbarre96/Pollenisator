@@ -50,12 +50,6 @@ paths:
           schema:
             type: string
           description: State token to prevent CSRF
-        - name: error
-          in: query
-          required: false
-          schema:
-            type: string
-          description: Error message from Google if authentication failed
       responses:
         "200":
           description: Successfully authenticated, returns JWT token and user info
