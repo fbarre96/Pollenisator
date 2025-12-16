@@ -665,7 +665,8 @@ def validateDefectTemplate(iid: str, **kwargs) -> Union[bool, Tuple[str, int]]:
     existing = dbclient.findInDb("pollenisator", "defects", {"$or":[{"_id":ObjectId(suggestion.get("_id")), "language":language}, {"title": suggestion.get("title"), "language":language}]}, False)
     
     if existing.get("script", "") != suggestion.get("script", "") and "write_defect_script" not in kwargs["token_info"]["scope"]:
-        return "Forbidden: write_defect_script permission required to validate templates with scripts", 403
+        suggestion["script"] = existing.get("script", "")
+        
     if existing is not None:
         suggestion["suggestion_type"] = "update"
         Defect.save_template_history(str(existing.get("_id")), username)
