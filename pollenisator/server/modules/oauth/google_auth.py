@@ -13,7 +13,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from google_auth_oauthlib.flow import Flow
 from pollenisator.core.components.mongo import DBClient
-from pollenisator.server.token import getTokenFor
+from pollenisator.server.token import getTokenFor, decode_token
 from pollenisator.core.components.logger_config import logger
 from flask import Response, make_response, jsonify
 import secrets
@@ -285,6 +285,8 @@ def google_callback(code: str, state: str) -> Union[Any, ErrorStatus]:
         username = user_record["username"]
         logger.info(f"User {username} ({email}) successfully logged in via Google")
         token = getTokenFor(username)
+        decoded_token = decode_token(token)
+        
         
         # Set token in httpOnly cookie
         response = make_response(jsonify({
@@ -293,7 +295,8 @@ def google_callback(code: str, state: str) -> Union[Any, ErrorStatus]:
             "email": email,
             "name": name,
             "picture": picture,
-            "scopes": user_record.get("scope", [])
+            "session_expiration": decoded_token.get("exp", 0),
+            "scopes": decoded_token.get("scope", [])
         }))
         response.set_cookie(
             'session_token',
