@@ -504,6 +504,7 @@ components:
         - impact
         - risk
         - type
+        - language
       properties:
         common_translation_id:
           type: string
