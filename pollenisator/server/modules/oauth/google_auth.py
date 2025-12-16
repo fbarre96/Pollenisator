@@ -288,7 +288,6 @@ def google_callback(code: str, state: str) -> Union[Any, ErrorStatus]:
         
         # Set token in httpOnly cookie
         response = make_response(jsonify({
-            "token": token,
             "mustChangePassword": False,  # OAuth users don't need to change password
             "username": username,
             "email": email,
