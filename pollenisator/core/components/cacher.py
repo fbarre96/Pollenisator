@@ -194,6 +194,8 @@ class Cacher:
         store = json.dumps(return_value, cls=utils.JSONEncoder)
         try:
             self.redis.set(cache_key, store, ex=self.key_expiry)
+            return return_value
         except redis.exceptions.ConnectionError as e:
             logger.warning("Failed to set to redis, connection error %s", e)
-        return return_value
+            return None
+        

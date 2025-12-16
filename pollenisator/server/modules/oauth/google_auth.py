@@ -98,13 +98,14 @@ def google_login() -> Union[Any, ErrorStatus]:
     # Store state token in database with expiration (5 minutes)
     dbclient = DBClient.getInstance()
     expires_at = datetime.datetime.now() + datetime.timedelta(minutes=5)
+    result = None
     if dbclient.cacher.isAvailable():
-        dbclient.cacher.setCacheFromFindResult(f"oauth_state.{state}", {
+        result = dbclient.cacher.setCacheFromFindResult(f"oauth_state.{state}", {
             "state": state,
             "created_at":  datetime.datetime.now() ,
             "expires_at": expires_at
         })
-    else:
+    if result is None:
         dbclient.insertInDb("pollenisator", "oauth_states", {
             "state": state,
             "created_at":  datetime.datetime.now() ,
