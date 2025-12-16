@@ -292,7 +292,8 @@ def google_callback(code: str, state: str) -> Union[Any, ErrorStatus]:
             "username": username,
             "email": email,
             "name": name,
-            "picture": picture
+            "picture": picture,
+            "scopes": user_record.get("scope", [])
         }))
         response.set_cookie(
             'session_token',

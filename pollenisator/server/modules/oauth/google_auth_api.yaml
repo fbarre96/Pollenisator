@@ -73,6 +73,11 @@ paths:
                   picture:
                     type: string
                     description: URL to user's profile picture
+                  scopes:
+                    type: array
+                    items:
+                      type: string
+                    description: List of scopes assigned to the user
               examples:
                 Success:
                   value: 
