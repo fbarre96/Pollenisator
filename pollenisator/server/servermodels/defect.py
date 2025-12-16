@@ -566,13 +566,7 @@ def insertDefectTemplate(body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Unio
     if defect_types is None or not isinstance(defect_types, list) or len(defect_types) == 0:
         return "Defect type must be a non empty list", 400
     
-    # Handle script field - only users with write_defect_script permission can add scripts
-    if "script" in body and body.get("script", ""):
-        if "write_defect_script" not in kwargs["token_info"]["scope"]:
-            return "Forbidden: write_defect_script permission required to add scripts to defect templates", 403
-    else:
-        # Ensure script field is empty if not provided or if user doesn't have permission
-        body["script"] = ""
+    del body["script"]
     
     if is_suggestion:
         res = insert_template_suggestion("pollenisator", body, kwargs["token_info"]["sub"])
@@ -667,6 +661,9 @@ def validateDefectTemplate(iid: str, **kwargs) -> Union[bool, Tuple[str, int]]:
     if language == "":
         return "The suggestion has no language, cannot validate it", 400
     existing = dbclient.findInDb("pollenisator", "defects", {"$or":[{"_id":ObjectId(suggestion.get("_id")), "language":language}, {"title": suggestion.get("title"), "language":language}]}, False)
+    
+    if existing.get("script", "") != suggestion.get("script", "") and "write_defect_script" not in kwargs["token_info"]["scope"]:
+        return "Forbidden: write_defect_script permission required to validate templates with scripts", 403
     if existing is not None:
         suggestion["suggestion_type"] = "update"
         Defect.save_template_history(str(existing.get("_id")), username)
