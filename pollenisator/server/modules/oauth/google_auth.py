@@ -140,7 +140,7 @@ def google_callback() -> Union[Any, ErrorStatus]:
     dbclient = DBClient.getInstance()
     state_record = None
     if dbclient.cacher.isAvailable():
-        state_record, _ = dbclient.cacher.getCacheFromFindResult(f"oauth_state.{state_from_request}")
+        state_record = dbclient.cacher.getCacheFromFindResult(f"oauth_state.{state_from_request}")
     if state_record is None:
         state_record = dbclient.findInDb("pollenisator", "oauth_states", {"state": state_from_request}, False)
     
