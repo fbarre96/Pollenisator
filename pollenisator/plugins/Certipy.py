@@ -186,18 +186,18 @@ def process_certificate_templates(pentest, templates_data, ip_o):
                     "vulnerability": vuln_type,
                     "description": vuln_desc
                 })
-            
+            ip_o.updateInfos({"vulnerable_adcs_templates": vulnerable_templates})
             # Add high priority tag if vulnerabilities exist
             if enabled:
                 if ip_o is not None:
-                    ip_o.addTag(Tag("certipy-vulnerable-template", "red", level="critical"))
+                    ip_o.addTag(Tag("certipy-vulnerable-template", "red", level="critical", notes="Vulnerabilities: " + ", ".join(vulnerabilities.keys())))
                 else:
-                    tags.append(Tag("certipy-vulnerable-template", "red", level="critical"))
+                    tags.append(Tag("certipy-vulnerable-template", "red", level="critical", notes="Vulnerabilities: " + ", ".join(vulnerabilities.keys())))
             else:
                 if ip_o is not None:
-                    ip_o.addTag(Tag("certipy-vulnerable-template-disabled", "orange", level="high"))
+                    ip_o.addTag(Tag("certipy-vulnerable-template-disabled", "orange", level="high", notes="Vulnerabilities: " + ", ".join(vulnerabilities.keys())))
                 else:
-                    tags.append(Tag("certipy-vulnerable-template-disabled", "orange", level="high"))
+                    tags.append(Tag("certipy-vulnerable-template-disabled", "orange", level="high", notes="Vulnerabilities: " + ", ".join(vulnerabilities.keys())))
         
         # List key properties
         client_auth = template_info.get("Client Authentication", False)
