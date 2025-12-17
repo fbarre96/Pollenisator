@@ -121,6 +121,7 @@ def insert_template_suggestion(pentest: str, body: Dict[str, Any], username: str
     data = defect.getData()
     data["suggested_by"] = username
     data["creation_time"] = str(datetime.datetime.now())
+    data["visibility"] = body.get("visibility", "me")
     insert_result = dbclient.insertInDb("pollenisator", "defectssuggestions", data)
     if insert_result is None:
         return "An error occured while inserting the defect template suggestion", 500
@@ -664,15 +665,18 @@ def validateDefectTemplate(iid: str, **kwargs) -> Union[bool, Tuple[str, int]]:
         return "The suggestion has no language, cannot validate it", 400
     existing = dbclient.findInDb("pollenisator", "defects", {"$or":[{"_id":ObjectId(suggestion.get("_id")), "language":language}, {"title": suggestion.get("title"), "language":language}]}, False)
     
-    if existing.get("script", "") != suggestion.get("script", "") and "write_defect_script" not in kwargs["token_info"]["scope"]:
-        suggestion["script"] = existing.get("script", "")
-        
+
     if existing is not None:
+        if existing.get("script", "") != suggestion.get("script", "") and "write_defect_script" not in kwargs["token_info"]["scope"]:
+            suggestion["script"] = existing.get("script", "")
+        
         suggestion["suggestion_type"] = "update"
         Defect.save_template_history(str(existing.get("_id")), username)
         doUpdate("pollenisator", str(existing.get("_id")), suggestion, username, True)
     else:
         suggestion["suggestion_type"] = "insert"
+        if suggestion.get("script", "").strip() != "" and "write_defect_script" not in kwargs["token_info"]["scope"]:
+            suggestion["script"] = ""
         res = doInsert("pollenisator", suggestion, username)
         if not res["res"]:
             return res

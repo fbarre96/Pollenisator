@@ -469,6 +469,11 @@ components:
         is_suggestion:
           type: boolean
           default: false
+        visibility:
+          type: string
+          enum:
+            - me
+            - all
         script:
           type: string
           description: Python script code written by a user for this defect template
@@ -565,6 +570,11 @@ components:
         is_suggestion:
           type: boolean
           default: false
+        visibility:
+          type: string
+          enum:
+            - me
+            - all
         script:
           type: string
           description: Python script code written by a user for this defect template
