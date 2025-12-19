@@ -132,8 +132,8 @@ def insert_template_suggestion(pentest: str, body: Dict[str, Any], username: str
 
 def insert_remark(pentest: str, body: Dict[str, Any]) -> RemarkInsertResult:
     """
-    Insert a new remark into the database. If a remark with the same id or title already exists, 
-    the function will return the id of the existing remark.
+    Insert a new remark into the database as a defect with is_remark=True.
+    If a remark with the same defect_id already exists, the function will return the id of the existing remark.
 
     Args:
         pentest (str): The name of the pentest.
@@ -143,18 +143,37 @@ def insert_remark(pentest: str, body: Dict[str, Any]) -> RemarkInsertResult:
         RemarkInsertResult: A dictionary containing the result of the operation and the id of the inserted remark.
     """
     dbclient = DBClient.getInstance()
-    base = {"id":body.get("id", body.get("title", ""))}
-    existing = dbclient.findInDb(pentest, "remarks", base, False)
+    
+    # Prepare the remark as a defect
+    remark_as_defect = dict(body)
+    remark_as_defect["is_remark"] = True
+    
+    # Ensure type is a list
+    if isinstance(remark_as_defect.get("type"), str):
+        remark_as_defect["type"] = [remark_as_defect["type"]]
+    
+    # Map fields appropriately
+    if "description" not in remark_as_defect and "title" in remark_as_defect:
+        remark_as_defect["description"] = remark_as_defect["title"]
+    
+    # Set defect_id based on id or title
+    remark_as_defect["defect_id"] = remark_as_defect.get("id", remark_as_defect.get("defect_id", remark_as_defect.get("title", "")))
+    
+    # Check if it already exists in defects collection
+    base = {"defect_id": remark_as_defect["defect_id"], "is_remark": True}
+    existing = dbclient.findInDb(pentest, "defects", base, False)
     if existing is not None:
-        return {"res":False, "iid":existing["_id"]}
-    body["id"] = body.get("id", body.get("title", ""))
-    ins_result = dbclient.insertInDb(pentest, "remarks", body)
+        return {"res": False, "iid": existing["_id"]}
+    
+    # Insert as a defect
+    ins_result = dbclient.insertInDb(pentest, "defects", remark_as_defect, notify=True)
     iid = ins_result.inserted_id
-    return {"res":True, "iid":iid}
+    return {"res": True, "iid": iid}
 
 def update_remark(pentest: str, remark_iid: ObjectId, body: Dict[str, Any]) -> None:
     """
-    Update a remark in the database using its id. The "_id" field in the body is ignored.
+    Update a remark in the defects collection using its id. The "_id" field in the body is ignored.
+    Remarks are stored as defects with is_remark=True.
 
     Args:
         pentest (str): The name of the pentest.
@@ -162,7 +181,21 @@ def update_remark(pentest: str, remark_iid: ObjectId, body: Dict[str, Any]) -> N
         body (Dict[str, Any]): A dictionary containing the new remark details.
     """
     dbclient = DBClient.getInstance()
-    dbclient.updateInDb(pentest, "remarks", {"_id":ObjectId(remark_iid)}, {"$set":body}, False, True)
+    
+    # Prepare update data
+    update_data = dict(body)
+    if "_id" in update_data:
+        del update_data["_id"]
+    
+    # Ensure is_remark stays True
+    update_data["is_remark"] = True
+    
+    # Ensure type is a list
+    if isinstance(update_data.get("type"), str):
+        update_data["type"] = [update_data["type"]]
+    
+    # Update in defects collection
+    dbclient.updateInDb(pentest, "defects", {"_id": ObjectId(remark_iid)}, {"$set": update_data}, False, True)
 
 @permission("pentester")
 def findInsertPosition(pentest: str, risk: str) -> int:
@@ -385,7 +418,7 @@ def importDefectTemplates(upfile: Any, **kwargs: Dict[str,Any ]) -> Union[Tuple[
     """
     Import defect templates from a JSON file. The file should contain a list of defects and a list of remarks. 
     Each defect and remark is inserted into the "pollenisator" database. If a defect or remark with the same id already exists, 
-    it is updated with the new details.
+    it is updated with the new details. Remarks are stored as defects with is_remark=True.
 
     Args:
         upfile (Any): The uploaded file containing the defect templates.
@@ -404,20 +437,35 @@ def importDefectTemplates(upfile: Any, **kwargs: Dict[str,Any ]) -> Union[Tuple[
         fh.write(json.dumps(export_backup, indent=4, cls=JSONEncoder))
     try:
         file_content = json.loads(upfile.stream.read())
+        
+        # Import regular defects
         defects = file_content.get("defects", [])
         for defect in defects:
-            invalids = ["target_id", "target_type",  "scope"]
+            invalids = ["target_id", "target_type", "scope"]
             for invalid in invalids:
                 if invalid in defect:
                     del defect[invalid]
+            # Ensure is_remark is False for regular defects
+            defect["is_remark"] = False
             res = doInsert("pollenisator", defect, username)
             if not res["res"]:
                 doUpdate("pollenisator", res["iid"], defect, username, True)
+        
+        # Import remarks as defects with is_remark=True
         remarks = file_content.get("remarks", [])
         for remark in remarks:
-            res = insert_remark("pollenisator", remark)
+            # Convert remark to defect format with is_remark=True
+            remark["is_remark"] = True
+            # Ensure type is a list
+            if isinstance(remark.get("type"), str):
+                remark["type"] = [remark["type"]]
+            # Map remark fields to defect fields if needed
+            if "description" not in remark and "title" in remark:
+                remark["description"] = remark["title"]
+            
+            res = doInsert("pollenisator", remark, username)
             if not res["res"]:
-                update_remark("pollenisator", res["iid"], remark)
+                doUpdate("pollenisator", res["iid"], remark, username, True)
     except Exception as e:
         return "Invalid json sent : "+str(e), 400
     return True
@@ -426,6 +474,7 @@ def importDefectTemplates(upfile: Any, **kwargs: Dict[str,Any ]) -> Union[Tuple[
 def exportDefectTemplates(**kwargs: Any) -> ExportDefectTemplates:
     """
     Export all defect and remark templates. The templates are extracted from the "pollenisator" database.
+    Remarks are exported from defects collection where is_remark=True.
 
     Args:
         **kwargs (Any): Additional keyword arguments.
@@ -434,17 +483,22 @@ def exportDefectTemplates(**kwargs: Any) -> ExportDefectTemplates:
         Dict[str, List[Dict[str, Any]]]: A dictionary containing two lists: one for defect templates and one for remark templates.
     """
     dbclient = DBClient.getInstance()
-    templates_defects = dbclient.findInDb("pollenisator", "defects", {}, True)
-    templates_remarks = dbclient.findInDb("pollenisator", "remarks", {}, True)
+    # Get all defects (including those that are remarks)
+    all_defects = dbclient.findInDb("pollenisator", "defects", {}, True)
+    
     res: ExportDefectTemplates = {"defects": [], "remarks": []}
-    for template in templates_defects:
-        t = template
-        del t['_id']
-        res["defects"].append(t)
-    for template in templates_remarks:
-        t = template
-        del t['_id']
-        res["remarks"].append(t)
+    
+    if all_defects is not None:
+        for template in all_defects:
+            t = dict(template)
+            del t['_id']
+            
+            # Separate remarks from regular defects
+            if t.get("is_remark", False):
+                res["remarks"].append(t)
+            else:
+                res["defects"].append(t)
+    
     return res
 
 @permission("user")
@@ -470,7 +524,8 @@ returnDefectSuggestionsType = TypedDict('returnDefectSuggestionsType', {'answers
 @permission("user")
 def findDefectSuggestions(body: Dict[str, Any]) -> Union[ErrorStatus, returnDefectSuggestionsType]:
     """
-    Search for defects  or remarks suggestions in the database based on the given parameters.
+    Search for defects or remarks suggestions in the database based on the given parameters.
+    Remarks are stored in defects collection with is_remark=True.
 
     Args:
         body (Dict[str, str]): A dictionary containing the search parameters. 
@@ -486,21 +541,28 @@ def findDefectSuggestions(body: Dict[str, Any]) -> Union[ErrorStatus, returnDefe
     terms = body.get("terms", "")
     lang = body.get("language", "")
     perimeter = body.get("perimeter", "")
-    if defect_type == "remark":
-        coll = "remarkssuggestions"
-    elif defect_type == "defect":
-        coll = "defectssuggestions"
-    else:
-        return "Invalid parameter: type must be either defect or remark.", 400
+    
     dbclient = DBClient.getInstance()
-    p = {"title":re.compile(terms, re.IGNORECASE)}
+    p = {"title": re.compile(terms, re.IGNORECASE)}
     if lang != "":
         p["language"] = re.compile(lang, re.IGNORECASE)
     if perimeter != "":
         p["perimeter"] = re.compile(perimeter, re.IGNORECASE)
-    res = dbclient.findInDb("pollenisator", coll, p, True)
+    
+    if defect_type == "remark":
+        # Search in defects with is_remark=True
+        p["is_remark"] = True
+        res = dbclient.findInDb("pollenisator", "defectssuggestions", p, True)
+            
+    elif defect_type == "defect":
+        # Search only for non-remark defects
+        p["is_remark"] = {"$ne": True}
+        res = dbclient.findInDb("pollenisator", "defectssuggestions", p, True)
+    else:
+        return "Invalid parameter: type must be either defect or remark.", 400
+    
     if res is None:
-        return {"answers":[]}
+        return {"answers": []}
     return {"answers": [x for x in res]}
 
 @permission("user")

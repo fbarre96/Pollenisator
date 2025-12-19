@@ -46,7 +46,7 @@ class Defect(Element):
                 A mongo fetched defect is optimal. Possible keys with default values are : _id (None), , parent (None), 
                 infos({}), defect_id(None), common_translation_id(None), target_id, target_type, title(""), synthesis(""), impacts(""), description(""), ease(""), impact(""), 
                 risk(""), cvss_score(0.0), cvss_string(""), redactor("N/A"), type([]),  language(""), notes(""), proofs([]), fixes([]), creation_time, 
-                redacted_state("New"), editor="", infos, index(None),  perimeter([]), script(""). Defaults to None.
+                redacted_state("New"), editor="", infos, index(None),  perimeter([]), script(""), is_remark(False). Defaults to None.
         """
         if valuesFromDb is None:
             valuesFromDb = {}
@@ -56,6 +56,7 @@ class Defect(Element):
         self.index = 0
         self.redacted_state = "New"
         self.mtype: Optional[Union[str, List[str]]] = []
+        self.is_remark = False
         if valuesFromDb is not None:
             self.initialize(valuesFromDb.get("defect_id", None), valuesFromDb.get("common_translation_id",None), valuesFromDb.get("target_id", None), valuesFromDb.get("target_type", ""),
                             valuesFromDb.get("title", ""), valuesFromDb.get("synthesis", ""), valuesFromDb.get("impacts", ""), valuesFromDb.get("description", ""),
@@ -69,14 +70,14 @@ class Defect(Element):
                             valuesFromDb.get("fixes", []), valuesFromDb.get("creation_time", None), valuesFromDb.get("redacted_state", "New"),
                             valuesFromDb.get("editor", ""),
                             valuesFromDb.get("infos", {}),
-                            valuesFromDb.get("index", 0), valuesFromDb.get("perimeter", []), valuesFromDb.get("script", ""), valuesFromDb.get("visibility","all"))
+                            valuesFromDb.get("index", 0), valuesFromDb.get("perimeter", []), valuesFromDb.get("script", ""), valuesFromDb.get("visibility","all"), valuesFromDb.get("is_remark", False))
 
     def initialize(self, defect_id: Optional[str] = None, common_translation_id: Optional[str] = None, target_id: Optional[ObjectId] = None, target_type: str = "", title: str = "", synthesis: str = "",
                    impacts: str= "", description: str = "", ease: str = "", impact: str = "", risk: str = "", cvss_score: float = 0.0, cvss_string: str = "", redactor: str = "N/A",
                    mtype: Optional[Union[str, List[str]]] = None, language: str = "", notes: str = "",
                    proofs: Optional[List[str]] = None, fixes: Optional[List[Dict[str, Any]]] = None,
                    creation_time: Optional[datetime] = None, redacted_state: str = "New", editor="", infos: Optional[Dict[str, Any]] = None,
-                   index: int = 0, perimeter: Optional[List[str]] = None, script: str = "", visibility: DEFECT_VISIBILITY = DEFECT_VISIBILITY.ALL) -> 'Defect':
+                   index: int = 0, perimeter: Optional[List[str]] = None, script: str = "", visibility: DEFECT_VISIBILITY = DEFECT_VISIBILITY.ALL, is_remark: bool = False) -> 'Defect':
         """
         Set values of defect.
 
@@ -108,6 +109,7 @@ class Defect(Element):
             perimeter (Optional[List[str]], optional): A list of perimeters for this defect. Defaults to None.
             script (str, optional): A Python script code written by a user for this defect template. Defaults to "".
             visibility (DEFECT_VISIBILITY, optional): The visibility of this defect template. Defaults to DEFECT_VISIBILITY.ALL.
+            is_remark (bool, optional): Whether this is a remark (True) or a regular defect (False). Defaults to False.
         Returns:
             Defect: This object.
         """
@@ -149,6 +151,7 @@ class Defect(Element):
         self.script = script if script is not None else ""
         self.repr_string = self.getDetailedString()
         self.visibility = visibility.value if isinstance(visibility, DEFECT_VISIBILITY) else visibility
+        self.is_remark = is_remark
 
         return self
 
@@ -159,7 +162,7 @@ class Defect(Element):
         Returns:
             Dict[str,Any]: A dictionary with keys title, 
             defect_id, common_translation_id, synthesis, impacts, description, ease, impact, risk, cvss_score, cvss_string, redactor, type, language, notes, target_id, target_type, index, 
-            proofs, creation_time, redacted_state, editor, fixes, _id, infos, script.
+            proofs, creation_time, redacted_state, editor, fixes, _id, infos, script, is_remark.
         """
 
         return {"defect_id": self.defect_id,  "common_translation_id": self.common_translation_id, "title": self.title, "synthesis":self.synthesis, "impacts":self.impacts, "description":self.description, "ease": self.ease, "impact": self.impact,
@@ -167,7 +170,7 @@ class Defect(Element):
                 "target_id": self.target_id, "target_type": self.target_type, "index":int(self.index),
                 "proofs": self.proofs, "creation_time": self.creation_time, "redacted_state":self.redacted_state, 
                 "editor":self.editor, "fixes":self.fixes, "perimeter":self.perimeter, "_id": self.getId(), 
-                "infos": self.infos, "script": self.script, "visibility": self.visibility}
+                "infos": self.infos, "script": self.script, "visibility": self.visibility, "is_remark": self.is_remark}
 
     @classmethod
     def getSearchableTextAttribute(cls) -> List[str]:

@@ -503,99 +503,10 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                common_translation_id:
-                  type: string
-                defect_id:
-                  type: string
-                title:
-                  type: string
-                  minLength: 2
-                synthesis:
-                  type: string
-                impacts:
-                  type: string
-                description:
-                  type: string
-                ease:
-                  type: string
-                  enum:
-                    - Easy
-                    - Moderate
-                    - Difficult
-                    - Arduous
-                    - N/A
-                impact:
-                  type: string
-                  enum:
-                    - Minor
-                    - Important
-                    - Major
-                    - Critical
-                    - N/A
-                risk:
-                  type: string
-                  enum:
-                    - Minor
-                    - Important
-                    - Major
-                    - Critical
-                    - N/A
-                cvss_string:
-                  type: string
-                  nullable: true
-                cvss_score:
-                  type: number
-                  format: float
-                  nullable: true
-                  minimum: 0.0
-                  maximum: 10.0
-                type:
-                  type: array
-                  items:
-                    type: string
-                language:
-                  type: string
-                perimeter:
-                  type: array
-                  items:
-                    type: string
-                is_suggestion:
-                  type: boolean
-                  default: false
-                visibility:
-                  type: string
-                  enum:
-                    - me
-                    - all
-                script:
-                  type: string
-                  description: Python script code written by a user for this defect template
-                fixes:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      description:
-                        type: string
-                      execution:
-                        type: string
-                        enum:
-                          - Quick Win
-                          - Moderate
-                          - Hard
-                      gain:
-                        type: string
-                        enum:
-                          - Weak
-                          - Moderate
-                          - Mean
-                          - Strong
-                      synthesis:
-                        type: string
-                      title:
-                        type: string
+              oneOf:
+                - $ref: "#/components/schemas/RemarkTemplateUpdate"
+                - $ref: "#/components/schemas/DefectTemplateUpdate"
+
               
       responses:
         "200":
