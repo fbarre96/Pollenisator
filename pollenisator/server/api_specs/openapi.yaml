@@ -513,6 +513,7 @@ components:
         - risk
         - type
         - language
+        - is_remark
       properties:
         common_translation_id:
           type: string
@@ -616,6 +617,7 @@ components:
         - description
         - type
         - language
+        - is_remark
       properties:
         common_translation_id:
           type: string
