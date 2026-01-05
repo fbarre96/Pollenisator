@@ -7,12 +7,13 @@ Module for Google Workspace OAuth authentication.
 import os
 import datetime
 from typing import Any, Dict, Optional, Tuple, Union
+from urllib.parse import urlencode, urlparse, urlunparse
 from flask import redirect, request, url_for
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from google_auth_oauthlib.flow import Flow
 from pollenisator.core.components.mongo import DBClient
-from pollenisator.server.token import getTokenFor
+from pollenisator.server.token import getTokenFor, decode_token
 from pollenisator.core.components.logger_config import logger
 from flask import Response, make_response, jsonify
 import secrets
@@ -33,6 +34,39 @@ SCOPES = [
 ]
 
 isdebug = bool(os.environ.get("FLASK_DEBUG", False))
+
+
+def get_authorization_response_url() -> str:
+    """
+    Construct the proper authorization response URL, handling reverse proxy scenarios.
+    
+    When behind a reverse proxy (nginx), Flask may receive internal URLs (http://127.0.0.1:5000)
+    instead of external URLs (https://example.com). This function reconstructs the correct URL
+    using the GOOGLE_REDIRECT_URI or by checking X-Forwarded-* headers.
+    
+    Returns:
+        str: The properly constructed authorization response URL.
+    """
+    # Option 1: Use the configured redirect URI with current query parameters
+    # This is the most reliable method when GOOGLE_REDIRECT_URI is properly configured
+    redirect_uri_parts = urlparse(GOOGLE_REDIRECT_URI)
+    
+    # Get current query parameters from the request
+    query_params = request.args.to_dict()
+    query_string = urlencode(query_params)
+    
+    # Reconstruct the URL using the configured redirect URI
+    authorization_response = urlunparse((
+        redirect_uri_parts.scheme,  # Use scheme from GOOGLE_REDIRECT_URI (https)
+        redirect_uri_parts.netloc,  # Use host from GOOGLE_REDIRECT_URI
+        redirect_uri_parts.path,    # Use path from GOOGLE_REDIRECT_URI
+        '',                          # params (unused)
+        query_string,                # query string from current request
+        ''                           # fragment (unused)
+    ))
+    
+    logger.debug(f"Constructed authorization response URL: {authorization_response}")
+    return authorization_response
 
 
 def is_google_auth_configured() -> bool:
@@ -98,13 +132,14 @@ def google_login() -> Union[Any, ErrorStatus]:
     # Store state token in database with expiration (5 minutes)
     dbclient = DBClient.getInstance()
     expires_at = datetime.datetime.now() + datetime.timedelta(minutes=5)
+    result = None
     if dbclient.cacher.isAvailable():
-        dbclient.cacher.setCacheFromFindResult(f"oauth_state.{state}", {
+        result = dbclient.cacher.setCacheFromFindResult(f"oauth_state.{state}", {
             "state": state,
             "created_at":  datetime.datetime.now() ,
             "expires_at": expires_at
         })
-    else:
+    if result is None:
         dbclient.insertInDb("pollenisator", "oauth_states", {
             "state": state,
             "created_at":  datetime.datetime.now() ,
@@ -120,7 +155,7 @@ def google_login() -> Union[Any, ErrorStatus]:
     return redirect(authorization_url)
 
 
-def google_callback() -> Union[Any, ErrorStatus]:
+def google_callback(code: str, state: str) -> Union[Any, ErrorStatus]:
     """
     Handle the OAuth callback from Google.
     
@@ -140,7 +175,7 @@ def google_callback() -> Union[Any, ErrorStatus]:
     dbclient = DBClient.getInstance()
     state_record = None
     if dbclient.cacher.isAvailable():
-        state_record, _ = dbclient.cacher.cacheGet(f"oauth_state.{state_from_request}", {}, False)
+        state_record = dbclient.cacher.getCacheFromFindResult(f"oauth_state.{state_from_request}")
     if state_record is None:
         state_record = dbclient.findInDb("pollenisator", "oauth_states", {"state": state_from_request}, False)
     
@@ -159,19 +194,14 @@ def google_callback() -> Union[Any, ErrorStatus]:
     # State is valid, delete it (one-time use)
     dbclient.deleteFromDb("pollenisator", "oauth_states", {"state": state_from_request}, False)
     
-    # Check for errors from Google
-    error = request.args.get('error')
-    if error:
-        logger.warning(f"Google OAuth error: {error}")
-        return f"Authentication failed: {error}", 401
-    
     flow = get_google_auth_flow()
     if flow is None:
         return "Failed to initialize Google authentication", 500
-    
     try:
         # Exchange authorization code for tokens
-        flow.fetch_token(authorization_response=request.url)
+        # Use the proper authorization response URL to handle reverse proxy scenarios
+        authorization_response_url = get_authorization_response_url()
+        flow.fetch_token(authorization_response=authorization_response_url)
         credentials = flow.credentials
         
         # Verify the ID token
@@ -232,7 +262,7 @@ def google_callback() -> Union[Any, ErrorStatus]:
                 "mustChangePassword": False,  # OAuth users don't need password
                 "scope": ["user"],  # Default user scope
                 "created_via": "google_oauth",
-                "created_at": dbclient.getTimestamp()
+                "created_at": datetime.datetime.now()
             }
             
             # Insert the new user
@@ -245,7 +275,7 @@ def google_callback() -> Union[Any, ErrorStatus]:
         # Update last login and OAuth info
         update_data = {
             "last_login_provider": "google",
-            "last_login": dbclient.getTimestamp(),
+            "last_login": datetime.datetime.now(),
             "google_id": google_user_id,
             "picture": picture
         }
@@ -255,15 +285,18 @@ def google_callback() -> Union[Any, ErrorStatus]:
         username = user_record["username"]
         logger.info(f"User {username} ({email}) successfully logged in via Google")
         token = getTokenFor(username)
+        decoded_token = decode_token(token)
+        
         
         # Set token in httpOnly cookie
         response = make_response(jsonify({
-            "token": token,
             "mustChangePassword": False,  # OAuth users don't need to change password
             "username": username,
             "email": email,
             "name": name,
-            "picture": picture
+            "picture": picture,
+            "session_expiration": decoded_token.get("exp", 0),
+            "scopes": decoded_token.get("scope", [])
         }))
         response.set_cookie(
             'session_token',

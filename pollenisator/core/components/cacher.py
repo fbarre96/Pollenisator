@@ -146,6 +146,29 @@ class Cacher:
         except redis.exceptions.ConnectionError:
             logger.warning("Failed to get from redis")
         return None, cache_key
+    
+    def getCacheFromFindResult(self, cache_key: str) \
+          -> Union[Dict[str, Any], List[Dict[str, Any]], None, pymongo.cursor.Cursor]:
+        """
+        Retrieve a cached result of a database find operation from Redis.
+        Args:
+            cache_key (str): The key under which the cached result is stored.
+
+        Returns:
+            Union[Dict[str, Any], List[Dict[str, Any]], None, pymongo.cursor.Cursor]: 
+                The cached value if found, otherwise None.
+        """
+        if self.redis is None:
+            return None
+        try:
+            res_redis: Any = self.redis.get(cache_key)
+            if res_redis:
+                res: Union[Dict[str, Any], List[Dict[str, Any]],
+                           None] = json.loads(res_redis, cls=utils.JSONDecoder)
+                return res
+        except redis.exceptions.ConnectionError as e:
+            logger.warning("Failed to get from redis, connection error %s", e)
+        return None
 
     def setCacheFromFindResult(self, cache_key: str, find_result: Union[pymongo.cursor.Cursor, None, List[Dict[str, Any]]])\
           -> Union[Dict[str, Any], List[Dict[str, Any]], None, pymongo.cursor.Cursor]:
@@ -171,6 +194,9 @@ class Cacher:
         store = json.dumps(return_value, cls=utils.JSONEncoder)
         try:
             self.redis.set(cache_key, store, ex=self.key_expiry)
+            return return_value
         except redis.exceptions.ConnectionError as e:
             logger.warning("Failed to set to redis, connection error %s", e)
-        return return_value
+            self.redis = None
+            return None
+        

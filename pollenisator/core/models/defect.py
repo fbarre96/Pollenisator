@@ -6,6 +6,7 @@ import uuid
 import re
 import shutil
 import threading
+import enum
 from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple, Union, cast
 from typing_extensions import TypedDict
 from bson.objectid import ObjectId
@@ -17,6 +18,10 @@ DefectInsertResult = TypedDict('DefectInsertResult', {'res': bool, 'iid': Object
 
 
 sem = threading.Semaphore() 
+
+class DEFECT_VISIBILITY(enum.Enum):
+    ME = 'me'
+    ALL = 'all'
 
 class Defect(Element):
     """
@@ -64,14 +69,14 @@ class Defect(Element):
                             valuesFromDb.get("fixes", []), valuesFromDb.get("creation_time", None), valuesFromDb.get("redacted_state", "New"),
                             valuesFromDb.get("editor", ""),
                             valuesFromDb.get("infos", {}),
-                            valuesFromDb.get("index", 0), valuesFromDb.get("perimeter", []), valuesFromDb.get("script", ""))
+                            valuesFromDb.get("index", 0), valuesFromDb.get("perimeter", []), valuesFromDb.get("script", ""), valuesFromDb.get("visibility","all"))
 
     def initialize(self, defect_id: Optional[str] = None, common_translation_id: Optional[str] = None, target_id: Optional[ObjectId] = None, target_type: str = "", title: str = "", synthesis: str = "",
                    impacts: str= "", description: str = "", ease: str = "", impact: str = "", risk: str = "", cvss_score: float = 0.0, cvss_string: str = "", redactor: str = "N/A",
                    mtype: Optional[Union[str, List[str]]] = None, language: str = "", notes: str = "",
                    proofs: Optional[List[str]] = None, fixes: Optional[List[Dict[str, Any]]] = None,
                    creation_time: Optional[datetime] = None, redacted_state: str = "New", editor="", infos: Optional[Dict[str, Any]] = None,
-                   index: int = 0, perimeter: Optional[List[str]] = None, script: str = "") -> 'Defect':
+                   index: int = 0, perimeter: Optional[List[str]] = None, script: str = "", visibility: DEFECT_VISIBILITY = DEFECT_VISIBILITY.ALL) -> 'Defect':
         """
         Set values of defect.
 
@@ -102,6 +107,7 @@ class Defect(Element):
             index (int, optional): The index of this defect in global defect table (only for unassigned defect). Defaults to 0.
             perimeter (Optional[List[str]], optional): A list of perimeters for this defect. Defaults to None.
             script (str, optional): A Python script code written by a user for this defect template. Defaults to "".
+            visibility (DEFECT_VISIBILITY, optional): The visibility of this defect template. Defaults to DEFECT_VISIBILITY.ALL.
         Returns:
             Defect: This object.
         """
@@ -142,6 +148,7 @@ class Defect(Element):
         self.editor = "" if editor is None else editor
         self.script = script if script is not None else ""
         self.repr_string = self.getDetailedString()
+        self.visibility = visibility.value if isinstance(visibility, DEFECT_VISIBILITY) else visibility
 
         return self
 
@@ -158,7 +165,9 @@ class Defect(Element):
         return {"defect_id": self.defect_id,  "common_translation_id": self.common_translation_id, "title": self.title, "synthesis":self.synthesis, "impacts":self.impacts, "description":self.description, "ease": self.ease, "impact": self.impact,
                 "risk": self.risk, "cvss_score":self.cvss_score, "cvss_string":self.cvss_string, "redactor": self.redactor, "type": self.mtype, "language":self.language, "notes": self.notes,
                 "target_id": self.target_id, "target_type": self.target_type, "index":int(self.index),
-                "proofs": self.proofs, "creation_time": self.creation_time, "redacted_state":self.redacted_state, "editor":self.editor, "fixes":self.fixes, "perimeter":self.perimeter, "_id": self.getId(), "infos": self.infos, "script": self.script}
+                "proofs": self.proofs, "creation_time": self.creation_time, "redacted_state":self.redacted_state, 
+                "editor":self.editor, "fixes":self.fixes, "perimeter":self.perimeter, "_id": self.getId(), 
+                "infos": self.infos, "script": self.script, "visibility": self.visibility}
 
     @classmethod
     def getSearchableTextAttribute(cls) -> List[str]:

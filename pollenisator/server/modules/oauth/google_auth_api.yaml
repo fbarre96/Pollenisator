@@ -50,12 +50,6 @@ paths:
           schema:
             type: string
           description: State token to prevent CSRF
-        - name: error
-          in: query
-          required: false
-          schema:
-            type: string
-          description: Error message from Google if authentication failed
       responses:
         "200":
           description: Successfully authenticated, returns JWT token and user info
@@ -64,9 +58,6 @@ paths:
               schema:
                 type: object
                 properties:
-                  token:
-                    type: string
-                    description: JWT authentication token
                   mustChangePassword:
                     type: boolean
                     description: Always false for OAuth users
@@ -82,6 +73,11 @@ paths:
                   picture:
                     type: string
                     description: URL to user's profile picture
+                  scopes:
+                    type: array
+                    items:
+                      type: string
+                    description: List of scopes assigned to the user
               examples:
                 Success:
                   value: 
