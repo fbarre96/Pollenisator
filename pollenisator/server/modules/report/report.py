@@ -297,7 +297,7 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
     timestr = datetime.now().strftime("%Y%m")
     ext = os.path.splitext(templateName)[-1]
     basename = client_name.strip() + " - "+mission_name.strip()
-    out_name = str(timestr)+" - "+basename
+    out_name = str(timestr)+" - "+basename.replace("/","_").replace("\\","_").replace("..","_")
     templateName = os.path.basename(templateName)
     lang = os.path.basename(lang)
     if not validate_lang(lang):
