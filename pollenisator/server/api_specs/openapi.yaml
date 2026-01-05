@@ -1876,18 +1876,12 @@ paths:
               examples:
                 Not owner of the db:
                   value: '"Forbidden"'
-  "/pentest/{pentest}":
+  "/pentest/createPentest":
     post:
       operationId: pollenisator.server.mongo.registerPentest
       tags:
         - pentest
       summary: Create a pentest
-      parameters:
-        - name: pentest
-          in: path
-          required: true
-          schema:
-            type: string
       requestBody:
         content:
           application/json:
@@ -1899,8 +1893,11 @@ paths:
                 - end_date
                 - scope
                 - settings
+                - pentest
                 - pentesters
               properties:
+                pentest:
+                  type: string
                 pentest_type:
                   type: string
                 start_date:

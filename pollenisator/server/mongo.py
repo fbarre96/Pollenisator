@@ -539,13 +539,13 @@ def deletePentest(pentest: str, **kwargs: Dict[str,Any]) -> ErrorStatus:
         return  "Unknown pentest", 404
 
 @permission("user")
-def registerPentest(pentest: str, body: Dict[str, Any], **kwargs: Dict[str, Any]) ->ErrorStatus:
+def registerPentest(body: Dict[str, Any], **kwargs: Dict[str, Any]) ->ErrorStatus:
     """
     Register a new pentest.
 
     Args:
-        pentest (str): The name of the pentest.
         body (Dict[str,Any]): A dictionary containing the details of the pentest.
+            "pentest" (str): The name of the pentest.
             "pentest_type" (str): The type of the pentest.
             "start_date" (datetime): The start date of the pentest.
             "end_date" (datetime): The end date of the pentest.
@@ -560,7 +560,9 @@ def registerPentest(pentest: str, body: Dict[str, Any], **kwargs: Dict[str, Any]
     username = kwargs["token_info"]["sub"]
 
 
-    pentest = urllib.parse.unquote(pentest)
+    pentest = body.get("pentest", "").strip()
+    if pentest == "":
+        return "Pentest name is required", 400
     dbclient = DBClient.getInstance()
     ret, msg = dbclient.registerPentest(username, pentest, None, False, False)
     if ret:
