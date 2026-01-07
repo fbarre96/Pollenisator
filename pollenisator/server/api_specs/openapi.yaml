@@ -2409,6 +2409,26 @@ paths:
               examples:
                 Success:
                   value: 'true'
+  /settings/{settings_iid}:
+    delete:
+      operationId: pollenisator.server.mongo.deleteSetting
+      tags:
+        - Settings
+      summary: Delete a global pollenisator setting
+      parameters:
+        - name: settings_iid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted global pollenisator setting
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"n": 1, "ok": 1, "deletedCount": 1}'
   /settings/update:
     put:
       operationId: pollenisator.server.mongo.updateSetting

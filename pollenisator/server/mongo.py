@@ -893,7 +893,28 @@ def createSetting(body: Dict[str, Union[str, Any]]) -> bool:
         return True
     return False
 
-@permission("user")
+@permission("admin")
+def deleteSetting(settings_iid: str) -> Union[bool, ErrorStatus]:
+    """
+    Delete a setting from the database.
+
+    Args:
+        settings_iid (str): the setting _id to delete.
+
+    Returns:
+        Union[bool, ErrorStatus]: True if the setting was successfully deleted, otherwise an error message and status code.
+    """
+    dbclient = DBClient.getInstance()
+    if isinstance(settings_iid, str):
+        ObjectId_settings_iid = detect_objectid(settings_iid)
+    ObjectId_settings = ObjectId(ObjectId_settings_iid)
+    pipeline = {"_id": ObjectId_settings}
+    res = dbclient.deleteFromDb("pollenisator", "settings", pipeline, many=False)
+    if res is None:
+        return False
+    return True
+
+@permission("admin")
 def updateSetting(body: Dict[str, Union[str, Any]]) -> bool:
     """
     Update a setting in the database.
@@ -910,7 +931,7 @@ def updateSetting(body: Dict[str, Union[str, Any]]) -> bool:
     key = body['key']
     value = body["value"]
     dbclient.updateInDb("pollenisator", "settings", {
-                    "key": key}, {"$set": {"value": value}})
+                    "key": key}, {"$set": {"value": value}}, upsert=True)
     return True
 
 @permission("pentester", "body.pentest")
