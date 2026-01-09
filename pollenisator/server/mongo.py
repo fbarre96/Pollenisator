@@ -539,16 +539,27 @@ def deletePentest(pentest: str, **kwargs: Dict[str,Any]) -> ErrorStatus:
     else:
         return  "Unknown pentest", 404
     
-def createPentestBasedOn(self, pentest_uuid: str, base_pentest: str, owner: str) -> Tuple[str, int]:
-    """"""
-    msg, ret = doCopyFromDb(pentest_uuid, base_pentest, owner)
+def createPentestBasedOn(new_pentest_name: str, base_pentest: str, owner: str) -> Tuple[str, int]:
+    """
+    Create a new pentest based on an existing one.
+    * Copies all data from the base pentest to the new pentest.
+    * Drop old pentest specific data like defects reviews.
+    * Rename old defects collection to keep old data as defects_old_pentest.
+    Args: 
+        new_pentest_name (str): The name of the new pentest.
+        base_pentest (str): The UUID of the base pentest.
+        owner (str): The owner of the new pentest.
+    Returns:
+        Tuple[str, int]: A success message if the creation was successful, otherwise an error message and status code.
+    """
+    msg, ret = doCopyFromDb(new_pentest_name, base_pentest, owner)
     if not ret == 200:
         return msg, ret
     # clean old pentest specific data.
     dbclient = DBClient.getInstance()
-    dbclient.client[msg].drop_collection("defects")
+    dbclient.client[msg].defects.rename("defects_old_pentest")
     dbclient.client[msg].drop_collection("defectsreviews")
-
+    return msg, ret
 
 @permission("user")
 def registerPentest(body: Dict[str, Any], **kwargs: Dict[str, Any]) ->ErrorStatus:
@@ -573,7 +584,7 @@ def registerPentest(body: Dict[str, Any], **kwargs: Dict[str, Any]) ->ErrorStatu
     """
     username = kwargs["token_info"]["sub"]
 
-    pentest = body.get("pentest","")
+    pentest = body.get("pentest","").strip()
     if pentest.strip() == "":
         return "Pentest name is required", 400
     base_pentest = body.get("base_pentest", None)
@@ -581,7 +592,8 @@ def registerPentest(body: Dict[str, Any], **kwargs: Dict[str, Any]) ->ErrorStatu
     dbclient = DBClient.getInstance()
     if base_pentest is not None:
         msg, ret = createPentestBasedOn(pentest, base_pentest, username)
-
+        if ret != 200:
+            return msg, ret
     else:
         ret, msg = dbclient.registerPentest(username, pentest, None, False, False)
     if ret:
