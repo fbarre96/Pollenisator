@@ -807,17 +807,21 @@ class Defect(Element):
         return target_elem.getDetailedString()
 
     @classmethod
-    def getGlobalDefects(cls, pentest: str) -> List[Dict[str, Any]]:
+    def getGlobalDefects(cls, pentest: str, exclude_remarks: bool = False) -> List[Dict[str, Any]]:
         """
         Get all global defects for a pentest. Global defects are defects that are not assigned to a specific target.
 
         Args:
             pentest (str): The name of the pentest.
+            exclude_remarks (bool, optional) : Include remarks or not. Defaults to False.
 
         Returns:
             List[Dict[str, Any]]: A list of dictionaries, each representing a global defect. The defects are ordered by their index.
         """
-        defects = Defect.fetchObjects(pentest, {"target_id": None})
+        if exclude_remarks:
+            defects = Defect.fetchObjects(pentest, {"target_id": None, "is_remark":{"$ne":True}})
+        else:
+            defects = Defect.fetchObjects(pentest, {"target_id": None})
         if defects is None:
             return []
         defects_ordered = []
