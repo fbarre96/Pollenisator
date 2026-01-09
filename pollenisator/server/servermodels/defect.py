@@ -384,17 +384,18 @@ def review(pentest: str, defect_iid: str) -> Union[Dict[str, Any], ErrorStatus]:
     return defect.get_review()
 
 @permission("pentester")
-def getGlobalDefects(pentest: str) -> List[Dict[str, Any]]:
+def getGlobalDefects(pentest: str, exclude_remarks: bool = False) -> List[Dict[str, Any]]:
     """
     Get all global defects for a pentest. Global defects are defects that are not assigned to a specific target.
 
     Args:
         pentest (str): The name of the pentest.
+        exclude_remarks (bool): Whether to exclude remarks from the returned list.
 
     Returns:
         List[Dict[str, Any]]: A list of dictionaries, each representing a global defect. The defects are ordered by their index.
     """
-    return Defect.getGlobalDefects(pentest)
+    return Defect.getGlobalDefects(pentest, exclude_remarks=exclude_remarks)
 
 @permission("pentester")
 def moveDefect(pentest: str, defect_id_to_move: str, target_id: str) -> Union[Tuple[str, int], int]:
