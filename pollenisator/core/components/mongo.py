@@ -307,6 +307,7 @@ class DBClient:
         except IOError as e:
             self.printDbConnectionError()
 
+
     def removeWorker(self, worker_name: str) -> None:
         """
         Remove the given worker shortname from database.
@@ -1294,9 +1295,9 @@ class DBClient:
         # else:
         #     toDbName = os.path.splitext(os.path.basename(filename))[0]
         success, msg = self.registerPentest(owner, str(pentest_name), orig_uuid, True, False)
-        # validate filename: only alphanumeric, hyphen, slash or dot allowed
-        if re.match(r'^[A-Za-z0-9\-\/\.]+$', filename) is None:
-            return "Invalid filename: only letters, numbers, hyphens, slashes and dots are allowed", 400
+        # validate filename: only alphanumeric, hyphen, slash or dot, underscore, and spaces allowed
+        if re.match(r'^[A-Za-z0-9\ \-\/\_\.]+$', filename) is None:
+            return "Invalid filename: only letters, numbers, hyphens, slashes, spaces, underscores, and dots are allowed", 400
         new_pentest_uuid = msg
         if not self.try_uuid(new_pentest_uuid):
             return msg, 403

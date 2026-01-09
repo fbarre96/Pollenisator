@@ -2136,18 +2136,13 @@ paths:
               examples:
                 Not owner of the db:
                   value: '"Forbidden"'
-  "/pentest/{pentest}":
+  "/pentest/createPentest":
     post:
       operationId: pollenisator.server.mongo.registerPentest
       tags:
         - pentest
       summary: Create a pentest
-      parameters:
-        - name: pentest
-          in: path
-          required: true
-          schema:
-            type: string
+       
       requestBody:
         content:
           application/json:
@@ -2160,7 +2155,12 @@ paths:
                 - scope
                 - settings
                 - pentesters
+                - pentest
               properties:
+                pentest:
+                  type: string
+                  required:
+                    - pentest
                 pentest_type:
                   type: string
                 start_date:
@@ -2173,6 +2173,9 @@ paths:
                   type: string
                 pentesters:
                   type: string
+                base_pentest:
+                  type: string
+                  description: Optional, pentest to copy from
                 settings:
                   type: object
                   properties:
