@@ -2102,6 +2102,59 @@ paths:
               examples:
                 Success:
                   value: '["pentest1", "pentest2"]'
+  "/pentest/{pentest}":
+    get:
+      operationId: pollenisator.server.mongo.getPentestGenericInfo
+      tags:
+        - pentest
+      summary: Get general information about a pentest
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful get
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{  "creation_date": "2021-06-01T12:00:00Z",  "name": "pentest1",  "owner": "admin"}'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              examples:
+                Pentest not found:
+                  value: '"Unknown pentest"'
+    put:
+      operationId: pollenisator.server.mongo.editPentest
+      tags:
+        - pentest
+      summary: Edit a pentest
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pentest_name:
+                  type: string
+                  required:
+                    - pentest_name
+
+      responses:
+        "200":
+          description: Successful edition
+  
   "/pentest/{pentest}/delete":
     delete:
       operationId: pollenisator.server.mongo.deletePentest
@@ -2218,47 +2271,7 @@ paths:
               examples:
                 Reason:
                   value: '"*{Reason of failure, invalid name, or database already exist..}*"'
-    get:
-      summary: 'get general information about pentest'
-      parameters:
-        - name: pentest
-          in: path
-          required: true
-          schema:
-            type: string
-      tags:
-        - pentest
-      operationId: pollenisator.server.mongo.getPentestInfo
-      responses:
-        '200':
-          description: OK
-      description: Get pentest infos
-    put:
-      operationId: pollenisator.server.mongo.editPentest
-      tags:
-        - pentest
-      summary: Edit a pentest
-      parameters:
-        - name: pentest
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                pentest_name:
-                  type: string
-                  required:
-                    - pentest_name
-
-      responses:
-        "200":
-          description: Successful edition
-  
+    
   "/pentest/{pentest}/users":
     get:
       operationId: pollenisator.server.mongo.getPentestUsers

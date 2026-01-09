@@ -1766,3 +1766,20 @@ def exportCheatsheet(**kwargs) -> Dict[str, List[Dict[str, Any]]]:
         Dict[str, List[Dict[str, Any]]]: A dictionary with "checkitems", "defects", and "commands" keys each containing a list of all items in the respective collections in the database.
     """
     return doExportCheatsheet()
+
+@permission("pentester")
+def getPentestGenericInfo(pentest: str) -> Union[Dict[str, Any], ErrorStatus]:
+    """
+    Get information about a pentest.
+
+    Args:
+        pentest (str): The UUID of the pentest.
+
+    Returns:
+        Union[Dict[str, Any], ErrorStatus]: A dictionary containing the pentest information, or an error message and status code if the pentest was not found.
+    """
+    dbclient = DBClient.getInstance()
+    pentest_record = dbclient.findInDb("pollenisator", "pentests", {"uuid":pentest}, False)
+    if pentest_record is None:
+        return "Pentest not found", 404
+    return pentest_record
