@@ -581,6 +581,7 @@ def craftContext(pentest: str, **kwargs: Any) -> Dict[str, Any]:
     context = add_pentesters_in_context(pentest, context)
     context = add_ports_in_context(pentest, context)
     context = add_defects_in_context(pentest, context)
+    context = add_retests_in_context(pentest, context)
     context = add_additional_sections_in_context(pentest, context)
     return context
 
@@ -604,6 +605,15 @@ def add_additional_sections_in_context(pentest: str, context: Dict[str, Any]) ->
                 context[title] = context.get(title, {}) | pentest_section
     except Exception as e:
         logger.error(f"Error while adding additional sections to the report: {e}")
+    return context
+
+def add_retests_in_context(pentest:str, context: Dict[str, Any]) -> Dict[str, Any]:
+    dbclient = DBClient.getInstance()
+    retests = dbclient.findInDb(pentest, "defects_old_pentest", {}, True)
+    if retests:
+        context["old_pentest_defects"] = [x for x in retests]
+    else:
+        context["old_pentest_defects"] = []
     return context
 
 def add_defects_in_context(pentest:str, context: Dict[str, Any]) -> Dict[str, Any]:

@@ -2155,7 +2155,6 @@ paths:
                 - settings
                 - pentest
                 - pentesters
-                - pentest
               properties:
                 pentest:
                   type: string
