@@ -61,7 +61,10 @@ components:
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/DefectTemplate"
+            oneOf:
+              - $ref: "#/components/schemas/DefectTemplate"
+              - $ref: "#/components/schemas/DefectTemplateRemark"
+
       required: true
     DefectTemplateSearch:
       content:
@@ -510,6 +513,7 @@ components:
         - risk
         - type
         - language
+        - is_remark
       properties:
         common_translation_id:
           type: string
@@ -570,6 +574,11 @@ components:
         is_suggestion:
           type: boolean
           default: false
+        is_remark:
+          type: boolean
+          enum: 
+            - false
+          default: false
         visibility:
           type: string
           enum:
@@ -602,6 +611,257 @@ components:
                 type: string
               title:
                 type: string
+    DefectTemplateRemark:
+      required:
+        - title
+        - description
+        - type
+        - language
+        - is_remark
+      properties:
+        common_translation_id:
+          type: string
+        defect_id:
+          type: string
+        title:
+          type: string
+          minLength: 2
+        synthesis:
+          type: string
+        impacts:
+          type: string
+        description:
+          type: string
+        ease:
+          type: string
+        impact:
+          type: string
+        risk:
+          type: string
+        cvss_string:
+          type: string
+          nullable: true
+        cvss_score:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0.0
+          maximum: 10.0
+        type:
+          type: array
+          items:
+            type: string
+        language:
+          type: string
+        perimeter:
+          type: array
+          items:
+            type: string
+        is_suggestion:
+          type: boolean
+          default: false
+        is_remark:
+          type: boolean
+          enum: 
+            - true
+          default: true
+        visibility:
+          type: string
+          enum:
+            - me
+            - all
+        script:
+          type: string
+          description: Python script code written by a user for this defect template
+        fixes:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              execution:
+                type: string
+                
+              gain:
+                type: string
+                
+              synthesis:
+                type: string
+              title:
+                type: string
+    RemarkTemplateUpdate:
+      type: object
+      properties:
+        common_translation_id:
+          type: string
+        defect_id:
+          type: string
+        title:
+          type: string
+          minLength: 2
+        synthesis:
+          type: string
+        impacts:
+          type: string
+        description:
+          type: string
+        ease:
+          type: string
+        impact:
+          type: string
+        risk:
+          type: string
+        cvss_string:
+          type: string
+          nullable: true
+        cvss_score:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0.0
+          maximum: 10.0
+        type:
+          type: array
+          items:
+            type: string
+        language:
+          type: string
+        perimeter:
+          type: array
+          items:
+            type: string
+        is_suggestion:
+          type: boolean
+          default: false
+        is_remark:
+          type: boolean
+          enum:
+            - true
+        visibility:
+          type: string
+          enum:
+            - me
+            - all
+        script:
+          type: string
+          description: Python script code written by a user for this defect template
+        fixes:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              execution:
+                type: string
+              gain:
+                type: string
+              synthesis:
+                type: string
+              title:
+                type: string
+
+    DefectTemplateUpdate:
+      type: object
+      properties:
+        common_translation_id:
+          type: string
+        defect_id:
+          type: string
+        title:
+          type: string
+          minLength: 2
+        synthesis:
+          type: string
+        impacts:
+          type: string
+        description:
+          type: string
+        ease:
+          type: string
+          enum:
+            - Easy
+            - Moderate
+            - Difficult
+            - Arduous
+            - N/A
+        impact:
+          type: string
+          enum:
+            - Minor
+            - Important
+            - Major
+            - Critical
+            - N/A
+        risk:
+          type: string
+          enum:
+            - Minor
+            - Important
+            - Major
+            - Critical
+            - N/A
+        cvss_string:
+          type: string
+          nullable: true
+        cvss_score:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0.0
+          maximum: 10.0
+        type:
+          type: array
+          items:
+            type: string
+        language:
+          type: string
+        perimeter:
+          type: array
+          items:
+            type: string
+        is_suggestion:
+          type: boolean
+          default: false
+        is_remark:
+          type: boolean
+          enum:
+            - false
+          default: false
+        visibility:
+          type: string
+          enum:
+            - me
+            - all
+        script:
+          type: string
+          description: Python script code written by a user for this defect template
+        fixes:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              execution:
+                type: string
+                enum:
+                  - Quick Win
+                  - Moderate
+                  - Hard
+              gain:
+                type: string
+                enum:
+                  - Weak
+                  - Moderate
+                  - Mean
+                  - Strong
+              synthesis:
+                type: string
+              title:
+                type: string
+
 
 security:
   - jwt: []
@@ -1895,9 +2155,12 @@ paths:
                 - settings
                 - pentest
                 - pentesters
+                - pentest
               properties:
                 pentest:
                   type: string
+                  required:
+                    - pentest
                 pentest_type:
                   type: string
                 start_date:
@@ -1910,6 +2173,9 @@ paths:
                   type: string
                 pentesters:
                   type: string
+                base_pentest:
+                  type: string
+                  description: Optional, pentest to copy from
                 settings:
                   type: object
                   properties:
@@ -2146,6 +2412,26 @@ paths:
               examples:
                 Success:
                   value: 'true'
+  /settings/{settings_iid}:
+    delete:
+      operationId: pollenisator.server.mongo.deleteSetting
+      tags:
+        - Settings
+      summary: Delete a global pollenisator setting
+      parameters:
+        - name: settings_iid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted global pollenisator setting
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"n": 1, "ok": 1, "deletedCount": 1}'
   /settings/update:
     put:
       operationId: pollenisator.server.mongo.updateSetting

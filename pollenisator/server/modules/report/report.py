@@ -297,7 +297,7 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
     timestr = datetime.now().strftime("%Y%m")
     ext = os.path.splitext(templateName)[-1]
     basename = client_name.strip() + " - "+mission_name.strip()
-    out_name = str(timestr)+" - "+basename.replace("/","_").replace("\\","_").replace(".","_")
+    out_name = str(timestr)+" - "+basename.replace("/","_").replace("\\","_").replace("..","_")
     templateName = os.path.basename(templateName)
     lang = os.path.basename(lang)
     if not validate_lang(lang):
@@ -385,9 +385,13 @@ def _generateDoc(ext: str, context: Dict[str, Any], template_to_use_path: str, o
         # return_dict["msg"] = "Unknown template file extension"
         result_queue.put({"res": res, "msg": msg})
 
-def searchDefectTemplates(terms: str, lang: str, perimeter: str, coll: str) -> List[Dict[str, Any]]:
+def searchDefectTemplates(terms: str, lang: str, perimeter: str, defect_type: str) -> List[Dict[str, Any]]:
     dbclient = DBClient.getInstance()
-    res = dbclient.findInDb("pollenisator", coll, {}, True)
+    if defect_type == "remark":
+        pipeline = {"is_remark":True}
+    else:
+        pipeline = {"is_remark":{"$ne":True}}
+    res = dbclient.findInDb("pollenisator", "defects", pipeline, True)
     ret = []
     if res is None:
         return ret
@@ -448,14 +452,10 @@ def search(body: Dict[str, str], **kwargs) -> Union[ErrorStatus, SearchResults]:
     terms = unidecode(body.get("terms", "")).lower()
     lang = body.get("language", "").lower()
     perimeter = body.get("perimeter", "").lower()
-    if defect_type == "remark":
-        coll = "remarks"
-    elif defect_type == "defect":
-        coll = "defects"
-    else:
+    if defect_type not in ["remark","defect"]:
         return "Invalid parameter: type must be either defect or remark.", 400
     answers: SearchResults = {"answers": []}
-    answers["answers"] = searchDefectTemplates(terms, lang, perimeter, coll)
+    answers["answers"] = searchDefectTemplates(terms, lang, perimeter, defect_type)
     return answers
 
 @permission("pentester")
@@ -684,18 +684,40 @@ def add_pentesters_in_context(pentest: str, context: Dict[str, Any]) -> Dict[str
     return context
 
 def add_remarks_in_context(pentest: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Add remarks to the report context by querying defects with is_remark=True.
+    
+    Args:
+        pentest (str): The pentest name/uuid
+        context (Dict[str, Any]): The report context to update
+        
+    Returns:
+        Dict[str, Any]: Updated context with positive_remarks, negative_remarks, and neutral_remarks lists
+    """
     dbclient = DBClient.getInstance()
     context["positive_remarks"] = []
     context["negative_remarks"] = []
     context["neutral_remarks"] = []
-    remarks = dbclient.findInDb(pentest, "remarks", {}, True)
-    for remark in remarks:
-        if remark["type"].lower() == "positive":
-            context["positive_remarks"].append(remark.get("description", remark.get("title", "")))
-        elif remark["type"].lower() == "negative":
-            context["negative_remarks"].append(remark.get("description", remark.get("title", "")))
-        elif remark["type"].lower() == "neutral":
-            context["neutral_remarks"].append(remark.get("description", remark.get("title", "")))
+    
+    # Get remarks from defects collection where is_remark=True
+    remarks = dbclient.findInDb(pentest, "defects", {"is_remark": True}, True)
+    
+    if remarks is not None:
+        for remark in remarks:
+            remark_type = remark.get("type", ["neutral"])
+            # Handle type as list (standard format)
+            if isinstance(remark_type, list):
+                remark_type = remark_type[0] if len(remark_type) > 0 else "neutral"
+            
+            remark_text = remark.get("description", remark.get("title", ""))
+            
+            if remark_type.lower() == "positive":
+                context["positive_remarks"].append(remark_text)
+            elif remark_type.lower() == "negative":
+                context["negative_remarks"].append(remark_text)
+            elif remark_type.lower() == "neutral":
+                context["neutral_remarks"].append(remark_text)
+    
     return context
 
 def getProofPath(pentest: str, defect_iid: ObjectId) -> str:

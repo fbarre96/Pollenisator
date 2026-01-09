@@ -6,6 +6,7 @@ from uuid import UUID
 import zipfile
 from typing import Any, Dict, List, Set, Tuple, Union
 import tempfile
+import datetime
 import re
 import urllib.parse
 import shutil
@@ -537,6 +538,28 @@ def deletePentest(pentest: str, **kwargs: Dict[str,Any]) -> ErrorStatus:
         return "Successful deletion", 200
     else:
         return  "Unknown pentest", 404
+    
+def createPentestBasedOn(new_pentest_name: str, base_pentest: str, owner: str) -> Tuple[str, int]:
+    """
+    Create a new pentest based on an existing one.
+    * Copies all data from the base pentest to the new pentest.
+    * Drop old pentest specific data like defects reviews.
+    * Rename old defects collection to keep old data as defects_old_pentest.
+    Args: 
+        new_pentest_name (str): The name of the new pentest.
+        base_pentest (str): The UUID of the base pentest.
+        owner (str): The owner of the new pentest.
+    Returns:
+        Tuple[str, int]: A success message if the creation was successful, otherwise an error message and status code.
+    """
+    msg, ret = doCopyFromDb(new_pentest_name, base_pentest, owner)
+    if not ret == 200:
+        return msg, ret
+    # clean old pentest specific data.
+    dbclient = DBClient.getInstance()
+    dbclient.client[msg].defects.rename("defects_old_pentest")
+    dbclient.client[msg].drop_collection("defectsreviews")
+    return msg, ret
 
 @permission("user")
 def registerPentest(body: Dict[str, Any], **kwargs: Dict[str, Any]) ->ErrorStatus:
@@ -545,13 +568,13 @@ def registerPentest(body: Dict[str, Any], **kwargs: Dict[str, Any]) ->ErrorStatu
 
     Args:
         body (Dict[str,Any]): A dictionary containing the details of the pentest.
-            "pentest" (str): The name of the pentest.
             "pentest_type" (str): The type of the pentest.
             "start_date" (datetime): The start date of the pentest.
             "end_date" (datetime): The end date of the pentest.
             "scope" (List[str]): The scope of the pentest.
             "settings" (Dict[str, Any]): The settings for the pentest.
             "pentesters" (List[str]): The pentesters for the pentest.
+            "base_pentest" (str, optional): The pentest to copy from.
         **kwargs (Dict[str, Any]): Additional keyword arguments. The "token_info" key should contain a dictionary with a "sub" key representing the user.
 
     Returns:
@@ -559,19 +582,30 @@ def registerPentest(body: Dict[str, Any], **kwargs: Dict[str, Any]) ->ErrorStatu
     """
     username = kwargs["token_info"]["sub"]
 
+    pentest = body.get("pentest","").strip()
+    if pentest.strip() == "":
+        return "Pentest name is required", 400
+    base_pentest = body.get("base_pentest", None)
 
     pentest = body.get("pentest", "").strip()
     if pentest == "":
         return "Pentest name is required", 400
     dbclient = DBClient.getInstance()
-    ret, msg = dbclient.registerPentest(username, pentest, None, False, False)
+    if base_pentest is not None:
+        msg, ret = createPentestBasedOn(pentest, base_pentest, username)
+        if ret != 200:
+            return msg, ret
+    else:
+        ret, msg = dbclient.registerPentest(username, pentest, None, False, False)
     if ret:
         #token = connectToPentest(pentest, **kwargs)
         #kwargs["token_info"] = decode_token(token[0])
+        
         uuid = msg
-        msgerror, success = preparePentest(uuid, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username, **kwargs)
+        msgerror, success = preparePentest(uuid, body["pentest_type"], body["start_date"], body["end_date"], body["scope"], body["settings"], body["pentesters"], username, based_on_pentest=base_pentest, **kwargs)
         if not success:
             return msgerror, 400
+    
         return msg, 200
     else:
         return msg, 403
@@ -779,7 +813,7 @@ def getPentestInfo(pentest: str, **kwargs: Dict[str, Any]) -> Dict[str, Any]:
     ret["checks_total"] = dbclient.countInDb(pentest, "checkinstances", {})
     return ret
 
-def preparePentest(pentest_uuid: str, pentest_type: str, start_date: str, end_date: str, scope: str, settings: Dict[str, Union[str, int]], pentesters: str, owner: str, **kwargs: Dict[str, Any]) -> ErrorStatus:
+def preparePentest(pentest_uuid: str, pentest_type: str, start_date: str, end_date: str, scope: str, settings: Dict[str, Union[str, int]], pentesters: str, owner: str, based_on_pentest: str, **kwargs: Dict[str, Any]) -> ErrorStatus:
     """
     Initiate a pentest database with wizard info.
 
@@ -795,6 +829,7 @@ def preparePentest(pentest_uuid: str, pentest_type: str, start_date: str, end_da
             * "Add all domains found":  Unsafe. if 1, all new domains found by tools will be considered in scope.
         pentesters (str): A string of pentesters, separated by commas or newlines.
         owner (str): The owner of the pentest.
+        based_on_pentest (str): The pentest uuid which was used as a base for this pentest.
         **kwargs (Dict[str, Any]): Additional keyword arguments. This should include a "token_info" key with a dictionary containing a "sub" key with the user's information.
 
     Returns:
@@ -818,7 +853,7 @@ def preparePentest(pentest_uuid: str, pentest_type: str, start_date: str, end_da
     dbclient.insertInDb(pentest_uuid, "settings", {"key":"defect_notation_types", "value":json.dumps(list(set(notation_types)))}, notify=False)
     pentester_list = [x.strip() for x in pentesters.replace("\n",",").split(",")]
     pentester_list.insert(0, owner)
-    dbclient.updateInDb("pollenisator", "pentests", {"uuid":pentest_uuid}, {"$set":{"owner":owner, "pentesters":pentester_list}})
+    dbclient.updateInDb("pollenisator", "pentests", {"uuid":pentest_uuid}, {"$set":{"owner":owner, "pentesters":pentester_list, "based_on_pentest":based_on_pentest}})
     Command.addUserCommandsToPentest(pentest_uuid, user)
     #addCheckInstancesToPentest(pentest, pentest_type)
     commands = Command.getList({}, pentest_uuid)
@@ -895,7 +930,28 @@ def createSetting(body: Dict[str, Union[str, Any]]) -> bool:
         return True
     return False
 
-@permission("user")
+@permission("admin")
+def deleteSetting(settings_iid: str) -> Union[bool, ErrorStatus]:
+    """
+    Delete a setting from the database.
+
+    Args:
+        settings_iid (str): the setting _id to delete.
+
+    Returns:
+        Union[bool, ErrorStatus]: True if the setting was successfully deleted, otherwise an error message and status code.
+    """
+    dbclient = DBClient.getInstance()
+    if isinstance(settings_iid, str):
+        ObjectId_settings_iid = detect_objectid(settings_iid)
+    ObjectId_settings = ObjectId(ObjectId_settings_iid)
+    pipeline = {"_id": ObjectId_settings}
+    res = dbclient.deleteFromDb("pollenisator", "settings", pipeline, many=False)
+    if res is None:
+        return False
+    return True
+
+@permission("admin")
 def updateSetting(body: Dict[str, Union[str, Any]]) -> bool:
     """
     Update a setting in the database.
@@ -912,7 +968,7 @@ def updateSetting(body: Dict[str, Union[str, Any]]) -> bool:
     key = body['key']
     value = body["value"]
     dbclient.updateInDb("pollenisator", "settings", {
-                    "key": key}, {"$set": {"value": value}})
+                    "key": key}, {"$set": {"value": value}}, upsert=True)
     return True
 
 @permission("pentester", "body.pentest")
@@ -1049,7 +1105,10 @@ def do_dump_db_to_file(dbName: str, collection: str, pentest_record: Dict[str, A
         if "_id" in pentest_record:
             del pentest_record["_id"]
         if "creation_date" in pentest_record:
-            pentest_record["creation_date"] = pentest_record["creation_date"].isoformat()
+            if isinstance(pentest_record["creation_date"], datetime.datetime):
+                pentest_record["creation_date"] = pentest_record["creation_date"].isoformat()
+            else:
+                pentest_record["creation_date"] = str(pentest_record["creation_date"])
         f.write(json.dumps(pentest_record))
     export_files =os.path.join(dirpath, "files")
     files_dir =  os.path.join(getMainDir(), "files", dbName)
@@ -1253,7 +1312,7 @@ def _validate_pentest_import_conditions(pentest: Dict[str, Any], **kwargs: Dict[
     return None
 
 def _import_database_and_files(username: str, pentest_archive: str, pentest: Dict[str, Any], 
-                               dirpath: str, **kwargs: Dict[str, Any]) -> Union[str, ErrorStatus]:
+                               dirpath: str, toDb:str) -> Union[str, ErrorStatus]:
     """
     Import database and associated files.
     
@@ -1262,13 +1321,13 @@ def _import_database_and_files(username: str, pentest_archive: str, pentest: Dic
         pentest_archive: Path to pentest archive
         pentest: Pentest configuration
         dirpath: Working directory
-        **kwargs: Additional arguments including toDb
+        toDb: Target database name
         
     Returns:
         Union[str, ErrorStatus]: New UUID if successful, error tuple otherwise
     """
     orig_uuid = pentest["uuid"]
-    to_name = kwargs.get("toDb", pentest["nom"])
+    to_name = toDb if toDb != "" else pentest.get("nom", "")
     dbclient = DBClient.getInstance()
     msg, success_status = dbclient.importDatabase(username, pentest_archive, to_name, orig_uuid)
     if success_status != 200:
@@ -1329,7 +1388,7 @@ def importDb(upfile: Union[str, werkzeug.datastructures.FileStorage], **kwargs: 
             return validation_error
         
         # Import database and files
-        result = _import_database_and_files(username, pentest_archive, pentest, dirpath, **kwargs)
+        result = _import_database_and_files(username, pentest_archive, pentest, dirpath, toDb=kwargs.get("toDb", pentest.get("nom","")))
         if isinstance(result, tuple):
             return result
         
@@ -1339,6 +1398,28 @@ def importDb(upfile: Union[str, werkzeug.datastructures.FileStorage], **kwargs: 
         # Always cleanup temporary directory
         shutil.rmtree(dirpath)
 
+
+
+def doCopyFromDb(toCopyName: str, fromCopyName: str, owner: str) -> Tuple[Any, int]:
+    """
+    Copy a database to another database.
+
+    Args:
+        toCopyName (str): The name of the destination database.
+        fromCopyName (str): The name of the source database.
+        owner (str): The owner of the new database.
+
+    Returns:
+        Any: The result of the database operation.
+    """
+    pentest_record = check_pentest_collection_exists(fromCopyName, "")
+    if isinstance(pentest_record, tuple):
+        return pentest_record
+    dirpath = tempfile.mkdtemp()
+    export_path = do_dump_db_to_file(fromCopyName, "", pentest_record, dirpath)
+    if isinstance(export_path, tuple):
+        return export_path
+    return importDb(export_path, toDb=toCopyName, username=owner, isCopy=True)
 
 @permission("pentester", "body.fromDb")
 def copyDb(body: Dict[str, str], **kwargs: Dict[str,Any]) -> Any:
@@ -1355,15 +1436,7 @@ def copyDb(body: Dict[str, str], **kwargs: Dict[str,Any]) -> Any:
     """
     toCopyName = body["toDb"]
     fromCopyName = body["fromDb"]
-    pentest_record = check_pentest_collection_exists(fromCopyName, "")
-    if isinstance(pentest_record, tuple):
-        return pentest_record
-    dirpath = tempfile.mkdtemp()
-    export_path = do_dump_db_to_file(fromCopyName, "", pentest_record, dirpath)
-    if isinstance(export_path, tuple):
-        return export_path
-    return importDb(export_path, toDb=toCopyName, username=kwargs["token_info"]["sub"], isCopy=True)
-
+    return doCopyFromDb(toCopyName, fromCopyName, kwargs["token_info"]["sub"])
 
 def doImportCommands(data: str, user: str) -> Union[ErrorStatus, List[Dict[str, Any]]]:
     """
