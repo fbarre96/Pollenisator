@@ -627,6 +627,13 @@ paths:
           required: true
           schema:
             type: string
+        - name: exclude_remarks
+          in: query
+          description: exclude remarks from the returned list
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         "200":
           description: A list of defect ordered by index
