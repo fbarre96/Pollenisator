@@ -726,7 +726,7 @@ def validateDefectTemplate(iid: str, **kwargs) -> Union[bool, Tuple[str, int]]:
     language = suggestion.get("language", "")
     if language == "":
         return "The suggestion has no language, cannot validate it", 400
-    existing = dbclient.findInDb("pollenisator", "defects", {"$or":[{"defect_id":ObjectId(suggestion.get("defect_id")), "language":language}, {"title": suggestion.get("title"), "language":language}]}, False)
+    existing = dbclient.findInDb("pollenisator", "defects", {"$or":[{"defect_id":suggestion.get("defect_id"), "language":language}, {"title": suggestion.get("title"), "language":language}]}, False)
     if existing is not None:
         if existing.get("script", "") != suggestion.get("script", "") and "write_defect_script" not in kwargs["token_info"]["scope"]:
             suggestion["script"] = existing.get("script", "")
