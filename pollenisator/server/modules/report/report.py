@@ -20,7 +20,7 @@ import pollenisator.core.reporting.wordexport as wordexport
 import pollenisator.core.reporting.powerpointexport as powerpointexport
 from pollenisator.server import settings
 from pollenisator.core.components.mongo import DBClient
-from pollenisator.core.components.utils import getMainDir, getServerLocalFolder
+from pollenisator.core.components.utils import getMainDir, getServerLocalFolder, JSONEncoder
 from pollenisator.server.permission import permission
 from pollenisator.core.components.logger_config import logger
 from pollenisator.server.modules.filemanager.filemanager import listFiles
@@ -314,7 +314,6 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
                             client=client_name.strip(), contract=mission_name.strip())
         context["pentest_type"] = pentest_type
         context.update(additional_context)
-    
 
         #manager = Manager()
         result_queue = Queue()
@@ -383,7 +382,7 @@ def _generateDoc(ext: str, context: Dict[str, Any], template_to_use_path: str, o
     else:
         # return_dict["res"] = False
         # return_dict["msg"] = "Unknown template file extension"
-        result_queue.put({"res": res, "msg": msg})
+        result_queue.put({"res": False, "msg": "Unknown template file extension"})
 
 def searchDefectTemplates(terms: str, lang: str, perimeter: str, defect_type: str) -> List[Dict[str, Any]]:
     dbclient = DBClient.getInstance()
@@ -687,10 +686,15 @@ def add_pentesters_in_context(pentest: str, context: Dict[str, Any]) -> Dict[str
     for pentesterName in pentesters:
         p = dbclient.getUserRecordFromUsername(pentesterName)
         if p is not None:
+            if "token" in p:
+                del p["token"]
             context["pentesters"].append(p)
     owner = dbclient.getPentestOwner(pentest)
     p = dbclient.getUserRecordFromUsername(owner)
+    if p and "token" in p:
+        del p["token"]
     context["owner"] = p if p is not None else None
+
     return context
 
 def add_remarks_in_context(pentest: str, context: Dict[str, Any]) -> Dict[str, Any]:
