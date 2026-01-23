@@ -124,6 +124,12 @@ def createReport(context: Dict[str, Any], template: str, out_name: str, **kwargs
         "Table":"StyleTableau" },
         mermaid_cli=os.environ.get("MARKDOWN_MERMAID_CLI", None),
         mermaid_server_link=os.environ.get("MARKDOWN_MERMAID_SERVER", None),
+        image_modifier=['''<a:outerShdw blurRad="63500" sx="102000" sy="102000"
+                                                algn="ctr" rotWithShape="0">
+                                                <a:prstClr val="black">
+                                                    <a:alpha val="40000" />
+                                                </a:prstClr>
+                                            </a:outerShdw>''']
     )
     if not result:
         return False, "Error in Markdown conversion : "+str(msg)
