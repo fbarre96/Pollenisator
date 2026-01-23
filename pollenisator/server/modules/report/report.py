@@ -620,7 +620,7 @@ def add_defects_in_context(pentest:str, context: Dict[str, Any]) -> Dict[str, An
     completed_defects = []
     completed_fixes = []
     defect_id = 1
-    defects = Defect.getGlobalDefects(pentest)
+    defects = Defect.getGlobalDefects(pentest, exclude_remarks=True)
     for defect in defects:
         defect_completed = defect
         defect_completed["id"] = str(defect_id)
