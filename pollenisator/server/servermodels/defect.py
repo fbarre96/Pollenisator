@@ -233,15 +233,15 @@ def update(pentest: str, defect_iid: str, force: bool, body: Dict[str, Any], **k
 
 def doUpdateReviewState(old: Defect, new_redacted_state: str, force:bool, username: str) -> ErrorStatus:
     #check order
-    if not force:
-        try:
-            order = ["New", "To review", "Reviewed", "Completed"]
-            if order.index(new_redacted_state) < order.index(old.redacted_state):
-                return "You are trying to rewind in the redacted state, this will delete any pending review.", 409
-            if order.index(new_redacted_state) > order.index(old.redacted_state)+1:
-                return "You are trying to skip a redaction step, this could leave some review unaccepted.", 409
-        except ValueError:
-            return "Unknown redacted state", 400
+    # if not force:
+    #     try:
+    #         order = ["New", "To review", "Reviewed", "Completed"]
+    #         if order.index(new_redacted_state) < order.index(old.redacted_state):
+    #             return "You are trying to rewind in the redacted state, this will delete any pending review.", 409
+    #         if order.index(new_redacted_state) > order.index(old.redacted_state)+1:
+    #             return "You are trying to skip a redaction step, this could leave some review unaccepted.", 409
+    #     except ValueError:
+    #         return "Unknown redacted state", 400
     old.save_history(username)
     
     # Delete review if needed
@@ -303,6 +303,26 @@ def getDefectHistory(pentest: str, defect_iid: str) -> Union[ErrorStatus,List[Di
         return "Not found", 404
     defect = cast(Defect, defect)
     return defect.get_history()
+
+@permission("pentester")
+def createDefectHistorySnapshot(pentest, defect_iid: str, **kwargs: Dict[str, Any]) -> Union[ErrorStatus, bool]:
+    """
+    Create a snapshot of the current defect state in its history.
+    Args:
+        pentest (str): The name of the pentest.
+        defect_iid (str): The id of the defect.
+    Returns:
+        bool: True if the operation was successful.
+        or 
+        ErrorStatus: A tuple containing an error message and status code if the defect was not found.
+    """
+    username = kwargs["token_info"]["sub"]
+    defect = Defect.fetchObject(pentest, {"_id":ObjectId(defect_iid)})
+    if defect is None:
+        return "Not found", 404
+    defect = cast(Defect, defect)
+    defect.save_history(username)
+    return True
 
 @permission("user")
 def getDefectTemplateHistory(defect_template_iid: str) -> Union[ErrorStatus,List[Dict[str, Any]]]:

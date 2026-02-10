@@ -3010,6 +3010,32 @@ paths:
       responses:
         "200":
           description: Get defect history as list of defects data
+    put:
+      operationId: pollenisator.server.servermodels.defect.createDefectHistorySnapshot
+      tags:
+        - Defects
+      summary: Create a new defect history snapshot
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: defect_iid
+          in: path
+          description: defect iid to create snapshot for
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Defect history snapshot created successfully
+          content:
+            application/json:
+              examples:
+                Success:
+                  value: '{"res": true, "snapshot_id": "ObjectId|5f9150fbed75193ef71ba47f"}'
 
   "/report/DefectTemplates/{defect_template_iid}/history":
     get:
