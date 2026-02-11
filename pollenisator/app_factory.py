@@ -18,7 +18,7 @@ import bcrypt
 from flask_socketio import SocketIO, join_room, leave_room
 from pollenisator.server.modules.worker.worker import removeWorkers, unregister
 from pollenisator.core.components.logger_config import logger
-from pollenisator.core.components.utils import JSONEncoder, loadServerConfig
+from pollenisator.core.components.utils import JSONEncoder, JSONDecoder, loadServerConfig
 from pollenisator.core.components.socketmanager import SocketManager
 import pollenisator.core.components.mongo as mongo
 from pollenisator.migrate import migrate
@@ -416,6 +416,7 @@ def create_app(debug: bool, async_mode: str) -> Flask:
             sm.socketio.emit("proxy-term", data, room=socket["consumer_sid"])
 
     flask_app.json_encoder = JSONEncoder
+    flask_app.json.loads = lambda s: json.loads(s, cls=JSONDecoder)
     logger.info('Running ...')
     CORS(flask_app,  expose_headers= ['Content-Disposition'])
     return flask_app

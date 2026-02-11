@@ -3037,6 +3037,123 @@ paths:
                 Success:
                   value: '{"res": true, "snapshot_id": "ObjectId|5f9150fbed75193ef71ba47f"}'
 
+  "/history/{pentest}/{entity_iid}":
+    get:
+      operationId: pollenisator.server.servermodels.history.getHistory
+      tags:
+        - History
+      summary: Get entity history snapshots
+      description: |
+        Retrieve all history snapshots for a specific entity from its history collection.
+        Returns snapshots ordered by snapshot_date.
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: entity_iid
+          in: path
+          description: entity id to get history for
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: query
+          description: collection name (e.g., "ips", "ports", "scopes", "waves")
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successfully retrieved history snapshots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+              example: [{"snapshot_date": "2026-02-10T10:30:00", "snapshot_user": "admin", "ip": "10.0.0.1", "history_ip_iid": "ObjectId|abc123"}]
+        "400":
+          description: Missing collection parameter
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  oneOf:
+                    - type: string
+                    - type: integer
+              example: ["Missing 'collection' query parameter", 400]
+        "404":
+          description: Entity not found
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  oneOf:
+                    - type: string
+                    - type: integer
+              example: ["Not found", 404]
+    put:
+      operationId: pollenisator.server.servermodels.history.createSnapshot
+      tags:
+        - History
+      summary: Create a generic entity history snapshot
+      description: |
+        Save a snapshot of any entity to its corresponding history collection.
+        The snapshot will be stored in {collection}_history with metadata (snapshot_date, snapshot_user, entity_type).
+        Use the generic /find/{pentest}/{collection}_history endpoint to retrieve snapshots.
+      parameters:
+        - name: pentest
+          in: path
+          description: pentest name
+          required: true
+          schema:
+            type: string
+        - name: entity_iid
+          in: path
+          description: entity id to create snapshot for
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - collection
+              properties:
+                collection:
+                  type: string
+                  description: Collection name (e.g., "ips", "ports", "scopes", "waves")
+              description: The complete entity data to snapshot with collection name
+      responses:
+        "200":
+          description: Snapshot created successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: boolean
+                example: [true, 200]
+        "500":
+          description: Database error
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  oneOf:
+                    - type: string
+                    - type: integer
+                example: ["Error message", 500]
+
   "/report/DefectTemplates/{defect_template_iid}/history":
     get:
       operationId: pollenisator.server.servermodels.defect.getDefectTemplateHistory
