@@ -15,24 +15,6 @@ NotificationCreateResult = TypedDict('NotificationCreateResult', {
 ErrorStatus = Tuple[str, int]
 
 
-def _ensure_notification_indexes() -> None:
-    """Create indexes for the user_notifications collection for performance."""
-    try:
-        dbclient = DBClient.getInstance()
-        # Index for efficient query of unread notifications for a user in a pentest
-        dbclient.create_index("pollenisator", "user_notifications", 
-                             [("pentest_id", 1), ("target_user", 1), ("read", 1)])
-        # Index for sorting by creation date
-        dbclient.create_index("pollenisator", "user_notifications", 
-                             [("created_at", -1)])
-    except Exception as e:
-        logger.warning(f"Could not create user_notifications indexes: {e}")
-
-
-# Ensure indexes are created when module is imported
-_ensure_notification_indexes()
-
-
 @permission("pentester", "body.pentest")
 def create(body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[NotificationCreateResult, ErrorStatus]:
     """
@@ -81,7 +63,7 @@ def create(body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Union[Notification
         }
         
         # Insert into global pollenisator database
-        result = dbclient.insertInDb("pollenisator", "user_notifications", 
+        result = dbclient.insertInDb(body['pentest'], "user_notifications", 
                                      notification, notify=False)
         
         # Emit Socket.IO event to pentest room
@@ -119,7 +101,7 @@ def getNotifications(pentest: str, username: str, **kwargs: Dict[str, Any]) -> U
             return "Forbidden: can only access your own notifications", 403
         
         dbclient = DBClient.getInstance()
-        notifications = dbclient.findInDb("pollenisator", "user_notifications", {
+        notifications = dbclient.findInDb(pentest, "user_notifications", {
             'pentest_id': pentest,
             'target_user': username,
             'read': False
@@ -162,7 +144,7 @@ def markAsRead(pentest:str, notification_id: str, **kwargs: Dict[str, Any]) -> U
         token_info = kwargs["token_info"]
         requesting_user = token_info["sub"]
         
-        notification = dbclient.findInDb("pollenisator", "user_notifications", 
+        notification = dbclient.findInDb(pentest, "user_notifications", 
                                         {'_id': ObjectId(notification_id), "pentest_id":pentest}, False)
         if notification is None:
             return 'Notification not found', 404
@@ -171,7 +153,7 @@ def markAsRead(pentest:str, notification_id: str, **kwargs: Dict[str, Any]) -> U
         if notification['target_user'] != requesting_user and "admin" not in token_info.get("scope", []):
             return "Forbidden: can only mark your own notifications as read", 403
         
-        result = dbclient.updateInDb("pollenisator", "user_notifications",
+        result = dbclient.updateInDb(pentest, "user_notifications",
                                      {'_id': ObjectId(notification_id)},
                                      {'$set': {'read': True}}, notify=False)
         
@@ -204,7 +186,7 @@ def delete(pentest:str, notification_id: str, **kwargs: Dict[str, Any]) -> Union
         token_info = kwargs["token_info"]
         requesting_user = token_info["sub"]
         
-        notification = dbclient.findInDb("pollenisator", "user_notifications", 
+        notification = dbclient.findInDb(pentest, "user_notifications", 
                                         {'_id': ObjectId(notification_id), "pentest_id":pentest}, False)
         if notification is None:
             return 'Notification not found', 404
@@ -213,7 +195,7 @@ def delete(pentest:str, notification_id: str, **kwargs: Dict[str, Any]) -> Union
         if notification['target_user'] != requesting_user and "admin" not in token_info.get("scope", []):
             return "Forbidden: can only delete your own notifications", 403
         
-        result = dbclient.deleteFromDb("pollenisator", "user_notifications",
+        result = dbclient.deleteFromDb(pentest, "user_notifications",
                                        {'_id': ObjectId(notification_id), "pentest":pentest}, 
                                        many=False, notify=False)
         
