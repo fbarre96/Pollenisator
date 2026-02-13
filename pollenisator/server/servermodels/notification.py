@@ -187,7 +187,7 @@ def delete(pentest:str, notification_id: str, **kwargs: Dict[str, Any]) -> Union
         requesting_user = token_info["sub"]
         
         notification = dbclient.findInDb(pentest, "user_notifications", 
-                                        {'_id': ObjectId(notification_id), "pentest_id":pentest}, False)
+                                        {'_id': ObjectId(notification_id)}, False)
         if notification is None:
             return 'Notification not found', 404
         
@@ -195,12 +195,11 @@ def delete(pentest:str, notification_id: str, **kwargs: Dict[str, Any]) -> Union
         if notification['target_user'] != requesting_user and "admin" not in token_info.get("scope", []):
             return "Forbidden: can only delete your own notifications", 403
         
-        result = dbclient.deleteFromDb(pentest, "user_notifications",
-                                       {'_id': ObjectId(notification_id), "pentest":pentest}, 
+        dbclient.deleteFromDb(pentest, "user_notifications",
+                                       {'_id': ObjectId(notification_id)}, 
                                        many=False, notify=False)
         
-        if result == 0:
-            return 'Notification not found', 404
+
         
         return {'success': True}
         
