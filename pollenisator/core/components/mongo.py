@@ -979,6 +979,8 @@ class DBClient:
             return []
         ret: List[str] = []
         for cal in cals:
+            if cal.get("uuid") is  None:
+                continue
             ret.append(str(cal["uuid"]))
         return ret
 

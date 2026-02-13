@@ -358,7 +358,7 @@ def update_template_suggestion(defect_iid: str, body: Dict[str, Any], username: 
     """
     dbclient = DBClient.getInstance()
     
-    body = json.loads(json.dumps(body), cls=JSONDecoder)
+    body = json.loads(json.dumps(body, cls=JSONEncoder), cls=JSONDecoder)
     
     partialUpdate = len(body) == 1
     if not partialUpdate:

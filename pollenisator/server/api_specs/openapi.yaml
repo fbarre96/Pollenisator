@@ -963,6 +963,175 @@ paths:
               examples:
                 Success:
                   value: 'True'
+  
+  /notifications:
+    post:
+      operationId: pollenisator.server.servermodels.notification.create
+      tags:
+        - Notifications
+      summary: Create a new review notification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - pentest
+                - entity_type
+                - entity_name
+                - target_user
+              properties:
+                pentest_name:
+                  type: string
+                  description: Pentest identifier
+                entity_type:
+                  type: string
+                  description: Entity collection name (e.g., "defects", "algo_rapport")
+                entity_id:
+                  type: string
+                  description: ObjectId of the entity being reviewed
+                entity_name:
+                  type: string
+                  description: Display name for the entity
+                target_user:
+                  type: string
+                  description: Username of reviewer
+      responses:
+        '201':
+          description: Notification created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  notification_id:
+                    type: string
+        '400':
+          description: Missing required field
+        '403':
+          description: Target user not in pentest
+        '404':
+          description: Target user not found
+
+  '/notifications/{pentest}/{username}':
+    get:
+      operationId: pollenisator.server.servermodels.notification.getNotifications
+      tags:
+        - Notifications
+      summary: Get all unread notifications for a user in a pentest
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Pentest identifier
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Username to fetch notifications for
+      responses:
+        '200':
+          description: List of unread notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    _id:
+                      type: string
+                    pentest_id:
+                      type: string
+                    entity_type:
+                      type: string
+                    entity_id:
+                      type: string
+                    entity_name:
+                      type: string
+                    requested_by:
+                      type: string
+                    target_user:
+                      type: string
+                    read:
+                      type: boolean
+                    created_at:
+                      type: string
+        '403':
+          description: Forbidden - can only access your own notifications
+
+  '/notifications/{pentest}/{notification_id}/read':
+    patch:
+      operationId: pollenisator.server.servermodels.notification.markAsRead
+      tags:
+        - Notifications
+      summary: Mark a notification as read
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Pentest identifier
+        - name: notification_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Notification ObjectId as string
+      responses:
+        '200':
+          description: Notification marked as read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '403':
+          description: Forbidden - can only mark your own notifications as read
+        '404':
+          description: Notification not found
+
+  '/notifications/{pentest}/{notification_id}':
+    delete:
+      operationId: pollenisator.server.servermodels.notification.delete
+      tags:
+        - Notifications
+      summary: Delete a notification
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: notification_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Notification ObjectId as string
+      responses:
+        '200':
+          description: Notification deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '403':
+          description: Forbidden - can only delete your own notifications
+        '404':
+          description: Notification not found
+
   /user/register:
     post:
       operationId: pollenisator.server.auth.createUser
