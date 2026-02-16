@@ -596,16 +596,12 @@ class Defect(Element):
         data = {} if data is None else data
         if "_id" in data:
             del data["_id"]
-        if "defect_id" in data:
-            del data["defect_id"]
         if "index" in data:
             del new_data["index"] # index is not updatable directly
         new_data |= data
         new_self = Defect(self.pentest, new_data)
         if "_id" in new_data:
             del new_data["_id"]
-        if "defect_id" in new_data:
-            del new_data["defect_id"]
         if "index" in data:
             del new_data["index"] # index is not updatable directly
         oldRisk = self.risk
