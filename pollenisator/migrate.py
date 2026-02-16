@@ -6,6 +6,7 @@ import os
 from pollenisator.core.components.utils import getMainDir
 from bson import ObjectId
 from typing import Dict, List, Union
+from pollenisator.server.modules.migration.migrate_remarks_to_defects import migrate_remarks_in_database
 
 def migrate():
     dbclient = mongo.DBClient.getInstance()
@@ -47,6 +48,8 @@ def migrate():
         version = migrate_2_16()
     if version == "2.16":
         version = migrate_2_17()
+    if version == "2.17":
+        version = migrate_2_18()
     logger.info("DB version is %s", version)
 
 def migrate_0():
@@ -470,3 +473,44 @@ def migrate_2_17():
         {"$set": {"key": "version", "value": "2.17"}}
     )
     return "2.17"
+
+def migrate_2_18():
+    """
+    Migrate all remarks from the 'remarks' collection to the 'defects' collection
+    with is_remark=True flag.
+    """
+    dbclient = mongo.DBClient.getInstance()
+    logger.info("Starting migration 2.18: Migrating remarks to defects")
+    
+    # Get all pentest databases
+    pentest_uuids = dbclient.listPentestUuids()
+    all_databases = ["pollenisator"] + pentest_uuids
+    
+    total_migrated = 0
+    total_errors = 0
+    
+    for pentest in all_databases:
+        try:
+            result = migrate_remarks_in_database(pentest, dry_run=False)
+            if not result.get("skipped", False):
+                total_migrated += result.get("migrated", 0)
+                total_errors += result.get("errors", 0)
+                logger.info(
+                    f"Pentest {pentest}: migrated {result.get('migrated', 0)}/{result.get('total', 0)} remarks, "
+                    f"{result.get('errors', 0)} errors"
+                )
+        except Exception as e:
+            logger.error(f"Error migrating remarks in {pentest}: {str(e)}")
+            total_errors += 1
+    
+    logger.info(
+        f"Migration 2.18 completed: {total_migrated} remarks migrated, {total_errors} errors"
+    )
+    
+    dbclient.updateInDb(
+        "pollenisator",
+        "infos",
+        {"key": "version"},
+        {"$set": {"key": "version", "value": "2.18"}}
+    )
+    return "2.18"
