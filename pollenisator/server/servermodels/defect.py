@@ -359,11 +359,11 @@ def update_template_suggestion(defect_iid: str, body: Dict[str, Any], username: 
     if old_data is None:
         old_data = dbclient.findInDb("pollenisator", "defects", {"_id":ObjectId(defect_iid)}, False)
         if old_data is None:
-            old_data = {}
+            return "Not found", 404
     old_data |= new_data
     old_data["suggested_by"] = username
     old_data["creation_time"] = str(datetime.datetime.now())
-    dbclient.updateInDb("pollenisator", "defectssuggestions", {"_id":ObjectId(defect_iid)}, {"$set":old_data}, False, True, upsert=True)
+    dbclient.updateInDb("pollenisator", "defectssuggestions", {"_id":ObjectId(defect_iid)}, {"$set":old_data}, False, True)
     return True
 
 @permission("pentester")
