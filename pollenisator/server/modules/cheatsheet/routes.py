@@ -37,26 +37,10 @@ def insert(body: Dict[str, Any]) -> Union[ErrorStatus, CheckItemInsertResult]:
     """
     try:
         body = json.loads(json.dumps(body), cls=JSONDecoder)
-        defect_tags = body.get("defect_tags", [])
-        if not isinstance(defect_tags, list):
-            return "defect_tags must be a list", 400
-        for defect_tag in defect_tags:
-            if not isinstance(defect_tag, list):
-                return "defect_tags must be a list of list", 400
-            if not isinstance(defect_tag[0], str):
-                return "defect_tags must be a list of list of 2 values : string, ObjectId", 400
-            if not isinstance(defect_tag[1], ObjectId):
-                if isinstance(defect_tag[1], str):
-                    oid = detect_objectid(defect_tag[1])
-                    defect_tag[1] = ObjectId(oid)
-                else:
-                    return "defect_tags must be a list of list of 2 values : string, ObjectId", 400
-                
     except json.JSONDecodeError:
         return "Invalid JSON", 400
     except bson.errors.InvalidId:
-        return "Invalid ObjectId  in defect_tags", 400
-    body["defect_tags"] = defect_tags
+        return "Invalid ObjectId", 400
     checkitem = CheckItem("pollenisator", body)
     res: CheckItemInsertResult = checkitem.addInDb()
     return res

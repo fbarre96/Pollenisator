@@ -407,12 +407,6 @@ components:
           type: array
           items:
             type: string
-        defect_tags:
-          type: array
-          items:
-            type: array
-            items:
-              type: string          
         script:
           type: string
         pentest_types:
@@ -425,5 +419,3 @@ components:
           type: array
           items:
             type: string
-
-

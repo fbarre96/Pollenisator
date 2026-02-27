@@ -329,6 +329,7 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
             logger.warning("Report generation is taking too long, terminating the process...")
             return "Report generation is taking too long and was terminated.", 500
         if result_queue.empty():
+            logger.error("Report generation did not return any result : result queue is empty.")
             return "An error occured while generating the report.", 500
         return_dict = result_queue.get()
         #p.join()
@@ -339,6 +340,7 @@ def generateReport(pentest: str, body: Dict[str, Any]) -> Union[ErrorStatus, Res
         logger.error(f"Error while generating the report: {e}")
         return "An error occured while generating the report.", 500
     if "res" not in return_dict:
+        logger.error("Report generation did not return a result.")
         return "An error occured while generating the report.", 500
     if return_dict["res"] is True:
         logger.info("Report generated successfully")
@@ -748,3 +750,143 @@ def getProofPath(pentest: str, defect_iid: ObjectId) -> str:
     local_path = os.path.join(getMainDir(), "files")
     return os.path.join(local_path, pentest, "proof", str(defect_iid))
 
+
+@permission("report_template_writer")
+def createDefectTagAssociation(body: Dict[str, Any]) -> Union[ErrorStatus, Dict[str, bool]]:
+    """
+    Create a Defect-Tag association in the global pollenisator database.
+    
+    Args:
+        body (Dict[str, Any]): The data containing tag_name and defect_common_translation_id.
+        
+    Returns:
+        Union[ErrorStatus, Dict[str, bool]]: Returns an error if validation fails, or a success dictionary.
+    """
+    tag_name = body.get("tag_name")
+    defect_common_translation_id = body.get("defect_common_translation_id")
+    
+    if not tag_name or not defect_common_translation_id:
+        return "Missing required fields: tag_name and defect_common_translation_id", 400
+    
+    dbclient = DBClient.getInstance()
+    
+    # Check if association already exists
+    existing = dbclient.findInDb(
+        "pollenisator", 
+        "defect_tags", 
+        {"tag_name": tag_name, "defect_common_translation_id": defect_common_translation_id}, 
+        False
+    )
+    
+    if existing:
+        return "Association already exists", 409
+    
+    # Insert the new association
+    dbclient.insertInDb(
+        "pollenisator",
+        "defect_tags",
+        {"tag_name": tag_name, "defect_common_translation_id": defect_common_translation_id},
+        parent="",
+        notify=True
+    )
+    
+    return {"res": True}
+
+@permission("report_template_writer")
+def deleteDefectTagAssociation(defect_tag_id: str) -> Union[ErrorStatus, Dict[str, bool]]:
+    """
+    Delete a Defect-Tag association from the global pollenisator database.
+    
+    Args:
+        defect_tag_id: str: The ID of the Defect-Tag association to delete, ObjectId
+        
+    Returns:
+        Union[ErrorStatus, Dict[str, bool]]: Returns an error if not found, or a success dictionary.
+    """
+    
+    
+    if not defect_tag_id.strip():
+        return "Missing required fields: tag_name and defect_common_translation_id", 400
+    defect_tag_id = ObjectId(defect_tag_id)
+    dbclient = DBClient.getInstance()
+    
+    # Delete the association
+    result = dbclient.deleteFromDb(
+        "pollenisator",
+        "defect_tags",
+        {"_id":ObjectId(defect_tag_id)},
+        notify=True
+    )
+    
+    if result == 0:
+        return "Association not found", 404
+    
+    return {"res": True}
+
+@permission("report_template_writer")
+def updateDefectTagAssociation(defect_tag_id: str, body: Dict[str, Any]) -> Union[ErrorStatus, Dict[str, bool]]:
+    """
+    Update a Defect-Tag association in the global pollenisator database.
+    
+    Args:
+        defect_tag_id: str: The ID of the Defect-Tag association to update, ObjectId
+        body (Dict[str, Any]): The data containing tag_name and/or defect_common_translation_id to update.
+        
+    Returns:
+        Union[ErrorStatus, Dict[str, bool]]: Returns an error if validation fails or association not found, or a success dictionary.
+    """
+    if not defect_tag_id.strip():
+        return "Missing required field: defect_tag_id", 400
+    defect_tag_id = ObjectId(defect_tag_id)
+    tag_name = body.get("tag_name")
+    defect_common_translation_id = body.get("defect_common_translation_id")
+    
+    if not tag_name and not defect_common_translation_id:
+        return "At least one field (tag_name or defect_common_translation_id) must be provided for update", 400
+    
+    dbclient = DBClient.getInstance()
+    
+    update_fields = {}
+    if tag_name:
+        update_fields["tag_name"] = tag_name
+    if defect_common_translation_id:
+        update_fields["defect_common_translation_id"] = defect_common_translation_id
+    
+    result = dbclient.updateInDb(
+        "pollenisator",
+        "defect_tags",
+        {"_id":defect_tag_id},
+        {"$set": update_fields},
+        notify=True
+    )
+    
+    if result == 0:
+        return "Association not found", 404
+    
+    return {"res": True}
+
+@permission("user")
+def getDefectTagAssociations() -> List[Dict[str, str]]:
+    """
+    Get all Defect-Tag associations from the global pollenisator database.
+    
+    Returns:
+        List[Dict[str, str]]: A list of all defect-tag associations with tag_name and defect_common_translation_id.
+    """
+    dbclient = DBClient.getInstance()
+    
+    associations = dbclient.findInDb("pollenisator", "defect_tags", {}, True)
+    
+    if associations is None:
+        return []
+    
+    # Return only the relevant fields and ensure _id is removed
+    result = []
+    for assoc in associations:
+        result.append({
+            "tag_name": assoc.get("tag_name", ""),
+            "defect_common_translation_id": assoc.get("defect_common_translation_id", ""),
+            "_id": ObjectId(assoc.get("_id", ""))
+        })
+    
+    return result

@@ -1547,47 +1547,15 @@ def _import_cheatsheet_commands(commands: List[Dict[str, Any]], user: str, dbcli
     
     return matching_commands
 
-
-def _import_cheatsheet_defects(defects: List[Dict[str, Any]], failed: List[Dict[str, Any]]) -> Dict[str, str]:
-    """
-    Import defects from cheatsheet data.
-
-    Args:
-        defects (List[Dict[str, Any]]): List of defect dictionaries to import.
-        failed (List[Dict[str, Any]]): List to append failed imports to.
-
-    Returns:
-        Dict[str, str]: Mapping of original IDs to new IDs.
-    """
-    matching_defects = {}
-    
-    for defect in defects:
-        save_id = str(defect["_id"])
-        del defect["_id"]
-        try:
-            obj_ins = Defect("pollenisator", defect).addInDb()
-            matching_defects[save_id] = str(obj_ins["iid"])
-            if not obj_ins["res"]:
-                failed.append(defect)
-        except ValueError as _e:
-            failed.append(defect)
-    
-    return matching_defects
-
-
-def _update_check_references(check: Dict[str, Any], matching_commands: Dict[str, str], 
-                           matching_defects: Dict[str, str]) -> None:
+def _update_check_references(check: Dict[str, Any], matching_commands: Dict[str, str]) -> None:
     """
     Update check item references to use new command and defect IDs.
 
     Args:
         check (Dict[str, Any]): Check item dictionary to update.
         matching_commands (Dict[str, str]): Mapping of original command IDs to new IDs.
-        matching_defects (Dict[str, str]): Mapping of original defect IDs to new IDs.
     """
     check_commands = check.get("commands", [])
-    check_defects = check.get("defects", [])
-    check_defect_tags = check.get("defect_tags", [])
     
     # Update command references
     check["commands"] = []
@@ -1595,36 +1563,20 @@ def _update_check_references(check: Dict[str, Any], matching_commands: Dict[str,
         if str(command) in matching_commands:
             check["commands"].append(matching_commands[str(command)])
     
-    # Update defect references
-    check["defects"] = []
-    for defect in check_defects:
-        if str(defect) in matching_defects:
-            check["defects"].append(matching_defects[str(defect)])
-    
-    # Update defect tag references
-    defect_tags = []
-    for defect_tag in check_defect_tags:
-        if str(defect_tag[1]) in matching_defects:
-            defect_tag[1] = str(matching_defects[str(defect_tag[1])])
-            defect_tags.append(defect_tag)
-    check["defect_tags"] = defect_tags
 
-
-def _import_cheatsheet_checkitems(checkitems: List[Dict[str, Any]], matching_commands: Dict[str, str], 
-                                 matching_defects: Dict[str, str]) -> None:
+def _import_cheatsheet_checkitems(checkitems: List[Dict[str, Any]], matching_commands: Dict[str, str]) -> None:
     """
     Import check items from cheatsheet data.
 
     Args:
         checkitems (List[Dict[str, Any]]): List of check item dictionaries to import.
         matching_commands (Dict[str, str]): Mapping of original command IDs to new IDs.
-        matching_defects (Dict[str, str]): Mapping of original defect IDs to new IDs.
     """
     for check in checkitems:
         save_id = str(check["_id"])
         del check["_id"]
         
-        _update_check_references(check, matching_commands, matching_defects)
+        _update_check_references(check, matching_commands)
         
         check_o = CheckItem("pollenisator", check)
         check_o.addInDb()
@@ -1653,11 +1605,9 @@ def doImportCheatsheet(data: str, user: str) -> Union[ErrorStatus, List[Dict[str
     # Import commands and track ID mappings
     matching_commands = _import_cheatsheet_commands(checks["commands"], user, dbclient, failed)
     
-    # Import defects and track ID mappings
-    matching_defects = _import_cheatsheet_defects(checks["defects"], failed)
     
     # Import check items with updated references
-    _import_cheatsheet_checkitems(checks["checkitems"], matching_commands, matching_defects)
+    _import_cheatsheet_checkitems(checks["checkitems"], matching_commands)
     
     return failed
 
@@ -1733,10 +1683,6 @@ def doExportCheatsheet() -> Dict[str, List[Dict[str, Any]]]:
     for check in checks:
         c = check
         res["checkitems"].append(c)
-    defects = dbclient.findInDb("pollenisator", "defects", {}, True)
-    for defect in defects:
-        c = defect
-        res["defects"].append(c)
     commands = dbclient.findInDb("pollenisator", "commands", {}, True)
     for command in commands:
         c = command

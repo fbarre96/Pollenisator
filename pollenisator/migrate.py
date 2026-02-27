@@ -50,6 +50,8 @@ def migrate():
         version = migrate_2_17()
     if version == "2.17":
         version = migrate_2_18()
+    if version == "2.18":
+        version = migrate_2_19()
     logger.info("DB version is %s", version)
 
 def migrate_0():
@@ -514,3 +516,17 @@ def migrate_2_18():
         {"$set": {"key": "version", "value": "2.18"}}
     )
     return "2.18"
+
+def migrate_2_19():
+    dbclient = mongo.DBClient.getInstance()
+    for checkitem in dbclient.findInDb("pollenisator", "checkitems", {}, True):
+        defect_tags = checkitem.get("defect_tags", [])
+        for assoc in defect_tags:
+            dbclient.insertInDb("pollenisator", "defect_tags", {"tag_name": assoc[0], "defect_common_translation_id": assoc[1]})
+    dbclient.updateInDb(
+        "pollenisator",
+        "infos",
+        {"key": "version"},
+        {"$set": {"key": "version", "value": "2.19"}}
+    )
+    return "2.19"

@@ -411,29 +411,17 @@ class Element(metaclass=AbstractMetaElement):
             tag (Tag): The tag associated with the defects.
             target_data (Dict[str, Any]): The target data to which the defects will be added.
         """
-        from pollenisator.server.modules.cheatsheet.cheatsheet import CheckItem
 
-        # Build MongoDB query for defects with matching tag name
-        query = {
-            "defect_tags": {
-                "$elemMatch": {
-                    "$elemMatch": {
-                        "$eq": tag.name
-                    }
-                }
-            }
-        }
         
-        checkitems = CheckItem.fetchObjects("pollenisator", query)
-        if checkitems is None:
+        defects_tags = DBClient.getInstance().findInDb(pentest, "defect_tags", {"tag_name": tag.name}, True)
+        if defects_tags is None:
             return
-
         # Get pentest language setting once
         pentest_language = cls._get_pentest_language(pentest)
         
         # Process each check item and its associated defects
-        for check_item in checkitems:
-            cls._process_check_item_defects(pentest, tag, target_data, check_item, pentest_language)
+        for defect_tag in defects_tags:
+            cls._process_tags_defects(pentest, tag, target_data, defect_tag, pentest_language)
 
     @classmethod
     def _get_pentest_language(cls, pentest: str) -> Optional[str]:
@@ -451,39 +439,45 @@ class Element(metaclass=AbstractMetaElement):
         return lang_setting.get("value") if lang_setting else None
 
     @classmethod
-    def _process_check_item_defects(cls, pentest: str, tag: Tag, target_data: Dict[str, Any], 
-                                  check_item: Any, pentest_language: Optional[str]) -> None:
+    def _process_tags_defects(cls, pentest: str, tag: Tag, target_data: Dict[str, Any], 
+                                  defect_tag: Dict[str, Any], pentest_language: Optional[str]) -> None:
         """
-        Processes defects for a specific check item.
+        Processes defects for a tag by checking if the defect tag matches the tag name and creating new defects as needed.
         
         Args:
             pentest (str): The name of the pentest.
             tag (Tag): The tag associated with the defects.
             target_data (Dict[str, Any]): The target data to which the defects will be added.
-            check_item: The check item containing defect tags.
+            defect_tag: a defect-tag association
             pentest_language (Optional[str]): The pentest language setting.
         """
         from pollenisator.core.models.defect import Defect
         
-        for defect_tag in check_item.defect_tags:
-            if not cls._is_matching_defect_tag(defect_tag, tag.name):
-                continue
-                
-            defect_id = defect_tag[1]
-            defect = Defect.fetchObject("pollenisator", {"_id": ObjectId(defect_id)})
+        if not cls._is_matching_defect_tag(defect_tag.get("tag_name",""), tag.name):
+            return
             
-            if defect is None:
-                continue
-                
-            defect = cast(Defect, defect)
-            
-            # Skip defect if language doesn't match pentest language
-            if not cls._should_include_defect(defect, pentest_language):
-                defect_translation = Defect.fetchObject("pollenisator", {"common_translation_id": defect.common_translation_id, "language": pentest_language})
-                if defect_translation is None:
-                    continue
-                defect = cast(Defect, defect_translation)
-            cls._create_new_defect(pentest, tag, target_data, defect)
+        defect_common_translation_id = defect_tag.get("defect_common_translation_id", "")
+        defects_translations = Defect.fetchObject("pollenisator", {"common_translation_id": defect_common_translation_id}, True)
+        
+        if defects_translations is None:
+            return
+        if defects_translations is not None and len(defects_translations) == 0:
+            return
+        english_defect = None
+        for defect in defects_translations:
+        # Skip defect if language doesn't match pentest language
+            if cls._should_include_defect(defect, pentest_language):
+                cls._create_new_defect(pentest, tag, target_data, defect)
+                return # one translation per tag is enough, we can stop after the first match
+            else:
+                if defect.language == "en":
+                    english_defect = defect
+        # If no defect matches the pentest language but an English translation exists, create a defect based on the English translation
+        if english_defect is not None: # fallback
+            cls._create_new_defect(pentest, tag, target_data, english_defect)
+        return
+        
+        
 
     @classmethod
     def _is_matching_defect_tag(cls, defect_tag: List[str], tag_name: str) -> bool:

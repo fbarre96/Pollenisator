@@ -989,6 +989,111 @@ paths:
                 not found:
                   value: '"This defect suggestion does not exist"'
 
+  "/report/DefectTemplates/defectTagAssociation":
+    post:
+      operationId: pollenisator.server.modules.report.report.createDefectTagAssociation
+      tags:
+        - Defect Template
+      summary: "Create a Defect-Tag association"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DefectTag'
+      responses:
+        "200":
+          description: successful creation of the Defect-Tag association
+    get:
+      operationId: pollenisator.server.modules.report.report.getDefectTagAssociations
+      tags:
+        - Defect Template
+      summary: "Get all Defect-Tag associations"
+      responses:
+        "200":
+          description: successful retrieval of all Defect-Tag associations
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '[{"tag_name": "tag1", "defect_common_translation_id": "defect1"}, {"tag_name": "tag2", "defect_common_translation_id": "defect2"}]'
+  "/report/DefectTemplates/defectTagAssociation/{defect_tag_id}":
+    delete:
+      operationId: pollenisator.server.modules.report.report.deleteDefectTagAssociation
+      tags:
+        - Defect Template
+      summary: "Delete a Defect-Tag association"
+      parameters:
+        - name: defect_tag_id
+          in: path
+          description: The ID of the Defect-Tag association to delete, ObjectId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: successful deletion of the Defect-Tag association
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"res": true}'
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                missing_fields:
+                  value: '"Missing required fields: defect_tag_id"'
+                invalid_id:
+                  value: '"Invalid defect_tag_id, must be a valid ObjectId"'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              examples:
+                not_found:
+                  value: '"Defect-Tag association not found"' 
+    put:
+      operationId: pollenisator.server.modules.report.report.updateDefectTagAssociation
+      tags:
+        - Defect Template
+      summary: "Update a Defect-Tag association"
+      parameters:
+        - name: defect_tag_id
+          in: path
+          description: The ID of the Defect-Tag association to update, ObjectId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DefectTag'
+      responses:
+        "200":
+          description: successful update of the Defect-Tag association
+          content:
+            application/json:
+              examples:
+                success:
+                  value: '{"res": true}'
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              examples:
+                missing_fields:
+                  value: '"Missing required fields: defect_tag_id"'
+                invalid_id:
+                  value: '"Invalid defect_tag_id, must be a valid ObjectId"'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              examples:
+                not_found:
+                  value: '"Defect-Tag association not found"'
   "/report/suggestions/search":
     post:
       operationId: pollenisator.server.servermodels.defect.findDefectSuggestions
@@ -1106,3 +1211,15 @@ paths:
                   value: '"The knowledge database is unreachable"'
                 Error from knowledge db:
                   value: '"The knowledge dabatase encountered an issue : "{response_text}'
+
+components:
+  schemas:
+    DefectTag:
+      title: DefectTag
+      type: object
+      description: A Defect-Tag association, when the tag is created, a defect is created and associated to the tag, when the tag is deleted, the associated defect is deleted as well
+      properties:
+        tag_name:
+          type: string
+        defect_common_translation_id:
+          type: string

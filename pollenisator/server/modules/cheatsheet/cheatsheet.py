@@ -37,9 +37,9 @@ class CheckItem(Element):
                         int(valuesFromDb.get("priority", 0)), int(valuesFromDb.get("max_thread", 1)),
                         valuesFromDb.get("description", ""), str(valuesFromDb.get("category", "")),
                         valuesFromDb.get("check_type", ""), int(valuesFromDb.get("step", 0)), 
-                        valuesFromDb.get("commands"), valuesFromDb.get("defect_tags"), valuesFromDb.get("script"), valuesFromDb.get("infos"))
+                        valuesFromDb.get("commands"),  valuesFromDb.get("script"), valuesFromDb.get("infos"))
 
-    def initialize(self, title: str, pentest_types: Optional[List[str]] = None, lvl: str = "", ports: str = "", priority: int = 0, max_thread: int = 1, description: str = "", category: str = "", check_type: str = "manual", step: int = 1, commands: Optional[List[str]] = None, defect_tags: Optional[List[str]] = None, script: Optional[str] = None, infos: Optional[Dict[str, Any]] = None) -> 'CheckItem':
+    def initialize(self, title: str, pentest_types: Optional[List[str]] = None, lvl: str = "", ports: str = "", priority: int = 0, max_thread: int = 1, description: str = "", category: str = "", check_type: str = "manual", step: int = 1, commands: Optional[List[str]] = None, script: Optional[str] = None, infos: Optional[Dict[str, Any]] = None) -> 'CheckItem':
         """
         Initialize this CheatSheet object with the provided parameters.
 
@@ -55,7 +55,6 @@ class CheckItem(Element):
             check_type (str, optional): The type of check for the CheatSheet. Defaults to "manual".
             step (int, optional): The step of the CheatSheet. Defaults to 1.
             commands (Optional[List[str]], optional): The commands of the CheatSheet. Defaults to None.
-            defect_tags (Optional[List[str]], optional): The defect tags of the CheatSheet. Defaults to None.
             script (Optional[str], optional): The script of the CheatSheet. Defaults to None.
             infos (Optional[Dict[str, Any]], optional): The additional information of the CheatSheet. Defaults to None.
 
@@ -73,7 +72,6 @@ class CheckItem(Element):
         self.max_thread = max_thread
         self.step = step
         self.commands = [] if commands is None else commands
-        self.defect_tags = [] if defect_tags is None else defect_tags
         self.script = script
         self.pentest_types = [] if pentest_types is None else pentest_types
         self.infos = {} if infos is None else infos
@@ -127,7 +125,7 @@ class CheckItem(Element):
         return {"_id": self._id, "type":self.type, "title":self.title,"pentest_types":self.pentest_types, "lvl":self.lvl, "ports":self.ports,
                 "priority":self.priority, "max_thread":self.max_thread, "description": self.description, "category":self.category,
                 "check_type":self.check_type, "step":self.step, "parent":self.parent,
-                "commands":self.commands,"defect_tags":self.defect_tags, "script":self.script, "infos":self.infos}
+                "commands":self.commands, "script":self.script, "infos":self.infos}
 
     def addInDb(self) -> CheckItemInsertResult:
         """
