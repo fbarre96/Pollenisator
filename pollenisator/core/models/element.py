@@ -413,7 +413,7 @@ class Element(metaclass=AbstractMetaElement):
         """
 
         
-        defects_tags = DBClient.getInstance().findInDb(pentest, "defect_tags", {"tag_name": tag.name}, True)
+        defects_tags = DBClient.getInstance().findInDb("pollenisator", "defect_tags", {"tag_name": tag.name}, True)
         if defects_tags is None:
             return
         # Get pentest language setting once
@@ -457,14 +457,11 @@ class Element(metaclass=AbstractMetaElement):
             return
             
         defect_common_translation_id = defect_tag.get("defect_common_translation_id", "")
-        defects_translations = Defect.fetchObject("pollenisator", {"common_translation_id": defect_common_translation_id}, True)
-        
+        defects_translations = Defect.fetchObjects("pollenisator", {"common_translation_id": defect_common_translation_id})
         if defects_translations is None:
             return
-        if defects_translations is not None and len(defects_translations) == 0:
-            return
         english_defect = None
-        for defect in defects_translations:
+        for defect in cast(Generator[Defect, None, None], defects_translations):
         # Skip defect if language doesn't match pentest language
             if cls._should_include_defect(defect, pentest_language):
                 cls._create_new_defect(pentest, tag, target_data, defect)
@@ -491,6 +488,8 @@ class Element(metaclass=AbstractMetaElement):
         Returns:
             bool: True if the defect tag matches, False otherwise.
         """
+        if isinstance(defect_tag, str):
+            return defect_tag == tag_name
         return len(defect_tag) >= 2 and defect_tag[0] == tag_name
 
     @classmethod
