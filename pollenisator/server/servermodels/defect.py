@@ -15,7 +15,7 @@ import uuid
 import datetime
 DefectInsertResult = TypedDict('DefectInsertResult', {'res': bool, 'iid': ObjectId})
 RemarkInsertResult = TypedDict('RemarkInsertResult', {'res': bool, 'iid': ObjectId})
-ExportDefectTemplates = TypedDict('ExportDefectTemplates', {'defects': List[Dict[str, Any]], 'remarks': List[Dict[str, Any]]})
+ExportDefectTemplates = TypedDict('ExportDefectTemplates', {'defects': List[Dict[str, Any]], 'remarks': List[Dict[str, Any]], 'defect_tags': List[Dict[str, Any]]})
 
 ErrorStatus = Tuple[str, int]
 
@@ -487,6 +487,16 @@ def importDefectTemplates(upfile: Any, **kwargs: Dict[str,Any ]) -> Union[Tuple[
             res = doInsert("pollenisator", remark, username)
             if not res["res"]:
                 doUpdate("pollenisator", res["iid"], remark, username, True)
+
+        # defect tags:
+        defect_tags = file_content.get("defect_tags", [])
+        for tag in defect_tags:
+            if "tag_name" not in tag or "defect_common_translation_id" not in tag:
+                continue
+            existing_tags = DBClient.getInstance().findInDb("pollenisator", "defect_tags", {"tag_name": tag["tag_name"], "defect_common_translation_id":tag["defect_common_translation_id"]}, False)
+            if existing_tags is None:
+                DBClient.getInstance().insertInDb("pollenisator", "defect_tags", tag)
+            
     except Exception as e:
         return "Invalid json sent : "+str(e), 400
     return True
@@ -507,7 +517,7 @@ def exportDefectTemplates(**kwargs: Any) -> ExportDefectTemplates:
     # Get all defects (including those that are remarks)
     all_defects = dbclient.findInDb("pollenisator", "defects", {}, True)
     
-    res: ExportDefectTemplates = {"defects": [], "remarks": []}
+    res: ExportDefectTemplates = {"defects": [], "remarks": [], "defect_tags":[]}
     
     if all_defects is not None:
         for template in all_defects:
@@ -520,6 +530,12 @@ def exportDefectTemplates(**kwargs: Any) -> ExportDefectTemplates:
             else:
                 res["defects"].append(t)
     
+    all_defect_tags = dbclient.findInDb("pollenisator", "defect_tags", {}, True)
+    if all_defect_tags is not None:
+        for tag in all_defect_tags:
+            t = dict(tag)
+            del t['_id']
+            res["defect_tags"].append(t)
     return res
 
 @permission("user")
@@ -754,6 +770,11 @@ def validateDefectTemplate(iid: str, **kwargs) -> Union[bool, Tuple[str, int]]:
         suggestion["suggestion_type"] = "update"
         Defect.save_template_history(str(existing.get("_id")), username)
         doUpdate("pollenisator", str(existing.get("_id")), suggestion, username, True)
+        Defect.sync_translation_fields(
+            existing.get("common_translation_id", ""),
+            suggestion,
+            str(existing.get("_id")),
+        )
     else:
         suggestion["suggestion_type"] = "insert"
         if suggestion.get("script", "").strip() != "" and "write_defect_script" not in kwargs["token_info"]["scope"]:

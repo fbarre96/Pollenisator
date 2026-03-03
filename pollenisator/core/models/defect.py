@@ -17,7 +17,9 @@ from pollenisator.core.models.element import Element
 DefectInsertResult = TypedDict('DefectInsertResult', {'res': bool, 'iid': ObjectId})
 
 
-sem = threading.Semaphore() 
+sem = threading.Semaphore()
+
+TRANSLATION_SHARED_FIELDS: frozenset = frozenset({"risk", "perimeter", "ease", "impact", "cvss_score", "cvss_string"})
 
 class DEFECT_VISIBILITY(enum.Enum):
     ME = 'me'
@@ -613,6 +615,31 @@ class Defect(Element):
             new_data = self.handle_proofs_update(clean_proofs, new_data)
         dbclient.updateInDb(self.pentest, "defects", {"_id":ObjectId(self.getId())}, {"$set":new_data}, False, True)
         return list(new_data.keys())
+
+    @classmethod
+    def sync_translation_fields(cls, common_translation_id: str, data: Dict[str, Any], exclude_iid: str) -> None:
+        """
+        Propagate shared fields (risk, perimeter, ease, impact, cvss_score, cvss_string) to all
+        defect templates that share the same common_translation_id, excluding the one that was
+        just updated.
+
+        Args:
+            common_translation_id (str): The common_translation_id grouping all translations.
+            data (Dict[str, Any]): The update data; only TRANSLATION_SHARED_FIELDS keys are propagated.
+            exclude_iid (str): The _id (string) of the defect that was just updated, to skip it.
+        """
+        shared_data = {k: v for k, v in data.items() if k in TRANSLATION_SHARED_FIELDS}
+        if not shared_data:
+            return
+        dbclient = DBClient.getInstance()
+        dbclient.updateInDb(
+            "pollenisator",
+            "defects",
+            {"common_translation_id": common_translation_id, "_id": {"$ne": ObjectId(exclude_iid)}},
+            {"$set": shared_data},
+            True,   # many=True — update all sibling translations
+            False,  # notify=False — avoid flooding WebSocket clients
+        )
 
     def handle_proofs_update(self, clean_proofs:bool, new_data: Dict[str, Any]) -> Dict[str, Any]:
         """
