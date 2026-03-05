@@ -342,8 +342,7 @@ def verify_api_key_header(api_key: str) -> Optional[Dict[str, Any]]:
             if api_key_instance.pentest:
                 token_info["api_key_pentest"] = api_key_instance.pentest
             return token_info
-        
-        six.raise_from(Unauthorized, e)
+        raise ValueError("Invalid API key")
     except Exception as e:
         logger.error(f"Failed to verify API key: {e}")
         return {}
