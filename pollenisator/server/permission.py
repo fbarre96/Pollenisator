@@ -1,5 +1,3 @@
-from contextlib import contextmanager
-import contextvars
 from typing import Any
 from pollenisator.core.components.mongo import DBClient
 from pollenisator.core.components.logger_config import logger
@@ -10,40 +8,6 @@ from pollenisator.server.token import checkTokenValidity
 
 all_permissions = ["admin", "user", "owner", "pentester", "template_writer", "worker", "report_template_writer", "write_defect_script"]
 
-# System token used for trusted internal calls (see as_system()).
-_SYSTEM_TOKEN: dict[str, Any] = {
-    "sub": "system",
-    "scope": ["admin"],
-    "api_key_id": "system",  # skips checkTokenValidity
-}
-
-# Context variable that holds a synthetic token for internal calls.
-# Default is None, meaning no internal override is active.
-_system_call_ctx: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(
-    "system_call_ctx", default=None
-)
-
-
-@contextmanager
-def as_system():
-    """Context manager for trusted internal calls to @permission-decorated functions.
-
-    Usage::
-
-        from pollenisator.server.permission import as_system
-
-        with as_system():
-            result = some_permission_protected_function(pentest=pentest_id, ...)
-
-    All permission checks are still executed (scope, pentest access, …) but with a
-    synthetic admin token so they will always pass.  This must be called explicitly;
-    a missing ``token_info`` without this context will return a 401 Unauthorized.
-    """
-    token = _system_call_ctx.set(_SYSTEM_TOKEN)
-    try:
-        yield
-    finally:
-        _system_call_ctx.reset(token)
 
 def checkPentestPermission(token_info: dict[str, Any], pentest: str, check_owner: bool) -> bool:
     """
@@ -83,16 +47,9 @@ def permission(*dec_args, **deckwargs):
     def _permission(function):
         def wrapper(*args, **kwargs):
             token_info = kwargs.get("token_info", None)
-            if token_info is None:
-                system_token = _system_call_ctx.get()
-                if system_token is None:
-                    logger.debug("Unauthorized: token_info is None and no internal system context is active")
-                    return "Unauthorized", 401
-                # Inject a *copy* of the system token so the wrapper's in-place scope
-                # mutations (token_scope.append) do not corrupt the shared constant.
-                token_info = {**system_token, "scope": list(system_token["scope"])}
-                kwargs["token_info"] = token_info
-                kwargs.setdefault("user", token_info["sub"])
+            if token_info is None: # permission called from already checked function, assume authorization
+                result = function(*args, **kwargs)
+                return result
             scope = dec_args[0]
             arg_name = dec_args[1] if len(dec_args) == 2 else "pentest"
             #Check token_info and user kwargs supplied to the function by connexion specifying a security
