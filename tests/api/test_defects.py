@@ -172,7 +172,10 @@ class TestDefectTemplates:
                 "description": "Implement proper input validation",
                 "execution": "Moderate",
                 "gain": "Strong"
-            }]
+            }],
+            "is_template": True,
+            "is_remark": False,
+            "is_suggestion": True
         }
         def mock_find_in_db(_database, collection, _query, multi=False, *args, **kwargs):
             if collection == "defects":
