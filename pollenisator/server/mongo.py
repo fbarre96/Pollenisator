@@ -477,6 +477,8 @@ def bulk_delete_commands(body: Union[str, Dict[str, List[str]]], **kwargs: Dict[
 def listPentests(**kwargs: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     List all pentests for a user, or all pentests if the user is an admin.
+    When called with an API key scoped to a specific pentest, only that pentest
+    is returned.
 
     Args:
         **kwargs (Dict[str, Union[str, List[str]]]): Additional keyword arguments. The "token_info" key should contain a dictionary with a "sub" key representing the user and a "scope" key representing the user's scope.
@@ -486,6 +488,11 @@ def listPentests(**kwargs: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     dbclient = DBClient.getInstance()
     username = kwargs["token_info"]["sub"]
+    # If the request comes from a pentest-scoped API key, restrict to that pentest
+    api_key_pentest = kwargs["token_info"].get("api_key_pentest")
+    if api_key_pentest:
+        ret = dbclient.findInDb("pollenisator", "pentests", {"uuid": api_key_pentest}, False)
+        return [ret] if ret else []
     if "admin" in kwargs["token_info"]["scope"]:
         user_filter = None
     else:

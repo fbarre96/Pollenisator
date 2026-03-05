@@ -10,6 +10,7 @@ from pollenisator.core.models.element import Element
 from pymongo.results import InsertOneResult
 from pollenisator.core.models.tool import Tool
 from pollenisator.server.permission import permission
+from pollenisator.server.permission import checkPentestPermission
 from pollenisator.core.components.logger_config import logger
 from .api_key_manager import ApiKeyManager
 from werkzeug.exceptions import Unauthorized
@@ -180,6 +181,7 @@ def create_api_key(body: Dict[str, Any], **kwargs: Any) -> Union[Dict[str, Any],
         name = body.get("name", "").strip()
         expires_in_days = body.get("expires_in_days")
         permissions = body.get("permissions", ["read"])
+        pentest = body.get("pentest") or None
         
         # Validate input
         if not name:
@@ -196,6 +198,17 @@ def create_api_key(body: Dict[str, Any], **kwargs: Any) -> Union[Dict[str, Any],
         if not isinstance(permissions, list) or not all(p in valid_permissions for p in permissions):
             return f"Invalid permissions. Must be a list containing only: {valid_permissions}", 400
         
+        # Validate pentest exists if provided
+        if pentest is not None:
+            dbclient = DBClient.getInstance()
+            if dbclient.findInDb("pollenisator", "pentests", {"uuid": pentest}, False) is None:
+                return "Pentest not found", 404
+            if not checkPentestPermission(kwargs["token_info"], pentest, False):
+                return "Forbidden : you are not allowed to access this pentest", 403
+            # Force pentester permission for pentest-scoped keys
+            if "pentester" not in permissions:
+                permissions.append("pentester")
+        
         # Ensure user scope is included
         if "user" not in permissions:
             permissions.append("user")
@@ -206,7 +219,8 @@ def create_api_key(body: Dict[str, Any], **kwargs: Any) -> Union[Dict[str, Any],
             user_id=username,
             name=name,
             expires_in_days=expires_in_days,
-            permissions=permissions
+            permissions=permissions,
+            pentest=pentest
         )
         
         return {
@@ -214,7 +228,8 @@ def create_api_key(body: Dict[str, Any], **kwargs: Any) -> Union[Dict[str, Any],
             "api_key": plain_key,
             "name": api_key_instance.name,
             "expires_at": api_key_instance.expires_at.isoformat(),
-            "permissions": api_key_instance.permissions
+            "permissions": api_key_instance.permissions,
+            "pentest": api_key_instance.pentest
         }, 201
         
     except ValueError as e:
@@ -318,12 +333,15 @@ def verify_api_key_header(api_key: str) -> Optional[Dict[str, Any]]:
         
         if api_key_instance and api_key_instance.is_valid():
             # Return token info in the same format as JWT tokens
-            return {
+            token_info: Dict[str, Any] = {
                 "sub": api_key_instance.user_id,
                 "scope": api_key_instance.permissions,
                 "api_key_id": api_key_instance.key_id,
                 "exp": int(api_key_instance.expires_at.timestamp())
             }
+            if api_key_instance.pentest:
+                token_info["api_key_pentest"] = api_key_instance.pentest
+            return token_info
         
         six.raise_from(Unauthorized, e)
     except Exception as e:

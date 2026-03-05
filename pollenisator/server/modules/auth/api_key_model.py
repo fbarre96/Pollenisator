@@ -13,7 +13,7 @@ class ApiKey:
     def __init__(self, key_id: str, user_id: str, name: str, key_hash: str, 
                  salt: str, created_at: datetime, expires_at: datetime,
                  last_used_at: Optional[datetime], permissions: List[str], 
-                 is_active: bool):
+                 is_active: bool, pentest: Optional[str] = None):
         self.key_id = key_id
         self.user_id = user_id
         self.name = name
@@ -24,6 +24,7 @@ class ApiKey:
         self.last_used_at = last_used_at
         self.permissions = permissions
         self.is_active = is_active
+        self.pentest = pentest  # Optional pentest UUID this key is restricted to
     
     @classmethod
     def generate_api_key(cls) -> Tuple[str, str, str]:
@@ -49,7 +50,7 @@ class ApiKey:
     
     @classmethod
     def create(cls, user_id: str, name: str, expires_in_days: int, 
-               permissions: List[str]) -> Tuple['ApiKey', str]:
+               permissions: List[str], pentest: Optional[str] = None) -> Tuple['ApiKey', str]:
         """
         Create a new API key instance.
         Returns: (ApiKey instance, plain_api_key)
@@ -69,7 +70,8 @@ class ApiKey:
             expires_at=expires_at,
             last_used_at=None,
             permissions=permissions or ['read'],
-            is_active=True
+            is_active=True,
+            pentest=pentest
         )
         
         return instance, api_key
@@ -105,7 +107,8 @@ class ApiKey:
             'expires_at': self.expires_at,
             'last_used_at': self.last_used_at,
             'permissions': self.permissions,
-            'is_active': self.is_active
+            'is_active': self.is_active,
+            'pentest': self.pentest
         }
     
     @classmethod
@@ -134,7 +137,8 @@ class ApiKey:
             expires_at=expires_at,
             last_used_at=last_used_at,
             permissions=data['permissions'],
-            is_active=data['is_active']
+            is_active=data['is_active'],
+            pentest=data.get('pentest')
         )
     
     def to_info_dict(self) -> Dict[str, Any]:
@@ -146,5 +150,6 @@ class ApiKey:
             'expires_at': self.expires_at.isoformat() if isinstance(self.expires_at, datetime) else self.expires_at,
             'last_used_at': self.last_used_at.isoformat() if self.last_used_at and isinstance(self.last_used_at, datetime) else self.last_used_at,
             'permissions': self.permissions,
-            'is_active': self.is_valid()
+            'is_active': self.is_valid(),
+            'pentest': self.pentest
         }

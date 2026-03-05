@@ -21,7 +21,7 @@ paths:
               $ref: '#/components/schemas/AuthInfo'
         description: ''
       tags:
-        - Authentication Info
+        - get
     parameters:
       - schema:
           type: string
@@ -181,6 +181,10 @@ components:
             enum: [read, write, delete, pentester, user]
           description: Permissions granted to this API key
           default: [read]
+        pentest:
+          type: string
+          description: Optional pentest UUID to restrict this API key to a single pentest
+          nullable: true
       required:
         - name
         - expires_in_days
@@ -207,6 +211,10 @@ components:
           items:
             type: string
           description: Permissions granted to this API key
+        pentest:
+          type: string
+          description: Pentest UUID this API key is restricted to (null if unrestricted)
+          nullable: true
       required:
         - key_id
         - api_key
@@ -244,6 +252,10 @@ components:
         is_active:
           type: boolean
           description: Whether the API key is active and not expired
+        pentest:
+          type: string
+          description: Pentest UUID this API key is restricted to (null if unrestricted)
+          nullable: true
       required:
         - key_id
         - name

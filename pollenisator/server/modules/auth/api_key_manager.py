@@ -27,7 +27,7 @@ class ApiKeyManager:
             logger.warning(f"Could not create API key indexes: {e}")
     
     def create_api_key(self, user_id: str, name: str, expires_in_days: int,
-                      permissions: List[str] = None) -> Tuple[ApiKey, str]:
+                      permissions: List[str] = None, pentest: Optional[str] = None) -> Tuple[ApiKey, str]:
         """
         Create a new API key for a user.
         
@@ -36,6 +36,7 @@ class ApiKeyManager:
             name: Human-readable name for the key
             expires_in_days: Days until expiration (1-365)
             permissions: List of permissions
+            pentest: Optional pentest UUID to restrict this key to a single pentest
         
         Returns:
             Tuple of (ApiKey instance, plain_api_key)
@@ -65,7 +66,8 @@ class ApiKeyManager:
             user_id=user_id,
             name=name,
             expires_in_days=expires_in_days,
-            permissions=permissions or ['read']
+            permissions=permissions or ['read'],
+            pentest=pentest
         )
         
         # Store in database

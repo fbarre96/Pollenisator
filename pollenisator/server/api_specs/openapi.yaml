@@ -904,7 +904,6 @@ paths:
       tags:
         - Other
       summary: Get current user
-      security: []
       responses:
         '200':
           description: The username of the current logged user
