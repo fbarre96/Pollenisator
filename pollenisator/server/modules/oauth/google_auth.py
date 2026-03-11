@@ -6,6 +6,8 @@ Module for Google Workspace OAuth authentication.
 
 import os
 import datetime
+import base64
+import hashlib
 from typing import Any, Dict, Optional, Tuple, Union
 from urllib.parse import urlencode, urlparse, urlunparse
 from flask import redirect, request, url_for
@@ -128,28 +130,38 @@ def google_login() -> Union[Any, ErrorStatus]:
     
     # Generate and store state token to prevent CSRF
     state = secrets.token_urlsafe(32)
-    
+
+    # Generate PKCE code_verifier and derive the code_challenge (S256).
+    # The verifier is stored with the state so the callback can restore it on
+    # the new Flow instance – without this, newer versions of requests-oauthlib
+    # that auto-add code_challenge to the authorization URL would cause Google
+    # to return (invalid_grant) Missing code verifier.
+    code_verifier = secrets.token_urlsafe(96)
+    code_challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode('ascii')).digest()
+    ).rstrip(b'=').decode('ascii')
+
     # Store state token in database with expiration (5 minutes)
     dbclient = DBClient.getInstance()
     expires_at = datetime.datetime.now() + datetime.timedelta(minutes=5)
+    state_data = {
+        "state": state,
+        "code_verifier": code_verifier,
+        "created_at": datetime.datetime.now(),
+        "expires_at": expires_at
+    }
     result = None
     if dbclient.cacher.isAvailable():
-        result = dbclient.cacher.setCacheFromFindResult(f"oauth_state.{state}", {
-            "state": state,
-            "created_at":  datetime.datetime.now() ,
-            "expires_at": expires_at
-        })
+        result = dbclient.cacher.setCacheFromFindResult(f"oauth_state.{state}", state_data)
     if result is None:
-        dbclient.insertInDb("pollenisator", "oauth_states", {
-            "state": state,
-            "created_at":  datetime.datetime.now() ,
-            "expires_at": expires_at
-        })
-        
+        dbclient.insertInDb("pollenisator", "oauth_states", state_data)
+
     authorization_url, _ = flow.authorization_url(
         access_type='online',
         state=state,
-        prompt='select_account'  # Force account selection
+        prompt='select_account',  # Force account selection
+        code_challenge=code_challenge,
+        code_challenge_method='S256'
     )
     
     return redirect(authorization_url)
@@ -194,9 +206,18 @@ def google_callback(code: str, state: str) -> Union[Any, ErrorStatus]:
     # State is valid, delete it (one-time use)
     dbclient.deleteFromDb("pollenisator", "oauth_states", {"state": state_from_request}, False)
     
+    # Retrieve the PKCE verifier persisted during the login step
+    code_verifier = state_record.get('code_verifier')
+
     flow = get_google_auth_flow()
     if flow is None:
         return "Failed to initialize Google authentication", 500
+
+    # Restore the PKCE code_verifier on the new Flow instance so that
+    # fetch_token() includes it in the token request.
+    if code_verifier:
+        flow.code_verifier = code_verifier
+
     try:
         # Exchange authorization code for tokens
         # Use the proper authorization response URL to handle reverse proxy scenarios
