@@ -4,7 +4,6 @@
 Module for the authentication and user management.
 """
 
-import os
 from typing import Any, Dict, List, Tuple, Union
 from pollenisator.core.components.mongo import DBClient
 import bcrypt
@@ -13,11 +12,10 @@ from pollenisator.server.token import getTokenFor
 from pollenisator.server.mongo import doImportCheatsheet
 from pollenisator.core.components.utils import getDefaultCheatsheetFile
 from pollenisator.core.components.logger_config import logger
+from pollenisator.server.modules.oauth.oauth_utils import set_session_cookie
 from flask import Response, make_response, jsonify
 import re
 ErrorStatus = Tuple[str, int]
-
-isdebug = bool(os.environ.get("FLASK_DEBUG", False))
 
 def password_check(password):
     """
@@ -158,14 +156,7 @@ def updateUserRoles(body: Dict[str, Union[str|list[str]]], **kwargs) -> ErrorSta
         # If the user is updating his own roles, we need to update his token too
         token = getTokenFor(str(username))
         response = make_response(jsonify({"message":"Successully updated user", "token":token}))
-        response.set_cookie(
-            'session_token', 
-            token,
-            httponly=True,
-            secure=not isdebug,
-            samesite='Strict'
-        )
-        return response
+        return set_session_cookie(response, token)
     return "Successully updated user", 200
 
 @permission("admin")
@@ -318,14 +309,7 @@ def login(body: Dict[str, str]) -> Union[Any, ErrorStatus]:
             logger.info(f"User {username} successfully logged in")
             token = getTokenFor(username)
             response = make_response( jsonify({"token":token, "mustChangePassword": user_record.get("mustChangePassword", True)}))
-            response.set_cookie(
-                'session_token', 
-                token,
-                httponly=True,
-                secure=not isdebug,
-                samesite='Strict'
-            )
-            return response
+            return set_session_cookie(response, token)
     return "Authentication failure", 401
 
 @permission("user")
@@ -341,10 +325,10 @@ def logout(**kwargs: Any) -> Response:
     """
     response = make_response(jsonify({"message":"Successfully logged out"}))
     response.set_cookie(
-        'session_token', 
+        'session_token',
         '',
         httponly=True,
-        secure=not isdebug,
+        secure=True,
         samesite='Strict',
         expires=0
     )
@@ -388,14 +372,7 @@ def connectToPentest(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union
         # Set token in httpOnly cookie and return pentest name
         pentest_token = getTokenFor(username)
         response = make_response(jsonify({"pentest_name": pentest_name, "token":pentest_token}))
-        response.set_cookie(
-            'session_token', 
-            pentest_token,
-            httponly=True,
-            secure=not isdebug,
-            samesite='Strict'
-        )
-        return response
+        return set_session_cookie(response, pentest_token)
     else:
         owner = dbclient.getPentestOwner(pentest)
         testers.append(owner)
@@ -409,11 +386,4 @@ def connectToPentest(pentest: str, body: Dict[str, Any], **kwargs: Any) -> Union
         # Set token in httpOnly cookie and return pentest name
         pentest_token = getTokenFor(username)
         response = make_response(jsonify({"pentest_name": pentest_name, "token":pentest_token}))
-        response.set_cookie(
-            'session_token', 
-            pentest_token,
-            httponly=True,
-            secure=not isdebug,
-            samesite='Strict'
-        )
-        return response
+        return set_session_cookie(response, pentest_token)

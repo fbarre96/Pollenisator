@@ -1,0 +1,255 @@
+openapi: 3.0.0
+info:
+  description: AI-powered defect extraction and report synthesis for Pollenisator
+  version: 1.0.0
+  title: AI Module
+
+paths:
+
+  '/ai/{pentest}/analyze':
+    post:
+      summary: Start AI defect extraction pipeline
+      operationId: pollenisator.server.modules.ai.ai.analyze
+      tags:
+        - AI
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          description: Pentest UUID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - notes
+              properties:
+                notes:
+                  type: string
+                  description: Raw pentest notes to analyse
+                language:
+                  type: string
+                  default: en
+                  description: >
+                    Language code for template matching and synthesis
+                    (e.g. en, fr). Should match the language of your
+                    defect template library.
+      responses:
+        '200':
+          description: Pipeline job created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  status:
+                    type: string
+        '400':
+          description: Bad request (missing notes)
+        '503':
+          description: AI not configured — set api key via /ai/admin/settings
+
+  '/ai/{pentest}/job/{job_id}':
+    get:
+      summary: Poll AI extraction job status
+      operationId: pollenisator.server.modules.ai.ai.get_job
+      tags:
+        - AI
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job status document
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  status:
+                    type: string
+                    enum: [pending, running, completed, failed]
+                  progress_pct:
+                    type: integer
+                  step:
+                    type: string
+                  defects_created:
+                    type: integer
+                  error:
+                    type: string
+                    nullable: true
+                  created_at:
+                    type: string
+                  completed_at:
+                    type: string
+                    nullable: true
+        '404':
+          description: Job not found
+
+  '/ai/{pentest}/synthesis':
+    get:
+      summary: Get latest AI executive synthesis for a pentest
+      operationId: pollenisator.server.modules.ai.ai.get_synthesis
+      tags:
+        - AI
+      parameters:
+        - name: pentest
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: AI synthesis document
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: string
+                    description: Executive synthesis prose
+                  language:
+                    type: string
+                  generated_at:
+                    type: string
+                  job_id:
+                    type: string
+                  findings:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: No synthesis found — run analyze first
+
+  '/ai/admin/embed-templates':
+    post:
+      summary: Rebuild the embedding index for all defect templates
+      operationId: pollenisator.server.modules.ai.ai.embed_templates
+      tags:
+        - AI
+      description: >
+        Iterates every template in the pollenisator defect library,
+        computes (title + synthesis) embeddings, and stores them in-place.
+        Run once after initial setup and after bulk template imports.
+        Individual saves auto-trigger incremental re-embedding.
+      responses:
+        '200':
+          description: Embedding completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  embedded:
+                    type: integer
+                  status:
+                    type: string
+        '500':
+          description: Embedding failed (check AI settings)
+
+  '/ai/admin/settings':
+    get:
+      summary: Get current AI settings
+      operationId: pollenisator.server.modules.ai.ai.get_settings
+      tags:
+        - AI
+      description: Returns all non-null AI settings. API key is masked.
+      responses:
+        '200':
+          description: Current AI settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AiSettings'
+
+    put:
+      summary: Update AI settings
+      operationId: pollenisator.server.modules.ai.ai.update_settings
+      tags:
+        - AI
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiSettings'
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated:
+                    type: array
+                    items:
+                      type: string
+
+
+components:
+  schemas:
+    AiSettings:
+      title: AI Settings
+      type: object
+      properties:
+        ai_api_key:
+          type: string
+          description: API key for the LLM/embedding provider
+        ai_model:
+          type: string
+          description: >
+            litellm model identifier, e.g. "gpt-4o-mini",
+            "ollama/mistral", "anthropic/claude-3-haiku-20240307"
+        ai_base_url:
+          type: string
+          description: >
+            Custom base URL (for Ollama, Azure OpenAI, or local deployments).
+            Leave empty for OpenAI/Anthropic hosted APIs.
+        ai_embedding_model:
+          type: string
+          description: >
+            litellm embedding model identifier,
+            e.g. "text-embedding-3-small", "ollama/nomic-embed-text"
+        ai_similarity_threshold:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: >
+            Minimum cosine similarity score for a template to be sent to
+            the LLM for verification. Default: 0.65
+        ai_prompt_verify_system:
+          type: string
+          description: >
+            Override the verification-stage system prompt. Must instruct the
+            model to return JSON matching
+            {"results": [{"id": "...", "confirmed": true, "evidence": "..."}]}.
+            Candidate findings and note excerpts are injected in the user
+            message — no format variables needed here.
+            Leave empty to use the built-in default.
+        ai_prompt_synthesis_system:
+          type: string
+          description: >
+            Override the synthesis-stage system prompt. May contain the
+            literal "{language}" placeholder which is replaced at runtime
+            with the language code passed to /analyze. Must instruct the
+            model to return JSON matching {"synthesis": "<prose>"}.
+            Leave empty to use the built-in default.

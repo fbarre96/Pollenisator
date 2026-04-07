@@ -52,6 +52,8 @@ def migrate():
         version = migrate_2_18()
     if version == "2.18":
         version = migrate_2_19()
+    if version == "2.19":
+        version = migrate_2_20()
     logger.info("DB version is %s", version)
 
 def migrate_0():
@@ -530,3 +532,93 @@ def migrate_2_19():
         {"$set": {"key": "version", "value": "2.19"}}
     )
     return "2.19"
+
+def migrate_2_20():
+    """Migrate OAuth user documents from flat google_id / auth_provider fields
+    to the normalised ``oauth_identities`` array used by both Google and
+    Microsoft providers.
+
+    Before::
+
+        {
+            "google_id": "1234",
+            "auth_provider": "google",
+            "created_via": "google_oauth",
+            ...
+        }
+
+    After::
+
+        {
+            "oauth_identities": [
+                {"provider": "google", "provider_id": "1234", "email": "user@gmail.com"}
+            ],
+            ...
+        }
+    """
+    dbclient = mongo.DBClient.getInstance()
+    logger.info("Starting migration 2.20: normalise OAuth identity fields")
+
+    # Find all users that still have the legacy google_id field
+    users = dbclient.findInDb(
+        "pollenisator", "users", {"google_id": {"$exists": True}}, True
+    )
+
+    migrated = 0
+    for user in users:
+        google_id = user.get("google_id", "")
+        email = user.get("email", "")
+        if not google_id:
+            continue
+
+        identity_entry = {
+            "provider": "google",
+            "provider_id": google_id,
+            "email": email,
+        }
+
+        # Preserve any oauth_identities that might already exist
+        existing_identities = user.get("oauth_identities", [])
+        # Avoid duplicates
+        already_present = any(
+            entry.get("provider") == "google" and entry.get("provider_id") == google_id
+            for entry in existing_identities
+        )
+        if not already_present:
+            existing_identities.append(identity_entry)
+
+        dbclient.updateInDb(
+            "pollenisator",
+            "users",
+            {"_id": user["_id"]},
+            {
+                "$set": {"oauth_identities": existing_identities},
+                "$unset": {
+                    "google_id": "",
+                    "auth_provider": "",
+                    "created_via": "",
+                },
+            },
+            False,
+        )
+        migrated += 1
+
+    # Also ensure users that have NO oauth_identities field get an empty array
+    # so queries using $elemMatch don't fail on older documents.
+    dbclient.updateInDb(
+        "pollenisator",
+        "users",
+        {"oauth_identities": {"$exists": False}},
+        {"$set": {"oauth_identities": []}},
+        many=True,
+    )
+
+    logger.info("Migration 2.20 completed: %d users migrated to oauth_identities", migrated)
+
+    dbclient.updateInDb(
+        "pollenisator",
+        "infos",
+        {"key": "version"},
+        {"$set": {"key": "version", "value": "2.20"}},
+    )
+    return "2.20"

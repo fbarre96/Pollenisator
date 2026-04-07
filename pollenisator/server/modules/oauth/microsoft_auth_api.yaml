@@ -1,0 +1,208 @@
+openapi: 3.0.0
+info:
+  description: Microsoft (Entra ID) OAuth authentication endpoints
+  version: 1.0.0
+  title: Microsoft Authentication API
+
+paths:
+  /auth/microsoft/login:
+    get:
+      operationId: pollenisator.server.modules.oauth.microsoft_auth.microsoft_login
+      tags:
+        - Microsoft Authentication
+      summary: Initiate Microsoft OAuth login
+      security: []
+      responses:
+        "302":
+          description: Redirect to Microsoft identity platform consent screen
+        "503":
+          description: Microsoft authentication not configured
+          content:
+            application/json:
+              examples:
+                NotConfigured:
+                  value: "Microsoft authentication is not configured on this server"
+        "500":
+          description: Failed to initialize authentication
+
+  /auth/microsoft/callback:
+    get:
+      operationId: pollenisator.server.modules.oauth.microsoft_auth.microsoft_callback
+      tags:
+        - Microsoft Authentication
+      summary: Handle Microsoft OAuth callback
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Authorization code from Microsoft
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+          description: CSRF state token
+        - name: error
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Error code if the user denied consent or an error occurred
+        - name: error_description
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Human-readable error description
+      responses:
+        "200":
+          description: >
+            Authentication result. The response body ``action`` field determines
+            the next step for the frontend.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - description: Direct login success
+                    type: object
+                    properties:
+                      action:
+                        type: string
+                        enum: [logged_in]
+                      username:
+                        type: string
+                      email:
+                        type: string
+                      name:
+                        type: string
+                      picture:
+                        type: string
+                      session_expiration:
+                        type: integer
+                      scopes:
+                        type: array
+                        items:
+                          type: string
+                  - description: Account linking required
+                    type: object
+                    properties:
+                      action:
+                        type: string
+                        enum: [link_required]
+                      temp_token:
+                        type: string
+                      matched_username:
+                        type: string
+                      matched_email:
+                        type: string
+                      provider:
+                        type: string
+                      provider_email:
+                        type: string
+                      expires_in:
+                        type: integer
+        "400":
+          description: Invalid state parameter
+        "401":
+          description: Authentication failed (email not returned, token error, consent denied)
+        "403":
+          description: Domain restriction – user email not from allowed domain
+        "500":
+          description: Server error during authentication
+        "503":
+          description: Microsoft authentication not configured
+
+  /auth/microsoft/status:
+    get:
+      operationId: pollenisator.server.modules.oauth.microsoft_auth.get_microsoft_auth_status
+      tags:
+        - Microsoft Authentication
+      summary: Get Microsoft authentication configuration status
+      security: []
+      responses:
+        "200":
+          description: Microsoft authentication configuration status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                    description: Whether Microsoft authentication is configured
+                  domain_restriction:
+                    type: boolean
+                    description: Whether domain restriction is enabled
+                  allowed_domain:
+                    type: string
+                    nullable: true
+                    description: Allowed domain if restriction is enabled
+              examples:
+                Enabled:
+                  value:
+                    enabled: true
+                    domain_restriction: true
+                    allowed_domain: "company.com"
+                Disabled:
+                  value:
+                    enabled: false
+                    domain_restriction: false
+                    allowed_domain: null
+
+  /auth/microsoft/link/confirm:
+    post:
+      operationId: pollenisator.server.modules.oauth.microsoft_auth.microsoft_link_confirm
+      tags:
+        - Microsoft Authentication
+      summary: Confirm linking a Microsoft identity to an existing account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - temp_token
+                - password
+              properties:
+                temp_token:
+                  type: string
+                  description: Temporary token received from the callback link_required response
+                password:
+                  type: string
+                  description: The user's existing Pollenisator password to confirm ownership
+      responses:
+        "200":
+          description: Account linked successfully, returns session info with cookie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  action:
+                    type: string
+                    enum: [logged_in]
+                  username:
+                    type: string
+                  email:
+                    type: string
+                  name:
+                    type: string
+                  picture:
+                    type: string
+                  session_expiration:
+                    type: integer
+                  scopes:
+                    type: array
+                    items:
+                      type: string
+        "400":
+          description: Missing required fields or account has no password
+        "401":
+          description: Incorrect password
+        "410":
+          description: Link token expired

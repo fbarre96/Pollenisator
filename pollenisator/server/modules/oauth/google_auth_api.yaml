@@ -165,3 +165,58 @@ paths:
                     enabled: false
                     domain_restriction: false
                     allowed_domain: null
+
+  /auth/google/link/confirm:
+    post:
+      operationId: pollenisator.server.modules.oauth.google_auth.google_link_confirm
+      tags:
+        - Google Authentication
+      summary: Confirm linking a Google identity to an existing account
+      security: []  # Uses temp_token + password instead of JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - temp_token
+                - password
+              properties:
+                temp_token:
+                  type: string
+                  description: Temporary token received from the callback link_required response
+                password:
+                  type: string
+                  description: The user's existing Pollenisator password to confirm ownership
+      responses:
+        "200":
+          description: Account linked successfully, returns session info with cookie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  action:
+                    type: string
+                    enum: [logged_in]
+                  username:
+                    type: string
+                  email:
+                    type: string
+                  name:
+                    type: string
+                  picture:
+                    type: string
+                  session_expiration:
+                    type: integer
+                  scopes:
+                    type: array
+                    items:
+                      type: string
+        "400":
+          description: Missing required fields or account has no password
+        "401":
+          description: Incorrect password
+        "410":
+          description: Link token expired

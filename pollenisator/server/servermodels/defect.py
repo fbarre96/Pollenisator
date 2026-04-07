@@ -96,7 +96,15 @@ def doInsert(pentest: str, body: Dict[str, Any], username: str) -> DefectInsertR
     body = json.loads(json.dumps(body, cls=JSONEncoder), cls=JSONDecoder)
     body["editor"] = username
     defect = Defect(pentest, body)
-    return defect.addInDb()
+    result = defect.addInDb()
+    # Keep the embedding index up to date for template defects
+    if pentest == "pollenisator" and result.get("res"):
+        try:
+            from pollenisator.server.modules.ai.embedder import embed_single_async
+            embed_single_async(result["iid"])
+        except ImportError:
+            pass
+    return result
 
 def insert_template_suggestion(pentest: str, body: Dict[str, Any], username: str) -> Union[DefectInsertResult, Tuple[str, int]]:
     """
@@ -284,6 +292,13 @@ def doUpdate(pentest: str, defect_iid: str, body: Dict[str, Any], username: str,
             old.save_review(body)
         else:
             old.updateInDb(body, clean_proofs=False)
+    # Keep the embedding index up to date for template defects
+    if pentest == "pollenisator":
+        try:
+            from pollenisator.server.modules.ai.embedder import embed_single_async
+            embed_single_async(ObjectId(defect_iid))
+        except ImportError:
+            pass
     return "Success", 200
 
 @permission("pentester")
