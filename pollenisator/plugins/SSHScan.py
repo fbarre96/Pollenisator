@@ -5,6 +5,7 @@ from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, InfoUpdate, TagAddition
 
 class SSHScan(Plugin):
     default_bin_names = ["ssh-scan", "ssh_scan"]
@@ -55,7 +56,7 @@ class SSHScan(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
-            return None, None, None, None
+            return PluginResult.empty()
         notes = ""
         tags = [self.getTags()["info-sshscan"]]
         content = file_opened.read().decode("utf-8", errors="ignore")
@@ -63,8 +64,9 @@ class SSHScan(Plugin):
         try:
             notes_json = json.loads(content)
         except json.decoder.JSONDecodeError:
-            return None, None, None, None
+            return PluginResult.empty()
         oneScanIsValid = False
+        result = PluginResult(notes=notes, tags=tags, lvl="port", targets=targets)
         for scan in notes_json:
             try:
                 if scan.get('ssh_scan_version', None) is None:
@@ -74,28 +76,38 @@ class SSHScan(Plugin):
                 for ip in ips:
                     if ip.strip() == "":
                         continue
-                    Ip(pentest).initialize(ip, infos={"plugin":SSHScan.get_name()}).addInDb()
-                    port_o = Port(pentest).initialize(ip, port, "tcp", "ssh", infos={"plugin":SSHScan.get_name()})
-                    insert_res = port_o.addInDb()
-                    if not insert_res["res"]:
-                        port_o = Port.fetchObject(pentest, {"_id": insert_res["iid"]})
-                    if port_o is None:
-                        continue
-                    notes = "\n".join(
+                    result.ips.append(Ip(pentest).initialize(ip, infos={"plugin": SSHScan.get_name()}))
+                    result.ports.append(Port(pentest).initialize(ip, port, "tcp", "ssh", infos={"plugin": SSHScan.get_name()}))
+                    port_key = {"ip": ip, "port": port, "proto": "tcp"}
+                    scan_notes = "\n".join(
                         scan["compliance"].get("recommendations", []))
-                    targets[str(port_o.getId())] = {
+                    targets["sshscan_" + ip + "_" + port] = {
                         "ip": ip, "port": port, "proto": "tcp"}
                     oneScanIsValid = True
                     if "nopassword" in scan["auth_methods"]:
-                        tags = [self.getTags()["pwned-ssh-nopassword"]]
+                        result.tags = [self.getTags()["pwned-ssh-nopassword"]]
                     # Will not exit if port was not ssh
                     is_ok = scan["compliance"]["compliant"]
                     if str(is_ok) == "False":
-                        port_o.updateInfos({"compliant": "False"})
-                        port_o.updateInfos({"auth_methods": scan["auth_methods"]})
-                        port_o.addTag(Tag(self.getTags()["SSH-flaw"], notes=notes))
+                        result.info_updates.append(InfoUpdate(
+                            collection="ports",
+                            db_key=port_key,
+                            infos={"compliant": "False"}
+                        ))
+                        result.info_updates.append(InfoUpdate(
+                            collection="ports",
+                            db_key=port_key,
+                            infos={"auth_methods": scan["auth_methods"]}
+                        ))
+                        result.tag_additions.append(TagAddition(
+                            collection="ports",
+                            db_key=port_key,
+                            tag=Tag(self.getTags()["SSH-flaw"], notes=scan_notes)
+                        ))
+                    notes = scan_notes
             except KeyError:
                 continue
         if not oneScanIsValid:
-            return None, None, None, None
-        return notes, tags, "port", targets
+            return PluginResult.empty()
+        result.notes = notes
+        return result

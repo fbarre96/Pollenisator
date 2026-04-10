@@ -6,6 +6,7 @@ from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, InfoUpdate
 import re
 
 
@@ -111,7 +112,7 @@ class Dirsearch(Plugin):
         return {"todo-dirsearch": Tag("todo-dirsearch", "blue", "todo")}
 
     @abstractmethod
-    def Parse(self, pentest: str, file_opened: IO[bytes], **kwargs: Any) -> Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Optional[Dict[str, Optional[str]]]]]]:
+    def Parse(self, pentest: str, file_opened: IO[bytes], **kwargs: Any) -> PluginResult:
         """
         Parse an opened file to extract information.
 
@@ -121,39 +122,30 @@ class Dirsearch(Plugin):
             **kwargs (Any): Additional parameters (not used).
 
         Returns:
-            Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Dict[str, str]]]]: A tuple with 4 values (All set to None if Parsing wrong file): 
-                0. notes (str): Notes to be inserted in tool giving direct info to pentester.
-                1. tags (List[Tag]): A list of tags to be added to tool.
-                2. lvl (str): The level of the command executed to assign to given targets.
-                3. targets (Dict[str, Optional[Dict[str, Optional[str]]]]]): A list of composed keys allowing retrieve/insert from/into database targeted objects.
+            PluginResult: A result object containing parsed data.
         """
         tags = []
         try:
             data = file_opened.read().decode("utf-8", errors="ignore")
         except UnicodeDecodeError:
-            return None, None, None, None
+            return PluginResult.empty()
         notes = ""
         if data.strip() == "":
-            return None, None, None, None
+            return PluginResult.empty()
         else:
             hosts = parse_dirsearch_file(data)
             if not hosts.keys():
-                return None, None, None, None
+                return PluginResult.empty()
             targets = {}
+            result = PluginResult(lvl="port")
             for host in hosts:
                 ip_m = Ip(pentest).initialize(host, infos={"plugin":Dirsearch.get_name()})
-                ip_m.addInDb()
+                result.ips.append(ip_m)
                 for port in hosts[host]:
                     port_o = Port(pentest)
                     port_o.initialize(host, port, "tcp",
                                       hosts[host][port]["service"], infos={"plugin":Dirsearch.get_name()})
-                    insert_ret = port_o.addInDb()
-                    if not insert_ret["res"]:
-                        port_db = Port.fetchObject(pentest, {"_id": insert_ret["iid"]})
-                        if port_db is not None:
-                            port_o = cast(Port, port_db)
-                        else:
-                            continue
+                    result.ports.append(port_o)
                     targets[str(port_o.getId())] = port_o.getDbKey()
                     hosts[host][port]["paths"].sort(key=lambda x: int(x[0]))
                     results = "\n".join(hosts[host][port]["paths"])
@@ -168,7 +160,14 @@ class Dirsearch(Plugin):
                         else:
                             atLeastOne = True
                     newInfos["SSL"] = "True" if hosts[host][port]["service"] == "https" else "False"
-                    port_o.updateInfos(newInfos)
+                    result.info_updates.append(InfoUpdate(
+                        collection="ports",
+                        db_key={"ip": host, "port": port, "proto": "tcp"},
+                        infos=newInfos
+                    ))
                     if atLeastOne:
                         tags = [Tag(self.getTags()["todo-dirsearch"], notes=notes)]
-        return notes, tags, "port", targets
+            result.notes = notes
+            result.tags = tags
+            result.targets = targets
+            return result

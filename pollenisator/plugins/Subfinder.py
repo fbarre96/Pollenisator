@@ -3,6 +3,7 @@
 from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult
 import re
 
 
@@ -79,25 +80,24 @@ class Subfinder(Plugin):
         """
         notes = ""
         tags = []
-        countInserted = 0
         domains = parseContent(file_opened)
         if domains is None:
-            return None, None, None, None
+            return PluginResult.empty()
         
+        result = PluginResult(tags=tags, lvl="wave", targets={"wave": None})
+        countFound = 0
         for domain in domains:
             infosToAdd = {"plugin": Subfinder.get_name()}
             ip_m = Ip(pentest).initialize(domain.strip(), infos=infosToAdd)
-            insert_ret = ip_m.addInDb()
-            # failed, domain already exists
-            if not insert_ret["res"]:
-                notes += domain + " exists but already added.\n"
-            else:
-                countInserted += 1
-                notes += domain + " inserted.\n"
+            result.ips.append(ip_m)
+            countFound += 1
+            notes += domain + " found.\n"
         
         if notes.strip() == "":
-            return None, None, None, None
-        elif countInserted != 0:
-            tags.append(Tag(self.getTags()["info-found-domains"], notes=str(countInserted)))
+            return PluginResult.empty()
+        if countFound != 0:
+            tags.append(Tag(self.getTags()["info-found-domains"], notes=str(countFound)))
         
-        return notes, tags, "wave", {"wave": None}
+        result.notes = notes
+        result.tags = tags
+        return result

@@ -249,11 +249,15 @@ def importResult(pentest: str, tool_iid: str, upfile: Any, body: Dict[str, Any])
     if mod is not None:
         try:
             # Check return code by plugin (can be always true if the return code is inconsistent)
-            notes, tags, _, _ = mod.Parse(pentest, f, tool=toolModel, ext=ext, filename=upfile.filename)
-            if notes is None:
+            from pollenisator.plugins.plugin_result import apply_plugin_result
+            plugin_result = mod.Parse(pentest, f, tool=toolModel, ext=ext, filename=upfile.filename)
+            if plugin_result.is_empty():
                 notes = "No results found by plugin."
-            if tags is None:
                 tags = []
+            else:
+                apply_plugin_result(pentest, plugin_result)
+                notes = plugin_result.notes if plugin_result.notes else "No results found by plugin."
+                tags = plugin_result.tags if plugin_result.tags else []
             if isinstance(tags, Tag):
                 tags = [tags]
             # Success could be change to False by the plugin function (evaluating the return code for exemple)

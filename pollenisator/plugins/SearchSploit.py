@@ -3,6 +3,7 @@
 import re
 from pollenisator.core.components.tag import Tag
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult
 import json
 
 class SearchSploit(Plugin):
@@ -68,26 +69,26 @@ class SearchSploit(Plugin):
         """
         tags = []
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
-            return None, None, None, None
+            return PluginResult.empty()
         notes = file_opened.read().decode("utf-8", errors="ignore")
         try:
             jsonFile = json.loads(notes)
             if not isinstance(jsonFile, dict):
-                return None, None, None, None
+                return PluginResult.empty()
             if jsonFile.get("RESULTS_EXPLOIT", None) is None or jsonFile.get("RESULTS_SHELLCODE", None) is None:
-                return None,None,None,None
+                return PluginResult.empty()
             if jsonFile.get("SEARCH", "None") == "None":
-                return "No product known detected", tags, "wave", {"wave": None}
+                return PluginResult(notes="No product known detected", tags=tags, lvl="wave", targets={"wave": None})
             if len(jsonFile["RESULTS_EXPLOIT"]) == 0 :
-                return notes, tags,"wave", {"wave": None}
+                return PluginResult(notes=notes, tags=tags, lvl="wave", targets={"wave": None})
             elif not re.match(r"\d", jsonFile["SEARCH"]):
-                return notes, tags, "wave", {"wave": None}
+                return PluginResult(notes=notes, tags=tags, lvl="wave", targets={"wave": None})
             else:
                 for exploit in jsonFile["RESULTS_EXPLOIT"]:
                     notes += exploit["Date"] + " - " + exploit["Title"] + "\n"
                     notes += "Exploitdb path : " + exploit["Path"] + "\n"
                     notes += "\n"
                 tags.append(Tag(self.getTags()["todo-searchsploit"], notes))
-                return notes, tags, "wave", {"wave": None}
+                return PluginResult(notes=notes, tags=tags, lvl="wave", targets={"wave": None})
         except ValueError: # Couldn't parse json file
-            return notes,None,None,None
+            return PluginResult(notes=notes)

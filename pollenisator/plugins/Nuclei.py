@@ -3,6 +3,7 @@
 from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, TagAddition, InfoUpdate
 import json
 
 
@@ -92,14 +93,14 @@ class Nuclei(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
-            return None, None, None, None
+            return PluginResult.empty()
         parsed_by_hosts = parse(file_opened)
-        print("PARSEDBYHOSTS", parsed_by_hosts)
         if parsed_by_hosts is None:
-            return None, None, None, None
+            return PluginResult.empty()
         tags = [self.getTags()["info-nuclei"]]
         cumulative_notes = []
         targets = {}
+        result = PluginResult(tags=tags, lvl="ip", targets=targets)
         for parsed_host in parsed_by_hosts:
             host = parsed_host
             findings = parsed_by_hosts[parsed_host]
@@ -113,18 +114,23 @@ class Nuclei(Plugin):
                 if finding["info"].get("level", finding["info"].get("severity", "none")) in ["critical","high"]:
                     tags = [self.getTags()["todo-high-nuclei-level"]]
             ip_o = Ip(pentest).initialize(host, notes, infos={"plugin":Nuclei.get_name(), "findings":findings})
-            # Add a tags to the ip object
+            result.ips.append(ip_o)
+            # Add a tag to the ip object
             nuclei_tag = Tag("used-nuclei", level="info")
-            inserted = ip_o.addInDb()
-            ip_o.addTag(nuclei_tag)
-            if not inserted["res"]:
-                ip_o = Ip.fetchObject(pentest, {"_id": inserted["iid"]})
-                if ip_o is not None:
-                    ip_o.notes += "\nNuclei:\n"+notes
-                    ip_o.infos = {"plugin":Nuclei.get_name(), "findings":findings}
-                    ip_o.updateInDb()
-                
+            result.tag_additions.append(TagAddition(
+                collection="ips",
+                db_key={"ip": host},
+                tag=nuclei_tag
+            ))
+            # Schedule info update for existing IPs (merge findings)
+            result.info_updates.append(InfoUpdate(
+                collection="ips",
+                db_key={"ip": host},
+                infos={"plugin":Nuclei.get_name(), "findings":findings}
+            ))
             cumulative_notes.append(notes+"\n")
         notes = "\n".join(cumulative_notes)
-
-        return notes, tags, "ip", targets
+        result.notes = notes
+        result.tags = tags
+        result.targets = targets
+        return result

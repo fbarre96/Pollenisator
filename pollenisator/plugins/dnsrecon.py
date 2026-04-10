@@ -5,6 +5,7 @@ import json
 from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, InfoUpdate
 
 
 class dnsrecon(Plugin):
@@ -76,50 +77,47 @@ class dnsrecon(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
-            return None, None, None, None
+            return PluginResult.empty()
         notes = ""
         tags = []
         countInserted = 0
         try:
             dnsrecon_content = json.loads(file_opened.read().decode("utf-8", errors="ignore"))
         except json.decoder.JSONDecodeError:
-            return None, None, None, None
+            return PluginResult.empty()
         except UnicodeDecodeError:
-            return None, None, None, None
+            return PluginResult.empty()
         try:
             if isinstance(dnsrecon_content, list) and len(dnsrecon_content) == 0:
-                return None, None, None, None
+                return PluginResult.empty()
             if not isinstance(dnsrecon_content[0], dict):
-                return None, None, None, None
+                return PluginResult.empty()
             if dnsrecon_content[0].get("type", "") != "ScanInfo":
-                return None, None, None, None
+                return PluginResult.empty()
             if dnsrecon_content[0].get("date", "") == "":
-                return None, None, None, None
+                return PluginResult.empty()
         except:
-            return None, None, None, None
+            return PluginResult.empty()
+        result = PluginResult(notes=notes, tags=tags, lvl="wave", targets={"wave": None})
         for records in dnsrecon_content[1:]:
             if not isinstance(records, list):
                 records = [records]
             for record in records:
                 ip = record["address"]
                 name = record["name"]
-                infosToAdd = {"hostname": [name], "plugin":dnsrecon.get_name()}
-                ip_m = Ip(pentest).initialize(ip, infos=infosToAdd)
-                ip_m.addInDb()
-                infosToAdd = {"ip": [ip], "plugin":dnsrecon.get_name()}
-                ip_m = Ip(pentest).initialize(name, infos=infosToAdd)
-                insert_ret = ip_m.addInDb()
-                # failed, domain is out of scope
-                if not insert_ret["res"]:
-                    notes += name+" exists but already added.\n"
-                    ip_m = Ip.fetchObject(pentest, {"_id": insert_ret["iid"]})
-                    existing_ips = ip_m.infos.get("ip", [])
-                    if not isinstance(existing_ips, list):
-                        existing_ips = [existing_ips]
-                    infosToAdd = {"ip": list(set([ip] +existing_ips))}
-                    ip_m.updateInfos(infosToAdd)
-                else:
-                    countInserted += 1
-                    tags = [self.getTags()["info-dnsrecon"]]
-                    notes += name+" inserted.\n"
-        return notes, tags, "wave", {"wave": None}
+                infosToAdd = {"hostname": [name], "plugin": dnsrecon.get_name()}
+                result.ips.append(Ip(pentest).initialize(ip, infos=infosToAdd))
+                infosToAdd = {"ip": [ip], "plugin": dnsrecon.get_name()}
+                result.ips.append(Ip(pentest).initialize(name, infos=infosToAdd))
+                # Deferred info update to merge ip list into the domain entry
+                result.info_updates.append(InfoUpdate(
+                    collection="ips",
+                    db_key={"ip": name},
+                    infos={"ip": [ip]}
+                ))
+                countInserted += 1
+                tags = [self.getTags()["info-dnsrecon"]]
+                notes += name + " found.\n"
+        result.notes = notes
+        result.tags = tags
+        return result

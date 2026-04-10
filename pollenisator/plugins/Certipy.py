@@ -3,6 +3,7 @@
 from typing import IO, Any, Dict, List, Optional, Tuple
 from pollenisator.core.components.tag import Tag
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, InfoUpdate, TagAddition
 from pollenisator.core.models.ip import Ip
 from pollenisator.server.modules.activedirectory.users import User
 from pollenisator.server.modules.activedirectory.computers import Computer
@@ -94,23 +95,24 @@ def parse_certipy_output(file_opened):
     return data
 
 
-def process_certificate_authorities(pentest, cas_data):
+def process_certificate_authorities(pentest, cas_data, result):
     """
-    Process Certificate Authorities data
+    Process Certificate Authorities data, collecting objects into the PluginResult.
     
     Args:
         pentest: pentest name
         cas_data: Certificate Authorities data from Certipy
+        result: PluginResult to collect objects into
         
     Returns:
-        Tuple of (notes, tags, inserted_count)
+        Tuple of (notes, tags, inserted_count, host_for_templates)
     """
     notes = ""
     tags = []
     inserted = 0
-    ip_o = None
+    host = None
     if not cas_data:
-        return notes, tags, inserted
+        return notes, tags, inserted, host
     
     notes += "=== Certificate Authorities ===\n"
     
@@ -128,33 +130,37 @@ def process_certificate_authorities(pentest, cas_data):
             # Remove port if present
             host = dns_name.split(":")[0]
             
-            # Create or update IP entry
-            ip_o = Ip(pentest).initialize(
+            # Create IP entry (collected, not inserted)
+            result.ips.append(Ip(pentest).initialize(
                 host,
                 infos={
                     "plugin": Certipy.get_name(),
                     "ca_name": ca_name,
                     "web_enrollment": web_enrollment
                 }
-            )
-            result = ip_o.addInDb()
-            if result["res"]:
-                inserted += 1
-            # If web enrollment is enabled, note the HTTP/HTTPS service
+            ))
+            inserted += 1
+            # If web enrollment is enabled, add tag via deferred operation
             if web_enrollment.lower() == "enabled":
-                ip_o.addTag(Tag("certipy-web-enrollment", "blue", level="info"))
+                result.tag_additions.append(TagAddition(
+                    collection="ips",
+                    db_key={"ip": host},
+                    tag=Tag("certipy-web-enrollment", "blue", level="info")
+                ))
 
     
-    return notes, tags, inserted, ip_o
+    return notes, tags, inserted, host
 
 
-def process_certificate_templates(pentest, templates_data, ip_o):
+def process_certificate_templates(pentest, templates_data, host, result):
     """
-    Process Certificate Templates data
+    Process Certificate Templates data, collecting deferred operations into the PluginResult.
     
     Args:
         pentest: pentest name
         templates_data: Certificate Templates data from Certipy
+        host: the host IP/domain from the CA (used for deferred tag/info operations)
+        result: PluginResult to collect deferred operations into
         
     Returns:
         Tuple of (notes, tags, vulnerable_templates)
@@ -186,18 +192,33 @@ def process_certificate_templates(pentest, templates_data, ip_o):
                     "vulnerability": vuln_type,
                     "description": vuln_desc
                 })
-            ip_o.updateInfos({"vulnerable_adcs_templates": vulnerable_templates})
+            if host is not None:
+                result.info_updates.append(InfoUpdate(
+                    collection="ips",
+                    db_key={"ip": host},
+                    infos={"vulnerable_adcs_templates": vulnerable_templates}
+                ))
             # Add high priority tag if vulnerabilities exist
             if enabled:
-                if ip_o is not None:
-                    ip_o.addTag(Tag("certipy-vulnerable-template", "red", level="critical", notes="Vulnerabilities: " + ", ".join(vulnerabilities.keys())))
+                tag = Tag("certipy-vulnerable-template", "red", level="critical", notes="Vulnerabilities: " + ", ".join(vulnerabilities.keys()))
+                if host is not None:
+                    result.tag_additions.append(TagAddition(
+                        collection="ips",
+                        db_key={"ip": host},
+                        tag=tag
+                    ))
                 else:
-                    tags.append(Tag("certipy-vulnerable-template", "red", level="critical", notes="Vulnerabilities: " + ", ".join(vulnerabilities.keys())))
+                    tags.append(tag)
             else:
-                if ip_o is not None:
-                    ip_o.addTag(Tag("certipy-vulnerable-template-disabled", "orange", level="high", notes="Vulnerabilities: " + ", ".join(vulnerabilities.keys())))
+                tag = Tag("certipy-vulnerable-template-disabled", "orange", level="high", notes="Vulnerabilities: " + ", ".join(vulnerabilities.keys()))
+                if host is not None:
+                    result.tag_additions.append(TagAddition(
+                        collection="ips",
+                        db_key={"ip": host},
+                        tag=tag
+                    ))
                 else:
-                    tags.append(Tag("certipy-vulnerable-template-disabled", "orange", level="high", notes="Vulnerabilities: " + ", ".join(vulnerabilities.keys())))
+                    tags.append(tag)
         
         # List key properties
         client_auth = template_info.get("Client Authentication", False)
@@ -267,7 +288,7 @@ class Certipy(Plugin):
             "certipy-vulnerable-template-disabled": Tag("certipy-vulnerable-template-disabled", "orange", level="high")
         }
     
-    def Parse(self, pentest: str, file_opened: IO[bytes], **kwargs: Dict[str, Any]) -> Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Optional[Dict[str, Optional[str]]]]]]:
+    def Parse(self, pentest: str, file_opened: IO[bytes], **kwargs: Dict[str, Any]) -> PluginResult:
         """
         Parse an opened Certipy JSON file to extract certificate information
         
@@ -277,36 +298,34 @@ class Certipy(Plugin):
             **kwargs: Additional parameters
             
         Returns:
-            Tuple with 4 values (All set to None if parsing wrong file):
-                0. notes (str): Notes to be inserted in tool
-                1. tags (List[Tag]): A list of tags to be added to tool
-                2. lvl (str): The level of the command executed
-                3. targets (Dict): Dictionary of targeted objects
+            PluginResult with collected objects and deferred operations
         """
         # Check file extension
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
-            return None, None, None, None
+            return PluginResult.empty()
         
         # Parse the file
         parsed_data = parse_certipy_output(file_opened)
         if parsed_data is None:
-            return None, None, None, None
+            return PluginResult.empty()
         
         # Initialize return values
         all_notes = "Certipy Results\n" + "="*50 + "\n\n"
         all_tags = [self.getTags()["certipy-info"]]
         targets = {}
         
+        result = PluginResult(notes=all_notes, tags=all_tags, lvl="wave", targets={"wave": None})
+        
         # Process Certificate Authorities
         cas_data = parsed_data.get("Certificate Authorities", {})
-        ca_notes, ca_tags, ca_inserted, ip_o = process_certificate_authorities(pentest, cas_data)
+        ca_notes, ca_tags, ca_inserted, host = process_certificate_authorities(pentest, cas_data, result)
         all_notes += ca_notes
         all_tags.extend(ca_tags)
         
         # Process Certificate Templates
         templates_data = parsed_data.get("Certificate Templates", {})
         template_notes, template_tags, vulnerable_templates = process_certificate_templates(
-            pentest, templates_data, ip_o
+            pentest, templates_data, host, result
         )
         all_notes += template_notes
         all_tags.extend(template_tags)
@@ -324,5 +343,6 @@ class Certipy(Plugin):
         
         all_notes += summary
         
+        result.notes = all_notes
         # Return at wave level since this is domain-wide information
-        return all_notes, all_tags, "wave", {"wave": None}
+        return result

@@ -5,6 +5,7 @@ import shlex
 from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, InfoUpdate, TagAddition
 from pollenisator.server.modules.activedirectory.computers import Computer
 import re
 
@@ -82,11 +83,12 @@ class GetUserSPNImpacket(Plugin):
         try:
             notes = file_opened.read().decode("utf-8", errors="ignore")
         except UnicodeDecodeError:
-            return None, None, None, None
+            return PluginResult.empty()
         if notes == "":
-            return None, None, None, None
+            return PluginResult.empty()
         is_impacket = False
         header_found = False
+        result = PluginResult(notes=notes, tags=tags, lvl="user", targets=targets)
         for line in notes.split("\n"):
             line = line.strip()
             if line.startswith("Impacket "):
@@ -107,27 +109,23 @@ class GetUserSPNImpacket(Plugin):
                         username = username[:-1]
                     hash_kerb = line.strip()
                     notes += f"User {domain}\\{username} has a Kerberoastable SPN hash: {hash_kerb}"
-                    user_m =  User.fetchObject(pentest, {"username": username, "domain": domain})
-                    if user_m is None:
-                        user_m = User(pentest).initialize(domain, username, "", None, None, infos={"plugin":GetUserSPNImpacket.get_name(), "secrets":[hash_kerb]})
-                        user_m.addInDb()
-                        user_m.addTag(self.getTags()["kerberoastable"])
-
-                    else:
-                        secrets = user_m.infos.get("secrets", [])
-                        if secrets is None:
-                            secrets = []
-                        if hash_kerb not in secrets:
-                            secrets.append(hash_kerb)
-                        user_m.infos["secrets"] = secrets
-                        user_m.update()
-                        user_m.addTag(self.getTags()["kerberoastable"])
+                    # Collect user with secrets info
+                    user_m = User(pentest).initialize(domain, username, "", None, None, infos={"plugin": GetUserSPNImpacket.get_name(), "secrets": [hash_kerb]})
+                    result.users.append(user_m)
+                    # Deferred tag on the user
+                    result.tag_additions.append(TagAddition(
+                        collection="users",
+                        db_key={"username": username, "domain": domain},
+                        tag=self.getTags()["kerberoastable"]
+                    ))
                 except IndexError:
                     continue
         if is_impacket and header_found:
             if notes == "":
                 notes = "No Kerberoastable users found"
         else:
-            return None, None, None, None
+            return PluginResult.empty()
 
-        return notes, tags, "user", targets
+        result.notes = notes
+        result.tags = tags
+        return result

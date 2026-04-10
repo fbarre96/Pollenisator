@@ -4,6 +4,7 @@ import os
 import re
 import shlex
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, UserLink
 from pollenisator.core.components.tag import Tag
 from pollenisator.server.modules.activedirectory.users import User
 from pollenisator.server.modules.activedirectory.computers import Computer
@@ -138,7 +139,7 @@ class NXCNtds(Plugin):
         cmdline = kwargs.get("cmdline", None)
         cmd_args = shlex.split(cmdline)
         if len(cmd_args) < 3:
-            return None, None, None, None
+            return PluginResult.empty()
         ip = cmd_args[2]
 
         data = parse_output_file_ntds_hashes(file_opened)
@@ -146,28 +147,32 @@ class NXCNtds(Plugin):
         tags = []
         targets = {}
 
-        # Create a computer object of fetch the existing one
-        computer_object = Computer.fetchObject(pentest, {"ip": ip})
-        if computer_object is None:
-            computer_object = Computer(pentest).initialize(ip=ip)
-            computer_object.addInDb()
+        result = PluginResult(notes=notes, tags=tags, lvl="ports", targets=targets)
+
+        # Create a computer object (collected, not inserted)
+        computer_object = Computer(pentest).initialize(ip=ip)
+        result.computers.append(computer_object)
 
         for user, item in data.items():
-            # Create a user object of fetch the existing one
-            user_object = User.fetchObject(pentest, {"username": item["username"]})
-            if user_object is None:
-                user_object = User(pentest).initialize(username=item["username"],
-                                                       domain=item["domain"],
-                                                       infos={"RID": item["rid"],
-                                                              "hashNT": item["hashnt"], 
-                                                              "hashLM": item["hashlm"], 
-                                                              "fullhash": item["fullhash"], 
-                                                              "status": item["status"]})
-                user_object.addInDb()
+            # Create a user object (collected, not inserted)
+            user_object = User(pentest).initialize(username=item["username"],
+                                                   domain=item["domain"],
+                                                   infos={"RID": item["rid"],
+                                                          "hashNT": item["hashnt"], 
+                                                          "hashLM": item["hashlm"], 
+                                                          "fullhash": item["fullhash"], 
+                                                          "status": item["status"]})
+            result.users.append(user_object)
 
-            # Add the user to the computer
-            computer_object.add_user(user_object.domain, user_object.domain, "", user_object.infos)
-            computer_object.addInDb()
+            # Deferred user link to computer
+            result.user_links.append(UserLink(
+                computer_ip=ip,
+                domain=item["domain"],
+                username=item["domain"],
+                password="",
+                infos={"RID": item["rid"], "hashNT": item["hashnt"], "hashLM": item["hashlm"], "fullhash": item["fullhash"], "status": item["status"]},
+                is_admin=False
+            ))
 
             # Add the user tag
             tags.append(Tag("pwned-ntds", "black", "critical",
@@ -179,4 +184,6 @@ class NXCNtds(Plugin):
         tags.append(Tag("pwned-ntds", "black", "critical",
                         notes=f"Computer {ip} found in the NTDS dump"))
 
-        return notes, tags, "ports", targets
+        result.notes = notes
+        result.tags = tags
+        return result

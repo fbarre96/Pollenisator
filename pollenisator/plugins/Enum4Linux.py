@@ -2,13 +2,13 @@
 
 import re
 
-from bson import ObjectId
 from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.core.models.port import Port
 from pollenisator.server.modules.activedirectory.computers import Computer
-from pollenisator.server.modules.activedirectory.users import insert as user_insert, update as user_update, User
+from pollenisator.server.modules.activedirectory.users import User
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, InfoUpdate, UserLink
 from pollenisator.core.components.utils import performLookUp
 import json
 import shlex
@@ -130,45 +130,51 @@ def getInfos(enum4linux_file):
         return infos
     return None
 
-def updateDatabase(pentest, enum_infos):
+def collectEnumResults(pentest, enum_infos, result):
     """
-    Add all the ips and theirs ports found after parsing the file to the scope object in database.
+    Collect all the ips, ports, computers and users found after parsing the file into the PluginResult.
     Args:
-        hostsInfos: the dictionnary with ips as keys and a list of dictionnary containing ports informations as value.
+        pentest: pentest identifier
+        enum_infos: the dictionary with parsed enum4linux info.
+        result: PluginResult to collect into
+    Returns:
+        targets dict
     """
     # Check if any ip has been found.
     if enum_infos is None:
         return
-    ip_m = Ip(pentest).initialize(str(enum_infos["ip"]), infos={"plugin":Enum4Linux.get_name()})
-    insert_ret = ip_m.addInDb()
-    port_m = Port(pentest).initialize(str(enum_infos["ip"]), "445", "tcp", "netbios-ssn", infos={"plugin":Enum4Linux.get_name()})
-    insert_ret = port_m.addInDb()
-    port_m = Port.fetchObject(pentest, {"_id": insert_ret["iid"]})
-    targets = {"enum4linux":{"ip": enum_infos["ip"], "port": "445", "proto": "tcp"}}
-    infosToAdd = enum_infos
+    result.ips.append(Ip(pentest).initialize(str(enum_infos["ip"]), infos={"plugin": Enum4Linux.get_name()}))
+    result.ports.append(Port(pentest).initialize(str(enum_infos["ip"]), "445", "tcp", "netbios-ssn", infos={"plugin": Enum4Linux.get_name()}))
+    targets = {"enum4linux": {"ip": enum_infos["ip"], "port": "445", "proto": "tcp"}}
+    infosToAdd = dict(enum_infos)
     if enum_infos.get("session_allowed", False):
         creds = (enum_infos.get("domain", ""), enum_infos.get("username", "anonymous"), enum_infos.get("password", ""))
-        computer_m = Computer.fetchObject(pentest, {"ip":port_m.ip})
-        if computer_m is not None:
-            computer_m.add_user(creds[0], creds[1], creds[2])
+        result.user_links.append(UserLink(
+            computer_ip=str(enum_infos["ip"]),
+            domain=creds[0],
+            username=creds[1],
+            password=creds[2],
+            is_admin=False
+        ))
     for user_account, user_add_infos in enum_infos.get("domain_users", {}).items():
         domain = user_account.split("\\")[0]
         username = user_account.split("\\")[1]
         password = ""
-        user_m = User(pentest).initialize( domain, username, password, user_add_infos.get("groups",[]), user_add_infos.get("desc"))
-        res = user_insert(pentest, user_m.getData())
-        update_data = {"groups": user_add_infos.get("groups", []), "description": user_add_infos.get("desc", "")}
-        user_update(pentest, ObjectId(res["iid"]), update_data)
+        user_m = User(pentest).initialize(domain, username, password, user_add_infos.get("groups", []), user_add_infos.get("desc"))
+        result.users.append(user_m)
     for computer, computer_infos in enum_infos.get("computers", {}).items():
-        ip_m = Ip(pentest).initialize(str(computer_infos["ip"]), infos={"plugin":Enum4Linux.get_name()})
-        insert_ret = ip_m.addInDb()
-        comp_m = Computer(pentest).initialize(computer, computer_infos["ip"], computer_infos["domain"], infos={"plugin":Enum4Linux.get_name()})
-        comp_m.addInDb()
+        result.ips.append(Ip(pentest).initialize(str(computer_infos["ip"]), infos={"plugin": Enum4Linux.get_name()}))
+        comp_m = Computer(pentest).initialize(computer, computer_infos["ip"], computer_infos["domain"], infos={"plugin": Enum4Linux.get_name()})
+        result.computers.append(comp_m)
     if "users" in infosToAdd:
         del infosToAdd["users"]
     if "admins" in infosToAdd:
         del infosToAdd["admins"]
-    port_m.updateInfos(infosToAdd)
+    result.info_updates.append(InfoUpdate(
+        collection="ports",
+        db_key={"ip": str(enum_infos["ip"]), "port": "445", "proto": "tcp"},
+        infos=infosToAdd
+    ))
     return targets
 
 
@@ -249,12 +255,14 @@ class Enum4Linux(Plugin):
         domain, user, password = getUserInfoFromCmdLine(cmdline)
         notes = json.dumps(enum_infos, indent=4)
         if enum_infos is None or not isinstance(enum_infos, dict):
-            return None, None, None, None
+            return PluginResult.empty()
         if enum_infos is not None and enum_infos.get("users") is not None:
             tags = [self.getTags()["info-enum4linux-success"]]
             if domain is None and user is None:
                 tags += [Tag(self.getTags()["high-null-sessions-allowed"], notes=f"Null session allowed on {enum_infos.get('ip')}")]
         elif enum_infos.get("null_session_allowed") == True:
             tags += [Tag(self.getTags()["high-null-sessions-allowed"], notes=f"Null or guest session allowed on {enum_infos.get('ip')}")]
-        targets = updateDatabase(pentest, enum_infos)
-        return notes, tags, "ports", targets
+        result = PluginResult(notes=notes, tags=tags, lvl="ports", targets={})
+        targets = collectEnumResults(pentest, enum_infos, result)
+        result.targets = targets
+        return result

@@ -6,6 +6,7 @@ import webbrowser
 from pollenisator.core.models.ip import Ip
 from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, InfoUpdate
 
 class WhatWeb(Plugin):
     default_bin_names = ["whatweb", "whatweb.rb"]
@@ -78,18 +79,19 @@ class WhatWeb(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
-            return None, None, None, None
+            return PluginResult.empty()
         tags = []
         targets = {}
         notes = file_opened.read().decode("utf-8", errors="ignore")
         if notes == "":
-            return None, None, None, None
+            return PluginResult.empty()
         try:
             data = json.loads(notes)
         except json.decoder.JSONDecodeError:
-            return None, None, None, None
+            return PluginResult.empty()
         regex_host = r"https?://([^\/]+)"
         oneValidWhatweb = False
+        result = PluginResult(notes=notes, tags=tags, lvl="port", targets=targets)
         for website in data:
             keys = website.keys()
             expected_keys = ['target', 'http_status',
@@ -112,11 +114,8 @@ class WhatWeb(Plugin):
             else:
                 host = host_port
                 port = "443" if "https://" in website["target"] else "80"
-            Ip(pentest).initialize(host, infos={"plugin":WhatWeb.get_name()}).addInDb()
-            p_o = Port(pentest).initialize(host, port, "tcp", service, infos={"plugin":WhatWeb.get_name()})
-            insert_res = p_o.addInDb()
-            if not insert_res["res"]:
-                p_o = Port.fetchObject(pentest, {"_id": insert_res["iid"]})
+            result.ips.append(Ip(pentest).initialize(host, infos={"plugin": WhatWeb.get_name()}))
+            result.ports.append(Port(pentest).initialize(host, port, "tcp", service, infos={"plugin": WhatWeb.get_name()}))
             infosToAdd = {"URL": website["target"]}
             for plugin in website.get("plugins", {}):
                 item = website["plugins"][plugin].get("string")
@@ -127,10 +126,14 @@ class WhatWeb(Plugin):
                     item = str(item)
                     if item != "":
                         infosToAdd[plugin] = item
-            p_o.updateInfos(infosToAdd)
-            targets[str(p_o.getId())] = {
+            result.info_updates.append(InfoUpdate(
+                collection="ports",
+                db_key={"ip": host, "port": port, "proto": "tcp"},
+                infos=infosToAdd
+            ))
+            targets["whatweb_" + host + "_" + port] = {
                 "ip": host, "port": port, "proto": "tcp"}
             oneValidWhatweb = True
         if not oneValidWhatweb:
-            return None, None, None, None
-        return notes, tags, "port", targets
+            return PluginResult.empty()
+        return result

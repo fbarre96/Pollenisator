@@ -1,5 +1,6 @@
-"""Implement a default to plugin. Using Plugin inheritied functions"""
+"""Implement a default to plugin. Using Plugin inherited functions"""
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult
 
 
 class Default(Plugin):

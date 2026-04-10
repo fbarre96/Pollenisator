@@ -3,6 +3,7 @@
 from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult
 import re
 import json
 
@@ -100,14 +101,16 @@ class Bbot(Plugin):
         """
         notes = ""
         tags = []
-        countInserted = 0
+        countFound = 0
         domains_found = set()
+        
+        result = PluginResult(tags=tags, lvl="wave", targets={"wave": None})
         
         for line in file_opened:
             try:
                 line = line.decode("utf-8", errors="ignore")
             except UnicodeDecodeError:
-                return None, None, None, None
+                return PluginResult.empty()
             
             domain, ip = parse_bbot_line(line)
             
@@ -120,30 +123,23 @@ class Bbot(Plugin):
                 # A domain has been found
                 infosToAdd = {"plugin": Bbot.get_name()}
                 ip_m = Ip(pentest).initialize(domain, infos=infosToAdd)
-                insert_ret = ip_m.addInDb()
-                
-                # failed, domain already exists
-                if not insert_ret["res"]:
-                    notes += domain + " exists but already added.\n"
-                else:
-                    countInserted += 1
-                    notes += domain + " inserted.\n"
+                result.ips.append(ip_m)
+                countFound += 1
+                notes += domain + " found.\n"
             
             elif ip is not None:
                 # An IP address has been found
                 infosToAdd = {"plugin": Bbot.get_name()}
                 ip_m = Ip(pentest).initialize(ip, infos=infosToAdd)
-                insert_ret = ip_m.addInDb()
-                
-                if not insert_ret["res"]:
-                    notes += ip + " exists but already added.\n"
-                else:
-                    countInserted += 1
-                    notes += ip + " inserted.\n"
+                result.ips.append(ip_m)
+                countFound += 1
+                notes += ip + " found.\n"
         
         if notes.strip() == "":
-            return None, None, None, None
-        elif countInserted != 0:
-            tags.append(Tag(self.getTags()["info-found-domains"], notes=str(countInserted)))
+            return PluginResult.empty()
+        if countFound != 0:
+            tags.append(Tag(self.getTags()["info-found-domains"], notes=str(countFound)))
         
-        return notes, tags, "wave", {"wave": None}
+        result.notes = notes
+        result.tags = tags
+        return result

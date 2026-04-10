@@ -4,6 +4,7 @@ from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, InfoUpdate, TagAddition
 import re
 
 
@@ -119,28 +120,37 @@ class HttpMethods(Plugin):
         try:
             notes = file_opened.read().decode("utf-8", errors="ignore")
         except UnicodeDecodeError:
-            return None, None, None, None
+            return PluginResult.empty()
         targets = {}
         tags = []
         if "| http-methods:" not in notes:
-            return None, None, None, None
+            return PluginResult.empty()
         host, port, proto, service, risky_methods, supported_methods = parse(
             notes)
         if host == "":
-            return None, None, None, None
-        Ip(pentest).initialize(host, infos={"plugin":HttpMethods.get_name()}).addInDb()
-        p_o = Port(pentest).initialize(host, port, proto, service, infos={"plugin":HttpMethods.get_name()})
-        insert_res = p_o.addInDb()
-        if not insert_res["res"]:
-            p_o = Port.fetchObject(pentest, {"_id": insert_res["iid"]})
-
-        p_o.updateInfos({"Methods": ", ".join(supported_methods)})
-        targets[str(p_o.getId())] = {"ip": host, "port": port, "proto": proto}
+            return PluginResult.empty()
+        result = PluginResult(notes=notes, tags=tags, lvl="port", targets=targets)
+        result.ips.append(Ip(pentest).initialize(host, infos={"plugin": HttpMethods.get_name()}))
+        result.ports.append(Port(pentest).initialize(host, port, proto, service, infos={"plugin": HttpMethods.get_name()}))
+        port_key = {"ip": host, "port": port, "proto": proto}
+        result.info_updates.append(InfoUpdate(
+            collection="ports",
+            db_key=port_key,
+            infos={"Methods": ", ".join(supported_methods)}
+        ))
+        targets["httpmethods_target"] = {"ip": host, "port": port, "proto": proto}
         if "TRACE" in risky_methods:
-            p_o.addTag(Tag(self.getTags()["HTTP-TRACE"], notes="TRACE method allowed"))
+            result.tag_additions.append(TagAddition(
+                collection="ports",
+                db_key=port_key,
+                tag=Tag(self.getTags()["HTTP-TRACE"], notes="TRACE method allowed")
+            ))
             risky_methods.remove("TRACE")
         if len(risky_methods) > 0:
-            notes = "RISKY HTTP METHODS ALLOWED : " + " ".join(risky_methods)
-            tags = []
-            p_o.addTag(Tag(self.getTags()["RISKY-HTTP-METHODS"], notes=notes))
-        return notes, tags, "port", targets
+            risky_notes = "RISKY HTTP METHODS ALLOWED : " + " ".join(risky_methods)
+            result.tag_additions.append(TagAddition(
+                collection="ports",
+                db_key=port_key,
+                tag=Tag(self.getTags()["RISKY-HTTP-METHODS"], notes=risky_notes)
+            ))
+        return result

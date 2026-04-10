@@ -2,6 +2,7 @@
 from typing import IO, Any, Dict, List, Optional, Tuple
 from pollenisator.core.components.tag import Tag
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult
 from pollenisator.core.models.ip import Ip
 from pollenisator.server.modules.activedirectory.users import User
 from pollenisator.server.modules.activedirectory.computers import Computer
@@ -64,22 +65,21 @@ def parse_computers(open_file):
     return computers
 
 
-def updateDatabase(pentest, users, computers):
-    # Check if any ip has been found.
+def collectBloodHoundCEResults(pentest, users, computers, result):
+    """Collect BloodHoundCE results into a PluginResult."""
     inserted_user = 0
     inserted_computer = 0
     for computer in computers:
-        ip_m = Ip(pentest).initialize(str(computer["ip"]), infos={"plugin":BloodHoundCE.get_name()})
-        ip_m.addInDb()
-        comp_m = Computer(pentest).initialize(computer["name"], computer["ip"], computer["domain"], infos={"plugin":BloodHoundCE.get_name()})
-        comp_m.addInDb()
+        result.ips.append(Ip(pentest).initialize(str(computer["ip"]), infos={"plugin": BloodHoundCE.get_name()}))
+        comp_m = Computer(pentest).initialize(computer["name"], computer["ip"], computer["domain"], infos={"plugin": BloodHoundCE.get_name()})
+        result.computers.append(comp_m)
         inserted_computer += 1
     for user in users:
         domain = user.get("domain", "")
         username = user.get("name", "")
         password = ""
-        user_m = User(pentest).initialize(domain, username, password, None, user.get("desc"), infos={"plugin":BloodHoundCE.get_name()})
-        user_m.addInDb()
+        user_m = User(pentest).initialize(domain, username, password, None, user.get("desc"), infos={"plugin": BloodHoundCE.get_name()})
+        result.users.append(user_m)
         inserted_user += 1
     return inserted_user, inserted_computer
 
@@ -138,7 +138,7 @@ class BloodHoundCE(Plugin):
         return {}
 
 
-    def Parse(self, pentest: str, file_opened: IO[bytes], **kwargs: Dict[str, Any]) -> Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Optional[Dict[str, Optional[str]]]]]]:
+    def Parse(self, pentest: str, file_opened: IO[bytes], **kwargs: Dict[str, Any]) -> PluginResult:
         """
         Parse an opened file to extract information.
 
@@ -148,38 +148,36 @@ class BloodHoundCE(Plugin):
             **kwargs ([str, Any]): Additional parameters (not used).
 
         Returns:
-            Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Dict[str, str]]]]: A tuple with 4 values (All set to None if Parsing wrong file): 
-                0. notes (str): Notes to be inserted in tool giving direct info to pentester.
-                1. tags (List[Tag]): A list of tags to be added to tool.
-                2. lvl (str): The level of the command executed to assign to given targets.
-                3. targets (Optional[Dict[str, Optional[Dict[str, Optional[str]]]]]]):
-                     A list of composed keys allowing retrieve/insert from/into database targeted objects.
+            PluginResult with collected objects.
         """
         if str(kwargs.get("ext", "")).lower() != self.getFileOutputExt():
-            return None, None, None, None
+            return PluginResult.empty()
         path = kwargs.get("filename")
         if path is None:
-            return None, None, None, None
+            return PluginResult.empty()
         try:
             myzip = ZipFile(BytesIO(file_opened.read()))
         except:
-            return None, None, None, None
+            return PluginResult.empty()
         files = myzip.namelist()
+        users = []
+        computers = []
         for file in files:
             if file.endswith("_users.json"):
                 f = myzip.open(file)
                 users = parse_users(f)
                 f.close()
                 if users is None:
-                    return None,None,None,None
+                    return PluginResult.empty()
             if file.endswith("_computers.json"):
                 f = myzip.open(file)
                 computers = parse_computers(f)
                 f.close()
                 if computers is None:
-                    return None,None,None,None
-        inserted_user, inserted_computer = updateDatabase(pentest, users, computers)
-        notes = "inserted users : "+str(inserted_user)
-        notes += "\ninserted computers : "+str(inserted_computer)
+                    return PluginResult.empty()
+        result = PluginResult(notes="", tags=[], lvl="wave", targets={"wave": None})
+        inserted_user, inserted_computer = collectBloodHoundCEResults(pentest, users, computers, result)
+        result.notes = "found users : " + str(inserted_user)
+        result.notes += "\nfound computers : " + str(inserted_computer)
         myzip.close()
-        return notes, [], "wave", {"wave": None}
+        return result

@@ -6,6 +6,7 @@ from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, InfoUpdate, TagAddition
 
 class SSHAudit(Plugin):
     default_bin_names = ["ssh-audit", "ssh_audit", "ssh_audit.py"]
@@ -74,7 +75,7 @@ class SSHAudit(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
-            return None, None, None, None
+            return PluginResult.empty()
         notes = ""
         tags = [self.getTags()["info-sshaudit"]]
         content = file_opened.read().decode("utf-8", errors="ignore")
@@ -82,37 +83,34 @@ class SSHAudit(Plugin):
         try:
             scan = json.loads(content)
         except json.decoder.JSONDecodeError:
-            return None, None, None, None
+            return PluginResult.empty()
         try:
             if scan.get('additional_notes', None) is None:
-                return None, None, None, None
+                return PluginResult.empty()
             if scan.get("cves", None) is None:
-                return None, None, None, None
+                return PluginResult.empty()
             if scan.get("kex", None) is None:
-                return None, None, None, None
+                return PluginResult.empty()
             if scan.get("enc", None) is None:
-                return None, None, None, None
+                return PluginResult.empty()
             target = scan.get("target", None)
             if target is None:
-                return None, None, None, None
+                return PluginResult.empty()
             target_split = target.split(":")
             if len(target_split) != 2:
-                return None, None, None, None
+                return PluginResult.empty()
             try:
                 ip = target_split[0]
                 port = int(target_split[1])
             except ValueError:
-                return None, None, None, None
+                return PluginResult.empty()
             
             if ip.strip() == "":
-                return None, None, None, None
-            Ip(pentest).initialize(ip, infos={"plugin":SSHAudit.get_name()}).addInDb()
-            port_o = Port(pentest).initialize(ip, port, "tcp", "ssh", infos={"plugin":SSHAudit.get_name()})
-            insert_res = port_o.addInDb()
-            if not insert_res["res"]:
-                port_o = Port.fetchObject(pentest, {"_id": insert_res["iid"]})
-            if port_o is None:
-                return None, None, None, None
+                return PluginResult.empty()
+            result = PluginResult(notes=notes, tags=tags, lvl="port", targets=targets)
+            result.ips.append(Ip(pentest).initialize(ip, infos={"plugin": SSHAudit.get_name()}))
+            result.ports.append(Port(pentest).initialize(ip, port, "tcp", "ssh", infos={"plugin": SSHAudit.get_name()}))
+            port_key = {"ip": ip, "port": str(port), "proto": "tcp"}
             notes = ""
             for cve in scan["cves"]:
                 if cve.get("cve", None) is not None:
@@ -120,13 +118,22 @@ class SSHAudit(Plugin):
                     tags.append(self.getTags()["CVE-ssh"])
             notes += str(scan.get("recommendations",""))           
 
-            targets[str(port_o.getId())] = {
+            targets["sshaudit_" + ip + "_" + str(port)] = {
                 "ip": ip, "port": port, "proto": "tcp"}
             # Will not exit if port was not ssh
             is_ok = len(scan.get("recommendations",{})) == 0
             if not is_ok:
-                port_o.updateInfos({"compliant": "False"})
-                port_o.addTag(Tag(self.getTags()["SSH-flaw"], notes=notes))
+                result.info_updates.append(InfoUpdate(
+                    collection="ports",
+                    db_key=port_key,
+                    infos={"compliant": "False"}
+                ))
+                result.tag_additions.append(TagAddition(
+                    collection="ports",
+                    db_key=port_key,
+                    tag=Tag(self.getTags()["SSH-flaw"], notes=notes)
+                ))
+            result.notes = notes
         except KeyError:
-            return None, None, None, None
-        return notes, tags, "port", targets
+            return PluginResult.empty()
+        return result

@@ -3,6 +3,7 @@ from pollenisator.core.models.ip import Ip
 from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
 from pollenisator.core.components.tag import Tag
+from pollenisator.plugins.plugin_result import PluginResult, TagAddition
 
 class BlueKeep(Plugin):
     """Inherits Plugin
@@ -62,39 +63,46 @@ class BlueKeep(Plugin):
         tags = ["neutral"]
         targets = {}
         success = False
+        result = PluginResult(lvl="port")
         for line in file_opened:
             # Auto Detect
             try:
                 line = line.decode("utf-8", errors="ignore")
             except UnicodeDecodeError:
-                return None, None, None, None
+                return PluginResult.empty()
             infos = line.split(" - ")
             if len(infos) < 3:
-                return None, None, None, None
+                return PluginResult.empty()
             if not Ip.isIp(infos[0]):
-                return None, None, None, None
+                return PluginResult.empty()
             if infos[1] not in ["UNKNOWN", "SAFE", "VULNERABLE"]:
-                return None, None, None, None
+                return PluginResult.empty()
             # Parse
             ip = line.split(" ")[0].strip()
             success = True
-            Ip(pentest).initialize(ip, infos={"plugin":BlueKeep.get_name()}).addInDb()
-            p_o = Port.fetchObject(pentest, {"ip": ip, "port": kwargs.get(
-                "port", None), "proto": kwargs.get("proto", None)})
-            if p_o is not None:
-                targets[str(p_o.getId())] = {"ip": ip, "port": kwargs.get(
+            result.ips.append(Ip(pentest).initialize(ip, infos={"plugin":BlueKeep.get_name()}))
+            if kwargs.get("port", None) is not None and kwargs.get("proto", None) is not None:
+                targets[ip] = {"ip": ip, "port": kwargs.get(
                     "port", None), "proto": kwargs.get("proto", None)}
             if "VULNERABLE" in line:
-                ip_o.addTag(Tag(self.getTags()["pwned-bluekeep"], notes=line))
-                if p_o is not None:
-                    ip_o.addTag(Tag(self.getTags()["pwned-bluekeep"], notes=line))
-                ip_o = Ip.fetchObject(pentest, {"ip": ip})
-                if ip_o is not None:
-                    ip_o.addTag(Tag(self.getTags()["pwned-bluekeep"], notes=line))
-                  
+                vuln_tag = Tag(self.getTags()["pwned-bluekeep"], notes=line)
+                result.tag_additions.append(TagAddition(
+                    collection="ips",
+                    db_key={"ip": ip},
+                    tag=vuln_tag
+                ))
+                if kwargs.get("port", None) is not None and kwargs.get("proto", None) is not None:
+                    result.tag_additions.append(TagAddition(
+                        collection="ports",
+                        db_key={"ip": ip, "port": kwargs.get("port", None), "proto": kwargs.get("proto", None)},
+                        tag=vuln_tag
+                    ))
             elif "UNKNOWN" in line:
                 tags = [self.getTags()["todo-bluekeep"]]
             notes += line
         if not success:
-            return None, None, None, None
-        return notes, tags, "port", targets
+            return PluginResult.empty()
+        result.notes = notes
+        result.tags = tags
+        result.targets = targets
+        return result

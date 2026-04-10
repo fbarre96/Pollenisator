@@ -3,6 +3,7 @@
 from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult
 import re
 
 
@@ -82,11 +83,12 @@ class Knockpy(Plugin):
         marker = "IpaddressCodeSubdomainServerRealhostname"
         markerFound = False
         countFound = 0
+        result = PluginResult(tags=tags, lvl="wave", targets={"wave": None})
         for line in file_opened:
             try:
                 line = line.decode("utf-8", errors="ignore")
             except UnicodeDecodeError:
-                return None, None, None, None
+                return PluginResult.empty()
             if marker == line.replace(" ","").strip():
                 markerFound = True
             if not markerFound:
@@ -94,14 +96,11 @@ class Knockpy(Plugin):
             ip, domain = parse_knockpy_line(line)
             if ip is not None and domain is not None:
                 # a domain has been found
-                insert_res = Ip(pentest).initialize(domain, infos={"plugin":Knockpy.get_name()}).addInDb()
-                if insert_res["res"]:
-                    Ip(pentest).initialize(ip, infos={"plugin":Knockpy.get_name()}).addInDb()
-                    notes += f"{domain} inserted ({ip})\n"
-                    countFound += 1
-                # failed, domain is out of scope
-                else:
-                    notes += domain+" exists but already added.\n"
+                result.ips.append(Ip(pentest).initialize(domain, infos={"plugin":Knockpy.get_name()}))
+                result.ips.append(Ip(pentest).initialize(ip, infos={"plugin":Knockpy.get_name()}))
+                notes += f"{domain} found ({ip})\n"
+                countFound += 1
         if notes.strip() == "":
-            return None, None, None, None
-        return notes, tags, "wave", {"wave": None}
+            return PluginResult.empty()
+        result.notes = notes
+        return result

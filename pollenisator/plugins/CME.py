@@ -2,14 +2,13 @@
 
 import re
 
-from bson import ObjectId
 from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.core.models.port import Port
-from pollenisator.server.modules.activedirectory.computers import Computer
 
 from pollenisator.server.modules.activedirectory.users import User
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, InfoUpdate, TagAddition, UserLink, ObjectUpdate
 
 def remove_term_colors(data: str) -> str:
     """
@@ -187,7 +186,7 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
                                     toAdd["domain"] = data_parts[-1]
                                     toAdd["secrets"] = [secret]
                                 except IndexError as e:
-                                    toAdd["secrets"] += [secret]
+                                    toAdd["secrets"] = toAdd.get("secrets", []) + [secret]
                     else:
                         failure_infos = re.search(regex_logon_failed, line)
                         if failure_infos is not None:
@@ -243,17 +242,22 @@ SMB         winterfell.north.sevenkingdoms.local 445    WINTERFELL       [-] nor
     return result
 
 
-def editScopeIPs(pentest, hostsInfos):
+def collectScopeIPs(pentest, hostsInfos, plugin_result):
     """
-    Add all the ips and theirs ports found after parsing the file to the scope object in database.
+    Collect all the ips, ports, computers, users found after parsing the file into the PluginResult.
     Args:
-        hostsInfos: the dictionnary with ips as keys and a list of dictionnary containing ports informations as value.
+        pentest: pentest identifier
+        hostsInfos: the list of dictionaries with host info.
+        plugin_result: PluginResult to collect into
+    Returns:
+        targets dict
     """
-    # Check if any ip has been found.
     targets = {}
     if hostsInfos is not None:
         for infos in hostsInfos:
             infosToAdd = {}
+            users_to_add = []
+            admins_to_add = []
             if infos["type"] == "info":
                 thisOS = infos.get("os", "")
                 if thisOS != "":
@@ -273,13 +277,13 @@ def editScopeIPs(pentest, hostsInfos):
             elif infos["type"] == "failure":
                 if infos["reason"] in ["KDC_ERR_PREAUTH_FAILED", "KDC_ERR_CLIENT_REVOKED"]:
                     user_model = User(pentest).initialize(infos.get("domain"), infos.get("username"), None)
-                    infosToAdd["users"] = infosToAdd.get("users", []) + [user_model]
+                    users_to_add.append(user_model)
             elif infos["type"] == "interesting":
                 if "asreproast" in infos["reason"]:
                     user_info = infos
                     user_info["asreproastable"] = True
                     user_model = User(pentest).initialize(infos.get("domain"), infos.get("username"), infos=user_info)
-                    infosToAdd["users"] = infosToAdd.get("users", []) + [user_model]
+                    users_to_add.append(user_model)
                     
             elif infos["type"] == "success":
                 powned = infos.get("powned", False)
@@ -304,78 +308,113 @@ def editScopeIPs(pentest, hostsInfos):
                                 this_info["hashLM"] = hashLM
                             this_info["hashNT"] = hashNT
                             user_model = User(pentest).initialize(infos.get("domain", ""), username, "", infos=this_info)
-                            infosToAdd["users"] = infosToAdd.get("users", []) + [user_model]
+                            users_to_add.append(user_model)
                 hashNT = infos.get("hashNT", "")
                 if hashNT != "":
                     user_info["hashNT"] = hashNT
                 user_model = User(pentest).initialize(infos.get("domain", ""), infos.get("username", ""), infos.get("password"), infos=user_info)
-                infosToAdd["users"] = infosToAdd.get("users", []) + [user_model]
+                users_to_add.append(user_model)
                 if powned:
                     infosToAdd["powned"] = powned
-                    infosToAdd["admins"] = infosToAdd.get("admins", []) + [user_model]
-                
+                    admins_to_add.append(user_model)
 
-            ip_m = Ip(pentest).initialize(str(infos["ip"]), infos={"plugin":CME.get_name(),"hostname":infos.get("machine_name", "")})
-            insert_ret = ip_m.addInDb()
-            if not insert_ret["res"]:
-                ip_m = Ip.fetchObject(pentest, {"_id": insert_ret["iid"]})
-            ip_m.notes = "machine_name:" + \
-                infos["machine_name"] + "\n"+infos.get("os", "")
-            if infos["type"] == "success":
-                if infos.get("powned", False):
-                    ip_m.addTag(Tag("pwned", "red", "high", notes=str(infos)))
             host = str(infos["ip"])
             port = str(infos["port"])
             proto = "tcp"
             service = "netbios-ssn"
-            port_m = Port(pentest).initialize(host, port, proto, service, infos={"plugin":CME.get_name()})
-            insert_ret = port_m.addInDb()
-            port_m = Port.fetchObject(pentest, {"_id": insert_ret["iid"]})
 
-            if infos.get("powned", False):
-                port_m.addTag(Tag("pwned", "red", "high", notes=str(infos)), True)
-            computer_m = Computer.fetchObject(pentest, {"ip":port_m.ip})
-            if computer_m is not None: 
-                users = infosToAdd.get("users", [])
-                for user in users:
-                    if isinstance(user, User):
-                        user_iid = computer_m.add_user(computer_m.domain, user.username, user.password, user.infos)
-                        user_m = User.fetchObject(pentest, {"_id":ObjectId(user_iid)})
+            plugin_result.ips.append(Ip(pentest).initialize(host, infos={"plugin": CME.get_name(), "hostname": infos.get("machine_name", "")}))
+            plugin_result.ports.append(Port(pentest).initialize(host, port, proto, service, infos={"plugin": CME.get_name()}))
+
+            port_key = {"ip": host, "port": port, "proto": proto}
+
+            if infos["type"] == "success":
+                if infos.get("powned", False):
+                    plugin_result.tag_additions.append(TagAddition(
+                        collection="ips", db_key={"ip": host},
+                        tag=Tag("pwned", "red", "high", notes=str(infos))
+                    ))
+                    plugin_result.tag_additions.append(TagAddition(
+                        collection="ports", db_key=port_key,
+                        tag=Tag("pwned", "red", "high", notes=str(infos))
+                    ))
+
+            # Collect users and admins as deferred UserLink operations
+            for user in users_to_add:
+                if isinstance(user, User):
+                    plugin_result.users.append(user)
+                    plugin_result.user_links.append(UserLink(
+                        computer_ip=host,
+                        domain=infos.get("domain", ""),
+                        username=user.username,
+                        password=user.password if hasattr(user, 'password') else "",
+                        infos=user.infos if hasattr(user, 'infos') else None,
+                        is_admin=False
+                    ))
+                    # Deferred user tags
+                    if hasattr(user, 'infos') and user.infos:
+                        user_key = {"username": user.username, "domain": user.domain if hasattr(user, 'domain') else infos.get("domain", "")}
                         if user.infos.get("asreproastable", False):
-                            user_m.addTag(Tag("asreproastable", color="orange", level="high", notes=f"{user.domain}\\{user.username} is asreproastable"), True)
+                            plugin_result.tag_additions.append(TagAddition(
+                                collection="users", db_key=user_key,
+                                tag=Tag("asreproastable", color="orange", level="high", notes=f"{user.domain}\\{user.username} is asreproastable")
+                            ))
                         if user.infos.get("secrets", []):
-                            user_m.addTag(Tag("user-secrets-found", color="red", level="high", notes=f"{user.domain}\\{user.username} has secrets : {infos.get('secrets')}"), True)
+                            plugin_result.tag_additions.append(TagAddition(
+                                collection="users", db_key=user_key,
+                                tag=Tag("user-secrets-found", color="red", level="high", notes=f"{user.domain}\\{user.username} has secrets : {user.infos.get('secrets')}")
+                            ))
                         if user.infos.get("hashLM", "") != "":
-                            user_m.addTag(Tag("hashLM-found", color="red", level="high", notes=f"{user.domain}\\{user.username} has hashLM : {user.infos.get('hashLM')}"), True)
+                            plugin_result.tag_additions.append(TagAddition(
+                                collection="users", db_key=user_key,
+                                tag=Tag("hashLM-found", color="red", level="high", notes=f"{user.domain}\\{user.username} has hashLM : {user.infos.get('hashLM')}")
+                            ))
                         if user.infos.get("hashNT", "") != "":
-                            user_m.addTag(Tag("hashNT-found", color="red", level="high", notes=f"{user.domain}\\{user.username} has hashNT : {user.infos.get('hashNT')}"), True)
-                    else:
-                        computer_m.add_user(user[0], user[1], user[2])
-                admins = infosToAdd.get("admins", [])
-                for user in admins:
-                    if isinstance(user, User):
-                        computer_m.add_admin(user.domain, user.username, user.password) 
-                    else:
-                        computer_m.add_admin(user[0], user[1], user[2])
-                computer_m.name = infos["machine_name"]
-                computer_m.domain = infos.get("domain")
-                d = computer_m.getData()
-                if "infos" not in d:
-                    d["infos"] = {}
-                d["infos"].update(infosToAdd)
-                d["infos"]["plugins"]  = CME.get_name()
-                computer_m = Computer(pentest, d)
-                computer_m.update()
-                if d["infos"].get("signing", True) == False:
-                    computer_m.addTag(Tag("signing-disabled", "orange", "medium", f"Signing is disabled on {computer_m.name}"), True)
-                if d["infos"].get("smbv1", True) == False:
-                    computer_m.addTag(Tag("smbv1-enabled", "orange", "medium", f"SMBv1 is enabled on {computer_m.name}"), True)
-            if "users" in infosToAdd:
-                del infosToAdd["users"]
-            if "admins" in infosToAdd:
-                del infosToAdd["admins"]
-            port_m.updateInfos(infosToAdd)
-            targets[str(insert_ret["iid"])] = {
+                            plugin_result.tag_additions.append(TagAddition(
+                                collection="users", db_key=user_key,
+                                tag=Tag("hashNT-found", color="red", level="high", notes=f"{user.domain}\\{user.username} has hashNT : {user.infos.get('hashNT')}")
+                            ))
+
+            for user in admins_to_add:
+                if isinstance(user, User):
+                    plugin_result.user_links.append(UserLink(
+                        computer_ip=host,
+                        domain=user.domain if hasattr(user, 'domain') else infos.get("domain", ""),
+                        username=user.username,
+                        password=user.password if hasattr(user, 'password') else "",
+                        is_admin=True
+                    ))
+
+            # Deferred computer update
+            plugin_result.object_updates.append(ObjectUpdate(
+                collection="computers",
+                db_key={"ip": host},
+                data={
+                    "name": infos["machine_name"],
+                    "domain": infos.get("domain", ""),
+                    "infos": {**infosToAdd, "plugins": CME.get_name()}
+                }
+            ))
+
+            # Deferred computer tags for signing/smbv1
+            if str(infosToAdd.get("signing", True)).lower() == "false":
+                plugin_result.tag_additions.append(TagAddition(
+                    collection="computers", db_key={"ip": host},
+                    tag=Tag("signing-disabled", "orange", "medium", f"Signing is disabled on {infos['machine_name']}")
+                ))
+            if str(infosToAdd.get("smbv1", False)).lower() == "true":
+                plugin_result.tag_additions.append(TagAddition(
+                    collection="computers", db_key={"ip": host},
+                    tag=Tag("smbv1-enabled", "orange", "medium", f"SMBv1 is enabled on {infos['machine_name']}")
+                ))
+
+            # Port info updates (without users/admins)
+            port_infos = {k: v for k, v in infosToAdd.items() if k not in ("users", "admins")}
+            if port_infos:
+                plugin_result.info_updates.append(InfoUpdate(
+                    collection="ports", db_key=port_key, infos=port_infos
+                ))
+            targets["cme_" + host + "_" + port] = {
                     "ip": host, "port": port, "proto": proto}
     return targets
 
@@ -432,16 +471,12 @@ class CME(Plugin):
             file_opened: the open file
             kwargs: not used
         Returns:
-            a tuple with 4 values (All set to None if Parsing wrong file): 
-                0. notes: notes to be inserted in tool giving direct info to pentester
-                1. tags: a list of tags to be added to tool 
-                2. lvl: the level of the command executed to assign to given targets
-                3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
+            PluginResult
         """
         tags = []
         result = getInfos(file_opened)
         if result.get("success", False) == False:
-            return None, None, None, None
+            return PluginResult.empty()
         hostsInfos = result.get("retour", [])
         if result.get("countPwn") is not None:
             count = int(result.get("countPwn"))
@@ -458,6 +493,8 @@ class CME(Plugin):
             if len(result.get("ntds", [])) > 0:
                 tags += [Tag(self.getTags()["pwned-ntds"], notes=f"{len(result.get('ntds',[]))} ntds found")]
         if hostsInfos is None:
-            return None, None, None, None
-        targets = editScopeIPs(pentest, hostsInfos)
-        return result.get("notes", ""), tags, "ports", targets
+            return PluginResult.empty()
+        plugin_result = PluginResult(notes=result.get("notes", ""), tags=tags, lvl="ports")
+        targets = collectScopeIPs(pentest, hostsInfos, plugin_result)
+        plugin_result.targets = targets
+        return plugin_result

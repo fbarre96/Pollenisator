@@ -4,6 +4,7 @@ from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, InfoUpdate
 import re
 
 
@@ -89,21 +90,21 @@ class Nikto(Plugin):
         try:
             notes = file_opened.read().decode("utf-8", errors="ignore")
         except UnicodeDecodeError:
-            return None, None, None, None
+            return PluginResult.empty()
         if notes == "":
-            return None, None, None, None
+            return PluginResult.empty()
         if not notes.startswith("- Nikto v"):
-            return None, None, None, None
+            return PluginResult.empty()
+        result = PluginResult(notes=notes, tags=tags, lvl="port", targets=targets)
         host, port, service, infos = parse_nikto_plain_text(notes)
         if host:
             if port:
-                Ip(pentest).initialize(host, infos={"plugin":Nikto.get_name()}).addInDb()
-                p_o = Port(pentest).initialize(host, port, "tcp", service, infos={"plugin":Nikto.get_name()})
-                insert_res = p_o.addInDb()
-                if not insert_res["res"]:
-                    p_o = Port.fetchObject(pentest, {"_id": insert_res["iid"]})
-                p_o.updateInfos(
-                    {"Nikto": infos, "SSL": "True" if service == "https" else "False"})
-                targets[str(insert_res["iid"])] = {
-                    "ip": host, "port": port, "proto": "tcp"}
-        return notes, tags, "port", targets
+                result.ips.append(Ip(pentest).initialize(host, infos={"plugin": Nikto.get_name()}))
+                result.ports.append(Port(pentest).initialize(host, port, "tcp", service, infos={"plugin": Nikto.get_name()}))
+                result.info_updates.append(InfoUpdate(
+                    collection="ports",
+                    db_key={"ip": host, "port": port, "proto": "tcp"},
+                    infos={"Nikto": infos, "SSL": "True" if service == "https" else "False"}
+                ))
+                targets["nikto_target"] = {"ip": host, "port": port, "proto": "tcp"}
+        return result

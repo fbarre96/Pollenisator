@@ -2,6 +2,7 @@
 
 from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, InfoUpdate
 import re
 
 
@@ -82,22 +83,22 @@ class PythonReverseLookup(Plugin):
         try:
             result_socket = file_opened.read().decode("utf-8", errors="ignore")
         except UnicodeDecodeError:
-            return None, None, None, None
+            return PluginResult.empty()
         domain, ip = parse_reverse_python(result_socket)
         if domain is None:
-            return None, None, None, None
-        Ip(pentest).initialize(domain, infos={"plugin":PythonReverseLookup.get_name()}).addInDb()
-        ip_m = Ip(pentest).initialize(ip, infos={"plugin":PythonReverseLookup.get_name()})
-        insert_res = ip_m.addInDb()
-        if not insert_res["res"]:
-            ip_m = Ip.fetchObject(pentest, {"_id": insert_res["iid"]})
-        existing_hostnames = ip_m.infos.get("hostname", [])
-        if not isinstance(existing_hostnames, list):
-            existing_hostnames = [existing_hostnames]
-        hostnames = list(set(existing_hostnames + [domain]))
-        ip_m.updateInfos({"hostname": hostnames})
+            return PluginResult.empty()
+        result = PluginResult(notes=notes, tags=tags, lvl="ip", targets=targets)
+        # Add domain as an IP entry
+        result.ips.append(Ip(pentest).initialize(domain, infos={"plugin": PythonReverseLookup.get_name()}))
+        # Add the IP entry
+        result.ips.append(Ip(pentest).initialize(ip, infos={"plugin": PythonReverseLookup.get_name(), "hostname": [domain]}))
+        # Deferred info update to merge hostname into the IP entry
+        result.info_updates.append(InfoUpdate(
+            collection="ips",
+            db_key={"ip": ip},
+            infos={"hostname": [domain]}
+        ))
         targets["ip"] = {"ip": ip}
-        notes += "Domain found :"+domain+"\n"
-        if notes == "":
-            notes = "No domain found\n"
-        return notes, tags, "ip", targets
+        notes += "Domain found :" + domain + "\n"
+        result.notes = notes
+        return result

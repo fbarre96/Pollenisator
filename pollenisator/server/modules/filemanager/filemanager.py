@@ -332,6 +332,7 @@ def _process_plugin_results(pentest: str, upfile: werkzeug.datastructures.FileSt
     Returns:
         Tuple[List[Dict[str, Any]], Dict[str, int], Optional[str]]: Plugin results, results count, and any error message.
     """
+    from pollenisator.plugins.plugin_result import apply_plugin_result
     results_count: Dict[str, int] = {}
     plugin_results = []
     error_msg: Optional[str] = None
@@ -348,9 +349,11 @@ def _process_plugin_results(pentest: str, upfile: werkzeug.datastructures.FileSt
         mod = loadPlugin(plugin)
         try:
             logger.info("PLUGIN for cmdline %s", str(cmdline))
-            notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline, ext=ext, filename=upfile.filename)
-            results_count[plugin] = results_count.get(plugin, 0) + 1
-            plugin_results.append({"plugin": plugin, "notes": notes, "tags": tags, "lvl": lvl, "targets": targets})
+            plugin_result = mod.Parse(pentest, upfile.stream, cmdline=cmdline, ext=ext, filename=upfile.filename)
+            if not plugin_result.is_empty():
+                apply_plugin_result(pentest, plugin_result)
+                results_count[plugin] = results_count.get(plugin, 0) + 1
+                plugin_results.append({"plugin": plugin, "notes": plugin_result.notes, "tags": plugin_result.tags, "lvl": plugin_result.lvl, "targets": plugin_result.targets})
         except (ImportError, AttributeError, ValueError) as e:
             error_msg = str(e)
             logger.error("Plugin exception : %s", str(e))

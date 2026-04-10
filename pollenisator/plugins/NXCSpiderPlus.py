@@ -5,6 +5,7 @@ import os
 import shlex
 from typing import cast
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, TagAddition
 from pollenisator.core.components.tag import Tag
 from pollenisator.server.modules.activedirectory.shares import Share
 
@@ -102,7 +103,7 @@ class NXCSpiderPlus(Plugin):
         cmdline = kwargs.get("cmdline", None)
         cmd_args = shlex.split(cmdline)
         if len(cmd_args) < 3:
-            return None, None, None, None
+            return PluginResult.empty()
         ip = cmd_args[2]
 
         # Get the user and password from the command line
@@ -115,35 +116,30 @@ class NXCSpiderPlus(Plugin):
         tags = []
         targets = {}
 
+        result = PluginResult(notes=notes, tags=tags, lvl="shares", targets=targets)
         for share in data.items():
             share_name = share[0]
 
-            # Create the share object and add it in DB
+            # Create the share object (collected, not inserted)
             share_object = Share(pentest).initialize(ip, share_name)
-            insert_ret = share_object.addInDb()
-            if not insert_ret["res"]:
-                share_db = Share.fetchObject(pentest, {"_id": insert_ret["iid"]})
-                if share_db is not None:
-                    share_object = cast(Share, share_db)
-                else:
-                    continue
             
             interesting_name_list = ["passwd", "password", "pwd", "mot_de_passe", "motdepasse", "auth", "secret",".ps1"
                              "creds", "confidentiel", "confidential", "backup", ".xml", ".conf", ".cfg", "unattended"]
-            # Update share with sharefiles
+            # Collect file data for the share
             for share_content in share[1].items():
                 file_path = share_content[0]
                 file_size = convert_size(share_content[1]["size"])
                 file_info = share_content[1]
                 user_domain = file_path.split("/")[0]
-                # Add file to Share object
+                # Add file to Share object (in-memory, will be persisted by orchestrator)
                 share_object.add_file(path=file_path, flagged=False, priv="READ", size=file_size, domain=user_domain, user=username, infos=file_info)
 
-                # Create Tag
-                sharefile_tag = Tag("todo-nxc-sharefile-found", "green", "todo", notes=f"Found file in {share_name} share with {username} user.")
-                share_object.addTag(sharefile_tag)
+            result.shares.append(share_object)
+            # Create deferred tag for the share
+            result.tag_additions.append(TagAddition(
+                collection="shares",
+                db_key={"ip": ip, "share": share_name},
+                tag=Tag("todo-nxc-sharefile-found", "green", "todo", notes=f"Found file in {share_name} share with {username} user.")
+            ))
 
-            # Update share in DB
-            share_object.update(insert_ret["iid"])
-
-        return notes, tags, "shares", targets
+        return result

@@ -4,6 +4,7 @@ import webbrowser
 from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult
 
 class Gowitness(Plugin):
     autoDetect = False
@@ -94,11 +95,11 @@ class Gowitness(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
-            return None, None, None, None
+            return PluginResult.empty()
         tags = [self.getTags()["gowitness-done"]]
         targets = {}
         notes = file_opened.read(2).decode("utf-8", errors="ignore")
         if notes != "PK":
-            return None, None, None, None
+            return PluginResult.empty()
         notes = "Valid zip received. Extract them using a script."
-        return notes, tags, "port", targets
+        return PluginResult(notes=notes, tags=tags, lvl="port", targets=targets)

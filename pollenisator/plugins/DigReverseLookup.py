@@ -2,6 +2,7 @@
 
 from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, InfoUpdate
 
 def parse_reverse_dig(result_dig):
     """
@@ -67,26 +68,25 @@ class DigReverseLookup(Plugin):
         try:
             ip, domain = parse_reverse_dig(file_opened.read().decode("utf-8", errors="ignore"))
         except UnicodeDecodeError:
-            return None, None, None, None
+            return PluginResult.empty()
         if ip is None:
-            return None, None, None, None
+            return PluginResult.empty()
         if domain is not None:
-            # Add a domain as a scope in db
-            Ip(pentest).initialize(domain, infos={"plugin":DigReverseLookup.get_name()}).addInDb()
-            ip_m = Ip(pentest).initialize(ip, infos={"plugin":DigReverseLookup.get_name()})
-            insert_ret = ip_m.addInDb()
-            if not insert_ret["res"]:
-                ip_m = Ip.fetchObject(pentest, {"_id": insert_ret["iid"]})
-            hostnames = ip_m.infos.get("hostname", [])
-            if isinstance(hostnames, str):
-                hostnames = [hostnames]
-                
-            hostnames = list(set(hostnames + [domain]))
-            ip_m.updateInfos({"hostname": hostnames, "plugin":DigReverseLookup.get_name()})
-            ip_m.notes = "reversed dig give this domain : "+domain+"\n"+ip_m.notes
-            notes += "Domain found :"+domain+"\n"
+            result = PluginResult(notes=notes, tags=tags, lvl="ip", targets=targets)
+            # Add domain as an IP entry
+            result.ips.append(Ip(pentest).initialize(domain, infos={"plugin": DigReverseLookup.get_name()}))
+            # Add the IP entry with hostname info
+            result.ips.append(Ip(pentest).initialize(ip, infos={"plugin": DigReverseLookup.get_name(), "hostname": [domain]}))
+            # Deferred info update to merge hostname into the IP entry
+            result.info_updates.append(InfoUpdate(
+                collection="ips",
+                db_key={"ip": ip},
+                infos={"hostname": [domain], "plugin": DigReverseLookup.get_name()}
+            ))
+            notes += "Domain found :" + domain + "\n"
+            notes += "reversed dig give this domain : " + domain + "\n"
             targets["ip"] = {"ip": ip}
-            ip_m.updateInDb()
-        if notes == "":
-            notes = "No domain found\n"
-        return notes, tags, "ip", targets
+            result.notes = notes
+            return result
+        notes = "No domain found\n"
+        return PluginResult(notes=notes, tags=tags, lvl="ip", targets=targets)

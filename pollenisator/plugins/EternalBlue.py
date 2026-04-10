@@ -4,6 +4,7 @@ from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, TagAddition
 import re
 
 
@@ -70,36 +71,38 @@ class EternalBlue(Plugin):
         try:
             allnotes = file_opened.read().decode("utf-8", errors="ignore")
         except UnicodeDecodeError:
-            return None, None, None, None
+            return PluginResult.empty()
         regex_ip = r"Nmap scan report for (\S+)"
         ip_group = re.search(regex_ip, allnotes) # no IP is was found
         if ip_group is None:
-            return None, None, None, None
+            return PluginResult.empty()
         # Auto Detect:
         if "smb-vuln-ms17-010:" not in allnotes: # no vuln detected
-            return None, None, None, None
+            return PluginResult.empty()
         # Parsing
+        result = PluginResult(notes=allnotes, tags=[], lvl="port", targets=targets)
         sub_notes = allnotes.split("Nmap scan report for")[1:]
         for notes in sub_notes:
             ip = notes.split("\n")[0].strip()
-            Ip(pentest).initialize(ip, infos={"plugin":EternalBlue.get_name()}).addInDb()
+            result.ips.append(Ip(pentest).initialize(ip, infos={"plugin":EternalBlue.get_name()}))
             port_re = r"(\d+)\/(\S+)\s+open\s+microsoft-ds"
             res_search = re.search(port_re, notes)
-            res_insert = None
-            if res_search is None:
-                port = None
-                proto = None
-            else:
+            if res_search is not None:
                 port = res_search.group(1)
                 proto = res_search.group(2)
                 p_o = Port(pentest)
                 p_o.initialize(ip, port, proto, "microsoft-ds", infos={"plugin":EternalBlue.get_name()})
-                insert_res = p_o.addInDb()
-                res_insert = insert_res["res"]
+                result.ports.append(p_o)
                 targets[str(p_o.getId())] = {
                     "ip": ip, "port": port, "proto": proto}
             if "VULNERABLE" in notes:
-                tags= [self.getTags()["pwned-eternalblue"]]
-                if res_insert is not None:
-                    p_o.addTag(Tag(self.getTags()["pwned-eternalblue"], notes=notes))
-        return allnotes, [], "port", targets
+                tags = [self.getTags()["pwned-eternalblue"]]
+                if res_search is not None:
+                    result.tag_additions.append(TagAddition(
+                        collection="ports",
+                        db_key={"ip": ip, "port": port, "proto": proto},
+                        tag=Tag(self.getTags()["pwned-eternalblue"], notes=notes)
+                    ))
+        result.tags = tags
+        result.targets = targets
+        return result

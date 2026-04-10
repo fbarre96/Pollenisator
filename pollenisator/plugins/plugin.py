@@ -1,15 +1,9 @@
 """A registry for all subclasses of Plugin
 A plugin should:
-1. return None values if not able to parse the file
+1. return a PluginResult.empty() if not able to parse the file
 2. parse the file to extract useful information
-3. Add corresponding objects to database:
-    * Ip (hostname are considered IPs too)
-    * Port
-    * Modules:
-        * ActiveDirectory:
-            * User
-            * Computer
-            * Share
+3. return a PluginResult containing objects to insert/upsert/update
+   (the caller will persist them via apply_plugin_result)
 
 """
 from typing import IO, Any, Dict, List, Optional, Tuple, Type
@@ -18,6 +12,7 @@ import shlex
 import os
 from pollenisator.core.components.logger_config import logger
 from pollenisator.core.components.tag import Tag
+from pollenisator.plugins.plugin_result import PluginResult
 
 REGISTRY: Dict[str, 'Plugin'] = {}
 
@@ -157,7 +152,7 @@ class Plugin(metaclass=AbstractMetaPlugin):
         return False
 
     @abstractmethod
-    def Parse(self, pentest: str, file_opened: IO[bytes], **kwargs: Any) -> Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Optional[Dict[str, Optional[str]]]]]]:
+    def Parse(self, pentest: str, file_opened: IO[bytes], **kwargs: Any) -> PluginResult:
         """
         Parse an opened file to extract information.
 
@@ -167,16 +162,19 @@ class Plugin(metaclass=AbstractMetaPlugin):
             **kwargs (Any): Additional parameters (not used).
 
         Returns:
-            Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Dict[str, str]]]]: A tuple with 4 values (All set to None if Parsing wrong file): 
-                0. notes (str): Notes to be inserted in tool giving direct info to pentester.
-                1. tags (List[Tag]): A list of tags to be added to tool.
-                2. lvl (str): The level of the command executed to assign to given targets.
-                3. targets (Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Optional[Dict[str, Optional[str]]]]]]): A list of composed keys allowing retrieve/insert from/into database targeted objects.
+            PluginResult: A result object containing:
+                - notes: Notes to be inserted in tool giving direct info to pentester.
+                - tags: A list of tags to be added to tool.
+                - lvl: The level of the command executed to assign to given targets.
+                - targets: A dict of composed keys allowing retrieve/insert from/into database targeted objects.
+                - ips/ports/computers/users/shares: Objects to insert.
+                - info_updates/tag_additions/...: Deferred DB operations.
+                All fields are None when the plugin cannot parse the file.
         """
         notes = ""
         tags = [Tag("todo")]
         notes = file_opened.read().decode("utf-8", errors="ignore")
-        return notes, tags, "wave", {"wave": {"wave":"Imported"}}
+        return PluginResult(notes=notes, tags=tags, lvl="wave", targets={"wave": {"wave": "Imported"}})
 
     def getFilePath(self, commandExecuted: str) -> str:
         """Returns the output file path given in the executed command using getFileOutputArg

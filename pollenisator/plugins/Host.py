@@ -3,6 +3,7 @@
 from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, InfoUpdate
 from pollenisator.server.modules.activedirectory.computers import Computer
 import re
 
@@ -74,35 +75,27 @@ class Host(Plugin):
         try:
             notes = file_opened.read().decode("utf-8", errors="ignore")
         except UnicodeDecodeError:
-            return None, None, None, None
+            return PluginResult.empty()
         if notes == "":
-            return None, None, None, None
+            return PluginResult.empty()
         infos = parse_host_plain_text(notes)
         if infos is None:
-            return None, None, None, None
+            return PluginResult.empty()
+        result = PluginResult(notes=notes, tags=tags, lvl="ip", targets=targets)
         for domain, ip in infos.items():
-            Ip(pentest).initialize(domain, infos={"plugin":Host.get_name()}).addInDb()
-            ip_m = Ip(pentest).initialize(ip, infos={"plugin":Host.get_name()})
-            insert_res = ip_m.addInDb()
-            if not insert_res["res"]:
-                ip_m = Ip.fetchObject(pentest, {"_id": insert_res["iid"]})
-            existing_hostnames = ip_m.infos.get("hostname", [])
-            if not isinstance(existing_hostnames, list):
-                existing_hostnames = [existing_hostnames]
-            hostnames = list(set(existing_hostnames + [domain]))
-            ip_m.updateInfos({"hostname": hostnames})
+            result.ips.append(Ip(pentest).initialize(domain, infos={"plugin": Host.get_name()}))
+            result.ips.append(Ip(pentest).initialize(ip, infos={"plugin": Host.get_name(), "hostname": [domain]}))
+            result.info_updates.append(InfoUpdate(
+                collection="ips",
+                db_key={"ip": ip},
+                infos={"hostname": [domain]}
+            ))
             targets["ip"] = {"ip": ip}
-            notes += "Domain found :"+domain+"\n"
-            if notes == "":
-                notes = "No domain found\n"
-            # test if the host was on an Active Directory domain name
-            active_domain_item = Computer.fetchObject(pentest, {"domain":domain})
+            notes += "Domain found :" + domain + "\n"
+            # test if the host was on an Active Directory domain name (DB read still needed)
+            active_domain_item = Computer.fetchObject(pentest, {"domain": domain})
             if active_domain_item is not None:
                 # host "domain name" gave an answer, probably domain controller
-                computer_dc = Computer.fetchObject(pentest, {"ip":ip, "domain":domain})
-                if computer_dc is None:
-                    Computer(pentest).initialize(name="", ip=ip, domain=domain, infos={"is_dc":True, "plugin":Host.get_name()}).addInDb()
-                else:
-                    computer_dc.infos.is_dc = True
-                    computer_dc.update()
-        return notes, tags, "ip", targets
+                result.computers.append(Computer(pentest).initialize(name="", ip=ip, domain=domain, infos={"is_dc": True, "plugin": Host.get_name()}))
+        result.notes = notes
+        return result

@@ -3,6 +3,7 @@
 from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult
 import re
 
 def parseContent(file_opened):
@@ -74,14 +75,13 @@ class Sublist3r(Plugin):
         tags = [self.getTags()["info-domains-sublist3r"]]
         ret = parseContent(file_opened)
         if ret is None:
-            return None, None, None, None
+            return PluginResult.empty()
+        result = PluginResult(tags=tags, lvl="wave", targets={"wave": None})
         for domain in ret:
-            insert_res = Ip(pentest).initialize(domain.strip(), infos={"plugin":Sublist3r.get_name()}).addInDb()
-            # failed, domain is out of wave, still noting thi
-            if not insert_res["res"]:
-                notes += domain+" exists but already added.\n"
-            else:
-                notes += domain+" inserted.\n"
+            ip_o = Ip(pentest).initialize(domain.strip(), infos={"plugin":Sublist3r.get_name()})
+            result.ips.append(ip_o)
+            notes += domain+" found.\n"
         if notes.strip() == "":
-            return None, None, None, None
-        return notes, tags, "wave", {"wave": None}
+            return PluginResult.empty()
+        result.notes = notes
+        return result

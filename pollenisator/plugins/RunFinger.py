@@ -4,8 +4,8 @@ import re
 from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.core.models.port import Port
-from pollenisator.server.modules.activedirectory.computers import Computer
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, InfoUpdate, ObjectUpdate
 
 
 def getInfos(runfinger_file):
@@ -54,13 +54,16 @@ def getInfos(runfinger_file):
     return retour,  notes
 
 
-def editScopeIPs(pentest, hostsInfos):
+def collectScopeIPs(pentest, hostsInfos, result):
     """
-    Add all the ips and theirs ports found after parsing the file to the scope object in database.
+    Collect all the ips and their ports found after parsing the file into the PluginResult.
     Args:
-        hostsInfos: the dictionnary with ips as keys and a list of dictionnary containing ports informations as value.
+        pentest: pentest identifier
+        hostsInfos: the dictionary with ips as keys and a list of dictionary containing ports information as value.
+        result: PluginResult to collect into
+    Returns:
+        targets dict
     """
-    # Check if any ip has been found.
     targets = {}
     if hostsInfos is not None:
         for infos in hostsInfos:
@@ -86,27 +89,25 @@ def editScopeIPs(pentest, hostsInfos):
             mssql = infos.get("mssql", "")
             if mssql != "":
                 infosToAdd["mssql"] = mssql
-            ip_m = Ip(pentest).initialize(str(infos["ip"]), infos={"plugin":RunFinger.get_name()})
-            insert_ret = ip_m.addInDb()
-            if not insert_ret["res"]:
-                ip_m = Ip.fetchObject(pentest, {"_id": insert_ret["iid"]})
             host = str(infos["ip"])
             port = str(445)
             proto = "tcp"
             service = "netbios-ssn"
-            port_m = Port(pentest).initialize(host, port, proto, service, infos={"plugin":RunFinger.get_name()})
-            insert_ret = port_m.addInDb()
-            port_m = Port.fetchObject(pentest, {"_id": insert_ret["iid"]})
-            port_m.updateInfos(infosToAdd)
-            computer_m = Computer.fetchObject(pentest, {"ip":port_m.ip})
-            if computer_m is not None:
-                computer_m.domain = infos.get("domain")
-                d = computer_m.getData()
-                comp_info = d["infos"]
-                comp_info.update(infosToAdd)
-                computer_m = Computer(pentest, d)
-                computer_m.update()
-            targets[str(insert_ret["iid"])] = {
+            result.ips.append(Ip(pentest).initialize(host, infos={"plugin": RunFinger.get_name()}))
+            result.ports.append(Port(pentest).initialize(host, port, proto, service, infos={"plugin": RunFinger.get_name()}))
+            result.info_updates.append(InfoUpdate(
+                collection="ports",
+                db_key={"ip": host, "port": port, "proto": proto},
+                infos=infosToAdd
+            ))
+            # Deferred computer update (domain field)
+            if domain:
+                result.object_updates.append(ObjectUpdate(
+                    collection="computers",
+                    db_key={"ip": host},
+                    data={"domain": domain, "infos": infosToAdd}
+                ))
+            targets["runfinger_" + host] = {
                     "ip": host, "port": port, "proto": proto}
     return targets
 
@@ -162,8 +163,10 @@ class RunFinger(Plugin):
         tags = []
         hostsInfos, notes = getInfos(file_opened)
         if hostsInfos is None:
-            return None, None, None, None
+            return PluginResult.empty()
         if hostsInfos:
             tags += [Tag(self.getTags()["info-runfinger"], notes=notes)]
-        targets = editScopeIPs(pentest, hostsInfos)
-        return notes, tags, "ports", targets
+        result = PluginResult(notes=notes, tags=tags, lvl="ports", targets={})
+        targets = collectScopeIPs(pentest, hostsInfos, result)
+        result.targets = targets
+        return result

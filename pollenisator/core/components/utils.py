@@ -126,6 +126,9 @@ def loadPlugin(pluginName: str) -> Plugin:
     except ModuleNotFoundError:
         __import__("Default")
         return REGISTRY["Default"]
+    except KeyError:
+        __import__("Default")
+        return REGISTRY["Default"]
     
 
 def listPlugin() -> List[str]:
@@ -157,23 +160,25 @@ def detectPlugins(pentest: str, upfile: werkzeug.datastructures.FileStorage, cmd
     Returns:
         List[Dict[str, Any]]: A list of dictionaries containing the results of each plugin.
     """
+    from pollenisator.plugins.plugin_result import PluginResult, apply_plugin_result
     results = []
     for pluginName in listPlugin():
         result: Dict[str, Any] = {"tags":[]}
         mod = loadPlugin(pluginName)
         if mod.autoDetectEnabled():
             try:
-                notes, tags, lvl, targets = mod.Parse(pentest, upfile.stream, cmdline=cmdline, ext=ext, filename=upfile.filename)
+                plugin_result = mod.Parse(pentest, upfile.stream, cmdline=cmdline, ext=ext, filename=upfile.filename)
             except Exception as e:
                 tb = traceback.format_exc()
                 logger.error("Error in plugin %s: %s", pluginName, tb)
-                notes, tags, lvl, targets  = None, None, None, None
+                plugin_result = PluginResult.empty()
             upfile.stream.seek(0)
-            if notes is not None and tags is not None:
-                result["tags"] = tags
-                result["notes"] = notes
-                result["lvl"] = lvl
-                result["targets"] = targets
+            if not plugin_result.is_empty():
+                apply_plugin_result(pentest, plugin_result)
+                result["tags"] = plugin_result.tags
+                result["notes"] = plugin_result.notes
+                result["lvl"] = plugin_result.lvl
+                result["targets"] = plugin_result.targets
                 result["plugin"] = pluginName
                 results.append(result)
     return results

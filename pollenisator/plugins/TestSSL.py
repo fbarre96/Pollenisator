@@ -4,28 +4,24 @@ from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, TagAddition, InfoUpdate
 from pollenisator.core.models.defect import Defect
 
 
 warning_regex = re.compile(r"^\"([^\"]*)\", ?\"([^\"]*)\", ?\"([^\"]*)\", ?\"(OK|INFO|NOT ok|WARN|LOW|MEDIUM|HIGH|CRITICAL)\", ?\"([^\"]*)\", ?\"([^\"]*)\", ?\"([^\"]*)\"$")
 
-def bulk_insertions(pentest, ips_to_add, ports_to_add):
-    """Bulk insertions of ips and ports
-    """
-    Ip.bulk_insert(pentest, ips_to_add, look_scopes=True)
-    Port.bulk_insert(pentest, ports_to_add)
-    
 
 def parseWarnings(pentest, file_opened):
     """
     Parse the result of a testssl json output file
         Args:
+            pentest: the pentest name
             file_opened:  the opened file reference
 
         Returns:
             Returns a tuple with (None values if not matching a testssl output):
-                - a list of string for each testssl NOT ok, WARN, or MEDIUM warnings
-                - a dict of targeted objects with database id as key and a unique key as a mongo search pipeline ({})
+                - PluginResult with ips, ports, tags and info updates
+                - or (None, None) if not matching
     """
     targets = {}
     missconfiguredHosts = {}
@@ -88,25 +84,17 @@ def parseWarnings(pentest, file_opened):
                 missconfiguredHosts[ip] = missconfiguredHosts.get(ip, {})
                 missconfiguredHosts[ip][port] = missconfiguredHosts[ip].get(port, [])
                 missconfiguredHosts[ip][port].append(information)
-    bulk_insertions(pentest, list(ips_to_add.values()), list(ports_to_add.values()))
-    cache = {}
+    
+    result = PluginResult()
+    result.ips = list(ips_to_add.values())
+    result.ports = list(ports_to_add.values())
+    
     for ip, _ in missconfiguredHosts.items():
         if ip.strip() != "":
-            print("IP : ", ip)
             for item, value in missconfiguredHosts[ip].items():
-                print("ITEM : ", item)
                 if isinstance(value, dict):
-                    # Means that the item is a domain
-                    print("VALUE : ", value)
                     for port in value.keys():
-                        print("PORT : ", port)
-                        if (ip, port) in cache:
-                            p_o = cache[(ip, port)]
-                        else:
-                            p_o = Port.fetchObject(pentest, {"ip": ip, "port": port, "proto": "tcp"})
-                            cache[(ip, port)] = p_o
-                        print("OBJET PORT : ", p_o)
-                        targets[str(p_o.getId())] = {
+                        targets[ip + ":" + port] = {
                             "ip": ip, "port": port, "proto": "tcp"}
                         notes = ""
                         for warning in value[port]:
@@ -115,19 +103,19 @@ def parseWarnings(pentest, file_opened):
                                 notes += "CVE  : " + warning["cve"] + "\n"
                             if "cwe" in warning:
                                 notes += "CWE : " + warning["cwe"] + "\n"
-                        p_o.addTag(Tag("SSL/TLS-flaws", None, "low", notes=notes))
-                        p_o.updateInfos({TestSSL.get_name(): missconfiguredHosts[ip][item][port]})
+                        result.tag_additions.append(TagAddition(
+                            collection="ports",
+                            db_key={"ip": ip, "port": port, "proto": "tcp"},
+                            tag=Tag("SSL/TLS-flaws", None, "low", notes=notes)
+                        ))
+                        result.info_updates.append(InfoUpdate(
+                            collection="ports",
+                            db_key={"ip": ip, "port": port, "proto": "tcp"},
+                            infos={TestSSL.get_name(): missconfiguredHosts[ip][item][port]}
+                        ))
                 else:
-                    # Means that the item is a port
-                    print("VALUE : ", value)
                     port = item
-                    if (ip, port) in cache:
-                        p_o = cache[(ip, port)]
-                    else:
-                        p_o = Port.fetchObject(pentest, {"ip": ip, "port": port, "proto": "tcp"})
-                        cache[(ip, port)] = p_o
-                    print("OBJET PORT : ", p_o)
-                    targets[str(p_o.getId())] = {
+                    targets[ip + ":" + port] = {
                         "ip": ip, "port": item, "proto": "tcp"}
                     notes = ""
                     for warning in value:
@@ -136,11 +124,20 @@ def parseWarnings(pentest, file_opened):
                             notes += "CVE  : " + warning["cve"] + "\n"
                         if "cwe" in warning:
                             notes += "CWE : " + warning["cwe"] + "\n"
-                    p_o.addTag(Tag("SSL/TLS-flaws", None, "low", notes=notes))
-                    p_o.updateInfos({TestSSL.get_name(): missconfiguredHosts[ip][item]})
+                    result.tag_additions.append(TagAddition(
+                        collection="ports",
+                        db_key={"ip": ip, "port": item, "proto": "tcp"},
+                        tag=Tag("SSL/TLS-flaws", None, "low", notes=notes)
+                    ))
+                    result.info_updates.append(InfoUpdate(
+                        collection="ports",
+                        db_key={"ip": ip, "port": item, "proto": "tcp"},
+                        infos={TestSSL.get_name(): missconfiguredHosts[ip][item]}
+                    ))
         if firstLine:
             return None, None
-    return str(len(missconfiguredHosts.keys()))+" misconfigured hosts found. Defects created.", targets
+    result.targets = targets
+    return str(len(missconfiguredHosts.keys()))+" misconfigured hosts found. Defects created.", result
 
 class TestSSL(Plugin):
     """A plugin to parse testssl.sh output files"""
@@ -207,8 +204,10 @@ class TestSSL(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
-            return None, None, None, None
-        notes, targets = parseWarnings(pentest, file_opened)
+            return PluginResult.empty()
+        notes, result = parseWarnings(pentest, file_opened)
         if notes is None:
-            return None, None, None, None
-        return notes, [], "port", targets
+            return PluginResult.empty()
+        result.notes = notes
+        result.lvl = "port"
+        return result

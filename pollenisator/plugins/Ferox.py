@@ -7,6 +7,7 @@ from pollenisator.core.models.ip import Ip
 from pollenisator.core.models.port import Port
 from pollenisator.core.components.tag import Tag
 from pollenisator.plugins.plugin import Plugin
+from pollenisator.plugins.plugin_result import PluginResult, InfoUpdate
 
 
 def parse_ferox_file(notes):
@@ -156,9 +157,9 @@ class Ferox(Plugin):
                 "todo-ferox-200": Tag("todo-ferox-200", "blue", "todo")}
 
     @abstractmethod
-    def Parse(self, pentest: str, file_opened: IO[bytes], **kwargs: Any) -> Tuple[Optional[str], Optional[List[Tag]], Optional[str], Optional[Dict[str, Optional[Dict[str, Optional[str]]]]]]:
+    def Parse(self, pentest: str, file_opened: IO[bytes], **kwargs: Any) -> PluginResult:
         """
-        Parse an openned feroxbuster output file to extract information
+        Parse an opened feroxbuster output file to extract information
 
         Args:
             pentest (str): the pentest name
@@ -166,16 +167,7 @@ class Ferox(Plugin):
             **kwargs (Any): additional arguments
 
         Returns:
-            Tuple[Optional[str], 
-                  Optional[List[Tag]], 
-                  Optional[str], 
-                  Optional[Dict[str, Optional[Dict[str, Optional[str]]]]]]: 
-
-                    - notes (str): Notes to be added in tool giving direct info to pentester
-                    - tags (List[Tag]): Tags to be added to the tool
-                    - lvl (str): The level of the command executed to assign to given targets
-                    - hosts (Dict[str, Optional[Dict[str, Optional[str]]]): 
-                        Dict of composed keys allowing retrieve/insert from/into DB targeted objects
+            PluginResult: A result object containing parsed data.
         """
         tags = []   # List of tags to be added to the tool
         notes = ""  # Notes to be added in tool giving direct info to pentester
@@ -183,42 +175,29 @@ class Ferox(Plugin):
         try:
             data = file_opened.read().decode("utf-8", errors="ignore") # Read the file
         except UnicodeDecodeError:
-            return None, None, None, None
+            return PluginResult.empty()
 
         if data.strip() == "":              # If the file is empty, return None
-            return None, None, None, None
+            return PluginResult.empty()
 
         hosts = parse_ferox_file(data)
         if not hosts.keys():            # If the hosts dict is empty, return None
-            return None, None, None, None
+            return PluginResult.empty()
 
         targets = {}    # The targets dict
+        result = PluginResult(lvl="port")
         for host in hosts:
             ip_object = Ip(pentest)
             ip_object.initialize(host, infos={"plugin": Ferox.get_name()})
+            result.ips.append(ip_object)
 
-            insert_ret = ip_object.addInDb() # Add the Ip object to the database
-            if not insert_ret["res"]:        # If the insertion failed, fetch the object from the DB
-                ip_db = Ip.fetchObject(pentest, {"_id": insert_ret["iid"]})
-                if ip_db is not None:
-                    ip_object = cast(Ip, ip_db)
-                else:
-                    continue
-
-            # Add the port to the database
+            # Add the port
             port = hosts[host]["port"]
             port_object = Port(pentest)
             port_object.initialize(host, port, "tcp", hosts[host]["service"], infos={"plugin": Ferox.get_name()})
+            result.ports.append(port_object)
 
-            insert_ret = port_object.addInDb() # Add the Port object to the database
-            if not insert_ret["res"]:          # If the insertion failed, fetch the object from DB
-                port_db = Port.fetchObject(pentest, {"_id": insert_ret["iid"]})
-                if port_db is not None:
-                    port_object = cast(Port, port_db)
-                else:
-                    continue
-
-            targets[str(port_object.getId())] = port_object.getDbKey() # Add the to the targets dict
+            targets[str(port_object.getId())] = port_object.getDbKey() # Add to the targets dict
 
             # Add status code, host and path of the current host to the notes
             results = "\n"
@@ -229,7 +208,11 @@ class Ferox(Plugin):
             # Check if the connection is SSL or not
             new_infos = {}
             new_infos["SSL"] = "True" if hosts[host]["service"] == "https" else "False"
-            port_object.updateInfos(new_infos)
+            result.info_updates.append(InfoUpdate(
+                collection="ports",
+                db_key={"ip": host, "port": port, "proto": "tcp"},
+                infos=new_infos
+            ))
 
             # Add the tags to the list of tags if there is at least one path
             if len(hosts[host]["paths"]) > 0:
@@ -237,4 +220,7 @@ class Ferox(Plugin):
                 tag.notes = notes
                 tags.append(tag)
 
-        return notes, tags, "port", targets
+        result.notes = notes
+        result.tags = tags
+        result.targets = targets
+        return result

@@ -5,7 +5,7 @@ from pollenisator.core.components.tag import Tag
 from pollenisator.core.models.ip import Ip
 from pollenisator.core.models.port import Port
 from pollenisator.plugins.plugin import Plugin
-from pollenisator.server.modules.activedirectory.computers import Computer
+from pollenisator.plugins.plugin_result import PluginResult, TagAddition, UserLink, FileAdd, ShareUpdate
 from pollenisator.server.modules.activedirectory.shares import Share
 
 
@@ -98,7 +98,7 @@ class SmbMap(Plugin):
                 3. targets: a list of composed keys allowing retrieve/insert from/into database targerted objects.
         """
         if kwargs.get("ext", "").lower() != self.getFileOutputExt():
-            return None, None, None, None
+            return PluginResult.empty()
         notes = ""
         tags = []
         targets = {}
@@ -117,7 +117,7 @@ class SmbMap(Plugin):
                 row = row.decode("utf-8", errors="ignore")
             row = row.split(",")
             if first_row and not ','.join(row).startswith("Host,Share,Privs,isDir,Path,fileSize,Date"):
-                return None, None, None, None
+                return PluginResult.empty()
             elif first_row:
                 first_row = False
                 continue
@@ -132,7 +132,7 @@ class SmbMap(Plugin):
                 interesting_files[interesting_file_type] = interesting_files.get(interesting_file_type, [])
                 interesting_files[interesting_file_type].append(', '.join(row))
                 isInteresting = True
-                tags=[("todo-smbmap-interesting", "green", "medium")]
+                tags=[Tag("todo-smbmap-interesting", "green", "medium")]
             else:
                 less_interesting_notes += ", ".join(row)+"\n"
             shares[target] = shares.get(target, {}) #{"<ip>":{"<shareName">:set(<tuple>)}}
@@ -147,40 +147,52 @@ class SmbMap(Plugin):
         if less_interesting_notes.strip() != "":
             notes += "\n=====================Other files:=====================\n"+less_interesting_notes
 
+        result = PluginResult(notes=notes, tags=[], lvl="port", targets=targets)
         for ip, share_dict in shares.items():
-            ip_m = Ip(pentest).initialize(ip, infos={"plugin":SmbMap.get_name()})
-            insert_ret = ip_m.addInDb()
-            if not insert_ret["res"]:
-                ip_m = Ip.fetchObject(pentest, {"_id": insert_ret["iid"]})
-            host = str(target)
+            result.ips.append(Ip(pentest).initialize(ip, infos={"plugin": SmbMap.get_name()}))
+            host = str(ip)
             port = str(445)
             proto = "tcp"
             service = "netbios-ssn"
-            port_m = Port(pentest).initialize(host, port, proto, service, infos={"plugin":SmbMap.get_name()})
-            insert_ret = port_m.addInDb()
-            if not insert_ret["res"]:
-                port_m = Port.fetchObject(pentest, {"_id": insert_ret["iid"]})
+            result.ports.append(Port(pentest).initialize(host, port, proto, service, infos={"plugin": SmbMap.get_name()}))
 
-            computer_m = Computer.fetchObject(pentest, {"ip":port_m.ip})
-            if computer_m is not None:
-                computer_m.add_user(domain, user, password)
+            # Deferred user link to computer
+            result.user_links.append(UserLink(
+                computer_ip=host,
+                domain=domain,
+                username=user,
+                password=password,
+                is_admin=False
+            ))
             for share_name in share_dict:
                 share_m = Share(pentest).initialize(host, share_name)
                 flagged_files = []
                 for share_info in share_dict[share_name]:
                     #share_info[] = path, isInteresting, privs, fileSize, domain, user
-                    share_m.add_file(path=share_info[0], flagged=share_info[1], priv=share_info[2], size=share_info[3], domain=share_info[4], user=share_info[5])
+                    result.file_additions.append(FileAdd(
+                        share_ip=host,
+                        share_name=share_name,
+                        path=share_info[0],
+                        flagged=share_info[1],
+                        priv=share_info[2],
+                        size=share_info[3],
+                        domain=share_info[4],
+                        user=share_info[5]
+                    ))
                     if share_info[1]:
                         flagged_files.append(share_info[0])
                 share_m.infos["flagged_files"] = flagged_files
-                res = share_m.addInDb()
+                result.shares.append(share_m)
                 if flagged_files:
-                    share_m.addTag(Tag(self.getTags()["interesting-share"], notes="Flagged files: "+str(flagged_files)))
-                if not res["res"]:
-                    share_m.update(res["iid"])
+                    result.tag_additions.append(TagAddition(
+                        collection="shares",
+                        db_key={"ip": host, "share": share_name},
+                        tag=Tag(self.getTags()["interesting-share"], notes="Flagged files: " + str(flagged_files))
+                    ))
 
             if password == "":
                 tags += [Tag(self.getTags()["todo-anon-share-found"], notes="Anonymous share found")]
         if notes.strip() != "" and not tags:
             tags = [Tag(self.getTags()["todo-smbmap"], notes=notes)]
-        return notes, tags, "port", targets
+        result.tags = tags
+        return result
