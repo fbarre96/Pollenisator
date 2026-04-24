@@ -192,7 +192,47 @@ class TestDefectTemplates:
                              json=template_data)
         
         assert response.status_code == 200
-    
+
+    def test_create_duplicate_defect_template_suggestion(self, client: Client, mock_db, auth_headers):
+        """Test that inserting a duplicate suggestion (same common_translation_id + language) returns res=False with existing iid."""
+        existing_iid = ObjectId("507f1f77bcf86cd799439011")
+        template_data = {
+            "title": "SQL Injection Template",
+            "description": "Template for SQL injection vulnerabilities",
+            "impact": "Major",
+            "ease": "Moderate",
+            "risk": "Major",
+            "type": ["Application"],
+            "language": "en",
+            "common_translation_id": "abc123",
+            "perimeter": ["Web"],
+            "fixes": [],
+            "is_template": True,
+            "is_remark": False,
+            "is_suggestion": True
+        }
+        existing_suggestion = {
+            "_id": existing_iid,
+            "language": "en",
+            "common_translation_id": "abc123",
+        }
+        def mock_find_in_db(_database, collection, _query, multi=False, *args, **kwargs):
+            if collection == "defectssuggestions":
+                return existing_suggestion
+            return None
+        mock_db.findInDb.side_effect = mock_find_in_db
+        mock_db.create_index.return_value = None
+
+        response = client.post('/api/v1/report/DefectTemplates/insert',
+                             headers=auth_headers,
+                             json=template_data)
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["res"] is False
+        assert str(data["iid"]) == str(existing_iid)
+        mock_db.insertInDb.assert_not_called()
+
 class TestDefectValidation:
     """Test defect data validation."""
     

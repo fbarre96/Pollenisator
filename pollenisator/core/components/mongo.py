@@ -380,7 +380,7 @@ class DBClient:
         collections: List[str] = self.db.list_collection_names()
         return collections
 
-    def create_index(self, pentest: str, collection: str, index: List[Tuple[str, Union[str,int]]]) -> None:
+    def create_index(self, pentest: str, collection: str, index: List[Tuple[str, Union[str,int]]], unique: bool = False) -> None:
         """
         Create an index in the specified collection of the pentest database.
 
@@ -388,11 +388,12 @@ class DBClient:
             pentest (str): The name of the pentest database.
             collection (str): The name of the collection where the index will be created.
             index List[tuple(str, int)]: The fields used for indexations like [("field1", 1), ("field2", 1]
+            unique (bool): Whether the index should enforce uniqueness. Defaults to False.
         """
         self.connectToDb(pentest)
         if self.db is None:
             return None
-        self.db[collection].create_index(index)
+        self.db[collection].create_index(index, unique=unique)
 
     def update(self, collection: str, pipeline: Dict[str, Any], updatePipeline: Dict[str, Any], many: bool = False, notify: bool = True, upsert: bool = False) -> pymongo.results.UpdateResult:
         """

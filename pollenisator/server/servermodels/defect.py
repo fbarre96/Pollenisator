@@ -122,6 +122,10 @@ def insert_template_suggestion(pentest: str, body: Dict[str, Any], username: str
     data["suggested_by"] = username
     data["creation_time"] = str(datetime.datetime.now())
     data["visibility"] = body.get("visibility", "me")
+    existing = dbclient.findInDb("pollenisator", "defectssuggestions",
+        {"common_translation_id": data.get("common_translation_id"), "language": data.get("language")}, False)
+    if existing is not None:
+        return {"res": False, "iid": existing["_id"]}
     insert_result = dbclient.insertInDb("pollenisator", "defectssuggestions", data)
     if insert_result is None:
         return "An error occured while inserting the defect template suggestion", 500
