@@ -667,6 +667,7 @@ def insertDefectTemplate(body: Dict[str, Any], **kwargs: Dict[str, Any]) -> Unio
     is_suggestion = ("admin" not in kwargs["token_info"]["scope"] and "template_writer" not in kwargs["token_info"]["scope"]) or body.get("is_suggestion", False)
     res: Union[DefectInsertResult, Tuple[str, int]]
     defect_types = body.get("type", [])
+    body["isTemplate"] = True
     if defect_types is None or not isinstance(defect_types, list) or len(defect_types) == 0:
         return "Defect type must be a non empty list", 400
     
