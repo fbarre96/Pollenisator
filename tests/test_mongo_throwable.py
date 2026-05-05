@@ -85,7 +85,7 @@ class TestMongoWithThrowableDB:
         """Test file upload operations."""
         # Test proof file upload path - accessing protected method for testing  # pylint: disable=protected-access
         attachment_id, upload_name, name, full_path = throwable_db_with_data._get_upload_path(
-            pentest="test-pentest",
+            pentest="3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90",
             filetype="proof", 
             attached_to="unassigned",
             filename="test_screenshot.jpg",
@@ -95,12 +95,12 @@ class TestMongoWithThrowableDB:
         assert attachment_id != "unassigned"
         assert upload_name == "test_screenshot.jpg"
         assert name.endswith(".png")  # Proof files are converted to PNG
-        assert "test-pentest" in full_path
+        assert "3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90" in full_path
         assert "proof" in full_path
         
         # Test result file upload path  # pylint: disable=protected-access
         attachment_id2, upload_name2, name2, full_path2 = throwable_db_with_data._get_upload_path(
-            pentest="test-pentest",
+            pentest="3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90",
             filetype="result",
             attached_to="tool123", 
             filename="scan_results.xml",
@@ -145,25 +145,26 @@ class TestMongoWithThrowableDB:
         test_tag = Tag("high_priority", color="#ff0000", level="5")
         
         # Register the tag
-        success = throwable_db_with_data.doRegisterTag("test-pentest-uuid", test_tag)
+        success = throwable_db_with_data.doRegisterTag("3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90", test_tag)
         assert success is True
         
         # Retrieve registered tags
-        tags = throwable_db_with_data.getRegisteredTags("test-pentest-uuid", only_name=True)
+        tags = throwable_db_with_data.getRegisteredTags("3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90", only_name=True)
         assert "high_priority" in tags
         
         # Test trying to register same tag again
-        success_duplicate = throwable_db_with_data.doRegisterTag("test-pentest-uuid", test_tag)
+        success_duplicate = throwable_db_with_data.doRegisterTag("3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90", test_tag)
         assert success_duplicate is False
     
     def test_user_management(self, throwable_db_with_data: ThrowableDBClient):
         """Test pentest user management."""
-        pentest_uuid = "test-pentest-uuid"
+        pentest_uuid = "3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90"
         
         # Add user to pentest
         success = throwable_db_with_data.addPentestUser(pentest_uuid, "newuser")
         assert success is True
         
+        # find db 
         # Get pentest users
         users = throwable_db_with_data.getPentestUsers(pentest_uuid)
         assert "newuser" in users

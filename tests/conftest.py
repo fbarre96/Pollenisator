@@ -105,6 +105,7 @@ def sample_pentest_data() -> Dict[str, Any]:
         "start_date": "2023-01-01T00:00:00",
         "end_date": "2023-01-31T23:59:59",
         "scope": "example.com,192.168.1.0/24",
+        
         "settings": {
             "Add domains whose IP are in scope": 1,
             "Add domains who have a parent domain in scope": 0,

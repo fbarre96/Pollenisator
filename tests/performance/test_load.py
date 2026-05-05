@@ -18,9 +18,9 @@ class TestMemoryUsage:
         # Mock very large result set
         large_results = [{"_id": f"id_{i}", "data": f"data_{i}"} for i in range(10000)]
         mock_db.findInDb.return_value = large_results
-        mock_db.listPentestUuids.return_value = ["test-pentest"]
+        mock_db.listPentestUuids.return_value = ["3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90"]
         
-        response = client.post('/api/v1/find/test-pentest/ips',
+        response = client.post('/api/v1/find/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90/ips',
                              headers=auth_headers,
                              json={"pipeline": "{}", "many": True})
         

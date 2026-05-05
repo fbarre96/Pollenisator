@@ -4,6 +4,7 @@ Database fixtures for testing with throwable MongoDB instances.
 import pytest
 import os
 import tempfile
+import uuid
 import shutil
 from typing import Generator, Optional
 from unittest.mock import patch, Mock
@@ -60,7 +61,7 @@ class ThrowableDBClient(DBClient):
         # Mock notification system to avoid SocketIO issues in tests
         self.send_notify = Mock()
     
-    def setup_test_data(self, pentest_uuid: str = "test-pentest-uuid") -> str:
+    def setup_test_data(self, pentest_name = "test-pentest-setup", pentest_uuid = "3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90") -> str:
         """
         Set up a test pentest with basic data structure.
         
@@ -70,10 +71,10 @@ class ThrowableDBClient(DBClient):
         Returns:
             str: The pentest UUID
         """
-        # Create pentest record
+        # Create pentest record - use pentest_name as the UUID so tests can
         pentest_data = {
             "uuid": pentest_uuid,
-            "nom": "Test Pentest",
+            "nom": pentest_name,
             "owner": "admin",
             "creation_date": "2024-01-01T00:00:00",
             "pentesters": ["admin", "pentester1"]

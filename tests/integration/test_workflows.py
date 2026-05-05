@@ -13,21 +13,20 @@ class TestPentestWorkflow:
     def test_complete_pentest_lifecycle(self, client: Client, mock_db, sample_pentest_data, auth_headers):
         """Test complete pentest lifecycle from creation to deletion."""
         # Step 1: Create pentest
-        mock_db.findInDb.return_value = None  # Pentest doesn't exist
-        mock_db.insertInDb.return_value = Mock(inserted_id="pentest_id")
-        mock_db.registerPentest.return_value = True, "Success"
+        mock_db.registerPentest.return_value = True, "3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90"
+        sample_pentest_data["pentest"] = "integration-test"  # Add 'f' field for pentest type
         with patch('pollenisator.server.mongo.preparePentest', return_value=("", True)):
-            create_response = client.post('/api/v1/pentest/integration-test',
+            create_response = client.post('/api/v1/pentest/createPentest',
                                         headers=auth_headers,
                                         json=sample_pentest_data)
             assert create_response.status_code == 200
         
         # Step 2: Add users to pentest
         mock_db.addPentestUser.return_value = True
-        mock_db.listPentestUuids.return_value = ["integration-test"]
+        mock_db.listPentestUuids.return_value = ["3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90"]
         mock_db.getPentestOwner.return_value = "admin"
         mock_db.getPentestUsers.return_value = [{"username": "admin", "role": "owner"}]
-        user_response = client.post('/api/v1/pentest/integration-test/users',
+        user_response = client.post('/api/v1/pentest/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90/users',
                                   headers=auth_headers,
                                   json={'username': 'testuser'})
         assert user_response.status_code == 200
@@ -39,7 +38,7 @@ class TestPentestWorkflow:
             "scope": "192.168.1.0/24",
             "notes": "Internal network"
         }
-        scope_response = client.post('/api/v1/insert/integration-test/scopes',
+        scope_response = client.post('/api/v1/insert/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90/scopes',
                                    headers=auth_headers,
                                    json={"pipeline": json.dumps(scope_data)})
         assert scope_response.status_code == 200
@@ -50,7 +49,7 @@ class TestPentestWorkflow:
             "notes": "Web server",
             "in_scopes": ["Main"]
         }
-        ip_response = client.post('/api/v1/insert/integration-test/ips',
+        ip_response = client.post('/api/v1/insert/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90/ips',
                                 headers=auth_headers,
                                 json={"pipeline": json.dumps(ip_data)})
         assert ip_response.status_code == 200
@@ -62,7 +61,7 @@ class TestPentestWorkflow:
             "proto": "tcp",
             "service": "http"
         }
-        port_response = client.post('/api/v1/insert/integration-test/ports',
+        port_response = client.post('/api/v1/insert/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90/ports',
                                   headers=auth_headers,
                                   json={"pipeline": json.dumps(port_data)})
         assert port_response.status_code == 200
@@ -78,7 +77,7 @@ class TestPentestWorkflow:
         }
         with patch('pollenisator.server.servermodels.defect.doInsert',
                    return_value={"res": True, "iid": "defect_id"}):
-            defect_response = client.post('/api/v1/defects/integration-test',
+            defect_response = client.post('/api/v1/defects/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90',
                                         headers=auth_headers,
                                         json=defect_data)
             assert defect_response.status_code == 200
@@ -86,7 +85,7 @@ class TestPentestWorkflow:
         # Step 7: Generate report
         with patch('pollenisator.server.modules.report.report.generateReport',
                    return_value=Mock(status_code=200)):
-            report_response = client.post('/api/v1/report/integration-test',
+            report_response = client.post('/api/v1/report/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90',
                                         headers=auth_headers,
                                         json={
                                             "templateName": "template.docx",
@@ -111,10 +110,10 @@ class TestToolExecutionWorkflow:
             "port": "80",
             "proto": "tcp"
         }
-        mock_db.listPentestUuids.return_value = ["test-pentest"]
+        mock_db.listPentestUuids.return_value = ["3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90"]
         mock_db.insertInDb.return_value = Mock(inserted_id="tool_id")
         
-        tool_response = client.post('/api/v1/insert/test-pentest/tools',
+        tool_response = client.post('/api/v1/insert/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90/tools',
                                   headers=auth_headers,
                                   json={"pipeline": json.dumps(tool_data)})
         assert tool_response.status_code == 200
@@ -122,7 +121,7 @@ class TestToolExecutionWorkflow:
         # Step 2: Queue the tool
         with patch('pollenisator.core.models.tool.Tool.queueTasks',
                    return_value={"successes": [{"tool_iid": "tool_id"}], "failures": []}):
-            queue_response = client.post('/api/v1/tools/test-pentest/queueTasks',
+            queue_response = client.post('/api/v1/tools/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90/queueTasks',
                                        headers=auth_headers,
                                        json=["tool_id"])
             assert queue_response.status_code == 200
@@ -134,7 +133,7 @@ class TestToolExecutionWorkflow:
             "status": ["queued"]
         }
         
-        status_response = client.post('/api/v1/find/test-pentest/tools',
+        status_response = client.post('/api/v1/find/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90/tools',
                                     headers=auth_headers,
                                     json={"pipeline": '{"_id": "tool_id"}'})
         assert status_response.status_code == 200
@@ -145,7 +144,7 @@ class TestToolExecutionWorkflow:
                 self.raw_result = raw_result    
         mock_db.updateInDb.return_value = mockResult({"n": 1, "nModified": 1, "ok": 1})
         
-        completion_response = client.post('/api/v1/update/test-pentest/tools',
+        completion_response = client.post('/api/v1/update/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90/tools',
                                         headers=auth_headers,
                                         json={
                                             "pipeline": '{"_id": "tool_id"}',

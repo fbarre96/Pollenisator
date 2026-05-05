@@ -18,7 +18,7 @@ class TestDefectManagement:
         
         with patch('pollenisator.server.servermodels.defect.doInsert', 
                    return_value={"res": True, "iid": "507f1f77bcf86cd799439011"}):
-            response = client.post('/api/v1/defects/test-pentest',
+            response = client.post('/api/v1/defects/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90',
                                  headers=auth_headers,
                                  json=sample_defect)
         
@@ -36,7 +36,7 @@ class TestDefectManagement:
             # Missing required fields
         }
         
-        response = client.post('/api/v1/defects/test-pentest',
+        response = client.post('/api/v1/defects/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90',
                              headers=auth_headers,
                              json=invalid_defect)
         
@@ -74,7 +74,7 @@ class TestDefectManagement:
             "risk": "Major"
         }
         
-        response = client.put('/api/v1/defects/update/test-pentest/507f1f77bcf86cd799439011',
+        response = client.put('/api/v1/defects/update/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90/507f1f77bcf86cd799439011',
                             headers=auth_headers,
                             json=updated_defect)
         
@@ -84,7 +84,7 @@ class TestDefectManagement:
         """Test updating a non-existent defect."""
         mock_db.findInDb.return_value = None
         
-        response = client.put('/api/v1/defects/update/test-pentest/507f1f77bcf86cd799439011',
+        response = client.put('/api/v1/defects/update/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90/507f1f77bcf86cd799439011',
                             headers=auth_headers,
                             json={"title": "Updated", "risk": "Major"})
         
@@ -127,7 +127,7 @@ class TestDefectManagement:
            
         mock_db.findInDb.side_effect = mock_find_in_db
         
-        response = client.post('/api/v1/defects/test-pentest/getTargetRepr',
+        response = client.post('/api/v1/defects/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90/getTargetRepr',
                                 headers=auth_headers,
                                 json=["507f1f77bcf86cd799439011"])
         
@@ -145,7 +145,7 @@ class TestDefectManagement:
         }
         mock_db.findInDb.return_value = mock_defect
         
-        response = client.get('/api/v1/defects/test-pentest/review/507f1f77bcf86cd799439011',
+        response = client.get('/api/v1/defects/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90/review/507f1f77bcf86cd799439011',
                             headers=auth_headers)
         
         assert response.status_code == 200
@@ -245,7 +245,7 @@ class TestDefectValidation:
             "cvss_score": 15.0  # Invalid score > 10
         }
         
-        response = client.post('/api/v1/defects/test-pentest',
+        response = client.post('/api/v1/defects/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90',
                              headers=auth_headers,
                              json=invalid_defect)
         
@@ -259,7 +259,7 @@ class TestDefectValidation:
             "risk": "Super Critical"  # Invalid enum value
         }
         
-        response = client.post('/api/v1/defects/test-pentest',
+        response = client.post('/api/v1/defects/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90',
                              headers=auth_headers,
                              json=invalid_defect)
         
@@ -273,7 +273,7 @@ class TestDefectValidation:
             "ease": "Super Easy"  # Invalid enum value
         }
         
-        response = client.post('/api/v1/defects/test-pentest',
+        response = client.post('/api/v1/defects/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90',
                              headers=auth_headers,
                              json=invalid_defect)
         
@@ -290,7 +290,7 @@ class TestDefectValidation:
             }]
         }
         
-        response = client.post('/api/v1/defects/test-pentest',
+        response = client.post('/api/v1/defects/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90',
                              headers=auth_headers,
                              json=defect_with_invalid_fixes)
         

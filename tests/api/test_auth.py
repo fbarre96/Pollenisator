@@ -59,7 +59,7 @@ class TestAuthentication:
             if collection == "pentests":
                 return {
                     "nom": "Test Pentest",
-                    "uuid": "test-pentest",
+                    "uuid": "3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90",
                 }
             elif collection == "users":
                 return {
@@ -74,10 +74,10 @@ class TestAuthentication:
         mock_db.findInDb.side_effect = mock_find_in_db
         mock_db.getPentestUsers.return_value = ["admin", "user1"]
         mock_db.getPentestOwner.return_value = "admin"
-        mock_db.listPentestUuids.return_value = ["test-pentest"]  # Include our test pentest
+        mock_db.listPentestUuids.return_value = ["3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90"]  # Include our test pentest
         mock_db.countInDb.return_value = 1  # Avoid cheatsheet import
         
-        response = client.post('/api/v1/login/test-pentest',
+        response = client.post('/api/v1/login/3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90',
                              headers=auth_headers,
                              json={'addDefaultCommands': False})
         
@@ -102,7 +102,7 @@ class TestAuthentication:
             return None
             
         mock_db.findInDb.side_effect = mock_find_in_db
-        mock_db.listPentestUuids.return_value = ["test-pentest"]  # Include our test pentest
+        mock_db.listPentestUuids.return_value = ["3f9c2d7e-6c1a-4b8e-9f2d-1a7c3e5b8f90"]  # Include our test pentest
         mock_db.countInDb.return_value = 1  # Avoid cheatsheet import
         
         response = client.post('/api/v1/login/nonexistent', 

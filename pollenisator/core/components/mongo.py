@@ -1119,8 +1119,7 @@ class DBClient:
         Returns:
             List[str]: A list of usernames who are users of the specified pentest. If no users are found, an empty list is returned.
         """
-        dbclient = DBClient.getInstance()
-        pentest_record = dbclient.findInDb("pollenisator", "pentests", {"uuid": pentest}, False)
+        pentest_record = self.findInDb("pollenisator", "pentests", {"uuid": pentest}, False)
         if pentest_record is None:
             return []
         return [x.strip() for x in set(pentest_record.get("pentesters", []) + [pentest_record.get("owner", None)]) if x != "" ]
